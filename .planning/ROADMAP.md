@@ -33,9 +33,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Monorepo scaffolding, DB schema, seed script, dev stack
-- [ ] 01-02-PLAN.md — JWT auth, login/logout, session persistence, app layout with role-conditional sidebar
-- [ ] 01-03-PLAN.md — User management CRUD, document type management CRUD with search
+- [ ] 01-01-PLAN.md — Monorepo scaffolding, DB schema (users + sessions + document_types), seed script, dev stack
+- [ ] 01-02-PLAN.md — Bearer token auth (sessions table, NOT JWT), login/logout, session persistence via localStorage, app layout with role-conditional sidebar
+- [ ] 01-03-PLAN.md — User management CRUD (with session revocation on disable), document type management CRUD with search
 
 ### Phase 2: AI Provider and Model Configuration
 **Goal**: Administrators can configure AI providers and models, verify connectivity, and prepare models for use in workflows

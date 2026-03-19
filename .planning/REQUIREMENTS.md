@@ -12,7 +12,7 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 - [ ] **AUTH-01**: 用户可通过用户名和密码登录系统
 - [ ] **AUTH-02**: 管理员可创建、编辑、停用用户账号
 - [ ] **AUTH-03**: 用户登录后系统根据角色（系统管理员/普通用户）展示对应功能
-- [ ] **AUTH-04**: 用户会话在浏览器刷新后保持登录状态
+- [x] **AUTH-04**: 用户会话在浏览器刷新后保持登录状态
 
 ### AI 模型配置
 
@@ -206,7 +206,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AUTH-01 | Phase 1 | Pending |
 | AUTH-02 | Phase 1 | Pending |
 | AUTH-03 | Phase 1 | Pending |
-| AUTH-04 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Complete |
 | DTYPE-01 | Phase 1 | Pending |
 | DTYPE-02 | Phase 1 | Pending |
 | DTYPE-03 | Phase 1 | Pending |

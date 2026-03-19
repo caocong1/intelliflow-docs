@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-03-19T04:12:49.228Z"
+progress:
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 3
+  completed_plans: 1
+---
+
 # Project State
 
 ## Project Reference
@@ -10,28 +23,28 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 1 of 5 (Foundation + Auth + Document Types)
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-03-19 — Roadmap created
+Plan: 1 of 3 in current phase
+Status: Executing
+Last activity: 2026-03-19 — Completed 01-01 (Project Scaffold)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███░░░░░░░] 33%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: -
-- Total execution time: 0 hours
+- Total plans completed: 1
+- Average duration: 5min
+- Total execution time: 0.08 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01    | 1/3   | 5min  | 5min     |
 
 **Recent Trend:**
-- Last 5 plans: -
-- Trend: -
+- Last 5 plans: 5min
+- Trend: Starting
 
 *Updated after each plan completion*
 
@@ -47,6 +60,10 @@ Recent decisions affecting current work:
 - Auth: v1 username/password, enterprise WeChat OAuth deferred to v2
 - Model invocation: v1 CLI command line, v2 API direct calls
 - Research recommended NestJS+React but user chose Bun+SolidJS stack — use user's stack
+- [01-01] Used postgres npm package (not bun:sql) for proven stable PostgreSQL driver
+- [01-01] Bearer token + sessions table auth (no JWT, no @elysiajs/jwt)
+- [01-01] Exported Elysia app type for Eden Treaty type-safe client in Plan 02
+- [01-01] Added typescript as workspace root dev dependency for tsc checks
 
 ### Pending Todos
 
@@ -59,5 +76,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-19
-Stopped at: Roadmap created, ready to plan Phase 1
+Stopped at: Completed 01-01-PLAN.md (Project Scaffold)
 Resume file: None

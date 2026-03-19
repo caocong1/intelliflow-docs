@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-19T09:45:55.008Z"
+last_updated: "2026-03-19T10:57:02Z"
 progress:
-  total_phases: 4
+  total_phases: 7
   completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 21
+  completed_plans: 8
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 7: Model Parameter Configuration (complete)
+**Current focus:** Phase 3: Workflow Orchestration (in progress)
 
 ## Current Position
 
-Phase: 7 of 7 (Model Parameter Configuration)
-Plan: 1 of 1 in current phase (phase complete)
-Status: Phase 7 Complete
-Last activity: 2026-03-19 — Completed 07-01 (Model Parameter Configuration)
+Phase: 3 of 7 (Workflow Orchestration)
+Plan: 1 of 5 in current phase (plan complete)
+Status: Phase 3 In Progress
+Last activity: 2026-03-19 — Completed 03-01 (Workflow Types, DB Schema, CRUD API)
 
-Progress: [██████████] 100%
+Progress: [████████░░] 38% (8/21 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 7
-- Average duration: 8.6min
-- Total execution time: 0.85 hours
+- Total plans completed: 8
+- Average duration: 8.1min
+- Total execution time: 0.93 hours
 
 **By Phase:**
 
@@ -42,15 +42,17 @@ Progress: [██████████] 100%
 |-------|-------|-------|----------|
 | 01    | 3/3   | ~41min | ~14min  |
 | 02    | 2/2   | 29min | 14.5min  |
+| 03    | 1/5   | 5min  | 5min     |
 | 06    | 1/1   | 3min  | 3min     |
 | 07    | 1/1   | 2min  | 2min     |
 
 **Recent Trend:**
-- Last 5 plans: 4min, 25min, ~30min, 3min, 2min
-- Trend: Stable (07-01 fast -- small schema + UI changes)
+- Last 5 plans: 25min, ~30min, 3min, 2min, 5min
+- Trend: Stable
 
 *Updated after each plan completion*
 | Phase 07 P01 | 2min | 2 tasks | 4 files |
+| Phase 03 P01 | 5min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -81,6 +83,11 @@ Recent decisions affecting current work:
 - [06-01] DTYPE-04 association check placeholder acceptable -- no documents table in Phase 1
 - [06-01] Existing SUMMARY Playwright results used as primary verification evidence
 - [Phase 07]: Parameters are nullable — null means use API default, explicit value overrides
+- [03-01] Disabled declaration emit in backend tsconfig — backend runs via Bun, not tsc; avoids rootDir cross-package constraint
+- [03-01] Added @intelliflow/shared paths mapping to backend tsconfig for tsc workspace resolution
+- [03-01] listWorkflows uses jsonb_array_length() SQL expression for nodeCount — avoids loading full graph in list view
+- [03-01] validateWorkflow is a pure function (no DB access) — called before draft->active status transition
+- [03-01] setDefaultWorkflow uses db.transaction() — atomically unsets all defaults then sets one
 
 ### Pending Todos
 
@@ -93,5 +100,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-19
-Stopped at: Completed 07-01-PLAN.md (Model Parameter Configuration)
+Stopped at: Completed 03-01-PLAN.md (Workflow Types, DB Schema, CRUD API)
 Resume file: None

@@ -67,7 +67,7 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Shared workflow types, DB schema (workflows table with JSONB), backend CRUD + validation API
+- [x] 03-01-PLAN.md — Shared workflow types, DB schema (workflows table with JSONB), backend CRUD + validation API
 - [ ] 03-02-PLAN.md — Workflow management list page (table CRUD, filters, copy, set-default)
 - [ ] 03-03-PLAN.md — Canvas editor with @dschz/solid-flow, custom node components, node library panel
 - [ ] 03-04-PLAN.md — Node configuration panels for all 5 types, prompt editor with {{variable}} tag system
@@ -152,8 +152,8 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 |-------|----------------|--------|-----------|
 | 1. Foundation + Auth + Document Types | 3/3 | Complete | 2026-03-19 |
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
-| 3. Workflow Orchestration | 0/5 | Not started | - |
+| 3. Workflow Orchestration | 1/5 | In progress | - |
 | 4. Project + Document + Version + File System Infrastructure | 0/4 | Not started | - |
 | 5. Document Creation Runtime | 0/5 | Not started | - |
-| 6. Phase 1 Formal Verification & Housekeeping | 0/1 | Not started | - |
-| 7. Model Parameter Configuration | 0/1 | Not started | - |
+| 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
+| 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |

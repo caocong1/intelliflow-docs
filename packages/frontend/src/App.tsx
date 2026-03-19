@@ -11,6 +11,8 @@ import Login from "./pages/Login";
 import DocumentTypeManagement from "./pages/admin/DocumentTypeManagement";
 import ModelConfiguration from "./pages/admin/ModelConfiguration";
 import UserManagement from "./pages/admin/UserManagement";
+import WorkflowManagement from "./pages/admin/WorkflowManagement";
+import WorkflowEditor from "./pages/admin/WorkflowEditor";
 
 const AdminRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -62,6 +64,22 @@ const App: Component = () => {
           component={() => (
             <AdminRoute>
               <ModelConfiguration />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/workflows"
+          component={() => (
+            <AdminRoute>
+              <WorkflowManagement />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/workflows/:id/edit"
+          component={() => (
+            <AdminRoute>
+              <WorkflowEditor />
             </AdminRoute>
           )}
         />

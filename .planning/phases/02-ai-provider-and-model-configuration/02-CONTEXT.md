@@ -14,11 +14,23 @@
 ## Implementation Decisions
 
 ### 调用协议
-- v1 仅实现 **OpenAI 兼容协议**（Chat Completions 格式），不实现 CLI 命令行调用
+- v1 实现两种 Provider 类型：
+  1. **OpenAI 兼容协议**（Chat Completions 格式）— 直接调用 API
+  2. **OpenCode Server**（`opencode serve` 模式）— 通过本地 OpenCode 代理调用
+- 不实现 CLI 命令行调用
+
+#### OpenAI 兼容协议
 - 开发阶段使用火山方舟 Coding Plan（Base URL: `https://ark.cn-beijing.volces.com/api/coding/v3`）
 - 生产环境切换为火山方舟正式 API（Base URL: `https://ark.cn-beijing.volces.com/api/v3`）
 - 两者接口格式完全一致，切换只需改 Base URL
 - 认证方式：API Key（请求头 Bearer Token）
+
+#### OpenCode Server
+- 本地运行 `opencode serve`，默认监听 `http://localhost:4096`
+- 调用流程：POST /session 创建会话 → POST /session/:id/message 发送消息并等待响应
+- 认证方式：可选 HTTP Basic Auth（设置 `OPENCODE_SERVER_PASSWORD` 环境变量启用，用户名默认 `opencode`）
+- 连通性测试：GET /global/health 返回 `{ healthy: true, version: "..." }`
+- 可通过 GET /config/providers 获取已配置的 provider 和默认模型映射
 
 ### 可用模型（Coding Plan 套餐）
 - `doubao-seed-2.0-pro` — 字节跳动，通用能力强，文档生成首选
@@ -91,7 +103,7 @@
 <deferred>
 ## Deferred Ideas
 
-- CLI 命令行调用方式（原需求 v1 首选）— 暂缓，先用 OpenAI 兼容 API
+- CLI 命令行调用方式（原需求 v1 首选）— 暂缓
 - 其他 Provider 类型（DashScope 原生、自定义 HTTP）— 暂缓
 - 模型参数配置（temperature、max_tokens、top_p、自定义 JSON）— 后续按需添加
 - 用量与限制（AIMC 需求中的 2.5.3 节）— v2 范围

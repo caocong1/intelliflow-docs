@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Forbidden from "./pages/Forbidden";
 import Login from "./pages/Login";
 import DocumentTypeManagement from "./pages/admin/DocumentTypeManagement";
+import ModelConfiguration from "./pages/admin/ModelConfiguration";
 import UserManagement from "./pages/admin/UserManagement";
 
 const AdminRoute: ParentComponent = (props) => {
@@ -53,6 +54,14 @@ const App: Component = () => {
           component={() => (
             <AdminRoute>
               <DocumentTypeManagement />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/model-config"
+          component={() => (
+            <AdminRoute>
+              <ModelConfiguration />
             </AdminRoute>
           )}
         />

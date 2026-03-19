@@ -1,4 +1,5 @@
-import { boolean, integer, pgEnum, pgTable, real, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgEnum, pgTable, real, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import type { WorkflowEdgeDef, WorkflowNodeDef } from "@intelliflow/shared";
 
 export const providerTypeEnum = pgEnum("provider_type", ["openai_compatible", "opencode"]);
 export const deploymentTypeEnum = pgEnum("deployment_type", ["cloud", "local"]);
@@ -61,6 +62,24 @@ export const models = pgTable("models", {
   temperature: real("temperature"),
   maxTokens: integer("max_tokens"),
   topP: real("top_p"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const workflowStatusEnum = pgEnum("workflow_status", ["draft", "active", "disabled"]);
+
+export const workflows = pgTable("workflows", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  documentTypeId: uuid("document_type_id")
+    .notNull()
+    .references(() => documentTypes.id),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: varchar("description", { length: 1000 }),
+  status: workflowStatusEnum("status").default("draft").notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  nodes: jsonb("nodes").$type<WorkflowNodeDef[]>().default([]).notNull(),
+  edges: jsonb("edges").$type<WorkflowEdgeDef[]>().default([]).notNull(),
+  schemaVersion: integer("schema_version").default(1).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

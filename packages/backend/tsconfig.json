@@ -8,13 +8,15 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "declaration": true,
-    "declarationMap": true,
+    "declaration": false,
+    "declarationMap": false,
     "sourceMap": true,
     "outDir": "./dist",
-    "rootDir": "./src",
     "jsx": "preserve",
-    "types": ["@types/bun"]
+    "types": ["@types/bun"],
+    "paths": {
+      "@intelliflow/shared": ["../shared/src/types.ts"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

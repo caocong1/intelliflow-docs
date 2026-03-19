@@ -26,6 +26,9 @@ type Model = {
   displayName: string;
   isActive: boolean;
   isProviderDisabled: boolean;
+  temperature: number | null;
+  maxTokens: number | null;
+  topP: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -62,6 +65,9 @@ export default function ModelConfiguration() {
   const [modelForm, setModelForm] = createSignal({
     modelId: "",
     displayName: "",
+    temperature: null as number | null,
+    maxTokens: null as number | null,
+    topP: null as number | null,
   });
 
   // Delete confirm state
@@ -258,7 +264,7 @@ export default function ModelConfiguration() {
   function openCreateModel(providerId: string) {
     setEditingModel(null);
     setModelForProvider(providerId);
-    setModelForm({ modelId: "", displayName: "" });
+    setModelForm({ modelId: "", displayName: "", temperature: null, maxTokens: null, topP: null });
     setShowModelModal(true);
   }
 
@@ -268,6 +274,9 @@ export default function ModelConfiguration() {
     setModelForm({
       modelId: model.modelId,
       displayName: model.displayName,
+      temperature: model.temperature ?? null,
+      maxTokens: model.maxTokens ?? null,
+      topP: model.topP ?? null,
     });
     setShowModelModal(true);
   }
@@ -286,6 +295,9 @@ export default function ModelConfiguration() {
         const { error } = await api.api.models({ id: editing.id }).patch({
           modelId: form.modelId,
           displayName: form.displayName,
+          temperature: form.temperature,
+          maxTokens: form.maxTokens,
+          topP: form.topP,
         });
         if (error) {
           const errData = error.value as { error?: string } | undefined;
@@ -298,6 +310,9 @@ export default function ModelConfiguration() {
           providerId: modelForProvider(),
           modelId: form.modelId,
           displayName: form.displayName,
+          temperature: form.temperature,
+          maxTokens: form.maxTokens,
+          topP: form.topP,
         });
         if (error) {
           const errData = error.value as { error?: string } | undefined;
@@ -780,6 +795,67 @@ export default function ModelConfiguration() {
               required
             />
           </div>
+
+          {/* Parameter Configuration */}
+          <div class="border-t border-slate-200 pt-4 mt-4">
+            <p class="text-sm font-medium text-slate-700 mb-1">参数配置（可选）</p>
+            <p class="text-xs text-slate-400 mb-3">留空使用 API 默认值</p>
+
+            <div class="space-y-4">
+              <div>
+                <label for="model-temperature" class={labelClass}>Temperature</label>
+                <input
+                  id="model-temperature"
+                  type="number"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={modelForm().temperature ?? ""}
+                  onInput={(e) => {
+                    const val = e.currentTarget.value;
+                    setModelForm((f) => ({ ...f, temperature: val === "" ? null : Number.parseFloat(val) }));
+                  }}
+                  class={inputClass}
+                  placeholder="0.0 - 2.0"
+                />
+              </div>
+              <div>
+                <label for="model-maxtokens" class={labelClass}>Max Tokens</label>
+                <input
+                  id="model-maxtokens"
+                  type="number"
+                  min="1"
+                  max="1000000"
+                  step="1"
+                  value={modelForm().maxTokens ?? ""}
+                  onInput={(e) => {
+                    const val = e.currentTarget.value;
+                    setModelForm((f) => ({ ...f, maxTokens: val === "" ? null : Number.parseInt(val, 10) }));
+                  }}
+                  class={inputClass}
+                  placeholder="1 - 1000000"
+                />
+              </div>
+              <div>
+                <label for="model-topp" class={labelClass}>Top P</label>
+                <input
+                  id="model-topp"
+                  type="number"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={modelForm().topP ?? ""}
+                  onInput={(e) => {
+                    const val = e.currentTarget.value;
+                    setModelForm((f) => ({ ...f, topP: val === "" ? null : Number.parseFloat(val) }));
+                  }}
+                  class={inputClass}
+                  placeholder="0.0 - 1.0"
+                />
+              </div>
+            </div>
+          </div>
+
           <div class="flex justify-end gap-3 pt-2">
             <button
               type="button"

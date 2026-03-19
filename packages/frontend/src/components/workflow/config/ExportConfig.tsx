@@ -1,0 +1,136 @@
+import { For } from "solid-js";
+import type { ExportConfig, VariableRef, OutputDef } from "@intelliflow/shared";
+import type { WFNode } from "../../../pages/admin/WorkflowEditor";
+
+const FORMAT_OPTIONS: { value: ExportConfig["format"]; label: string; desc: string }[] = [
+  { value: "word", label: "Word", desc: ".docx 格式，适合正式文档" },
+  { value: "pdf", label: "PDF", desc: ".pdf 格式，适合固定版式" },
+  { value: "markdown", label: "Markdown", desc: ".md 格式，适合技术文档" },
+];
+
+interface ExportConfigProps {
+  config: ExportConfig;
+  allNodes: WFNode[];
+  upstreamNodes: WFNode[];
+  onChange: (config: ExportConfig) => void;
+}
+
+function getAvailableOutputs(nodes: WFNode[]): Array<{ ref: VariableRef; outputDef: OutputDef; nodeLabel: string }> {
+  const result: Array<{ ref: VariableRef; outputDef: OutputDef; nodeLabel: string }> = [];
+  for (const node of nodes) {
+    const outputs = node.data.outputs as OutputDef[];
+    for (const output of outputs) {
+      if (output.name) {
+        result.push({
+          ref: {
+            nodeId: node.id,
+            outputId: output.id,
+            variableName: `${node.data.label}.${output.name}`,
+          },
+          outputDef: output,
+          nodeLabel: node.data.label,
+        });
+      }
+    }
+  }
+  return result;
+}
+
+export default function ExportConfigPanel(props: ExportConfigProps) {
+  const availableOutputs = () => getAvailableOutputs(props.upstreamNodes);
+
+  function isSelected(ref: VariableRef) {
+    return props.config.contentMapping.some(
+      (r) => r.nodeId === ref.nodeId && r.outputId === ref.outputId
+    );
+  }
+
+  function toggleOutput(ref: VariableRef) {
+    const selected = isSelected(ref);
+    const next = selected
+      ? props.config.contentMapping.filter(
+          (r) => !(r.nodeId === ref.nodeId && r.outputId === ref.outputId)
+        )
+      : [...props.config.contentMapping, ref];
+    props.onChange({ ...props.config, contentMapping: next });
+  }
+
+  return (
+    <div class="space-y-4">
+      {/* Format Selector */}
+      <div>
+        <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">导出格式</h4>
+        <div class="space-y-1.5">
+          <For each={FORMAT_OPTIONS}>
+            {(opt) => (
+              <label class="flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer select-none transition-colors hover:bg-slate-50"
+                classList={{
+                  "border-red-400 bg-red-50": props.config.format === opt.value,
+                  "border-slate-200": props.config.format !== opt.value,
+                }}
+              >
+                <input
+                  type="radio"
+                  name="export-format"
+                  value={opt.value}
+                  checked={props.config.format === opt.value}
+                  onChange={() => props.onChange({ ...props.config, format: opt.value })}
+                  class="mt-0.5 text-red-600 focus:ring-red-500 cursor-pointer"
+                />
+                <div>
+                  <p class="text-xs font-medium text-slate-800">{opt.label}</p>
+                  <p class="text-xs text-slate-400">{opt.desc}</p>
+                </div>
+              </label>
+            )}
+          </For>
+        </div>
+      </div>
+
+      {/* Template Selector (placeholder) */}
+      <div>
+        <label class="block text-xs font-medium text-slate-600 mb-1">文档模板</label>
+        <select
+          value={props.config.templateId ?? ""}
+          onChange={(e) =>
+            props.onChange({ ...props.config, templateId: e.currentTarget.value || null })
+          }
+          class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+        >
+          <option value="">默认模板</option>
+        </select>
+        <p class="text-xs text-slate-400 mt-1">模板系统将在后续版本中支持</p>
+      </div>
+
+      {/* Content Mapping */}
+      <div>
+        <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">导出内容</h4>
+        <p class="text-xs text-slate-500 mb-2">选择要包含在导出文件中的上游输出内容：</p>
+
+        {availableOutputs().length === 0 ? (
+          <p class="text-xs text-slate-400 italic text-center py-3">
+            暂无可用的上游输出。请先为上游节点定义输出内容块。
+          </p>
+        ) : (
+          <div class="space-y-1">
+            <For each={availableOutputs()}>
+              {({ ref, outputDef, nodeLabel }) => (
+                <label class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={isSelected(ref)}
+                    onChange={() => toggleOutput(ref)}
+                    class="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                  />
+                  <span class="text-xs text-slate-400">{nodeLabel}</span>
+                  <span class="text-slate-300 text-xs">›</span>
+                  <span class="text-xs text-slate-700 font-medium">{outputDef.name}</span>
+                </label>
+              )}
+            </For>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

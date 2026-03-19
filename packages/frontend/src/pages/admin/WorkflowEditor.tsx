@@ -11,7 +11,8 @@ import { api } from "../../api/client";
 import { showToast } from "../../components/ui/Toast";
 import WorkflowCanvas from "../../components/workflow/canvas/WorkflowCanvas";
 import NodeLibraryPanel from "../../components/workflow/canvas/NodeLibraryPanel";
-import type { WorkflowNodeType } from "@intelliflow/shared";
+import ConfigPanel from "../../components/workflow/config/ConfigPanel";
+import type { WorkflowNodeType, OutputDef } from "@intelliflow/shared";
 
 // Node data shape stored in solid-flow Node.data
 export type WorkflowNodeData = {
@@ -180,6 +181,30 @@ export default function WorkflowEditor() {
     }
   }
 
+  function handleConfigChange(nodeId: string, config: Record<string, unknown>) {
+    setNodes(
+      nodes.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, config } } : n
+      )
+    );
+  }
+
+  function handleOutputsChange(nodeId: string, outputs: OutputDef[]) {
+    setNodes(
+      nodes.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, outputs } } : n
+      )
+    );
+  }
+
+  function handleLabelChange(nodeId: string, label: string) {
+    setNodes(
+      nodes.map((n) =>
+        n.id === nodeId ? { ...n, data: { ...n.data, label } } : n
+      )
+    );
+  }
+
   function handleNodeDropped(nodeType: WorkflowNodeType, position: { x: number; y: number }) {
     const id = crypto.randomUUID();
     const label = DEFAULT_LABELS[nodeType];
@@ -236,9 +261,6 @@ export default function WorkflowEditor() {
           />
         </div>
         <div class="flex items-center gap-2">
-          <Show when={selectedNodeId()}>
-            <span class="text-xs text-slate-400 mr-2">已选: {selectedNodeId()}</span>
-          </Show>
           <button
             type="button"
             onClick={handleSave}
@@ -298,14 +320,16 @@ export default function WorkflowEditor() {
           </Show>
         </div>
 
-        {/* Right: Config Panel Slot (Plan 03-04) */}
-        <div class="w-72 bg-white border-l border-slate-200 flex-shrink-0 flex items-center justify-center">
-          <p class="text-xs text-slate-400 text-center px-4">
-            选择节点以配置参数
-            <br />
-            <span class="text-slate-300">(Plan 03-04)</span>
-          </p>
-        </div>
+        {/* Right: Config Panel */}
+        <ConfigPanel
+          selectedNode={nodes.find((n) => n.id === selectedNodeId()) ?? null}
+          allNodes={nodes}
+          edges={edges}
+          onConfigChange={handleConfigChange}
+          onOutputsChange={handleOutputsChange}
+          onLabelChange={handleLabelChange}
+          onClose={() => setSelectedNodeId(null)}
+        />
       </div>
     </div>
   );

@@ -20,10 +20,10 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 - [x] **AIMC-02**: 管理员可编辑和删除 Provider 实例
 - [x] **AIMC-03**: 管理员可测试 Provider 连通性
 - [x] **AIMC-04**: 管理员可启用/停用 Provider 实例
-- [ ] **AIMC-05**: 管理员可在 Provider 下添加模型（模型 ID、显示名称、部署类型、参数配置）
+- [x] **AIMC-05**: 管理员可在 Provider 下添加模型（模型 ID、显示名称、部署类型、参数配置）
 - [x] **AIMC-06**: 管理员可编辑、启用/停用、删除模型
 - [x] **AIMC-07**: 模型支持标记部署类型（线上云端/本地私有）
-- [ ] **AIMC-09**: 模型支持配置参数（temperature、max_tokens、top_p 等）
+- [x] **AIMC-09**: 模型支持配置参数（temperature、max_tokens、top_p 等）
 
 ### 文档类型管理
 
@@ -216,10 +216,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AIMC-02 | Phase 2 | Complete |
 | AIMC-03 | Phase 2 | Complete |
 | AIMC-04 | Phase 2 | Complete |
-| AIMC-05 | Phase 2, Phase 7 | Pending |
+| AIMC-05 | Phase 2, Phase 7 | Complete |
 | AIMC-06 | Phase 2 | Complete |
 | AIMC-07 | Phase 2 | Complete |
-| AIMC-09 | Phase 2, Phase 7 | Pending |
+| AIMC-09 | Phase 2, Phase 7 | Complete |
 | FLOW-01 | Phase 3 | Pending |
 | FLOW-02 | Phase 3 | Pending |
 | FLOW-03 | Phase 3 | Pending |

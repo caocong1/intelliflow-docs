@@ -1,0 +1,18 @@
+{
+  "name": "@intelliflow/root",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter @intelliflow/backend dev\" \"pnpm --filter @intelliflow/frontend dev\"",
+    "dev:backend": "pnpm --filter @intelliflow/backend dev",
+    "dev:frontend": "pnpm --filter @intelliflow/frontend dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

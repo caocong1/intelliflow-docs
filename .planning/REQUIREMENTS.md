@@ -5,7 +5,7 @@
 
 ## v1 Requirements
 
-Requirements for initial release (M1-M3). Each maps to roadmap phases.
+Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 认证与用户管理
 
@@ -203,13 +203,99 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated during roadmap creation) | | |
+| AUTH-01 | Phase 1 | Pending |
+| AUTH-02 | Phase 1 | Pending |
+| AUTH-03 | Phase 1 | Pending |
+| AUTH-04 | Phase 1 | Pending |
+| DTYPE-01 | Phase 1 | Pending |
+| DTYPE-02 | Phase 1 | Pending |
+| DTYPE-03 | Phase 1 | Pending |
+| DTYPE-04 | Phase 1 | Pending |
+| DTYPE-05 | Phase 1 | Pending |
+| AIMC-01 | Phase 2 | Pending |
+| AIMC-02 | Phase 2 | Pending |
+| AIMC-03 | Phase 2 | Pending |
+| AIMC-04 | Phase 2 | Pending |
+| AIMC-05 | Phase 2 | Pending |
+| AIMC-06 | Phase 2 | Pending |
+| AIMC-07 | Phase 2 | Pending |
+| AIMC-08 | Phase 2 | Pending |
+| AIMC-09 | Phase 2 | Pending |
+| FLOW-01 | Phase 3 | Pending |
+| FLOW-02 | Phase 3 | Pending |
+| FLOW-03 | Phase 3 | Pending |
+| FLOW-04 | Phase 3 | Pending |
+| FLOW-05 | Phase 3 | Pending |
+| FLOW-06 | Phase 3 | Pending |
+| FLOW-07 | Phase 3 | Pending |
+| FLOW-08 | Phase 3 | Pending |
+| FLOW-09 | Phase 3 | Pending |
+| FLOW-10 | Phase 3 | Pending |
+| FLOW-11 | Phase 3 | Pending |
+| FLOW-12 | Phase 3 | Pending |
+| FLOW-13 | Phase 3 | Pending |
+| PROJ-01 | Phase 4 | Pending |
+| PROJ-02 | Phase 4 | Pending |
+| PROJ-03 | Phase 4 | Pending |
+| PROJ-04 | Phase 4 | Pending |
+| PROJ-05 | Phase 4 | Pending |
+| PROJ-06 | Phase 4 | Pending |
+| PROJ-07 | Phase 4 | Pending |
+| PROJ-08 | Phase 4 | Pending |
+| PROJ-09 | Phase 4 | Pending |
+| DMGT-01 | Phase 4 | Pending |
+| DMGT-02 | Phase 4 | Pending |
+| DMGT-03 | Phase 4 | Pending |
+| DMGT-04 | Phase 4 | Pending |
+| DMGT-05 | Phase 4 | Pending |
+| DMGT-06 | Phase 4 | Pending |
+| VER-01 | Phase 4 | Pending |
+| VER-02 | Phase 4 | Pending |
+| VER-03 | Phase 4 | Pending |
+| FSYS-01 | Phase 4 | Pending |
+| FSYS-02 | Phase 4 | Pending |
+| FSYS-03 | Phase 4 | Pending |
+| FSYS-04 | Phase 4 | Pending |
+| DOC-01 | Phase 5 | Pending |
+| DOC-02 | Phase 5 | Pending |
+| DOC-03 | Phase 5 | Pending |
+| DOC-04 | Phase 5 | Pending |
+| DOC-05 | Phase 5 | Pending |
+| NODE-01 | Phase 5 | Pending |
+| NODE-02 | Phase 5 | Pending |
+| NODE-03 | Phase 5 | Pending |
+| NODE-04 | Phase 5 | Pending |
+| NODE-05 | Phase 5 | Pending |
+| NODE-06 | Phase 5 | Pending |
+| NODE-07 | Phase 5 | Pending |
+| NODE-08 | Phase 5 | Pending |
+| NODE-09 | Phase 5 | Pending |
+| NODE-10 | Phase 5 | Pending |
+| NODE-11 | Phase 5 | Pending |
+| NODE-12 | Phase 5 | Pending |
+| NODE-13 | Phase 5 | Pending |
+| NODE-14 | Phase 5 | Pending |
+| NODE-15 | Phase 5 | Pending |
+| NODE-16 | Phase 5 | Pending |
+| NODE-17 | Phase 5 | Pending |
+| NODE-18 | Phase 5 | Pending |
+| NODE-19 | Phase 5 | Pending |
+| NODE-20 | Phase 5 | Pending |
+| NODE-21 | Phase 5 | Pending |
+| NODE-22 | Phase 5 | Pending |
+| NOPS-01 | Phase 5 | Pending |
+| NOPS-02 | Phase 5 | Pending |
+| NOPS-03 | Phase 5 | Pending |
+| NOPS-04 | Phase 5 | Pending |
+| RECV-01 | Phase 5 | Pending |
+| RECV-02 | Phase 5 | Pending |
+| RECV-03 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 62 total
-- Mapped to phases: 0
-- Unmapped: 62 ⚠️
+- v1 requirements: 87 total
+- Mapped to phases: 87
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-19*
-*Last updated: 2026-03-19 after initial definition*
+*Last updated: 2026-03-19 after roadmap creation*

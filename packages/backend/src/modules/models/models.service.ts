@@ -9,6 +9,9 @@ export type ModelRow = {
   displayName: string;
   isActive: boolean;
   isProviderDisabled: boolean;
+  temperature: number | null;
+  maxTokens: number | null;
+  topP: number | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -20,6 +23,9 @@ const modelColumns = {
   displayName: models.displayName,
   isActive: models.isActive,
   isProviderDisabled: models.isProviderDisabled,
+  temperature: models.temperature,
+  maxTokens: models.maxTokens,
+  topP: models.topP,
   createdAt: models.createdAt,
   updatedAt: models.updatedAt,
 } as const;
@@ -36,6 +42,9 @@ export async function createModel(input: {
   providerId: string;
   modelId: string;
   displayName: string;
+  temperature?: number | null;
+  maxTokens?: number | null;
+  topP?: number | null;
 }): Promise<ModelRow> {
   // Verify provider exists
   const provider = await db
@@ -55,6 +64,9 @@ export async function createModel(input: {
       modelId: input.modelId,
       displayName: input.displayName,
       isProviderDisabled: !provider[0].isActive,
+      temperature: input.temperature ?? null,
+      maxTokens: input.maxTokens ?? null,
+      topP: input.topP ?? null,
     })
     .returning(modelColumns);
 
@@ -63,12 +75,21 @@ export async function createModel(input: {
 
 export async function updateModel(
   id: string,
-  input: { modelId?: string; displayName?: string },
+  input: {
+    modelId?: string;
+    displayName?: string;
+    temperature?: number | null;
+    maxTokens?: number | null;
+    topP?: number | null;
+  },
 ): Promise<ModelRow> {
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
   if (input.modelId !== undefined) updateData.modelId = input.modelId;
   if (input.displayName !== undefined) updateData.displayName = input.displayName;
+  if (input.temperature !== undefined) updateData.temperature = input.temperature;
+  if (input.maxTokens !== undefined) updateData.maxTokens = input.maxTokens;
+  if (input.topP !== undefined) updateData.topP = input.topP;
 
   const result = await db
     .update(models)

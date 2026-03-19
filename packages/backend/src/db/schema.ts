@@ -1,4 +1,4 @@
-import { boolean, pgEnum, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, pgEnum, pgTable, real, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const providerTypeEnum = pgEnum("provider_type", ["openai_compatible", "opencode"]);
 export const deploymentTypeEnum = pgEnum("deployment_type", ["cloud", "local"]);
@@ -58,6 +58,9 @@ export const models = pgTable("models", {
   displayName: varchar("display_name", { length: 100 }).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
   isProviderDisabled: boolean("is_provider_disabled").default(false).notNull(),
+  temperature: real("temperature"),
+  maxTokens: integer("max_tokens"),
+  topP: real("top_p"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

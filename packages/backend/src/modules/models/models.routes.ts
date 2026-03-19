@@ -41,6 +41,9 @@ export const modelRoutes = new Elysia({ prefix: "/models" })
         providerId: t.String(),
         modelId: t.String({ minLength: 1, maxLength: 200 }),
         displayName: t.String({ minLength: 1, maxLength: 100 }),
+        temperature: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 2 }))),
+        maxTokens: t.Optional(t.Nullable(t.Integer({ minimum: 1, maximum: 1000000 }))),
+        topP: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 1 }))),
       }),
     },
   )
@@ -64,6 +67,9 @@ export const modelRoutes = new Elysia({ prefix: "/models" })
       body: t.Object({
         modelId: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
         displayName: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
+        temperature: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 2 }))),
+        maxTokens: t.Optional(t.Nullable(t.Integer({ minimum: 1, maximum: 1000000 }))),
+        topP: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 1 }))),
       }),
     },
   )

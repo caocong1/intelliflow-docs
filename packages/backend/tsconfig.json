@@ -14,7 +14,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "jsx": "preserve",
-    "types": ["bun-types"]
+    "types": ["@types/bun"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

@@ -8,7 +8,8 @@
     "dev:frontend": "pnpm --filter @intelliflow/frontend dev"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "typescript": "^5.9.3"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

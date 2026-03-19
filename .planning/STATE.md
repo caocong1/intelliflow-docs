@@ -8,7 +8,7 @@ progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 3: Workflow Orchestration (in progress)
+**Current focus:** Phase 3: Workflow Orchestration (complete) — Phase 4 next
 
 ## Current Position
 
 Phase: 3 of 7 (Workflow Orchestration)
-Plan: 4 of 5 in current phase (plan complete)
-Status: Phase 3 In Progress
-Last activity: 2026-03-19 — Completed 03-04 (Node Configuration Panel)
+Plan: 5 of 5 in current phase (phase complete)
+Status: Phase 3 Complete
+Last activity: 2026-03-19 — Completed 03-05 (Validation Display and Workflow Editor Verification)
 
-Progress: [████████░░] 52% (11/21 plans)
+Progress: [████████░░] 57% (12/21 plans)
 
 ## Performance Metrics
 
@@ -42,7 +42,7 @@ Progress: [████████░░] 52% (11/21 plans)
 |-------|-------|-------|----------|
 | 01    | 3/3   | ~41min | ~14min  |
 | 02    | 2/2   | 29min | 14.5min  |
-| 03    | 3/5   | 21min  | 7min    |
+| 03    | 5/5   | 36min  | 7.2min  |
 | 06    | 1/1   | 3min  | 3min     |
 | 07    | 1/1   | 2min  | 2min     |
 
@@ -56,6 +56,7 @@ Progress: [████████░░] 52% (11/21 plans)
 | Phase 03 P02 | 4min | 2 tasks | 3 files |
 | Phase 03 P03 | 12min | 2 tasks | 11 files |
 | Phase 03 P04 | 5min | 2 tasks | 10 files |
+| Phase 03 P05 | 15min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,10 @@ Recent decisions affecting current work:
 - [03-04] PromptEditor: textarea+preview split — textarea can't render inline JSX; preview div parses {{...}} into colored tag chips per node type
 - [03-04] Variable naming: {nodeLabel}.{outputName} — scoped to prevent collisions across same-named outputs on different nodes
 - [03-04] BFS upstream traversal via getUpstreamNodeIds — computes variable scope for prompt template and export content mapping
+- [03-05] Validation is informational — draft always saves; only enabling to 'active' requires clean validation (enforced by backend)
+- [03-05] errorNodeIds computed as a JS Set from WorkflowValidationError[] for O(1) per-node hasError lookup
+- [03-05] ValidationOverlay auto-opens when errors exist after save; manual close button available; does not block save
+- [03-05] hasError prop pattern: each node accepts boolean derived from errorNodeIds.has(nodeId), threaded from WorkflowEditor signal
 
 ### Pending Todos
 
@@ -114,5 +119,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-19
-Stopped at: Completed 03-04-PLAN.md (Node Configuration Panel)
+Stopped at: Completed 03-05-PLAN.md (Validation Display and Workflow Editor Verification) — Phase 3 complete
 Resume file: None

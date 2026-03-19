@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation + Auth + Document Types** - Backend/frontend scaffolding, user authentication, role-based access, and document type CRUD (completed 2026-03-19)
 - [x] **Phase 2: AI Provider and Model Configuration** - Provider management, model configuration with CLI templates, connectivity testing (completed 2026-03-19)
-- [ ] **Phase 3: Workflow Orchestration** - Visual flow editor, 5 node types, variable system, flow validation, flow management
+- [x] **Phase 3: Workflow Orchestration** - Visual flow editor, 5 node types, variable system, flow validation, flow management (completed 2026-03-19)
 - [ ] **Phase 4: Project + Document + Version + File System Infrastructure** - Project CRUD with members, document management, version snapshots, working directory lifecycle
 - [ ] **Phase 5: Document Creation Runtime** - Workspace UI, all 5 node executors, multi-model streaming, common operations, failure recovery
 - [ ] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status
@@ -152,7 +152,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 |-------|----------------|--------|-----------|
 | 1. Foundation + Auth + Document Types | 3/3 | Complete | 2026-03-19 |
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
-| 3. Workflow Orchestration | 2/5 | In Progress|  |
+| 3. Workflow Orchestration | 5/5 | Complete   | 2026-03-19 |
 | 4. Project + Document + Version + File System Infrastructure | 0/4 | Not started | - |
 | 5. Document Creation Runtime | 0/5 | Not started | - |
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |

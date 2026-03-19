@@ -54,10 +54,11 @@
 - 模型调用采用统一抽象层：v1 首选 CLI 命令行调用（`claude -p "提示词"`），v2 扩展 API 直接调用
 - 脱敏机制：映射关系 DB 加密存储，脱敏规则（仅类型描述，不含真实值）自动注入后续模型调用提示词
 - 需求文档经过多轮审批会议迭代（v1→v4），当前以 `docs/requirements/v4-current.md` 为准
-- 技术栈待研究阶段确定
+- 技术栈已确定：Bun + ElysiaJS + Drizzle ORM + SolidJS + Tailwind CSS v4，详见 `docs/design/backend-tech-stack-research.md`
 
 ## Constraints
 
+- **技术栈**: Bun (runtime) + ElysiaJS (后端) + Drizzle ORM + PostgreSQL 18 + BullMQ + Redis + SolidJS (前端) + Tailwind CSS v4 — 所有组件使用最新版本
 - **存储架构**: PostgreSQL + 文件系统混合方案 — 已在审批会议中确定，详见 `docs/design/storage-architecture.md`
 - **模型调用**: v1 必须支持 CLI 命令行调用方式 — 当前各模型主要通过命令行 agent 方式使用
 - **安全**: 脱敏真实值不出服务器，脱敏节点仅可调用本地私有模型
@@ -83,6 +84,8 @@
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
+| Bun + ElysiaJS + Drizzle ORM + SolidJS + Tailwind v4 | Bun 统一前后端运行时，Eden Treaty 端到端类型安全，Drizzle 原生 bun:sql 驱动 | — Pending |
+| PostgreSQL 18 + Redis + BullMQ | PG17 最新稳定版，BullMQ 已官方支持 Bun，Redis 在 50 用户规模运维简单 | — Pending |
 | v1 用户名密码认证，不做企业微信 | 先跑通核心流程，降低外部依赖 | — Pending |
 | 渐进式 6 阶段里程碑交付 | 每阶段可验收界面和功能，降低风险 | — Pending |
 | 存储采用 PostgreSQL + 文件系统混合 | 审批会议确定，结构化查询+大文件分离 | — Pending |

@@ -1,12 +1,15 @@
 import { Navigate, Route, Router } from "@solidjs/router";
 import type { Component, ParentComponent } from "solid-js";
 import { Show } from "solid-js";
+import ToastContainer from "./components/ui/Toast";
 import { AuthProvider, useAuth } from "./contexts/auth";
 import AppLayout from "./layouts/AppLayout";
 import AuthLayout from "./layouts/AuthLayout";
 import Dashboard from "./pages/Dashboard";
 import Forbidden from "./pages/Forbidden";
 import Login from "./pages/Login";
+import DocumentTypeManagement from "./pages/admin/DocumentTypeManagement";
+import UserManagement from "./pages/admin/UserManagement";
 
 const AdminRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -17,24 +20,11 @@ const AdminRoute: ParentComponent = (props) => {
   );
 };
 
-const AdminUsersPlaceholder: Component = () => (
-  <div class="p-8">
-    <h1 class="text-2xl font-bold text-gray-900">用户管理</h1>
-    <p class="mt-4 text-base text-gray-500">功能开发中...</p>
-  </div>
-);
-
-const AdminDocTypesPlaceholder: Component = () => (
-  <div class="p-8">
-    <h1 class="text-2xl font-bold text-gray-900">文档类型管理</h1>
-    <p class="mt-4 text-base text-gray-500">功能开发中...</p>
-  </div>
-);
-
 const App: Component = () => {
   return (
     <Router>
       <AuthProvider>
+        <ToastContainer />
         <Route
           path="/login"
           component={() => (
@@ -49,7 +39,7 @@ const App: Component = () => {
             path="/admin/users"
             component={() => (
               <AdminRoute>
-                <AdminUsersPlaceholder />
+                <UserManagement />
               </AdminRoute>
             )}
           />
@@ -57,7 +47,7 @@ const App: Component = () => {
             path="/admin/document-types"
             component={() => (
               <AdminRoute>
-                <AdminDocTypesPlaceholder />
+                <DocumentTypeManagement />
               </AdminRoute>
             )}
           />

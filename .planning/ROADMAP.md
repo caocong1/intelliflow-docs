@@ -64,13 +64,14 @@ Plans:
   3. System validates workflow on save (start/end node rules, desensitize-restore pairing, required fields) and shows validation errors
   4. Admin can enable/disable, edit, delete, copy workflows and set a default workflow per document type
   5. Visual preview displays node flow and file data paths through the workflow
-**Plans**: TBD
+**Plans**: 5 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
-- [ ] 03-04: TBD
+- [ ] 03-01-PLAN.md — Shared workflow types, DB schema (workflows table with JSONB), backend CRUD + validation API
+- [ ] 03-02-PLAN.md — Workflow management list page (table CRUD, filters, copy, set-default)
+- [ ] 03-03-PLAN.md — Canvas editor with @dschz/solid-flow, custom node components, node library panel
+- [ ] 03-04-PLAN.md — Node configuration panels for all 5 types, prompt editor with {{variable}} tag system
+- [ ] 03-05-PLAN.md — Validation overlay with error navigation, data flow visualization, end-to-end verification
 
 ### Phase 4: Project + Document + Version + File System Infrastructure
 **Goal**: Users can organize work in projects with team members, manage documents with visibility controls, and the system maintains version history and working directories
@@ -151,7 +152,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 |-------|----------------|--------|-----------|
 | 1. Foundation + Auth + Document Types | 3/3 | Complete | 2026-03-19 |
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
-| 3. Workflow Orchestration | 0/4 | Not started | - |
+| 3. Workflow Orchestration | 0/5 | Not started | - |
 | 4. Project + Document + Version + File System Infrastructure | 0/4 | Not started | - |
 | 5. Document Creation Runtime | 0/5 | Not started | - |
 | 6. Phase 1 Formal Verification & Housekeeping | 0/1 | Not started | - |

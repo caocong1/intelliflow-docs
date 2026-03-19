@@ -4,10 +4,10 @@ type BadgeProps = {
 };
 
 const variantClasses: Record<BadgeProps["variant"], string> = {
-  success: "bg-green-100 text-green-700",
-  warning: "bg-yellow-100 text-yellow-700",
-  error: "bg-red-100 text-red-700",
-  info: "bg-blue-100 text-blue-700",
+  success: "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/60",
+  warning: "bg-amber-50 text-amber-700 ring-1 ring-amber-200/60",
+  error: "bg-red-50 text-red-600 ring-1 ring-red-200/60",
+  info: "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/60",
 };
 
 export default function Badge(props: BadgeProps) {

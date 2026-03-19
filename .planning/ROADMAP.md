@@ -30,12 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. System displays different navigation/features based on user role (admin vs regular user)
   4. Admin can create, edit, enable/disable, and delete document types with search
   5. Non-admin users cannot access admin-only pages (user management, document type management)
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md — Monorepo scaffolding, DB schema, seed script, dev stack
+- [ ] 01-02-PLAN.md — JWT auth, login/logout, session persistence, app layout with role-conditional sidebar
+- [ ] 01-03-PLAN.md — User management CRUD, document type management CRUD with search
 
 ### Phase 2: AI Provider and Model Configuration
 **Goal**: Administrators can configure AI providers and models, verify connectivity, and prepare models for use in workflows

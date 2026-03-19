@@ -38,12 +38,12 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 - [x] **FLOW-01**: 管理员可创建流程（选择所属文档类型、填写名称和描述）
 - [x] **FLOW-02**: 管理员可在流程编辑器中从 5 种基础节点类型添加、排列、配置节点
 - [x] **FLOW-03**: 同一节点类型可在流程中多次添加，各实例独立配置
-- [ ] **FLOW-04**: 管理员可配置输入转换节点（输入表单字段、文件上传选项、输出文件定义）
-- [ ] **FLOW-05**: 管理员可配置信息脱敏节点（脱敏规则类型、占位符格式、本地模型选择）
-- [ ] **FLOW-06**: 管理员可配置模型调用节点（显示名称、输入文件、提示词模板、模型选择、输出文件）
-- [ ] **FLOW-07**: 管理员可配置信息恢复节点
-- [ ] **FLOW-08**: 管理员可配置文件导出节点（导出格式、排版模板、内容映射规则）
-- [ ] **FLOW-09**: 提示词模板支持 {{变量名}} 插值（工作目录、输入目录、输出目录、脱敏规则等系统变量）
+- [x] **FLOW-04**: 管理员可配置输入转换节点（输入表单字段、文件上传选项、输出文件定义）
+- [x] **FLOW-05**: 管理员可配置信息脱敏节点（脱敏规则类型、占位符格式、本地模型选择）
+- [x] **FLOW-06**: 管理员可配置模型调用节点（显示名称、输入文件、提示词模板、模型选择、输出文件）
+- [x] **FLOW-07**: 管理员可配置信息恢复节点
+- [x] **FLOW-08**: 管理员可配置文件导出节点（导出格式、排版模板、内容映射规则）
+- [x] **FLOW-09**: 提示词模板支持 {{变量名}} 插值（工作目录、输入目录、输出目录、脱敏规则等系统变量）
 - [x] **FLOW-10**: 系统自动校验流程合理性（起止节点、脱敏配对、必填项等）
 - [x] **FLOW-11**: 管理员可启用/停用、编辑、删除、复制流程
 - [x] **FLOW-12**: 管理员可设置文档类型的默认流程
@@ -223,12 +223,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLOW-01 | Phase 3 | Complete |
 | FLOW-02 | Phase 3 | Complete |
 | FLOW-03 | Phase 3 | Complete |
-| FLOW-04 | Phase 3 | Pending |
-| FLOW-05 | Phase 3 | Pending |
-| FLOW-06 | Phase 3 | Pending |
-| FLOW-07 | Phase 3 | Pending |
-| FLOW-08 | Phase 3 | Pending |
-| FLOW-09 | Phase 3 | Pending |
+| FLOW-04 | Phase 3 | Complete |
+| FLOW-05 | Phase 3 | Complete |
+| FLOW-06 | Phase 3 | Complete |
+| FLOW-07 | Phase 3 | Complete |
+| FLOW-08 | Phase 3 | Complete |
+| FLOW-09 | Phase 3 | Complete |
 | FLOW-10 | Phase 3 | Complete |
 | FLOW-11 | Phase 3 | Complete |
 | FLOW-12 | Phase 3 | Complete |

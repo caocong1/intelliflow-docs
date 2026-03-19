@@ -19,6 +19,12 @@
 - 管理员同时也是普通用户，拥有普通用户的所有功能 + 管理功能
 - 普通用户尝试直接访问管理页面 URL 时，显示 403 无权访问提示页，带返回按钮
 
+### 认证方案
+- 不用 JWT，不用 Cookie Session
+- 使用 Bearer Token + localStorage：登录返回随机 token，前端存 localStorage，每次请求 Authorization: Bearer <token>
+- 后端 sessions 表存 token，derive 中间件验证
+- 停用用户时删除其所有 session 记录，立即生效
+
 ### Claude's Discretion
 - 整体应用布局结构（侧边栏 vs 顶部导航）
 - 登录页面设计风格

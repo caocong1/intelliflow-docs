@@ -9,10 +9,10 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 认证与用户管理
 
-- [ ] **AUTH-01**: 用户可通过用户名和密码登录系统
-- [ ] **AUTH-02**: 管理员可创建、编辑、停用用户账号
-- [ ] **AUTH-03**: 用户登录后系统根据角色（系统管理员/普通用户）展示对应功能
-- [ ] **AUTH-04**: 用户会话在浏览器刷新后保持登录状态
+- [x] **AUTH-01**: 用户可通过用户名和密码登录系统
+- [x] **AUTH-02**: 管理员可创建、编辑、停用用户账号
+- [x] **AUTH-03**: 用户登录后系统根据角色（系统管理员/普通用户）展示对应功能
+- [x] **AUTH-04**: 用户会话在浏览器刷新后保持登录状态
 
 ### AI 模型配置
 
@@ -27,11 +27,11 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 文档类型管理
 
-- [ ] **DTYPE-01**: 管理员可创建文档类型（类型名称、类型编码、类型描述）
-- [ ] **DTYPE-02**: 管理员可编辑文档类型信息
-- [ ] **DTYPE-03**: 管理员可启用/停用文档类型（停用后不可新建该类型文档）
-- [ ] **DTYPE-04**: 管理员可删除文档类型（仅无关联文档时可删除）
-- [ ] **DTYPE-05**: 管理员可查看文档类型列表并搜索
+- [x] **DTYPE-01**: 管理员可创建文档类型（类型名称、类型编码、类型描述）
+- [x] **DTYPE-02**: 管理员可编辑文档类型信息
+- [x] **DTYPE-03**: 管理员可启用/停用文档类型（停用后不可新建该类型文档）
+- [x] **DTYPE-04**: 管理员可删除文档类型（仅无关联文档时可删除）
+- [x] **DTYPE-05**: 管理员可查看文档类型列表并搜索
 
 ### 流程编排
 
@@ -203,15 +203,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1, Phase 6 | Pending |
-| AUTH-02 | Phase 1, Phase 6 | Pending |
-| AUTH-03 | Phase 1, Phase 6 | Pending |
-| AUTH-04 | Phase 1, Phase 6 | Pending |
-| DTYPE-01 | Phase 1, Phase 6 | Pending |
-| DTYPE-02 | Phase 1, Phase 6 | Pending |
-| DTYPE-03 | Phase 1, Phase 6 | Pending |
-| DTYPE-04 | Phase 1, Phase 6 | Pending |
-| DTYPE-05 | Phase 1, Phase 6 | Pending |
+| AUTH-01 | Phase 1, Phase 6 | Complete |
+| AUTH-02 | Phase 1, Phase 6 | Complete |
+| AUTH-03 | Phase 1, Phase 6 | Complete |
+| AUTH-04 | Phase 1, Phase 6 | Complete |
+| DTYPE-01 | Phase 1, Phase 6 | Complete |
+| DTYPE-02 | Phase 1, Phase 6 | Complete |
+| DTYPE-03 | Phase 1, Phase 6 | Complete |
+| DTYPE-04 | Phase 1, Phase 6 | Complete |
+| DTYPE-05 | Phase 1, Phase 6 | Complete |
 | AIMC-01 | Phase 2 | Complete |
 | AIMC-02 | Phase 2 | Complete |
 | AIMC-03 | Phase 2 | Complete |

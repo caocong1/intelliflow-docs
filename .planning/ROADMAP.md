@@ -12,7 +12,7 @@ IntelliFlow delivers an AI document generation platform through five phases: fou
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation + Auth + Document Types** - Backend/frontend scaffolding, user authentication, role-based access, and document type CRUD
+- [x] **Phase 1: Foundation + Auth + Document Types** - Backend/frontend scaffolding, user authentication, role-based access, and document type CRUD (completed 2026-03-19)
 - [x] **Phase 2: AI Provider and Model Configuration** - Provider management, model configuration with CLI templates, connectivity testing (completed 2026-03-19)
 - [ ] **Phase 3: Workflow Orchestration** - Visual flow editor, 5 node types, variable system, flow validation, flow management
 - [ ] **Phase 4: Project + Document + Version + File System Infrastructure** - Project CRUD with members, document management, version snapshots, working directory lifecycle
@@ -149,7 +149,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation + Auth + Document Types | 0/3 | Not started | - |
+| 1. Foundation + Auth + Document Types | 3/3 | Complete | 2026-03-19 |
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
 | 3. Workflow Orchestration | 0/4 | Not started | - |
 | 4. Project + Document + Version + File System Infrastructure | 0/4 | Not started | - |

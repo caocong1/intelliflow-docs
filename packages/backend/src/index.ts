@@ -15,7 +15,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(documentTypeRoutes)
   .use(providerRoutes)
   .use(modelRoutes)
-  .listen(3001);
+  .listen({ port: 3001, hostname: "0.0.0.0" });
 
 console.log(`Backend running on http://localhost:${app.server?.port}`);
 

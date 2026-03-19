@@ -41,9 +41,6 @@ export const modelRoutes = new Elysia({ prefix: "/models" })
         providerId: t.String(),
         modelId: t.String({ minLength: 1, maxLength: 200 }),
         displayName: t.String({ minLength: 1, maxLength: 100 }),
-        deploymentType: t.Optional(
-          t.Union([t.Literal("cloud"), t.Literal("local")]),
-        ),
       }),
     },
   )
@@ -67,9 +64,6 @@ export const modelRoutes = new Elysia({ prefix: "/models" })
       body: t.Object({
         modelId: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
         displayName: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
-        deploymentType: t.Optional(
-          t.Union([t.Literal("cloud"), t.Literal("local")]),
-        ),
       }),
     },
   )

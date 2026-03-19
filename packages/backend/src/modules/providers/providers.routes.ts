@@ -37,6 +37,9 @@ export const providerRoutes = new Elysia({ prefix: "/providers" })
         type: t.Optional(
           t.Union([t.Literal("openai_compatible"), t.Literal("opencode")]),
         ),
+        deploymentType: t.Optional(
+          t.Union([t.Literal("cloud"), t.Literal("local")]),
+        ),
         baseUrl: t.String({ minLength: 1, maxLength: 500 }),
         apiKey: t.Optional(t.String({ maxLength: 500 })),
         username: t.Optional(t.String({ maxLength: 100 })),
@@ -62,6 +65,9 @@ export const providerRoutes = new Elysia({ prefix: "/providers" })
       params: t.Object({ id: t.String() }),
       body: t.Object({
         name: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
+        deploymentType: t.Optional(
+          t.Union([t.Literal("cloud"), t.Literal("local")]),
+        ),
         baseUrl: t.Optional(t.String({ minLength: 1, maxLength: 500 })),
         apiKey: t.Optional(t.String({ maxLength: 500 })),
         username: t.Optional(t.String({ maxLength: 100 })),

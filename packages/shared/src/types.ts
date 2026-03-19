@@ -40,6 +40,7 @@ export type DeploymentType = "cloud" | "local";
 export interface Provider extends BaseEntity {
   name: string;
   type: ProviderType;
+  deploymentType: DeploymentType;
   baseUrl: string;
   apiKeyMasked: string | null;
   username: string | null;
@@ -51,7 +52,6 @@ export interface Model extends BaseEntity {
   providerId: string;
   modelId: string;
   displayName: string;
-  deploymentType: DeploymentType;
   isActive: boolean;
   isProviderDisabled: boolean;
 }

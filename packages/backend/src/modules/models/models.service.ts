@@ -7,7 +7,6 @@ export type ModelRow = {
   providerId: string;
   modelId: string;
   displayName: string;
-  deploymentType: "cloud" | "local";
   isActive: boolean;
   isProviderDisabled: boolean;
   createdAt: Date;
@@ -19,7 +18,6 @@ const modelColumns = {
   providerId: models.providerId,
   modelId: models.modelId,
   displayName: models.displayName,
-  deploymentType: models.deploymentType,
   isActive: models.isActive,
   isProviderDisabled: models.isProviderDisabled,
   createdAt: models.createdAt,
@@ -38,7 +36,6 @@ export async function createModel(input: {
   providerId: string;
   modelId: string;
   displayName: string;
-  deploymentType?: "cloud" | "local";
 }): Promise<ModelRow> {
   // Verify provider exists
   const provider = await db
@@ -57,7 +54,6 @@ export async function createModel(input: {
       providerId: input.providerId,
       modelId: input.modelId,
       displayName: input.displayName,
-      deploymentType: input.deploymentType ?? "cloud",
       isProviderDisabled: !provider[0].isActive,
     })
     .returning(modelColumns);
@@ -67,13 +63,12 @@ export async function createModel(input: {
 
 export async function updateModel(
   id: string,
-  input: { modelId?: string; displayName?: string; deploymentType?: "cloud" | "local" },
+  input: { modelId?: string; displayName?: string },
 ): Promise<ModelRow> {
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
   if (input.modelId !== undefined) updateData.modelId = input.modelId;
   if (input.displayName !== undefined) updateData.displayName = input.displayName;
-  if (input.deploymentType !== undefined) updateData.deploymentType = input.deploymentType;
 
   const result = await db
     .update(models)

@@ -9,6 +9,7 @@ type ModalProps = {
 
 const Modal: ParentComponent<ModalProps> = (props) => {
   let dialogRef: HTMLElement | undefined;
+  let mouseDownOnBackdrop = false;
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape") {
@@ -16,14 +17,19 @@ const Modal: ParentComponent<ModalProps> = (props) => {
     }
   };
 
+  const handleBackdropMouseDown = (e: MouseEvent) => {
+    mouseDownOnBackdrop = e.target === e.currentTarget;
+  };
+
   const handleBackdropClick = (e: MouseEvent) => {
-    if (e.target === e.currentTarget) {
+    if (e.target === e.currentTarget && mouseDownOnBackdrop) {
       props.onClose();
     }
+    mouseDownOnBackdrop = false;
   };
 
   const handleBackdropKeyDown = (e: KeyboardEvent) => {
-    if (e.key === "Enter" || e.key === " ") {
+    if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
       props.onClose();
     }
   };
@@ -51,6 +57,7 @@ const Modal: ParentComponent<ModalProps> = (props) => {
     <Show when={props.isOpen}>
       <div
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm transition-opacity"
+        onMouseDown={handleBackdropMouseDown}
         onClick={handleBackdropClick}
         onKeyDown={handleBackdropKeyDown}
         role="presentation"
@@ -58,7 +65,7 @@ const Modal: ParentComponent<ModalProps> = (props) => {
         <dialog
           ref={setDialogRef}
           open
-          class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform transition-all p-0"
+          class="relative inset-auto bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform transition-all p-0 m-0"
           aria-label={props.title}
         >
           <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">

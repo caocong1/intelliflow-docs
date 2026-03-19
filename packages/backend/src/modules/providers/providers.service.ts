@@ -6,6 +6,7 @@ export type ProviderRow = {
   id: string;
   name: string;
   type: "openai_compatible" | "opencode";
+  deploymentType: "cloud" | "local";
   baseUrl: string;
   apiKeyMasked: string | null;
   username: string | null;
@@ -28,6 +29,7 @@ function toProviderRow(row: {
   id: string;
   name: string;
   type: "openai_compatible" | "opencode";
+  deploymentType: "cloud" | "local";
   baseUrl: string;
   apiKey: string | null;
   username: string | null;
@@ -39,6 +41,7 @@ function toProviderRow(row: {
     id: row.id,
     name: row.name,
     type: row.type,
+    deploymentType: row.deploymentType,
     baseUrl: row.baseUrl,
     apiKeyMasked: maskApiKey(row.apiKey),
     username: row.username,
@@ -52,6 +55,7 @@ const providerColumns = {
   id: providers.id,
   name: providers.name,
   type: providers.type,
+  deploymentType: providers.deploymentType,
   baseUrl: providers.baseUrl,
   apiKey: providers.apiKey,
   username: providers.username,
@@ -72,6 +76,7 @@ export async function listProviders(): Promise<ProviderRow[]> {
 export async function createProvider(input: {
   name: string;
   type?: "openai_compatible" | "opencode";
+  deploymentType?: "cloud" | "local";
   baseUrl: string;
   apiKey?: string;
   username?: string;
@@ -81,6 +86,7 @@ export async function createProvider(input: {
     .values({
       name: input.name,
       type: input.type ?? "openai_compatible",
+      deploymentType: input.deploymentType ?? "cloud",
       baseUrl: stripTrailingSlashes(input.baseUrl),
       apiKey: input.apiKey ?? null,
       username: input.username ?? null,
@@ -92,11 +98,12 @@ export async function createProvider(input: {
 
 export async function updateProvider(
   id: string,
-  input: { name?: string; baseUrl?: string; apiKey?: string; username?: string },
+  input: { name?: string; deploymentType?: "cloud" | "local"; baseUrl?: string; apiKey?: string; username?: string },
 ): Promise<ProviderRow> {
   const updateData: Record<string, unknown> = { updatedAt: new Date() };
 
   if (input.name !== undefined) updateData.name = input.name;
+  if (input.deploymentType !== undefined) updateData.deploymentType = input.deploymentType;
   if (input.baseUrl !== undefined) updateData.baseUrl = stripTrailingSlashes(input.baseUrl);
   if (input.apiKey !== undefined && input.apiKey !== "") updateData.apiKey = input.apiKey;
   if (input.username !== undefined) updateData.username = input.username;

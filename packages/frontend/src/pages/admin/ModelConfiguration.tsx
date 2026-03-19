@@ -10,6 +10,7 @@ type Provider = {
   id: string;
   name: string;
   type: ProviderType;
+  deploymentType: DeploymentType;
   baseUrl: string;
   apiKeyMasked: string | null;
   username: string | null;
@@ -23,7 +24,6 @@ type Model = {
   providerId: string;
   modelId: string;
   displayName: string;
-  deploymentType: DeploymentType;
   isActive: boolean;
   isProviderDisabled: boolean;
   createdAt: string;
@@ -48,6 +48,7 @@ export default function ModelConfiguration() {
   const [providerForm, setProviderForm] = createSignal({
     name: "",
     type: "openai_compatible" as ProviderType,
+    deploymentType: "cloud" as DeploymentType,
     baseUrl: "",
     apiKey: "",
     username: "",
@@ -61,7 +62,6 @@ export default function ModelConfiguration() {
   const [modelForm, setModelForm] = createSignal({
     modelId: "",
     displayName: "",
-    deploymentType: "cloud" as DeploymentType,
   });
 
   // Delete confirm state
@@ -117,6 +117,7 @@ export default function ModelConfiguration() {
     setProviderForm({
       name: "",
       type: "openai_compatible",
+      deploymentType: "cloud",
       baseUrl: "",
       apiKey: "",
       username: "",
@@ -130,6 +131,7 @@ export default function ModelConfiguration() {
     setProviderForm({
       name: provider.name,
       type: provider.type,
+      deploymentType: provider.deploymentType,
       baseUrl: provider.baseUrl,
       apiKey: "",
       username: provider.username ?? "",
@@ -176,12 +178,14 @@ export default function ModelConfiguration() {
           name: string;
           baseUrl: string;
           type?: ProviderType;
+          deploymentType?: DeploymentType;
           apiKey?: string;
           username?: string;
         } = {
           name: form.name,
           baseUrl: form.baseUrl,
           type: form.type,
+          deploymentType: form.deploymentType,
         };
         if (form.type === "openai_compatible") {
           if (!form.apiKey.trim()) {
@@ -254,7 +258,7 @@ export default function ModelConfiguration() {
   function openCreateModel(providerId: string) {
     setEditingModel(null);
     setModelForProvider(providerId);
-    setModelForm({ modelId: "", displayName: "", deploymentType: "cloud" });
+    setModelForm({ modelId: "", displayName: "" });
     setShowModelModal(true);
   }
 
@@ -264,7 +268,6 @@ export default function ModelConfiguration() {
     setModelForm({
       modelId: model.modelId,
       displayName: model.displayName,
-      deploymentType: model.deploymentType,
     });
     setShowModelModal(true);
   }
@@ -283,7 +286,6 @@ export default function ModelConfiguration() {
         const { error } = await api.api.models({ id: editing.id }).patch({
           modelId: form.modelId,
           displayName: form.displayName,
-          deploymentType: form.deploymentType,
         });
         if (error) {
           const errData = error.value as { error?: string } | undefined;
@@ -296,7 +298,6 @@ export default function ModelConfiguration() {
           providerId: modelForProvider(),
           modelId: form.modelId,
           displayName: form.displayName,
-          deploymentType: form.deploymentType,
         });
         if (error) {
           const errData = error.value as { error?: string } | undefined;
@@ -456,6 +457,10 @@ export default function ModelConfiguration() {
                       variant="info"
                     />
                     <Badge
+                      label={provider.deploymentType === "cloud" ? "云端" : "本地"}
+                      variant={provider.deploymentType === "cloud" ? "info" : "warning"}
+                    />
+                    <Badge
                       label={provider.isActive ? "已启用" : "已停用"}
                       variant={provider.isActive ? "success" : "error"}
                     />
@@ -518,18 +523,6 @@ export default function ModelConfiguration() {
                   </div>
                 </div>
 
-                {/* Card Subheader */}
-                <div class="px-6 py-2.5 bg-slate-50/50 border-b border-slate-100 flex items-center gap-4 text-xs text-slate-500">
-                  <span class="truncate max-w-sm" title={provider.baseUrl}>
-                    Base URL: {provider.baseUrl}
-                  </span>
-                  <Show when={provider.apiKeyMasked}>
-                    <span>API Key: {provider.apiKeyMasked}</span>
-                  </Show>
-                  <Show when={provider.username}>
-                    <span>用户名: {provider.username}</span>
-                  </Show>
-                </div>
 
                 {/* Model List */}
                 <div class={`${!provider.isActive ? "opacity-50" : ""} transition-opacity duration-200`}>
@@ -542,29 +535,27 @@ export default function ModelConfiguration() {
                     }
                   >
                     <div class="divide-y divide-slate-100">
-                      <div class="grid grid-cols-[1fr_1fr_100px_100px_120px] gap-4 px-6 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50/80">
+                      <div class="grid grid-cols-[1fr_1fr_80px_150px] gap-4 px-6 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50/80">
                         <span>显示名称</span>
                         <span>模型 ID</span>
-                        <span>部署类型</span>
-                        <span>状态</span>
+                        <span class="text-center">状态</span>
                         <span class="text-right">操作</span>
                       </div>
                       <For each={provider.models}>
                         {(model) => (
                           <div
-                            class={`grid grid-cols-[1fr_1fr_100px_100px_120px] gap-4 px-6 py-3 items-center text-sm ${
+                            class={`grid grid-cols-[1fr_1fr_80px_150px] gap-4 px-6 py-3 items-center text-sm ${
                               model.isProviderDisabled ? "opacity-50" : ""
                             }`}
                           >
                             <span class="font-medium text-slate-900 truncate">{model.displayName}</span>
                             <span class="text-slate-500 truncate font-mono text-xs">{model.modelId}</span>
-                            <span class="text-slate-600">
-                              {model.deploymentType === "cloud" ? "云端" : "本地"}
-                            </span>
-                            <Badge
-                              label={modelStatusLabel(model)}
-                              variant={modelStatusVariant(model)}
-                            />
+                            <div class="text-center">
+                              <Badge
+                                label={modelStatusLabel(model)}
+                                variant={modelStatusVariant(model)}
+                              />
+                            </div>
                             <div class="flex items-center justify-end gap-2">
                               <button
                                 type="button"
@@ -651,6 +642,20 @@ export default function ModelConfiguration() {
             >
               <option value="openai_compatible">OpenAI 兼容</option>
               <option value="opencode">OpenCode Server</option>
+            </select>
+          </div>
+          <div>
+            <label for="provider-deployment" class={labelClass}>部署类型</label>
+            <select
+              id="provider-deployment"
+              value={providerForm().deploymentType}
+              onChange={(e) =>
+                setProviderForm((f) => ({ ...f, deploymentType: e.currentTarget.value as DeploymentType }))
+              }
+              class={inputClass}
+            >
+              <option value="cloud">云端</option>
+              <option value="local">本地</option>
             </select>
           </div>
           <div>
@@ -774,20 +779,6 @@ export default function ModelConfiguration() {
               placeholder="Doubao Seed Pro"
               required
             />
-          </div>
-          <div>
-            <label for="model-deployment" class={labelClass}>部署类型</label>
-            <select
-              id="model-deployment"
-              value={modelForm().deploymentType}
-              onChange={(e) =>
-                setModelForm((f) => ({ ...f, deploymentType: e.currentTarget.value as DeploymentType }))
-              }
-              class={inputClass}
-            >
-              <option value="cloud">云端</option>
-              <option value="local">本地</option>
-            </select>
           </div>
           <div class="flex justify-end gap-3 pt-2">
             <button

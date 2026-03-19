@@ -17,6 +17,8 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 3: Workflow Orchestration** - Visual flow editor, 5 node types, variable system, flow validation, flow management
 - [ ] **Phase 4: Project + Document + Version + File System Infrastructure** - Project CRUD with members, document management, version snapshots, working directory lifecycle
 - [ ] **Phase 5: Document Creation Runtime** - Workspace UI, all 5 node executors, multi-model streaming, common operations, failure recovery
+- [ ] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status
+- [ ] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09
 
 ## Phase Details
 
@@ -111,6 +113,34 @@ Plans:
 - [ ] 05-04: TBD
 - [ ] 05-05: TBD
 
+### Phase 6: Phase 1 Formal Verification & Housekeeping
+**Goal**: Formally verify Phase 1 implementation and close all housekeeping gaps (stale checkboxes, missing VERIFICATION.md, ROADMAP status)
+**Depends on**: Phase 1
+**Requirements**: AUTH-01, AUTH-02, AUTH-03, AUTH-04, DTYPE-01, DTYPE-02, DTYPE-03, DTYPE-04, DTYPE-05
+**Gap Closure:** Closes verification gaps from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. VERIFICATION.md exists for Phase 1 with all 9 requirements assessed
+  2. REQUIREMENTS.md checkboxes updated for AUTH-02, DTYPE-01–05
+  3. ROADMAP.md Phase 1 checkbox marked complete
+**Plans**: 1 plan
+
+Plans:
+- [ ] 06-01-PLAN.md — Run formal verification on Phase 1, update all stale tracking artifacts
+
+### Phase 7: Model Parameter Configuration
+**Goal**: Complete model parameter configuration (temperature, max_tokens, top_p) for AIMC-05 and AIMC-09
+**Depends on**: Phase 2
+**Requirements**: AIMC-05, AIMC-09
+**Gap Closure:** Closes requirement gaps from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. Admin can configure model parameters (temperature, max_tokens, top_p) when adding or editing a model
+  2. Parameter values are persisted and retrievable via API
+  3. Frontend UI provides parameter configuration fields in model add/edit forms
+**Plans**: 1 plan
+
+Plans:
+- [ ] 07-01-PLAN.md — Backend schema/API for model parameters + frontend parameter configuration UI
+
 ## Progress
 
 **Execution Order:**
@@ -124,3 +154,5 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 3. Workflow Orchestration | 0/4 | Not started | - |
 | 4. Project + Document + Version + File System Infrastructure | 0/4 | Not started | - |
 | 5. Document Creation Runtime | 0/5 | Not started | - |
+| 6. Phase 1 Formal Verification & Housekeeping | 0/1 | Not started | - |
+| 7. Model Parameter Configuration | 0/1 | Not started | - |

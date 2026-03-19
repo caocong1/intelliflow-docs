@@ -9,10 +9,10 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 认证与用户管理
 
-- [x] **AUTH-01**: 用户可通过用户名和密码登录系统
+- [ ] **AUTH-01**: 用户可通过用户名和密码登录系统
 - [ ] **AUTH-02**: 管理员可创建、编辑、停用用户账号
-- [x] **AUTH-03**: 用户登录后系统根据角色（系统管理员/普通用户）展示对应功能
-- [x] **AUTH-04**: 用户会话在浏览器刷新后保持登录状态
+- [ ] **AUTH-03**: 用户登录后系统根据角色（系统管理员/普通用户）展示对应功能
+- [ ] **AUTH-04**: 用户会话在浏览器刷新后保持登录状态
 
 ### AI 模型配置
 
@@ -20,10 +20,9 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 - [x] **AIMC-02**: 管理员可编辑和删除 Provider 实例
 - [x] **AIMC-03**: 管理员可测试 Provider 连通性
 - [x] **AIMC-04**: 管理员可启用/停用 Provider 实例
-- [x] **AIMC-05**: 管理员可在 Provider 下添加模型（模型 ID、显示名称、部署类型、调用方式、参数配置）
+- [ ] **AIMC-05**: 管理员可在 Provider 下添加模型（模型 ID、显示名称、部署类型、参数配置）
 - [x] **AIMC-06**: 管理员可编辑、启用/停用、删除模型
 - [x] **AIMC-07**: 模型支持标记部署类型（线上云端/本地私有）
-- [ ] **AIMC-08**: 模型支持配置 CLI 命令行调用模板（v1 首选）
 - [ ] **AIMC-09**: 模型支持配置参数（temperature、max_tokens、top_p 等）
 
 ### 文档类型管理
@@ -196,6 +195,7 @@ Deferred to future release. Tracked but not in current roadmap.
 | 多租户 SaaS 架构 | 公司内部工具，单租户部署 |
 | 插件/扩展市场 | 过度工程化，当前需求通过节点配置满足 |
 | 项目资料库（RAG） | 独立且复杂的子系统，涉及文件解析、向量化、检索等，暂不纳入规划 |
+| AIMC-08: CLI 命令行调用模板 | 改用 OpenCode Coding Plan 转发，不再需要 CLI 直接调用 |
 
 ## Traceability
 
@@ -203,24 +203,23 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 1 | Complete |
-| AUTH-02 | Phase 1 | Pending |
-| AUTH-03 | Phase 1 | Complete |
-| AUTH-04 | Phase 1 | Complete |
-| DTYPE-01 | Phase 1 | Pending |
-| DTYPE-02 | Phase 1 | Pending |
-| DTYPE-03 | Phase 1 | Pending |
-| DTYPE-04 | Phase 1 | Pending |
-| DTYPE-05 | Phase 1 | Pending |
+| AUTH-01 | Phase 1, Phase 6 | Pending |
+| AUTH-02 | Phase 1, Phase 6 | Pending |
+| AUTH-03 | Phase 1, Phase 6 | Pending |
+| AUTH-04 | Phase 1, Phase 6 | Pending |
+| DTYPE-01 | Phase 1, Phase 6 | Pending |
+| DTYPE-02 | Phase 1, Phase 6 | Pending |
+| DTYPE-03 | Phase 1, Phase 6 | Pending |
+| DTYPE-04 | Phase 1, Phase 6 | Pending |
+| DTYPE-05 | Phase 1, Phase 6 | Pending |
 | AIMC-01 | Phase 2 | Complete |
 | AIMC-02 | Phase 2 | Complete |
 | AIMC-03 | Phase 2 | Complete |
 | AIMC-04 | Phase 2 | Complete |
-| AIMC-05 | Phase 2 | Complete |
+| AIMC-05 | Phase 2, Phase 7 | Pending |
 | AIMC-06 | Phase 2 | Complete |
 | AIMC-07 | Phase 2 | Complete |
-| AIMC-08 | Phase 2 | Pending |
-| AIMC-09 | Phase 2 | Pending |
+| AIMC-09 | Phase 2, Phase 7 | Pending |
 | FLOW-01 | Phase 3 | Pending |
 | FLOW-02 | Phase 3 | Pending |
 | FLOW-03 | Phase 3 | Pending |
@@ -292,8 +291,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RECV-03 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 87 total
-- Mapped to phases: 87
+- v1 requirements: 86 total (AIMC-08 moved to Out of Scope)
+- Mapped to phases: 86
 - Unmapped: 0
 
 ---

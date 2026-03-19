@@ -16,13 +16,13 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### AI 模型配置
 
-- [ ] **AIMC-01**: 管理员可创建 Provider 实例（选择类型、填写名称、API 地址、认证信息）
-- [ ] **AIMC-02**: 管理员可编辑和删除 Provider 实例
-- [ ] **AIMC-03**: 管理员可测试 Provider 连通性
-- [ ] **AIMC-04**: 管理员可启用/停用 Provider 实例
-- [ ] **AIMC-05**: 管理员可在 Provider 下添加模型（模型 ID、显示名称、部署类型、调用方式、参数配置）
-- [ ] **AIMC-06**: 管理员可编辑、启用/停用、删除模型
-- [ ] **AIMC-07**: 模型支持标记部署类型（线上云端/本地私有）
+- [x] **AIMC-01**: 管理员可创建 Provider 实例（选择类型、填写名称、API 地址、认证信息）
+- [x] **AIMC-02**: 管理员可编辑和删除 Provider 实例
+- [x] **AIMC-03**: 管理员可测试 Provider 连通性
+- [x] **AIMC-04**: 管理员可启用/停用 Provider 实例
+- [x] **AIMC-05**: 管理员可在 Provider 下添加模型（模型 ID、显示名称、部署类型、调用方式、参数配置）
+- [x] **AIMC-06**: 管理员可编辑、启用/停用、删除模型
+- [x] **AIMC-07**: 模型支持标记部署类型（线上云端/本地私有）
 - [ ] **AIMC-08**: 模型支持配置 CLI 命令行调用模板（v1 首选）
 - [ ] **AIMC-09**: 模型支持配置参数（temperature、max_tokens、top_p 等）
 
@@ -212,13 +212,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DTYPE-03 | Phase 1 | Pending |
 | DTYPE-04 | Phase 1 | Pending |
 | DTYPE-05 | Phase 1 | Pending |
-| AIMC-01 | Phase 2 | Pending |
-| AIMC-02 | Phase 2 | Pending |
-| AIMC-03 | Phase 2 | Pending |
-| AIMC-04 | Phase 2 | Pending |
-| AIMC-05 | Phase 2 | Pending |
-| AIMC-06 | Phase 2 | Pending |
-| AIMC-07 | Phase 2 | Pending |
+| AIMC-01 | Phase 2 | Complete |
+| AIMC-02 | Phase 2 | Complete |
+| AIMC-03 | Phase 2 | Complete |
+| AIMC-04 | Phase 2 | Complete |
+| AIMC-05 | Phase 2 | Complete |
+| AIMC-06 | Phase 2 | Complete |
+| AIMC-07 | Phase 2 | Complete |
 | AIMC-08 | Phase 2 | Pending |
 | AIMC-09 | Phase 2 | Pending |
 | FLOW-01 | Phase 3 | Pending |

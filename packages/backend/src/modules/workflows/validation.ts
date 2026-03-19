@@ -1,0 +1,186 @@
+import type { WorkflowEdgeDef, WorkflowNodeDef, WorkflowValidationError } from "@intelliflow/shared";
+
+/**
+ * Validate a workflow graph.
+ * Returns a (possibly empty) list of structured validation errors.
+ */
+export function validateWorkflow(
+  nodes: WorkflowNodeDef[],
+  edges: WorkflowEdgeDef[],
+): WorkflowValidationError[] {
+  const errors: WorkflowValidationError[] = [];
+
+  if (nodes.length === 0) {
+    errors.push({ message: "工作流不能为空", severity: "error" });
+    return errors;
+  }
+
+  // ── Rule 1: Must have at least one input_transform node ───────────────────
+  const hasInputTransform = nodes.some((n) => n.type === "input_transform");
+  if (!hasInputTransform) {
+    errors.push({
+      message: "工作流必须包含至少一个【输入转换】节点",
+      severity: "error",
+    });
+  }
+
+  // ── Rule 2: Must have at least one export node ────────────────────────────
+  const hasExport = nodes.some((n) => n.type === "export");
+  if (!hasExport) {
+    errors.push({
+      message: "工作流必须包含至少一个【文件导出】节点",
+      severity: "error",
+    });
+  }
+
+  // ── Rule 3: Orphan nodes (every node must be connected, except single node) ─
+  if (nodes.length > 1) {
+    const connectedNodeIds = new Set<string>();
+    for (const edge of edges) {
+      connectedNodeIds.add(edge.source);
+      connectedNodeIds.add(edge.target);
+    }
+    for (const node of nodes) {
+      if (!connectedNodeIds.has(node.id)) {
+        errors.push({
+          nodeId: node.id,
+          message: `节点 "${node.label}" 未连接到任何其他节点`,
+          severity: "error",
+        });
+      }
+    }
+  }
+
+  // ── Rule 4: No cycles (topological sort via Kahn's algorithm) ─────────────
+  const nodeIds = new Set(nodes.map((n) => n.id));
+  const inDegree = new Map<string, number>();
+  const adjacency = new Map<string, string[]>();
+
+  for (const id of nodeIds) {
+    inDegree.set(id, 0);
+    adjacency.set(id, []);
+  }
+
+  for (const edge of edges) {
+    if (nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
+      inDegree.set(edge.target, (inDegree.get(edge.target) ?? 0) + 1);
+      adjacency.get(edge.source)?.push(edge.target);
+    }
+  }
+
+  const queue: string[] = [];
+  for (const [id, deg] of inDegree) {
+    if (deg === 0) queue.push(id);
+  }
+
+  let visited = 0;
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    visited++;
+    for (const neighbor of adjacency.get(current) ?? []) {
+      const newDeg = (inDegree.get(neighbor) ?? 0) - 1;
+      inDegree.set(neighbor, newDeg);
+      if (newDeg === 0) queue.push(neighbor);
+    }
+  }
+
+  if (visited < nodes.length) {
+    errors.push({
+      message: "工作流存在循环依赖，请检查节点连接",
+      severity: "error",
+    });
+  }
+
+  // ── Rule 5: desensitize/restore pairing ────────────────────────────────────
+  // Build reachability map (BFS/DFS downstream from each node)
+  function getDownstreamIds(startId: string): Set<string> {
+    const visited = new Set<string>();
+    const stack = [startId];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      for (const edge of edges) {
+        if (edge.source === current && !visited.has(edge.target)) {
+          visited.add(edge.target);
+          stack.push(edge.target);
+        }
+      }
+    }
+    return visited;
+  }
+
+  const desensitizeNodes = nodes.filter((n) => n.type === "desensitize");
+  const restoreNodes = nodes.filter((n) => n.type === "restore");
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+
+  // Every desensitize node must have a restore node reachable downstream
+  for (const dNode of desensitizeNodes) {
+    const downstream = getDownstreamIds(dNode.id);
+    const hasDownstreamRestore = restoreNodes.some((r) => downstream.has(r.id));
+    if (!hasDownstreamRestore) {
+      errors.push({
+        nodeId: dNode.id,
+        message: `【信息脱敏】节点 "${dNode.label}" 下游缺少对应的【信息恢复】节点`,
+        severity: "error",
+      });
+    }
+  }
+
+  // Every restore node must have pairedDesensitizeNodeId set and pointing to existing desensitize node
+  for (const rNode of restoreNodes) {
+    if (rNode.config.type !== "restore") continue;
+    const pairedId = rNode.config.pairedDesensitizeNodeId;
+    if (!pairedId) {
+      errors.push({
+        nodeId: rNode.id,
+        field: "pairedDesensitizeNodeId",
+        message: `【信息恢复】节点 "${rNode.label}" 未配置对应的脱敏节点`,
+        severity: "error",
+      });
+    } else {
+      const pairedNode = nodeMap.get(pairedId);
+      if (!pairedNode || pairedNode.type !== "desensitize") {
+        errors.push({
+          nodeId: rNode.id,
+          field: "pairedDesensitizeNodeId",
+          message: `【信息恢复】节点 "${rNode.label}" 引用的脱敏节点不存在`,
+          severity: "error",
+        });
+      }
+    }
+  }
+
+  // ── Rule 6: Required fields per node type ─────────────────────────────────
+  for (const node of nodes) {
+    if (node.config.type === "model_call") {
+      if (!node.config.promptTemplate || node.config.promptTemplate.trim() === "") {
+        errors.push({
+          nodeId: node.id,
+          field: "promptTemplate",
+          message: `【模型调用】节点 "${node.label}" 的提示词模板不能为空`,
+          severity: "error",
+        });
+      }
+      if (!node.config.modelId) {
+        errors.push({
+          nodeId: node.id,
+          field: "modelId",
+          message: `【模型调用】节点 "${node.label}" 未指定模型`,
+          severity: "warning",
+        });
+      }
+    }
+
+    if (node.config.type === "export") {
+      if (!node.config.format) {
+        errors.push({
+          nodeId: node.id,
+          field: "format",
+          message: `【文件导出】节点 "${node.label}" 未指定导出格式`,
+          severity: "error",
+        });
+      }
+    }
+  }
+
+  return errors;
+}

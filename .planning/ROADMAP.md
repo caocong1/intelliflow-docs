@@ -46,12 +46,11 @@ Plans:
   2. Admin can add models under a provider with display name, deployment type (cloud/local), and CLI command template
   3. Admin can configure model parameters (temperature, max_tokens, top_p) and enable/disable individual models
   4. Admin can edit, delete, and toggle provider and model status; disabled providers/models are excluded from workflow selection
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md — DB schema (providers + models), shared types, provider CRUD + connectivity test, model CRUD, route registration
+- [ ] 02-02-PLAN.md — Frontend card-layout admin page with modal forms, connectivity test toast, cascade status visualization, sidebar nav
 
 ### Phase 3: Workflow Orchestration
 **Goal**: Administrators can design, validate, and manage complete document generation workflows using a visual editor with five node types
@@ -121,7 +120,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation + Auth + Document Types | 0/3 | Not started | - |
-| 2. AI Provider and Model Configuration | 0/3 | Not started | - |
+| 2. AI Provider and Model Configuration | 0/2 | Not started | - |
 | 3. Workflow Orchestration | 0/4 | Not started | - |
 | 4. Project + Document + Version + File System Infrastructure | 0/4 | Not started | - |
 | 5. Document Creation Runtime | 0/5 | Not started | - |

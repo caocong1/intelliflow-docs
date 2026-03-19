@@ -8,8 +8,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "solid-js": "^1.9.5",
-    "@solidjs/router": "^0.15.3"
+    "@dschz/solid-flow": "^0.1.4",
+    "@solidjs/router": "^0.15.3",
+    "solid-js": "^1.9.5"
   },
   "devDependencies": {
     "@elysiajs/eden": "^1.4.8",

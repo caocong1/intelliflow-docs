@@ -22,38 +22,42 @@ const AdminRoute: ParentComponent = (props) => {
 
 const App: Component = () => {
   return (
-    <Router>
-      <AuthProvider>
-        <ToastContainer />
+    <Router
+      root={(props) => (
+        <AuthProvider>
+          <ToastContainer />
+          {props.children}
+        </AuthProvider>
+      )}
+    >
+      <Route
+        path="/login"
+        component={() => (
+          <AuthLayout>
+            <Login />
+          </AuthLayout>
+        )}
+      />
+      <Route path="/" component={AppLayout}>
+        <Route path="/" component={Dashboard} />
         <Route
-          path="/login"
+          path="/admin/users"
           component={() => (
-            <AuthLayout>
-              <Login />
-            </AuthLayout>
+            <AdminRoute>
+              <UserManagement />
+            </AdminRoute>
           )}
         />
-        <Route path="/" component={AppLayout}>
-          <Route path="/" component={Dashboard} />
-          <Route
-            path="/admin/users"
-            component={() => (
-              <AdminRoute>
-                <UserManagement />
-              </AdminRoute>
-            )}
-          />
-          <Route
-            path="/admin/document-types"
-            component={() => (
-              <AdminRoute>
-                <DocumentTypeManagement />
-              </AdminRoute>
-            )}
-          />
-        </Route>
-        <Route path="*" component={() => <Navigate href="/" />} />
-      </AuthProvider>
+        <Route
+          path="/admin/document-types"
+          component={() => (
+            <AdminRoute>
+              <DocumentTypeManagement />
+            </AdminRoute>
+          )}
+        />
+      </Route>
+      <Route path="*" component={() => <Navigate href="/" />} />
     </Router>
   );
 };

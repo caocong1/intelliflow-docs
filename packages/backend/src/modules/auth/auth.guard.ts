@@ -3,7 +3,7 @@ import type { SessionUser } from "./auth.service";
 import { getSessionUser } from "./auth.service";
 
 export const authPlugin = new Elysia({ name: "auth" }).resolve(
-  { as: "scoped" },
+  { as: "global" },
   async ({ request }): Promise<{ user: SessionUser | null; sessionToken: string | null }> => {
     const authorization = request.headers.get("Authorization");
     let token: string | null = null;

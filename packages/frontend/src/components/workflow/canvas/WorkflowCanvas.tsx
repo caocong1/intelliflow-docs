@@ -40,13 +40,23 @@ type WorkflowCanvasProps = {
   setEdges: (updater: WFEdge[] | ((prev: WFEdge[]) => WFEdge[])) => void;
   onNodeDropped: (nodeType: WorkflowNodeType, position: { x: number; y: number }) => void;
   onNodeSelect: (id: string | null) => void;
+  /** Set of node IDs that have validation errors — triggers red border highlight */
+  errorNodeIds?: Set<string>;
+  /** Callback to expose fitView so parent can center on a node */
+  onFitViewReady?: (fitView: (opts?: { nodes?: { id: string }[] }) => void) => void;
 };
 
 // Inner canvas component must be inside SolidFlow context to use useSolidFlow
 function CanvasInner(props: {
   onNodeDropped: (nodeType: WorkflowNodeType, position: { x: number; y: number }) => void;
+  onFitViewReady?: (fitView: (opts?: { nodes?: { id: string }[] }) => void) => void;
 }) {
   const flow = useSolidFlow();
+
+  // Expose fitView to parent via callback
+  if (props.onFitViewReady) {
+    props.onFitViewReady((opts) => flow.fitView(opts));
+  }
 
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
@@ -82,11 +92,34 @@ export default function WorkflowCanvas(props: WorkflowCanvasProps) {
     props.setEdges(updated);
   }
 
+  // Inject hasError into node data based on errorNodeIds set
+  const nodesWithErrors = () => {
+    const errorIds = props.errorNodeIds;
+    if (!errorIds || errorIds.size === 0) return props.nodes;
+    return props.nodes.map((n) => ({
+      ...n,
+      data: { ...n.data, hasError: errorIds.has(n.id) },
+    }));
+  };
+
+  // Annotate edges with label from source node's outputs (data flow preview)
+  const annotatedEdges = () => {
+    return props.edges.map((edge) => {
+      const sourceNode = props.nodes.find((n) => n.id === edge.source);
+      const outputs = sourceNode?.data.outputs as Array<{ name?: string; id?: string }> | undefined;
+      if (outputs && outputs.length > 0) {
+        const label = outputs.map((o) => o.name ?? "输出").join(", ");
+        return { ...edge, label };
+      }
+      return edge;
+    });
+  };
+
   return (
     <div class="w-full h-full">
       <SolidFlow
-        nodes={props.nodes as unknown as Store<Node[]>}
-        edges={props.edges as unknown as Store<Edge[]>}
+        nodes={nodesWithErrors() as unknown as Store<Node[]>}
+        edges={annotatedEdges() as unknown as Store<Edge[]>}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onConnect={handleConnect}
@@ -103,7 +136,10 @@ export default function WorkflowCanvas(props: WorkflowCanvasProps) {
           maskColor="rgba(248,250,252,0.7)"
           style={{ bottom: "80px" }}
         />
-        <CanvasInner onNodeDropped={props.onNodeDropped} />
+        <CanvasInner
+          onNodeDropped={props.onNodeDropped}
+          onFitViewReady={props.onFitViewReady}
+        />
       </SolidFlow>
     </div>
   );

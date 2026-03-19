@@ -12,6 +12,7 @@ import { showToast } from "../../components/ui/Toast";
 import WorkflowCanvas from "../../components/workflow/canvas/WorkflowCanvas";
 import NodeLibraryPanel from "../../components/workflow/canvas/NodeLibraryPanel";
 import ConfigPanel from "../../components/workflow/config/ConfigPanel";
+import ValidationOverlay, { type ValidationError } from "../../components/workflow/canvas/ValidationOverlay";
 import type { WorkflowNodeType, OutputDef } from "@intelliflow/shared";
 
 // Node data shape stored in solid-flow Node.data
@@ -79,6 +80,11 @@ export default function WorkflowEditor() {
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
+  const [validationErrors, setValidationErrors] = createSignal<ValidationError[]>([]);
+  const [showValidation, setShowValidation] = createSignal(false);
+
+  // fitView function exposed from WorkflowCanvas via CanvasInner
+  let canvasFitView: ((opts?: { nodes?: { id: string }[] }) => void) | null = null;
 
   // Use plain untyped stores — we cast to WFNode[]/WFEdge[] at usage points
   // createNodeStore/createEdgeStore typed generics impose BuiltInNode compatibility
@@ -158,7 +164,8 @@ export default function WorkflowEditor() {
         ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
       }));
 
-      const res2 = await (api.api as unknown as {
+      // Step 1: Save the workflow (draft always saves)
+      const saveRes = await (api.api as unknown as {
         workflows: Record<string, (id: string) => {
           put: (body: unknown) => Promise<{ error: unknown }>;
         }>;
@@ -168,12 +175,46 @@ export default function WorkflowEditor() {
         edges: backendEdges,
       });
 
-      if (res2.error) {
-        const errData = res2.error as { value?: { error?: string } };
+      if (saveRes.error) {
+        const errData = saveRes.error as { value?: { error?: string } };
         showToast(errData.value?.error ?? "保存工作流失败", "error");
         return;
       }
-      showToast("工作流已保存", "success");
+
+      // Step 2: Validate the workflow after save
+      try {
+        const validateRes = await (api.api as unknown as {
+          workflows: Record<string, (id: string) => {
+            validate: {
+              post: () => Promise<{ data: unknown; error: unknown }>;
+            };
+          }>;
+        }).workflows[":id"](params.id).validate.post();
+
+        if (!validateRes.error && validateRes.data) {
+          const result = validateRes.data as { data?: { errors?: ValidationError[] } };
+          const errors: ValidationError[] = result.data?.errors ?? [];
+          setValidationErrors(errors);
+
+          if (errors.length === 0) {
+            setShowValidation(false);
+            showToast("保存成功", "success");
+          } else {
+            setShowValidation(true);
+            showToast("保存成功，但流程存在校验问题", "error");
+          }
+        } else {
+          // Validation endpoint error is non-fatal — save still succeeded
+          setValidationErrors([]);
+          setShowValidation(false);
+          showToast("工作流已保存", "success");
+        }
+      } catch {
+        // Validation failure is non-fatal
+        setValidationErrors([]);
+        setShowValidation(false);
+        showToast("工作流已保存", "success");
+      }
     } catch {
       showToast("网络错误，请稍后重试", "error");
     } finally {
@@ -235,6 +276,35 @@ export default function WorkflowEditor() {
     }
   }
 
+  // Navigate canvas to focus on error node
+  function handleNavigateToNode(nodeId: string) {
+    // Select the node to open its config panel
+    setSelectedNodeId(nodeId);
+    // Use fitView to center the canvas on the specific node
+    if (canvasFitView) {
+      canvasFitView({ nodes: [{ id: nodeId }] });
+    }
+  }
+
+  // Compute error node IDs as a Set for O(1) lookup in canvas
+  const errorNodeIds = () => {
+    const errors = validationErrors();
+    const ids = new Set<string>();
+    for (const e of errors) {
+      if (e.nodeId) ids.add(e.nodeId);
+    }
+    return ids;
+  };
+
+  // Build nodeLabels map for ValidationOverlay display
+  const nodeLabels = () => {
+    const map: Record<string, string> = {};
+    for (const n of nodes) {
+      map[n.id] = n.data.label;
+    }
+    return map;
+  };
+
   return (
     <div class="flex flex-col h-screen bg-slate-50">
       {/* Top Toolbar */}
@@ -261,6 +331,24 @@ export default function WorkflowEditor() {
           />
         </div>
         <div class="flex items-center gap-2">
+          {/* Validation error indicator in toolbar */}
+          <Show when={validationErrors().length > 0}>
+            <button
+              type="button"
+              onClick={() => setShowValidation(true)}
+              class="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ring-1 ring-red-200"
+            >
+              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <title>校验错误</title>
+                <path
+                  fill-rule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              校验错误 ({validationErrors().length})
+            </button>
+          </Show>
           <button
             type="button"
             onClick={handleSave}
@@ -292,7 +380,7 @@ export default function WorkflowEditor() {
         {/* Left: Node Library Panel */}
         <NodeLibraryPanel />
 
-        {/* Center: Canvas */}
+        {/* Center: Canvas (relative positioned for ValidationOverlay) */}
         <div class="flex-1 relative overflow-hidden">
           <Show
             when={!loading()}
@@ -316,7 +404,19 @@ export default function WorkflowEditor() {
               setEdges={setEdges}
               onNodeDropped={handleNodeDropped}
               onNodeSelect={setSelectedNodeId}
+              errorNodeIds={errorNodeIds()}
+              onFitViewReady={(fn) => { canvasFitView = fn; }}
             />
+
+            {/* Validation overlay: positioned above the canvas, inside center column */}
+            <Show when={showValidation() && validationErrors().length > 0}>
+              <ValidationOverlay
+                errors={validationErrors()}
+                nodeLabels={nodeLabels()}
+                onNavigateToNode={handleNavigateToNode}
+                onClose={() => setShowValidation(false)}
+              />
+            </Show>
           </Show>
         </div>
 

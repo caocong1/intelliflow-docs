@@ -1,5 +1,5 @@
 /** User roles in the system */
-export type UserRole = 'admin' | 'user';
+export type UserRole = "admin" | "user";
 
 /** Base entity with common fields */
 export interface BaseEntity {
@@ -26,6 +26,6 @@ export interface DocumentType extends BaseEntity {
 
 /** API health check response */
 export interface HealthResponse {
-  status: 'ok';
+  status: "ok";
   timestamp: string;
 }

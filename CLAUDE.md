@@ -29,6 +29,13 @@ docs/
 3. **脱敏机制**：脱敏映射 DB 加密存储，脱敏规则（仅类型描述，不含真实值）自动注入后续模型调用的提示词
 4. **用户认证**：首选企业微信 OAuth，备选独立账号体系
 
+## 开发规范
+
+1. **包管理器**：全面使用 Bun（`bun install`、`bun run`、`bun add`），不使用 pnpm/npm/yarn，除非遇到 Bun 不支持的场景再讨论
+2. **Monorepo**：使用 Bun workspaces（package.json 中的 `workspaces` 字段），不使用 pnpm-workspace.yaml
+3. **代码规范**：使用 Biome 进行代码格式化和 lint，不使用 ESLint/Prettier
+4. **认证方案**：Bearer Token + localStorage，不使用 JWT 或 Cookie Session
+
 ## 需求文档阅读指引
 
 - **只看最终版**：`docs/requirements/v4-current.md` 是唯一有效的需求文档

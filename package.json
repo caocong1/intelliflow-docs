@@ -2,18 +2,18 @@
   "name": "@intelliflow/root",
   "private": true,
   "type": "module",
+  "workspaces": ["packages/*"],
   "scripts": {
-    "dev": "concurrently \"pnpm --filter @intelliflow/backend dev\" \"pnpm --filter @intelliflow/frontend dev\"",
-    "dev:backend": "pnpm --filter @intelliflow/backend dev",
-    "dev:frontend": "pnpm --filter @intelliflow/frontend dev"
+    "dev": "concurrently \"bun run --filter @intelliflow/backend dev\" \"bun run --filter @intelliflow/frontend dev\"",
+    "dev:backend": "bun run --filter @intelliflow/backend dev",
+    "dev:frontend": "bun run --filter @intelliflow/frontend dev",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "format": "biome format --write ."
   },
   "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
     "concurrently": "^9.1.2",
     "typescript": "^5.9.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
   }
 }

@@ -1,8 +1,8 @@
-import { Elysia } from 'elysia';
+import { Elysia } from "elysia";
 
-const app = new Elysia({ prefix: '/api' })
-  .get('/health', () => ({
-    status: 'ok' as const,
+const app = new Elysia({ prefix: "/api" })
+  .get("/health", () => ({
+    status: "ok" as const,
     timestamp: new Date().toISOString(),
   }))
   .listen(3001);

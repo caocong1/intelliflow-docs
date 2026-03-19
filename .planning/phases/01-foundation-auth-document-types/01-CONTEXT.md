@@ -19,6 +19,11 @@
 - 管理员同时也是普通用户，拥有普通用户的所有功能 + 管理功能
 - 普通用户尝试直接访问管理页面 URL 时，显示 403 无权访问提示页，带返回按钮
 
+### 包管理器与工具链
+- 全面使用 Bun（bun install、bun run、bun add），不使用 pnpm/npm/yarn
+- 使用 Bun workspaces（package.json workspaces 字段），不使用 pnpm-workspace.yaml
+- 使用 Biome 进行代码格式化和 lint，不使用 ESLint/Prettier
+
 ### 认证方案
 - 不用 JWT，不用 Cookie Session
 - 使用 Bearer Token + localStorage：登录返回随机 token，前端存 localStorage，每次请求 Authorization: Bearer <token>

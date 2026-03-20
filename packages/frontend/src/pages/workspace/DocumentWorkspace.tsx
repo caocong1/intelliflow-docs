@@ -5,7 +5,8 @@ import StepperBar from "../../components/workspace/StepperBar";
 import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
 import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExecutor";
 import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
-import type { DesensitizeConfig, ExportConfig, DocumentRuntimeState, NodeExecution } from "@intelliflow/shared";
+import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
+import type { DesensitizeConfig, ExportConfig, InputTransformConfig, DocumentRuntimeState, NodeExecution } from "@intelliflow/shared";
 
 type ViewMode = "current" | "history";
 
@@ -204,6 +205,17 @@ export default function DocumentWorkspace() {
                         </div>
                       }
                     >
+                      <Match when={currentNode()?.nodeType === "input_transform"}>
+                        <InputTransformExecutor
+                          nodeExecution={currentNode()!}
+                          config={({} as InputTransformConfig)}
+                          documentId={params.documentId}
+                          onDraftSave={(data) => {
+                            /* draft saved via executor */
+                          }}
+                          readOnly={false}
+                        />
+                      </Match>
                       <Match when={currentNode()?.nodeType === "desensitize"}>
                         <DesensitizeExecutor
                           nodeExecution={currentNode()!}

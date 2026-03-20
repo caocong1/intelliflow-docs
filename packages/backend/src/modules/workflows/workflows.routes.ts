@@ -13,8 +13,22 @@ import {
 import { validateWorkflow } from "./validation";
 import type { WorkflowEdgeDef, WorkflowNodeDef, WorkflowStatus } from "@intelliflow/shared";
 
-const nodeSchema = t.Any();
-const edgeSchema = t.Any();
+const nodeSchema = t.Object({
+  id: t.String(),
+  type: t.String(),
+  label: t.String(),
+  position: t.Object({ x: t.Number(), y: t.Number() }),
+  config: t.Record(t.String(), t.Unknown()),
+  outputs: t.Array(t.Object({ name: t.String(), label: t.String() })),
+});
+
+const edgeSchema = t.Object({
+  id: t.String(),
+  source: t.String(),
+  target: t.String(),
+  sourceHandle: t.Optional(t.String()),
+  targetHandle: t.Optional(t.String()),
+});
 
 export const workflowRoutes = new Elysia({ prefix: "/workflows" })
   .use(requireAdmin)

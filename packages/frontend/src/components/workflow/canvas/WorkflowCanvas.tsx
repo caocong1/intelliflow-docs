@@ -46,48 +46,19 @@ type WorkflowCanvasProps = {
   onFitViewReady?: (fitView: (opts?: { nodes?: { id: string }[] }) => void) => void;
 };
 
-// Inner canvas component must be inside SolidFlow context to use useSolidFlow
+// Inner component that registers flow context helpers with the parent
 function CanvasInner(props: {
-  onNodeDropped: (nodeType: WorkflowNodeType, position: { x: number; y: number }) => void;
-  onFitViewReady?: (fitView: (opts?: { nodes?: { id: string }[] }) => void) => void;
+  onReady: (flow: { screenToFlowPosition: (pos: { x: number; y: number }) => { x: number; y: number }; fitView: (opts?: { nodes?: { id: string }[] }) => void }) => void;
 }) {
   const flow = useSolidFlow();
-
-  // Expose fitView to parent via callback
-  if (props.onFitViewReady) {
-    props.onFitViewReady((opts) => flow.fitView(opts));
-  }
-
-  function handleDragOver(e: DragEvent) {
-    e.preventDefault();
-    if (e.dataTransfer) {
-      e.dataTransfer.dropEffect = "move";
-    }
-  }
-
-  function handleDrop(e: DragEvent) {
-    e.preventDefault();
-    const nodeType = e.dataTransfer?.getData("application/solid-flow-node") as WorkflowNodeType | undefined;
-    if (!nodeType) return;
-
-    // Convert screen coordinates to canvas flow coordinates
-    const position = flow.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-    props.onNodeDropped(nodeType, position);
-  }
-
-  return (
-    <div
-      class="absolute inset-0"
-      style={{ "pointer-events": "all", "z-index": "5" }}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    />
-  );
+  props.onReady(flow);
+  return null;
 }
 
 export default function WorkflowCanvas(props: WorkflowCanvasProps) {
+  let flowRef: { screenToFlowPosition: (pos: { x: number; y: number }) => { x: number; y: number }; fitView: (opts?: { nodes?: { id: string }[] }) => void } | null = null;
+
   function handleConnect(connection: EdgeConnection) {
-    // addEdge merges the new connection into the current edge list
     const updated = addEdge(connection, props.edges as unknown as EdgeConnection[]) as unknown as WFEdge[];
     props.setEdges(updated);
   }
@@ -115,8 +86,24 @@ export default function WorkflowCanvas(props: WorkflowCanvasProps) {
     });
   };
 
+  function handleDragOver(e: DragEvent) {
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = "move";
+    }
+  }
+
+  function handleDrop(e: DragEvent) {
+    e.preventDefault();
+    const nodeType = e.dataTransfer?.getData("application/solid-flow-node") as WorkflowNodeType | undefined;
+    if (!nodeType || !flowRef) return;
+
+    const position = flowRef.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+    props.onNodeDropped(nodeType, position);
+  }
+
   return (
-    <div class="w-full h-full">
+    <div class="w-full h-full" onDragOver={handleDragOver} onDrop={handleDrop}>
       <SolidFlow
         nodes={nodesWithErrors() as unknown as Store<Node[]>}
         edges={annotatedEdges() as unknown as Store<Edge[]>}
@@ -125,6 +112,7 @@ export default function WorkflowCanvas(props: WorkflowCanvasProps) {
         onConnect={handleConnect}
         onNodeClick={({ node }) => props.onNodeSelect(node.id)}
         fitView
+        fitViewOptions={{ maxZoom: 1 }}
         minZoom={0.2}
         maxZoom={4}
         defaultMarkerColor="#6366f1"
@@ -137,8 +125,12 @@ export default function WorkflowCanvas(props: WorkflowCanvasProps) {
           style={{ bottom: "80px" }}
         />
         <CanvasInner
-          onNodeDropped={props.onNodeDropped}
-          onFitViewReady={props.onFitViewReady}
+          onReady={(flow) => {
+            flowRef = flow;
+            if (props.onFitViewReady) {
+              props.onFitViewReady((opts) => flow.fitView(opts));
+            }
+          }}
         />
       </SolidFlow>
     </div>

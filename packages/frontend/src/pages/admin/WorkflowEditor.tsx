@@ -76,7 +76,7 @@ export default function WorkflowEditor() {
   const params = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [workflowName, setWorkflowName] = createSignal("加载中...");
+  const [workflowName, setWorkflowName] = createSignal("");
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
@@ -100,18 +100,14 @@ export default function WorkflowEditor() {
 
   onMount(async () => {
     try {
-      const res = await (api.api as unknown as {
-        workflows: Record<string, (id: string) => {
-          get: () => Promise<{ data: unknown; error: unknown }>;
-        }>;
-      }).workflows[":id"](params.id).get();
+      const res = await api.api.workflows({ id: params.id }).get();
 
       if (res.error || !res.data) {
         showToast("加载工作流失败", "error");
         navigate("/admin/workflows");
         return;
       }
-      const wf = (res.data as { data: WorkflowRaw }).data;
+      const wf = res.data as unknown as WorkflowRaw;
       setWorkflowName(wf.name);
 
       const sfNodes: WFNode[] = wf.nodes.map((n) => ({
@@ -153,7 +149,7 @@ export default function WorkflowEditor() {
         label: n.data.label,
         position: n.position,
         config: n.data.config,
-        outputs: n.data.outputs,
+        outputs: n.data.outputs as Array<{ name: string; label: string }>,
       }));
 
       const backendEdges = edges.map((e) => ({
@@ -165,11 +161,7 @@ export default function WorkflowEditor() {
       }));
 
       // Step 1: Save the workflow (draft always saves)
-      const saveRes = await (api.api as unknown as {
-        workflows: Record<string, (id: string) => {
-          put: (body: unknown) => Promise<{ error: unknown }>;
-        }>;
-      }).workflows[":id"](params.id).put({
+      const saveRes = await api.api.workflows({ id: params.id }).put({
         name: workflowName(),
         nodes: backendNodes,
         edges: backendEdges,
@@ -183,13 +175,7 @@ export default function WorkflowEditor() {
 
       // Step 2: Validate the workflow after save
       try {
-        const validateRes = await (api.api as unknown as {
-          workflows: Record<string, (id: string) => {
-            validate: {
-              post: () => Promise<{ data: unknown; error: unknown }>;
-            };
-          }>;
-        }).workflows[":id"](params.id).validate.post();
+        const validateRes = await api.api.workflows({ id: params.id }).validate.post();
 
         if (!validateRes.error && validateRes.data) {
           const result = validateRes.data as { data?: { errors?: ValidationError[] } };

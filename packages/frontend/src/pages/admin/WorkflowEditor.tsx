@@ -1,32 +1,15 @@
 import { Show, createSignal, onMount } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
-import {
-  createNodeStore,
-  createEdgeStore,
-  type Node,
-  type Edge,
-} from "@dschz/solid-flow";
-import "@dschz/solid-flow/styles";
+import type { WorkflowNodeType, OutputDef, NodeConfig } from "@intelliflow/shared";
 import { api } from "../../api/client";
 import { showToast } from "../../components/ui/Toast";
-import WorkflowCanvas from "../../components/workflow/canvas/WorkflowCanvas";
+import FlowCanvas from "../../components/workflow/canvas/FlowCanvas";
 import NodeLibraryPanel from "../../components/workflow/canvas/NodeLibraryPanel";
 import ConfigPanel from "../../components/workflow/config/ConfigPanel";
 import ValidationOverlay, { type ValidationError } from "../../components/workflow/canvas/ValidationOverlay";
-import type { WorkflowNodeType, OutputDef } from "@intelliflow/shared";
+import { createFlowStore } from "../../lib/flow-engine/store";
+import { deriveOutputs } from "../../lib/flow-engine/derive-outputs";
 import type { FlowNodeData, FlowEdgeData } from "../../lib/flow-engine/types";
-
-// Node data shape stored in solid-flow Node.data
-export type WorkflowNodeData = {
-  nodeType: WorkflowNodeType;
-  label: string;
-  config: Record<string, unknown>;
-  outputs: unknown[];
-};
-
-// Flow node/edge type aliases
-export type WFNode = Node<WorkflowNodeData, WorkflowNodeType>;
-export type WFEdge = Edge<Record<string, unknown>, string>;
 
 // Raw API workflow shape
 type WorkflowRaw = {
@@ -58,14 +41,14 @@ const DEFAULT_LABELS: Record<WorkflowNodeType, string> = {
   export: "文件导出",
 };
 
-function buildDefaultConfig(nodeType: WorkflowNodeType): Record<string, unknown> {
+function buildDefaultConfig(nodeType: WorkflowNodeType): NodeConfig {
   switch (nodeType) {
     case "input_transform":
       return { type: "input_transform", formFields: [], allowFileUpload: false };
     case "desensitize":
       return { type: "desensitize", categories: [], localModelId: null };
     case "model_call":
-      return { type: "model_call", displayName: DEFAULT_LABELS.model_call, modelId: null, promptTemplate: "", inputRefs: [] };
+      return { type: "model_call", displayName: DEFAULT_LABELS.model_call, modelIds: [], promptTemplate: "", inputRefs: [] };
     case "restore":
       return { type: "restore", pairedDesensitizeNodeId: null };
     case "export":
@@ -81,23 +64,12 @@ export default function WorkflowEditor() {
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
   const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
+  const [selectedEdgeId, setSelectedEdgeId] = createSignal<string | null>(null);
   const [validationErrors, setValidationErrors] = createSignal<ValidationError[]>([]);
   const [showValidation, setShowValidation] = createSignal(false);
 
-  // fitView function exposed from WorkflowCanvas via CanvasInner
-  let canvasFitView: ((opts?: { nodes?: { id: string }[] }) => void) | null = null;
-
-  // Use plain untyped stores — we cast to WFNode[]/WFEdge[] at usage points
-  // createNodeStore/createEdgeStore typed generics impose BuiltInNode compatibility
-  // so we use the base overload and cast
-  const [nodes, setNodes] = createNodeStore([]) as unknown as [
-    WFNode[],
-    (updater: WFNode[] | ((prev: WFNode[]) => WFNode[])) => void,
-  ];
-  const [edges, setEdges] = createEdgeStore([]) as unknown as [
-    WFEdge[],
-    (updater: WFEdge[] | ((prev: WFEdge[]) => WFEdge[])) => void,
-  ];
+  // Flow store
+  const store = createFlowStore();
 
   onMount(async () => {
     try {
@@ -111,29 +83,29 @@ export default function WorkflowEditor() {
       const wf = res.data as unknown as WorkflowRaw;
       setWorkflowName(wf.name);
 
-      const sfNodes: WFNode[] = wf.nodes.map((n) => ({
+      const flowNodes: FlowNodeData[] = wf.nodes.map((n) => ({
         id: n.id,
         type: n.type,
-        position: n.position,
+        position: n.position ?? { x: 0, y: 0 },
+        size: { width: 180, height: 60 },
         data: {
           nodeType: n.type,
           label: n.label || DEFAULT_LABELS[n.type],
-          config: n.config || {},
-          outputs: n.outputs || [],
+          config: (n.config || buildDefaultConfig(n.type)) as NodeConfig,
+          outputs: (n.outputs || []) as OutputDef[],
         },
+        sourceHandle: "right" as const,
+        targetHandle: "left" as const,
       }));
 
-      const sfEdges: WFEdge[] = wf.edges.map((e) => ({
+      const flowEdges: FlowEdgeData[] = wf.edges.map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
-        ...(e.sourceHandle != null ? { sourceHandle: e.sourceHandle } : {}),
-        ...(e.targetHandle != null ? { targetHandle: e.targetHandle } : {}),
-        type: "dataflow",
+        type: "bezier" as const,
       }));
 
-      setNodes(sfNodes);
-      setEdges(sfEdges);
+      store.applySnapshot({ nodes: flowNodes, edges: flowEdges });
     } catch {
       showToast("网络错误，请稍后重试", "error");
     } finally {
@@ -144,21 +116,19 @@ export default function WorkflowEditor() {
   async function handleSave() {
     setSaving(true);
     try {
-      const backendNodes = nodes.map((n) => ({
+      const backendNodes = [...store.nodes].map((n) => ({
         id: n.id,
         type: n.data.nodeType,
         label: n.data.label,
         position: n.position,
-        config: n.data.config,
+        config: n.data.config as Record<string, unknown>,
         outputs: n.data.outputs as Array<{ name: string; label: string }>,
       }));
 
-      const backendEdges = edges.map((e) => ({
+      const backendEdges = [...store.edges].map((e) => ({
         id: e.id,
         source: e.source,
         target: e.target,
-        ...(e.sourceHandle ? { sourceHandle: e.sourceHandle } : {}),
-        ...(e.targetHandle ? { targetHandle: e.targetHandle } : {}),
       }));
 
       // Step 1: Save the workflow (draft always saves)
@@ -191,13 +161,11 @@ export default function WorkflowEditor() {
             showToast("保存成功，但流程存在校验问题", "error");
           }
         } else {
-          // Validation endpoint error is non-fatal — save still succeeded
           setValidationErrors([]);
           setShowValidation(false);
           showToast("工作流已保存", "success");
         }
       } catch {
-        // Validation failure is non-fatal
         setValidationErrors([]);
         setShowValidation(false);
         showToast("工作流已保存", "success");
@@ -210,27 +178,26 @@ export default function WorkflowEditor() {
   }
 
   function handleConfigChange(nodeId: string, config: Record<string, unknown>) {
-    setNodes(
-      nodes.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, config } } : n
-      )
-    );
-  }
-
-  function handleOutputsChange(nodeId: string, outputs: OutputDef[]) {
-    setNodes(
-      nodes.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, outputs } } : n
-      )
-    );
+    const typedConfig = config as unknown as NodeConfig;
+    const outputs = deriveOutputs(nodeId, typedConfig);
+    const node = store.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    store.updateNode(nodeId, {
+      data: {
+        nodeType: node.data.nodeType,
+        label: node.data.label,
+        config: typedConfig,
+        outputs,
+      },
+    });
   }
 
   function handleLabelChange(nodeId: string, label: string) {
-    setNodes(
-      nodes.map((n) =>
-        n.id === nodeId ? { ...n, data: { ...n.data, label } } : n
-      )
-    );
+    const node = store.nodes.find((n) => n.id === nodeId);
+    if (!node) return;
+    store.updateNode(nodeId, {
+      data: { ...node.data, label },
+    });
   }
 
   function handleNodeDropped(nodeType: WorkflowNodeType, position: { x: number; y: number }) {
@@ -238,42 +205,67 @@ export default function WorkflowEditor() {
     const label = DEFAULT_LABELS[nodeType];
     const config = buildDefaultConfig(nodeType);
 
-    const newNode: WFNode = {
+    const newNode: FlowNodeData = {
       id,
       type: nodeType,
       position,
+      size: { width: 180, height: 60 },
       data: { nodeType, label, config, outputs: [] },
+      sourceHandle: "right",
+      targetHandle: "left",
     };
 
-    // Auto-connect: find the rightmost node and connect it to the new node
-    if (nodes.length > 0) {
-      const lastNode = nodes.reduce((prev, curr) =>
-        (curr.position?.x ?? 0) > (prev.position?.x ?? 0) ? curr : prev
+    store.addNode(newNode);
+
+    // Auto-connect: find nearest node with no outgoing edge
+    if (store.nodes.length > 1) {
+      const nodesWithoutOutgoing = [...store.nodes].filter(
+        (n) => n.id !== id && ![...store.edges].some((e) => e.source === n.id),
       );
-      const newEdge: WFEdge = {
-        id: `e-${lastNode.id}-${id}`,
-        source: lastNode.id,
-        target: id,
-        type: "dataflow",
-      };
-      setNodes([...nodes, newNode]);
-      setEdges([...edges, newEdge]);
-    } else {
-      setNodes([...nodes, newNode]);
+      if (nodesWithoutOutgoing.length > 0) {
+        const closest = nodesWithoutOutgoing.reduce((prev, curr) => {
+          const prevDist = Math.abs(curr.position.x - position.x) + Math.abs(curr.position.y - position.y);
+          const bestDist = Math.abs(prev.position.x - position.x) + Math.abs(prev.position.y - position.y);
+          return prevDist < bestDist ? curr : prev;
+        });
+        store.addEdge({
+          id: `e-${closest.id}-${id}`,
+          source: closest.id,
+          target: id,
+          type: "bezier",
+        });
+      }
     }
   }
 
-  // Navigate canvas to focus on error node
-  function handleNavigateToNode(nodeId: string) {
-    // Select the node to open its config panel
+  function handleConnectionComplete(sourceId: string, targetId: string) {
+    store.addEdge({
+      id: `e-${sourceId}-${targetId}`,
+      source: sourceId,
+      target: targetId,
+      type: "bezier",
+    });
+  }
+
+  function handleNodeSelect(nodeId: string, _e: MouseEvent) {
     setSelectedNodeId(nodeId);
-    // Use fitView to center the canvas on the specific node
-    if (canvasFitView) {
-      canvasFitView({ nodes: [{ id: nodeId }] });
-    }
+    setSelectedEdgeId(null);
   }
 
-  // Compute error node IDs as a Set for O(1) lookup in canvas
+  function handleEdgeSelect(edgeId: string) {
+    setSelectedEdgeId(edgeId);
+    setSelectedNodeId(null);
+  }
+
+  function handleCanvasClick() {
+    setSelectedNodeId(null);
+    setSelectedEdgeId(null);
+  }
+
+  function handleNavigateToNode(nodeId: string) {
+    setSelectedNodeId(nodeId);
+  }
+
   const errorNodeIds = () => {
     const errors = validationErrors();
     const ids = new Set<string>();
@@ -283,10 +275,9 @@ export default function WorkflowEditor() {
     return ids;
   };
 
-  // Build nodeLabels map for ValidationOverlay display
   const nodeLabels = () => {
     const map: Record<string, string> = {};
-    for (const n of nodes) {
+    for (const n of store.nodes) {
       map[n.id] = n.data.label;
     }
     return map;
@@ -318,7 +309,6 @@ export default function WorkflowEditor() {
           />
         </div>
         <div class="flex items-center gap-2">
-          {/* Validation error indicator in toolbar */}
           <Show when={validationErrors().length > 0}>
             <button
               type="button"
@@ -364,10 +354,8 @@ export default function WorkflowEditor() {
 
       {/* Main Editor Area */}
       <div class="flex flex-1 overflow-hidden">
-        {/* Left: Node Library Panel */}
         <NodeLibraryPanel />
 
-        {/* Center: Canvas (relative positioned for ValidationOverlay) */}
         <div class="flex-1 relative overflow-hidden">
           <Show
             when={!loading()}
@@ -384,18 +372,24 @@ export default function WorkflowEditor() {
               </div>
             }
           >
-            <WorkflowCanvas
-              nodes={nodes}
-              edges={edges}
-              setNodes={setNodes}
-              setEdges={setEdges}
-              onNodeDropped={handleNodeDropped}
-              onNodeSelect={setSelectedNodeId}
+            <FlowCanvas
+              nodes={store.nodes}
+              edges={store.edges}
+              viewport={store.viewport()}
+              setViewport={store.setViewport}
+              selectedNodeId={selectedNodeId()}
+              selectedEdgeId={selectedEdgeId()}
               errorNodeIds={errorNodeIds()}
-              onFitViewReady={(fn) => { canvasFitView = fn; }}
+              onNodeSelect={handleNodeSelect}
+              onEdgeSelect={handleEdgeSelect}
+              onCanvasClick={handleCanvasClick}
+              onNodeDragEnd={(nodeId, pos) => store.updateNodePosition(nodeId, pos)}
+              onNodeSizeChange={(nodeId, size) => store.updateNodeSize(nodeId, size)}
+              onConnectionComplete={handleConnectionComplete}
+              onNodeDropped={handleNodeDropped}
+              updateNodePosition={(nodeId, pos) => store.updateNodePosition(nodeId, pos)}
             />
 
-            {/* Validation overlay: positioned above the canvas, inside center column */}
             <Show when={showValidation() && validationErrors().length > 0}>
               <ValidationOverlay
                 errors={validationErrors()}
@@ -407,11 +401,10 @@ export default function WorkflowEditor() {
           </Show>
         </div>
 
-        {/* Right: Config Panel */}
         <ConfigPanel
-          selectedNode={(nodes.find((n) => n.id === selectedNodeId()) ?? null) as unknown as FlowNodeData | null}
-          allNodes={nodes as unknown as FlowNodeData[]}
-          edges={edges as unknown as FlowEdgeData[]}
+          selectedNode={store.nodes.find((n) => n.id === selectedNodeId()) ?? null}
+          allNodes={[...store.nodes]}
+          edges={[...store.edges]}
           onConfigChange={handleConfigChange}
           onLabelChange={handleLabelChange}
           onClose={() => setSelectedNodeId(null)}

@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 5: Document Creation Runtime** - Workspace UI, all 5 node executors, multi-model streaming, common operations, failure recovery
 - [ ] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status
 - [ ] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09
+- [ ] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync
 
 ## Phase Details
 
@@ -144,6 +145,20 @@ Plans:
 Plans:
 - [ ] 07-01-PLAN.md — Backend schema/API for model parameters + frontend parameter configuration UI
 
+### Phase 8: Integration Bug Fixes
+**Goal**: Fix cross-phase integration issues discovered during v1.0 audit — validation overlay display, model list provider names, and shared type sync
+**Depends on**: Phase 3, Phase 7
+**Requirements**: FLOW-10, FLOW-06
+**Gap Closure:** Closes integration gaps BROKEN-01, MISSING-01, MISSING-02 from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. Workflow validation overlay displays backend validation errors correctly (response shape aligned)
+  2. Model call config groups models by provider display name (not UUID)
+  3. Shared Model type includes temperature, maxTokens, topP fields from Phase 7
+**Plans**: TBD
+
+Plans:
+- [ ] 08-01-PLAN.md — Fix validation response shape, add provider JOIN to listActiveModels, sync shared Model type
+
 ## Progress
 
 **Execution Order:**
@@ -159,3 +174,4 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 5. Document Creation Runtime | 0/5 | Not started | - |
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |
+| 8. Integration Bug Fixes | 0/1 | Not started | - |

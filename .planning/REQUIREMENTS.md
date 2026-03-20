@@ -225,11 +225,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLOW-03 | Phase 3 | Complete |
 | FLOW-04 | Phase 3 | Complete |
 | FLOW-05 | Phase 3 | Complete |
-| FLOW-06 | Phase 3 | Complete |
+| FLOW-06 | Phase 3, Phase 8 | Complete |
 | FLOW-07 | Phase 3 | Complete |
 | FLOW-08 | Phase 3 | Complete |
 | FLOW-09 | Phase 3 | Complete |
-| FLOW-10 | Phase 3 | Complete |
+| FLOW-10 | Phase 3, Phase 8 | Complete |
 | FLOW-11 | Phase 3 | Complete |
 | FLOW-12 | Phase 3 | Complete |
 | FLOW-13 | Phase 3 | Complete |

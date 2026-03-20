@@ -8,7 +8,7 @@ progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 
 ## Current Position
 
-Phase: 4 of 7 (Project, Document, Version & File System Infrastructure) -- IN PROGRESS
-Plan: 5 of 6 in current phase
-Status: Executing Phase 4 gap closure plans
-Last activity: 2026-03-20 — Completed 04-05 (File Indexing Service)
+Phase: 4 of 7 (Project, Document, Version & File System Infrastructure) -- COMPLETE
+Plan: 6 of 6 in current phase
+Status: Phase 4 Complete, ready for Phase 5
+Last activity: 2026-03-20 — Completed 04-06 (Frontend TypeScript Error Fix)
 
-Progress: [████████░░] 81% (17/21 plans)
+Progress: [████████░░] 86% (18/21 plans)
 
 ## Performance Metrics
 
@@ -44,7 +44,7 @@ Progress: [████████░░] 81% (17/21 plans)
 | 02    | 2/2   | 29min | 14.5min  |
 | 03    | 5/5   | 36min  | 7.2min  |
 | 06    | 1/1   | 3min  | 3min     |
-| 04    | 4/4   | ~28min | ~7min   |
+| 04    | 6/6   | ~30min | ~5min   |
 | 07    | 1/1   | 2min  | 2min     |
 
 **Recent Trend:**
@@ -63,6 +63,7 @@ Progress: [████████░░] 81% (17/21 plans)
 | Phase 04 P03 | 6min | 2 tasks | 8 files |
 | Phase 04 P04 | 15min | 3 tasks | 8 files |
 | Phase 04 P05 | 1min | 2 tasks | 3 files |
+| Phase 04 P06 | 1min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,8 @@ Recent decisions affecting current work:
 - [04-04] LCS-based diff algorithm for v1 version comparison -- simple O(n*m) approach sufficient for document-length texts
 - [04-04] Route parameter pattern /:id/diff/:idB avoids Elysia route conflict with /:idA/diff/:idB
 - [04-04] DocumentDetail page provides basic document info view with version history navigation link
+- [04-06] Elysia route schemas should use t.Object() matching shared interfaces, never t.Any() which causes Eden Treaty File inference
+- [04-06] Cast outputs as Array<{ name: string; label: string }> in handleSave to bridge unknown[] type with strict schema
 
 ### Pending Todos
 
@@ -136,5 +139,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 04-05-PLAN.md (File Indexing Service)
+Stopped at: Completed 04-06-PLAN.md (Frontend TypeScript Error Fix) -- Phase 4 complete
 Resume file: None

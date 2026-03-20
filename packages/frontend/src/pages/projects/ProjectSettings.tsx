@@ -51,6 +51,16 @@ export default function ProjectSettings() {
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [deleting, setDeleting] = createSignal(false);
 
+  // Recycle bin
+  type DeletedDocItem = {
+    id: string;
+    title: string;
+    creatorName: string;
+    deletedAt: string | null;
+  };
+  const [deletedDocs, setDeletedDocs] = createSignal<DeletedDocItem[]>([]);
+  const [deletedLoading, setDeletedLoading] = createSignal(false);
+
   async function fetchProject() {
     try {
       const { data, error } = await api.api.projects({ id: params.id }).get();
@@ -83,10 +93,58 @@ export default function ProjectSettings() {
     }
   }
 
+  async function fetchDeletedDocs() {
+    setDeletedLoading(true);
+    try {
+      const { data, error } = await api.api.documents.deleted.get({
+        query: { projectId: params.id, page: "1", pageSize: "100" },
+      });
+      if (error) return;
+      const result = data as unknown as { data: DeletedDocItem[] };
+      setDeletedDocs(result.data);
+    } catch {
+      // ignore
+    } finally {
+      setDeletedLoading(false);
+    }
+  }
+
+  async function handleRestore(docId: string) {
+    try {
+      const { error } = await api.api.documents({ id: docId }).restore.post();
+      if (error) {
+        const errData = error.value as { error?: string } | undefined;
+        showToast(errData?.error ?? "恢复失败", "error");
+        return;
+      }
+      showToast("文档已恢复", "success");
+      fetchDeletedDocs();
+    } catch {
+      showToast("网络错误", "error");
+    }
+  }
+
+  async function handlePermanentDelete(docId: string, title: string) {
+    if (!confirm(`确定要彻底删除文档「${title}」吗？此操作不可恢复。`)) return;
+    try {
+      const { error } = await api.api.documents({ id: docId }).permanent.delete();
+      if (error) {
+        const errData = error.value as { error?: string } | undefined;
+        showToast(errData?.error ?? "删除失败", "error");
+        return;
+      }
+      showToast("文档已彻底删除", "success");
+      fetchDeletedDocs();
+    } catch {
+      showToast("网络错误", "error");
+    }
+  }
+
   async function init() {
     setLoading(true);
     await fetchProject();
     await fetchMembers();
+    await fetchDeletedDocs();
     setLoading(false);
   }
 
@@ -386,7 +444,64 @@ export default function ProjectSettings() {
         {/* Section: 回收站 */}
         <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
           <h2 class="text-base font-semibold text-slate-900 mb-4">回收站</h2>
-          <p class="text-sm text-slate-400">回收站将在后续计划中实现</p>
+
+          <Show when={deletedLoading()}>
+            <div class="flex items-center justify-center py-8">
+              <div class="w-6 h-6 border-3 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+            </div>
+          </Show>
+
+          <Show when={!deletedLoading()}>
+            <Show when={deletedDocs().length === 0}>
+              <p class="text-sm text-slate-400 text-center py-6">回收站为空</p>
+            </Show>
+
+            <Show when={deletedDocs().length > 0}>
+              <div class="overflow-x-auto rounded-lg border border-slate-200">
+                <table class="min-w-full divide-y divide-slate-200">
+                  <thead class="bg-slate-50">
+                    <tr>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-indigo-900 uppercase tracking-wider">标题</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-indigo-900 uppercase tracking-wider">创建人</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-indigo-900 uppercase tracking-wider">删除时间</th>
+                      <th class="px-4 py-3 text-left text-xs font-semibold text-indigo-900 uppercase tracking-wider">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody class="bg-white divide-y divide-slate-100">
+                    <For each={deletedDocs()}>
+                      {(doc) => (
+                        <tr class="transition-colors hover:bg-indigo-50/50">
+                          <td class="px-4 py-3 text-sm text-slate-700 font-medium">{doc.title}</td>
+                          <td class="px-4 py-3 text-sm text-slate-500">{doc.creatorName}</td>
+                          <td class="px-4 py-3 text-sm text-slate-400">
+                            {doc.deletedAt ? new Date(doc.deletedAt).toLocaleDateString("zh-CN") : "-"}
+                          </td>
+                          <td class="px-4 py-3 text-sm">
+                            <div class="flex items-center gap-3">
+                              <button
+                                type="button"
+                                onClick={() => handleRestore(doc.id)}
+                                class="text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors focus:outline-none"
+                              >
+                                恢复
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handlePermanentDelete(doc.id, doc.title)}
+                                class="text-sm text-red-600 hover:text-red-800 cursor-pointer transition-colors focus:outline-none"
+                              >
+                                彻底删除
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </For>
+                  </tbody>
+                </table>
+              </div>
+            </Show>
+          </Show>
         </div>
 
         {/* Danger zone: 删除项目 */}

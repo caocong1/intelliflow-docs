@@ -124,9 +124,9 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 版本管理
 
-- [ ] **VER-01**: 每个节点完成时系统自动生成版本快照
-- [ ] **VER-02**: 用户可查看版本列表（时间线形式）
-- [ ] **VER-03**: 用户可对比两个版本（Diff 查看）
+- [x] **VER-01**: 每个节点完成时系统自动生成版本快照
+- [x] **VER-02**: 用户可查看版本列表（时间线形式）
+- [x] **VER-03**: 用户可对比两个版本（Diff 查看）
 
 ### 文件系统与工作目录
 
@@ -248,9 +248,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DMGT-04 | Phase 4 | Complete |
 | DMGT-05 | Phase 4 | Complete |
 | DMGT-06 | Phase 4 | Complete |
-| VER-01 | Phase 4 | Pending |
-| VER-02 | Phase 4 | Pending |
-| VER-03 | Phase 4 | Pending |
+| VER-01 | Phase 4 | Complete |
+| VER-02 | Phase 4 | Complete |
+| VER-03 | Phase 4 | Complete |
 | FSYS-01 | Phase 4 | Complete |
 | FSYS-02 | Phase 4 | Complete |
 | FSYS-03 | Phase 4 | Complete |

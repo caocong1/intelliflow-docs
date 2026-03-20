@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation + Auth + Document Types** - Backend/frontend scaffolding, user authentication, role-based access, and document type CRUD (completed 2026-03-19)
 - [x] **Phase 2: AI Provider and Model Configuration** - Provider management, model configuration with CLI templates, connectivity testing (completed 2026-03-19)
 - [x] **Phase 3: Workflow Orchestration** - Visual flow editor, 5 node types, variable system, flow validation, flow management (completed 2026-03-19)
-- [ ] **Phase 4: Project + Document + Version + File System Infrastructure** - Project CRUD with members, document management, version snapshots, working directory lifecycle
+- [x] **Phase 4: Project + Document + Version + File System Infrastructure** - Project CRUD with members, document management, version snapshots, working directory lifecycle (completed 2026-03-20)
 - [ ] **Phase 5: Document Creation Runtime** - Workspace UI, all 5 node executors, multi-model streaming, common operations, failure recovery
 - [ ] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status
 - [ ] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09
@@ -86,10 +86,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — DB schema (projects, documents, versions, files tables + enums) and shared TypeScript types
-- [ ] 04-02-PLAN.md — Project CRUD API with member management + frontend pages (list with tabs, home, settings)
-- [ ] 04-03-PLAN.md — Document CRUD API with visibility controls, recycle bin, workspace directory creation + frontend integration
-- [ ] 04-04-PLAN.md — Version snapshot API with diff logic + Timeline component, VersionDiff component, document detail page
+- [x] 04-01-PLAN.md — DB schema (projects, documents, versions, files tables + enums) and shared TypeScript types
+- [x] 04-02-PLAN.md — Project CRUD API with member management + frontend pages (list with tabs, home, settings)
+- [x] 04-03-PLAN.md — Document CRUD API with visibility controls, recycle bin, workspace directory creation + frontend integration
+- [x] 04-04-PLAN.md — Version snapshot API with diff logic + Timeline component, VersionDiff component, document detail page
 
 ### Phase 5: Document Creation Runtime
 **Goal**: Users can create documents and execute the full workflow end-to-end — from input through AI generation, desensitization, recovery, to final export — with streaming output, multi-model comparison, and failure recovery
@@ -153,7 +153,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 1. Foundation + Auth + Document Types | 3/3 | Complete | 2026-03-19 |
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
 | 3. Workflow Orchestration | 5/5 | Complete   | 2026-03-19 |
-| 4. Project + Document + Version + File System Infrastructure | 0/4 | Not started | - |
+| 4. Project + Document + Version + File System Infrastructure | 4/4 | Complete | 2026-03-20 |
 | 5. Document Creation Runtime | 0/5 | Not started | - |
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |

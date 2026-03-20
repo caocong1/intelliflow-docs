@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-last_updated: "2026-03-20T14:54:49Z"
+status: unknown
+last_updated: "2026-03-20T15:02:15.532Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 37
-  completed_plans: 32
+  completed_plans: 33
 ---
 
 # Project State
@@ -81,6 +81,7 @@ Progress: [████████░░] 86% (32/37 plans)
 | Phase 05 P08 | 4min | 2 tasks | 4 files |
 | Phase 12 P01 | 6min | 2 tasks | 15 files |
 | Phase 12 P04 | 12min | 2 tasks | 9 files |
+| Phase 12 P02 | 17min | 2 tasks | 21 files |
 
 ## Accumulated Context
 
@@ -175,6 +176,9 @@ Recent decisions affecting current work:
 - [12-04] RuntimeSettings defaults: autoAdvance=false, allowEdit=true, skippable=false
 - [12-04] Config panels migrated from WFNode/WFEdge to FlowNodeData/FlowEdgeData for flow engine consistency
 - [12-04] OutputsEditor deleted; auto-derived outputs shown as read-only badges in ConfigPanel
+- [Phase 12]: SVG layer pointer-events:none on container, pointer-events:stroke on edge hit areas for correct HTML/SVG event layering
+- [Phase 12]: FlowNode wrapper handles positioning/drag/handles; child node components render only visual content
+- [Phase 12]: Connection target detection uses data-handle-type/data-node-id DOM attributes instead of coordinate hit testing
 
 ### Roadmap Evolution
 

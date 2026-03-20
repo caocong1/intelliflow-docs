@@ -210,7 +210,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DTYPE-01 | Phase 1, Phase 6 | Complete |
 | DTYPE-02 | Phase 1, Phase 6 | Complete |
 | DTYPE-03 | Phase 1, Phase 6 | Complete |
-| DTYPE-04 | Phase 1, Phase 6 | Complete |
+| DTYPE-04 | Phase 1, Phase 6, Phase 9 | Complete |
 | DTYPE-05 | Phase 1, Phase 6 | Complete |
 | AIMC-01 | Phase 2 | Complete |
 | AIMC-02 | Phase 2 | Complete |
@@ -237,7 +237,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROJ-02 | Phase 4 | Complete |
 | PROJ-03 | Phase 4 | Complete |
 | PROJ-04 | Phase 4 | Complete |
-| PROJ-05 | Phase 4 | Complete |
+| PROJ-05 | Phase 4, Phase 9 | Complete |
 | PROJ-06 | Phase 4 | Complete |
 | PROJ-07 | Phase 4 | Complete |
 | PROJ-08 | Phase 4 | Complete |

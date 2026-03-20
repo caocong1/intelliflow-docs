@@ -20,8 +20,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status (completed 2026-03-19)
 - [x] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09 (completed 2026-03-19)
 - [x] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync (completed 2026-03-20)
+- [ ] **Phase 9: Integration Polish & UX Guards** - Association check guard for document type delete, fix frontend ownership derivation
 
 ## Phase Details
+
+> **Note:** Phase 5 is the primary remaining work. Phase 9 addresses minor integration polish found during audit.
 
 ### Phase 1: Foundation + Auth + Document Types
 **Goal**: Administrators can manage users and document types on a working application with role-based access
@@ -159,6 +162,19 @@ Plans:
 Plans:
 - [ ] 08-01-PLAN.md — Fix validation response shape, add provider JOIN to listActiveModels, sync shared Model type
 
+### Phase 9: Integration Polish & UX Guards
+**Goal**: Fix minor integration issues found during v1.0 audit — document type delete association guard and frontend ownership derivation
+**Depends on**: Phase 1, Phase 4
+**Requirements**: DTYPE-04, PROJ-05
+**Gap Closure:** Closes integration gaps DTYPE-04-GUARD, PROJ-05-ISOWNER from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. Deleting a document type with associated workflows returns a user-friendly error message (not raw DB FK error)
+  2. Frontend `isOwner()` checks projectMembers role instead of `createdBy` field
+**Plans**: 1 plan
+
+Plans:
+- [ ] 09-01-PLAN.md — Association check in deleteDocumentType + fix isOwner() in ProjectHome.tsx
+
 ## Progress
 
 **Execution Order:**
@@ -175,3 +191,4 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |
 | 8. Integration Bug Fixes | 1/1 | Complete | 2026-03-20 |
+| 9. Integration Polish & UX Guards | 0/1 | Not started | - |

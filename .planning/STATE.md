@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-20T04:45:30.001Z"
+last_updated: "2026-03-20T06:17:35.000Z"
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 18
-  completed_plans: 18
+  total_phases: 7
+  completed_phases: 7
+  total_plans: 19
+  completed_plans: 19
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 4: Project, Document, Version & File System Infrastructure
+**Current focus:** Phase 8: Integration Bug Fixes -- COMPLETE
 
 ## Current Position
 
-Phase: 4 of 7 (Project, Document, Version & File System Infrastructure) -- COMPLETE
-Plan: 6 of 6 in current phase
-Status: Phase 4 Complete, ready for Phase 5
-Last activity: 2026-03-20 — Completed 04-06 (Frontend TypeScript Error Fix)
+Phase: 8 of 8 (Integration Bug Fixes) -- COMPLETE
+Plan: 1 of 1 in current phase
+Status: Phase 8 Complete
+Last activity: 2026-03-20 — Completed 08-01 (Integration Bug Fixes)
 
-Progress: [████████░░] 86% (18/21 plans)
+Progress: [█████████░] 90% (19/21 plans)
 
 ## Performance Metrics
 
@@ -46,6 +46,7 @@ Progress: [████████░░] 86% (18/21 plans)
 | 06    | 1/1   | 3min  | 3min     |
 | 04    | 6/6   | ~30min | ~5min   |
 | 07    | 1/1   | 2min  | 2min     |
+| 08    | 1/1   | 2min  | 2min     |
 
 **Recent Trend:**
 - Last 5 plans: ~30min, 3min, 2min, 5min, 12min
@@ -64,6 +65,7 @@ Progress: [████████░░] 86% (18/21 plans)
 | Phase 04 P04 | 15min | 3 tasks | 8 files |
 | Phase 04 P05 | 1min | 2 tasks | 3 files |
 | Phase 04 P06 | 1min | 2 tasks | 3 files |
+| Phase 08 P01 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -127,6 +129,7 @@ Recent decisions affecting current work:
 - [04-04] DocumentDetail page provides basic document info view with version history navigation link
 - [04-06] Elysia route schemas should use t.Object() matching shared interfaces, never t.Any() which causes Eden Treaty File inference
 - [04-06] Cast outputs as Array<{ name: string; label: string }> in handleSave to bridge unknown[] type with strict schema
+- [08-01] providerName optional in ModelRow -- only listActiveModels includes it via JOIN; other functions use modelColumns without it
 
 ### Pending Todos
 
@@ -139,5 +142,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 04-06-PLAN.md (Frontend TypeScript Error Fix) -- Phase 4 complete
+Stopped at: Completed 08-01-PLAN.md (Integration Bug Fixes) -- Phase 8 complete
 Resume file: None

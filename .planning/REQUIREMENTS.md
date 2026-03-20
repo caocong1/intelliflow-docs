@@ -63,11 +63,11 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 文档创建与工作台
 
-- [ ] **DOC-01**: 用户可在项目内从空白创建文档（选择文档类型→选择流程→填写标题）
+- [x] **DOC-01**: 用户可在项目内从空白创建文档（选择文档类型→选择流程→填写标题）
 - [ ] **DOC-02**: 创建文档时系统自动在服务器创建工作目录
-- [ ] **DOC-03**: 工作台展示流程进度导航栏（已完成/进行中/待执行状态标记）
-- [ ] **DOC-04**: 工作台展示当前节点操作区（根据节点类型展示对应界面）
-- [ ] **DOC-05**: 工作台展示节点历史面板（查看已完成节点的输入输出记录）
+- [x] **DOC-03**: 工作台展示流程进度导航栏（已完成/进行中/待执行状态标记）
+- [x] **DOC-04**: 工作台展示当前节点操作区（根据节点类型展示对应界面）
+- [x] **DOC-05**: 工作台展示节点历史面板（查看已完成节点的输入输出记录）
 
 ### 节点执行 — 输入转换
 
@@ -108,10 +108,10 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 节点通用操作
 
-- [ ] **NOPS-01**: 用户可在任意节点点击"确认/下一步"流转到下一个节点
+- [x] **NOPS-01**: 用户可在任意节点点击"确认/下一步"流转到下一个节点
 - [ ] **NOPS-02**: 用户可在任意节点展开内联编辑器修改当前节点输出内容
 - [ ] **NOPS-03**: 用户可跳过后续可选节点，直接流转至下一个必经节点或文件导出
-- [ ] **NOPS-04**: 用户可回退到之前的节点重新执行，后续节点状态重置
+- [x] **NOPS-04**: 用户可回退到之前的节点重新执行，后续节点状态重置
 
 ### 文档管理
 
@@ -137,8 +137,8 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 失败恢复
 
-- [ ] **RECV-01**: 每个节点操作过程自动保存草稿
-- [ ] **RECV-02**: 浏览器关闭后重新进入文档可恢复到上次操作状态
+- [x] **RECV-01**: 每个节点操作过程自动保存草稿
+- [x] **RECV-02**: 浏览器关闭后重新进入文档可恢复到上次操作状态
 - [ ] **RECV-03**: 支持取消正在进行的 AI 生成任务
 
 ## v2 Requirements
@@ -255,11 +255,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FSYS-02 | Phase 4 | Complete |
 | FSYS-03 | Phase 4 | Complete |
 | FSYS-04 | Phase 4 | Complete |
-| DOC-01 | Phase 5 | Pending |
+| DOC-01 | Phase 5 | Complete |
 | DOC-02 | Phase 5 | Pending |
-| DOC-03 | Phase 5 | Pending |
-| DOC-04 | Phase 5 | Pending |
-| DOC-05 | Phase 5 | Pending |
+| DOC-03 | Phase 5 | Complete |
+| DOC-04 | Phase 5 | Complete |
+| DOC-05 | Phase 5 | Complete |
 | NODE-01 | Phase 5 | Pending |
 | NODE-02 | Phase 5 | Pending |
 | NODE-03 | Phase 5 | Pending |
@@ -282,12 +282,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NODE-20 | Phase 5 | Pending |
 | NODE-21 | Phase 5 | Pending |
 | NODE-22 | Phase 5 | Pending |
-| NOPS-01 | Phase 5 | Pending |
+| NOPS-01 | Phase 5 | Complete |
 | NOPS-02 | Phase 5 | Pending |
 | NOPS-03 | Phase 5 | Pending |
-| NOPS-04 | Phase 5 | Pending |
-| RECV-01 | Phase 5 | Pending |
-| RECV-02 | Phase 5 | Pending |
+| NOPS-04 | Phase 5 | Complete |
+| RECV-01 | Phase 5 | Complete |
+| RECV-02 | Phase 5 | Complete |
 | RECV-03 | Phase 5 | Pending |
 
 **Coverage:**

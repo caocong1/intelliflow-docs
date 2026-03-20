@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-20T08:54:42.272Z"
+last_updated: "2026-03-20T10:10:30.579Z"
 progress:
-  total_phases: 10
+  total_phases: 11
   completed_phases: 10
-  total_plans: 22
-  completed_plans: 22
+  total_plans: 30
+  completed_plans: 24
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 11: Pre-Phase 5 API Access Fixes -- COMPLETE
+**Current focus:** Phase 05: Document Creation Runtime
 
 ## Current Position
 
-Phase: 11 of 11 (Pre-Phase 5 API Access Fixes) -- COMPLETE
-Plan: 1 of 1 in current phase
-Status: Phase 11 Complete
-Last activity: 2026-03-20 — Completed 11-01 (Non-Admin Read API Access)
+Phase: 05 of 11 (Document Creation Runtime)
+Plan: 2 of 8 in current phase (05-02 complete)
+Status: Executing Phase 05
+Last activity: 2026-03-20 — Completed 05-02 (Workspace Runtime & UI)
 
-Progress: [██████████] 100% (22/22 plans)
+Progress: [████████░░] 80% (24/30 plans)
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: [██████████] 100% (22/22 plans)
 | Phase 09 P01 | 3min | 2 tasks | 7 files |
 | Phase 10 P01 | 3min | 2 tasks | 5 files |
 | Phase 11 P01 | 3min | 2 tasks | 5 files |
+| Phase 05 P02 | 5min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -143,6 +144,9 @@ Recent decisions affecting current work:
 - [10-01] Status type cast as union literal for Drizzle PgEnum compatibility in eq() calls
 - [11-01] Followed Phase 10 route split pattern exactly for consistency across all modules
 - [11-01] Search uses ilike with or() on both username and displayName for flexible matching
+- [Phase 05]: Topological sort via BFS from root nodes for execution ordering
+- [Phase 05]: AutoAdvance only auto-completes restore nodes; other types need manual confirm
+- [Phase 05]: Rollback preserves outputData but resets status to pending for re-execution
 
 ### Pending Todos
 
@@ -155,5 +159,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 11-01-PLAN.md (Non-Admin Read API Access) -- Phase 11 complete
+Stopped at: Completed 05-02-PLAN.md (Workspace Runtime & UI)
 Resume file: None

@@ -412,7 +412,6 @@ export default function WorkflowEditor() {
           allNodes={nodes}
           edges={edges}
           onConfigChange={handleConfigChange}
-          onOutputsChange={handleOutputsChange}
           onLabelChange={handleLabelChange}
           onClose={() => setSelectedNodeId(null)}
         />

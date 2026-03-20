@@ -1,6 +1,6 @@
-import { Show, Switch, Match } from "solid-js";
+import { Show, Switch, Match, For } from "solid-js";
 import type {
-  OutputDef,
+  NodeConfig,
   InputTransformConfig,
   DesensitizeConfig,
   ModelCallConfig,
@@ -8,7 +8,8 @@ import type {
   ExportConfig,
 } from "@intelliflow/shared";
 import type { WFNode, WFEdge } from "../../../pages/admin/WorkflowEditor";
-import OutputsEditor from "./OutputsEditor";
+import { deriveOutputs } from "../../../lib/flow-engine/derive-outputs";
+import RuntimeSettings from "./RuntimeSettings";
 import InputTransformConfigPanel from "./InputTransformConfig";
 import DesensitizeConfigPanel from "./DesensitizeConfig";
 import RestoreConfigPanel from "./RestoreConfig";
@@ -44,7 +45,6 @@ interface ConfigPanelProps {
   allNodes: WFNode[];
   edges: WFEdge[];
   onConfigChange: (nodeId: string, config: Record<string, unknown>) => void;
-  onOutputsChange: (nodeId: string, outputs: OutputDef[]) => void;
   onLabelChange: (nodeId: string, label: string) => void;
   onClose: () => void;
 }
@@ -76,7 +76,6 @@ export default function ConfigPanel(props: ConfigPanelProps) {
   };
 
   const nodeConfig = () => props.selectedNode?.data.config as Record<string, unknown> | undefined;
-  const nodeOutputs = () => (props.selectedNode?.data.outputs ?? []) as OutputDef[];
 
   function handleConfigChange(config: Record<string, unknown>) {
     if (props.selectedNode) {
@@ -84,9 +83,10 @@ export default function ConfigPanel(props: ConfigPanelProps) {
     }
   }
 
-  function handleOutputsChange(outputs: OutputDef[]) {
-    if (props.selectedNode) {
-      props.onOutputsChange(props.selectedNode.id, outputs);
+  function handleRuntimeChange(updates: Partial<NodeConfig>) {
+    const current = nodeConfig();
+    if (props.selectedNode && current) {
+      props.onConfigChange(props.selectedNode.id, { ...current, ...updates });
     }
   }
 
@@ -97,6 +97,14 @@ export default function ConfigPanel(props: ConfigPanelProps) {
   }
 
   const nodeType = () => props.selectedNode?.data.nodeType ?? "input_transform";
+
+  /** Auto-derived outputs from node config */
+  const derivedOutputs = () => {
+    const config = nodeConfig();
+    const node = props.selectedNode;
+    if (!node || !config) return [];
+    return deriveOutputs(node.id, config as unknown as NodeConfig);
+  };
 
   return (
     <div
@@ -182,11 +190,39 @@ export default function ConfigPanel(props: ConfigPanelProps) {
                 </Match>
               </Switch>
 
-              {/* Outputs Editor — common to all node types */}
-              <OutputsEditor
-                outputs={nodeOutputs()}
-                onChange={handleOutputsChange}
-              />
+              {/* Runtime Settings — common to all node types */}
+              <Show when={nodeConfig()}>
+                <RuntimeSettings
+                  config={nodeConfig() as unknown as NodeConfig}
+                  onChange={handleRuntimeChange}
+                />
+              </Show>
+
+              {/* Auto-derived outputs — read-only display */}
+              <div class="mt-4 border-t border-slate-100 pt-4">
+                <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">节点输出</h4>
+                <Show
+                  when={derivedOutputs().length > 0}
+                  fallback={
+                    <p class="text-xs text-slate-400 italic text-center py-2">
+                      无输出（请先完成节点配置）
+                    </p>
+                  }
+                >
+                  <div class="flex flex-wrap gap-1.5">
+                    <For each={derivedOutputs()}>
+                      {(output) => (
+                        <span
+                          class="inline-flex items-center px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-700 border border-slate-200"
+                          title={output.description ?? output.name}
+                        >
+                          {output.name}
+                        </span>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </div>
             </div>
           </>
         )}

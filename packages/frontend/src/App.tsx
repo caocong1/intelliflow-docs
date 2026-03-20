@@ -18,6 +18,7 @@ import ProjectHome from "./pages/projects/ProjectHome";
 import ProjectSettings from "./pages/projects/ProjectSettings";
 import DocumentDetail from "./pages/documents/DocumentDetail";
 import VersionHistory from "./pages/documents/VersionHistory";
+import DocumentWorkspace from "./pages/workspace/DocumentWorkspace";
 
 const AdminRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -53,6 +54,7 @@ const App: Component = () => {
         <Route path="/projects/:id/settings" component={ProjectSettings} />
         <Route path="/documents/:id" component={DocumentDetail} />
         <Route path="/documents/:id/versions" component={VersionHistory} />
+        <Route path="/workspace/:documentId" component={DocumentWorkspace} />
         <Route
           path="/admin/users"
           component={() => (

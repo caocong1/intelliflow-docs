@@ -116,11 +116,19 @@ export default function DocumentDetail() {
 
               {/* Actions */}
               <div class="flex gap-3">
+                <Show when={docData().status === "draft" || docData().status === "in_progress"}>
+                  <A
+                    href={`/workspace/${params.id}`}
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                  >
+                    Enter Workspace
+                  </A>
+                </Show>
                 <A
                   href={`/documents/${params.id}/versions`}
                   class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
                 >
-                  查看版本历史
+                  Version History
                 </A>
                 <A
                   href={`/projects/${docData().projectId}`}

@@ -21,7 +21,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09 (completed 2026-03-19)
 - [x] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync (completed 2026-03-20)
 - [x] **Phase 9: Integration Polish & UX Guards** - Association check guard for document type delete, fix frontend ownership derivation (completed 2026-03-20)
-- [ ] **Phase 10: Non-Admin Read API Access** - Split doc-type/workflow listing to requireAuth so non-admin users can create documents
+- [x] **Phase 10: Non-Admin Read API Access** - Split doc-type/workflow listing to requireAuth so non-admin users can create documents (completed 2026-03-20)
 
 ## Phase Details
 
@@ -207,4 +207,4 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |
 | 8. Integration Bug Fixes | 1/1 | Complete | 2026-03-20 |
 | 9. Integration Polish & UX Guards | 1/1 | Complete | 2026-03-20 |
-| 10. Non-Admin Read API Access | 0/1 | Not started | - |
+| 10. Non-Admin Read API Access | 1/1 | Complete   | 2026-03-20 |

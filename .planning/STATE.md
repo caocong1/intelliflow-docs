@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-20T07:21:30.948Z"
+last_updated: "2026-03-20T07:57:27Z"
 progress:
-  total_phases: 8
-  completed_phases: 8
-  total_plans: 20
-  completed_plans: 20
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 21
+  completed_plans: 21
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 9: Integration Polish & UX Guards -- COMPLETE
+**Current focus:** Phase 10: Non-Admin Read API Access -- COMPLETE
 
 ## Current Position
 
-Phase: 9 of 9 (Integration Polish & UX Guards) -- COMPLETE
+Phase: 10 of 10 (Non-Admin Read API Access) -- COMPLETE
 Plan: 1 of 1 in current phase
-Status: Phase 9 Complete
-Last activity: 2026-03-20 — Completed 09-01 (Association Guard & isOwner Fix)
+Status: Phase 10 Complete
+Last activity: 2026-03-20 — Completed 10-01 (Non-Admin Read API Access)
 
-Progress: [██████████] 95% (20/21 plans)
+Progress: [██████████] 100% (21/21 plans)
 
 ## Performance Metrics
 
@@ -47,6 +47,8 @@ Progress: [██████████] 95% (20/21 plans)
 | 04    | 6/6   | ~30min | ~5min   |
 | 07    | 1/1   | 2min  | 2min     |
 | 08    | 1/1   | 2min  | 2min     |
+| 09    | 1/1   | 3min  | 3min     |
+| 10    | 1/1   | 3min  | 3min     |
 
 **Recent Trend:**
 - Last 5 plans: ~30min, 3min, 2min, 5min, 12min
@@ -67,6 +69,7 @@ Progress: [██████████] 95% (20/21 plans)
 | Phase 04 P06 | 1min | 2 tasks | 3 files |
 | Phase 08 P01 | 2min | 2 tasks | 4 files |
 | Phase 09 P01 | 3min | 2 tasks | 7 files |
+| Phase 10 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -133,6 +136,9 @@ Recent decisions affecting current work:
 - [08-01] providerName optional in ModelRow -- only listActiveModels includes it via JOIN; other functions use modelColumns without it
 - [09-01] Association pre-check via dedicated GET endpoint rather than inline in DELETE response -- allows frontend to show blocking UI before user confirms
 - [09-01] userRole subquery reuses same pattern as listProjects for consistency in getProject
+- [10-01] Route split pattern: one read group (requireAuth) + one admin group (requireAdmin) per module, both sharing same URL prefix
+- [10-01] Role-aware filtering via user?.role check in route handler, passing activeOnly/status params to service layer
+- [10-01] Status type cast as union literal for Drizzle PgEnum compatibility in eq() calls
 
 ### Pending Todos
 
@@ -145,5 +151,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 09-01-PLAN.md (Association Guard & isOwner Fix) -- Phase 9 complete
+Stopped at: Completed 10-01-PLAN.md (Non-Admin Read API Access) -- Phase 10 complete
 Resume file: None

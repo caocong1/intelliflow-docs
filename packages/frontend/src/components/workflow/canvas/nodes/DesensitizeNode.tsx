@@ -13,13 +13,13 @@ type NodeContentProps = {
 
 function getConfigSummary(config: NodeConfig): string {
   if (config.type !== "desensitize") return "";
-  const count = config.categories.length;
+  const count = config.categories?.length ?? 0;
   return count > 0 ? `${count} 个脱敏类别` : "暂无脱敏类别";
 }
 
 function isConfigured(config: NodeConfig): boolean {
   if (config.type !== "desensitize") return false;
-  return config.categories.length > 0;
+  return (config.categories?.length ?? 0) > 0;
 }
 
 export default function DesensitizeNode(props: NodeContentProps) {

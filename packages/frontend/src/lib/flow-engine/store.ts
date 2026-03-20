@@ -1,4 +1,4 @@
-import { createStore, reconcile } from "solid-js/store";
+import { createStore, reconcile, unwrap } from "solid-js/store";
 import { createSignal } from "solid-js";
 import type { FlowNodeData, FlowEdgeData, Viewport } from "./types";
 
@@ -88,7 +88,7 @@ export function createFlowStore(
 
   /** Get a deep-cloned snapshot for undo/redo and autosave */
   function getSnapshot(): { nodes: FlowNodeData[]; edges: FlowEdgeData[] } {
-    return structuredClone({ nodes: [...nodes], edges: [...edges] });
+    return JSON.parse(JSON.stringify({ nodes: unwrap(nodes), edges: unwrap(edges) }));
   }
 
   /** Apply a snapshot (from undo/redo), preserving fine-grained reactivity */

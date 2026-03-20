@@ -83,13 +83,15 @@ Plans:
   3. User can view, search, filter, and soft-delete documents within a project; document creator can set visibility (self/project/specific members)
   4. Version snapshots are created per node completion; user can view version timeline and diff two versions
   5. Each document has a working directory with standardized structure; node outputs write to step subdirectories with DB indexing; directories archive on document deletion
-**Plans**: 4 plans
+**Plans**: 6 plans
 
 Plans:
 - [x] 04-01-PLAN.md — DB schema (projects, documents, versions, files tables + enums) and shared TypeScript types
 - [x] 04-02-PLAN.md — Project CRUD API with member management + frontend pages (list with tabs, home, settings)
 - [x] 04-03-PLAN.md — Document CRUD API with visibility controls, recycle bin, workspace directory creation + frontend integration
 - [x] 04-04-PLAN.md — Version snapshot API with diff logic + Timeline component, VersionDiff component, document detail page
+- [ ] 04-05-PLAN.md — Gap closure: FSYS-02 file indexing service (insertDocumentFile + POST /files endpoint)
+- [ ] 04-06-PLAN.md — Gap closure: Fix pre-existing frontend TypeScript errors (replace t.Any() schemas, commit WorkflowEditor/Canvas fixes)
 
 ### Phase 5: Document Creation Runtime
 **Goal**: Users can create documents and execute the full workflow end-to-end — from input through AI generation, desensitization, recovery, to final export — with streaming output, multi-model comparison, and failure recovery
@@ -153,7 +155,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 1. Foundation + Auth + Document Types | 3/3 | Complete | 2026-03-19 |
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
 | 3. Workflow Orchestration | 5/5 | Complete   | 2026-03-19 |
-| 4. Project + Document + Version + File System Infrastructure | 4/4 | Complete | 2026-03-20 |
+| 4. Project + Document + Version + File System Infrastructure | 4/6 | Gap Closure | 2026-03-20 |
 | 5. Document Creation Runtime | 0/5 | Not started | - |
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |

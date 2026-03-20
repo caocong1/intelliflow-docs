@@ -9,7 +9,9 @@ import FlowNode from "./nodes/FlowNode";
 import EdgeRenderer from "./edges/EdgeRenderer";
 import TempEdge from "./edges/TempEdge";
 import SelectionBox from "./SelectionBox";
+import AlignmentGuides from "./AlignmentGuides";
 import FlowMiniMap from "./FlowMiniMap";
+import { computeAlignmentGuides, type Guide } from "../../../lib/flow-engine/alignment";
 import InputTransformNode from "./nodes/InputTransformNode";
 import DesensitizeNode from "./nodes/DesensitizeNode";
 import ModelCallNode from "./nodes/ModelCallNode";
@@ -69,6 +71,9 @@ export default function FlowCanvas(props: FlowCanvasProps) {
   let dragNodeStartPos = { x: 0, y: 0 };
   // For batch drag: store initial positions of all selected nodes
   let batchDragStartPositions: Map<string, { x: number; y: number }> = new Map();
+
+  // Alignment guides state
+  const [activeGuides, setActiveGuides] = createSignal<Guide[]>([]);
 
   // Connection state
   const [connecting, setConnecting] = createSignal<ConnectingState | null>(null);
@@ -226,6 +231,32 @@ export default function FlowCanvas(props: FlowCanvasProps) {
       const dx = (ev.clientX - dragStart.x) / props.viewport.zoom;
       const dy = (ev.clientY - dragStart.y) / props.viewport.zoom;
 
+      // For single node drag, compute alignment guides
+      if (batchDragStartPositions.size === 1) {
+        const startPos = batchDragStartPositions.get(nodeId);
+        if (startPos) {
+          const draggedNode = props.nodes.find((n) => n.id === nodeId);
+          const draggingRect = {
+            x: startPos.x + dx,
+            y: startPos.y + dy,
+            width: draggedNode?.size.width ?? 180,
+            height: draggedNode?.size.height ?? 60,
+          };
+          const otherRects = props.nodes
+            .filter((n) => n.id !== nodeId)
+            .map((n) => ({ x: n.position.x, y: n.position.y, width: n.size.width, height: n.size.height }));
+
+          const result = computeAlignmentGuides(draggingRect, otherRects, 5);
+          setActiveGuides(result.guides);
+
+          const finalX = result.snappedX ?? (startPos.x + dx);
+          const finalY = result.snappedY ?? (startPos.y + dy);
+          props.updateNodePosition(nodeId, { x: finalX, y: finalY });
+          return;
+        }
+      }
+
+      setActiveGuides([]);
       for (const [nid, startPos] of batchDragStartPositions) {
         props.updateNodePosition(nid, {
           x: startPos.x + dx,
@@ -236,14 +267,21 @@ export default function FlowCanvas(props: FlowCanvasProps) {
 
     function onUp(ev: MouseEvent) {
       setIsDragging(false);
+      setActiveGuides([]);
       const dx = (ev.clientX - dragStart.x) / props.viewport.zoom;
       const dy = (ev.clientY - dragStart.y) / props.viewport.zoom;
 
       for (const [nid, startPos] of batchDragStartPositions) {
-        props.onNodeDragEnd(nid, {
-          x: startPos.x + dx,
-          y: startPos.y + dy,
-        });
+        // Use current node position (which may be snapped) for final position
+        const currentNode = props.nodes.find((n) => n.id === nid);
+        if (currentNode) {
+          props.onNodeDragEnd(nid, currentNode.position);
+        } else {
+          props.onNodeDragEnd(nid, {
+            x: startPos.x + dx,
+            y: startPos.y + dy,
+          });
+        }
       }
 
       batchDragStartPositions = new Map();
@@ -523,6 +561,10 @@ export default function FlowCanvas(props: FlowCanvasProps) {
                 visible={rb().active}
               />
             )}
+          </Show>
+          {/* Alignment guides during node drag */}
+          <Show when={activeGuides().length > 0}>
+            <AlignmentGuides guides={activeGuides()} />
           </Show>
         </svg>
         {/* HTML node layer */}

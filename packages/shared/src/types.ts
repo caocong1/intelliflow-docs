@@ -109,6 +109,9 @@ export interface InputTransformConfig {
   formFields: FormFieldDef[];
   allowFileUpload: boolean;
   acceptedFileTypes?: string[];
+  autoAdvance?: boolean;
+  allowEdit?: boolean;
+  skippable?: boolean;
 }
 
 export interface DesensitizeConfig {
@@ -116,19 +119,30 @@ export interface DesensitizeConfig {
   ruleTypes: string[];
   placeholderFormat: string;
   localModelId: string | null;
+  autoAdvance?: boolean;
+  allowEdit?: boolean;
+  skippable?: boolean;
 }
 
 export interface ModelCallConfig {
   type: "model_call";
   displayName: string;
-  modelId: string | null;
+  modelIds: string[];
+  /** @deprecated Use modelIds instead. Kept for backward compatibility. */
+  modelId?: string | null;
   promptTemplate: string;
   inputRefs: VariableRef[];
+  autoAdvance?: boolean;
+  allowEdit?: boolean;
+  skippable?: boolean;
 }
 
 export interface RestoreConfig {
   type: "restore";
   pairedDesensitizeNodeId: string | null;
+  autoAdvance?: boolean;
+  allowEdit?: boolean;
+  skippable?: boolean;
 }
 
 export interface ExportConfig {
@@ -136,6 +150,9 @@ export interface ExportConfig {
   format: "word" | "pdf" | "markdown";
   templateId: string | null;
   contentMapping: VariableRef[];
+  autoAdvance?: boolean;
+  allowEdit?: boolean;
+  skippable?: boolean;
 }
 
 export type NodeConfig = InputTransformConfig | DesensitizeConfig | ModelCallConfig | RestoreConfig | ExportConfig;
@@ -288,4 +305,74 @@ export interface VersionDiffResult {
   versionB: DocumentVersion;
   /** Keyed by content field name */
   diffs: Record<string, VersionDiffLine[]>;
+}
+
+// ─── Phase 5: Document Creation Runtime types ────────────────────────────────
+
+/** Node execution status */
+export type NodeExecutionStatus = "pending" | "in_progress" | "completed" | "skipped" | "failed";
+
+/** Per-node execution record within a document */
+export interface NodeExecution {
+  id: string;
+  documentId: string;
+  nodeId: string;
+  nodeLabel: string;
+  nodeType: WorkflowNodeType;
+  status: NodeExecutionStatus;
+  stepOrder: number;
+  inputData: Record<string, unknown> | null;
+  outputData: Record<string, unknown> | null;
+  selectedOutputKey: string | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Desensitize mapping entry */
+export interface DesensitizeMapping {
+  id: string;
+  documentId: string;
+  nodeExecutionId: string;
+  placeholder: string;
+  originalValue: string;
+  sensitiveType: string;
+  createdAt: string;
+}
+
+/** Desensitize rule description (injected into prompts, NO real values) */
+export interface DesensitizeRuleDesc {
+  placeholder: string;
+  sensitiveType: string;
+  description: string;
+}
+
+/** Model call output for a single model */
+export interface ModelOutput {
+  modelId: string;
+  modelDisplayName: string;
+  content: string;
+  status: "pending" | "streaming" | "completed" | "failed";
+  errorMessage?: string;
+  tokenCount?: number;
+}
+
+/** SSE event types for model streaming */
+export type SSEEventType = "status" | "delta" | "complete" | "error";
+
+export interface SSEEvent {
+  type: SSEEventType;
+  modelId: string;
+  data: string;
+  timestamp: string;
+}
+
+/** Document runtime state (full workspace state for frontend) */
+export interface DocumentRuntimeState {
+  documentId: string;
+  workflowName: string;
+  currentNodeIndex: number;
+  nodes: NodeExecution[];
 }

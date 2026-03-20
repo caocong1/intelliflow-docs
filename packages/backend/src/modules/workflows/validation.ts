@@ -160,10 +160,10 @@ export function validateWorkflow(
           severity: "error",
         });
       }
-      if (!node.config.modelId) {
+      if ((!node.config.modelIds || node.config.modelIds.length === 0) && !node.config.modelId) {
         errors.push({
           nodeId: node.id,
-          field: "modelId",
+          field: "modelIds",
           message: `【模型调用】节点 "${node.label}" 未指定模型`,
           severity: "warning",
         });

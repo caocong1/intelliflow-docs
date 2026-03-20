@@ -1,4 +1,4 @@
-import { createSignal, onMount } from "solid-js";
+import { createSignal, For, onMount } from "solid-js";
 import { api } from "../../api/client";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
@@ -30,6 +30,8 @@ export default function DocumentTypeManagement() {
     action: "toggle" | "delete";
   } | null>(null);
   const [submitting, setSubmitting] = createSignal(false);
+  const [deleteCheckLoading, setDeleteCheckLoading] = createSignal(false);
+  const [associatedWorkflows, setAssociatedWorkflows] = createSignal<{id: string; name: string}[]>([]);
 
   // Create form
   const [createName, setCreateName] = createSignal("");
@@ -286,7 +288,20 @@ export default function DocumentTypeManagement() {
           </button>
           <button
             type="button"
-            onClick={() => setConfirmAction({ docType: dt, action: "delete" })}
+            onClick={() => {
+              setConfirmAction({ docType: dt, action: "delete" });
+              setDeleteCheckLoading(true);
+              setAssociatedWorkflows([]);
+              api.api["document-types"]({ id: dt.id }).associations.get()
+                .then(({ data, error }) => {
+                  if (!error && data) {
+                    const result = data as unknown as { workflows: { id: string; name: string }[] };
+                    setAssociatedWorkflows(result.workflows);
+                  }
+                })
+                .catch(() => {})
+                .finally(() => setDeleteCheckLoading(false));
+            }}
             class="text-sm text-red-500 hover:text-red-700 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-1"
           >
             删除
@@ -504,13 +519,35 @@ export default function DocumentTypeManagement() {
         }
       >
         <div class="space-y-4">
-          <p class="text-sm text-slate-600">
-            {confirmAction()?.action === "delete"
-              ? `确定要删除「${confirmAction()?.docType.name}」吗？此操作不可撤销。`
-              : confirmAction()?.docType.isActive
+          {confirmAction()?.action === "delete" ? (
+            deleteCheckLoading() ? (
+              <div class="flex items-center gap-2 text-sm text-slate-500">
+                <div class="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                <span>正在检查关联...</span>
+              </div>
+            ) : associatedWorkflows().length > 0 ? (
+              <div>
+                <p class="text-sm text-red-600 font-medium mb-2">
+                  无法删除：以下工作流正在使用该文档类型，请先修改或删除这些工作流。
+                </p>
+                <ul class="list-disc list-inside space-y-1">
+                  <For each={associatedWorkflows()}>
+                    {(w) => <li class="text-sm text-slate-600">{w.name}</li>}
+                  </For>
+                </ul>
+              </div>
+            ) : (
+              <p class="text-sm text-slate-600">
+                {`确定要删除「${confirmAction()?.docType.name}」吗？此操作不可撤销。`}
+              </p>
+            )
+          ) : (
+            <p class="text-sm text-slate-600">
+              {confirmAction()?.docType.isActive
                 ? `确定要停用「${confirmAction()?.docType.name}」吗？`
                 : `确定要启用「${confirmAction()?.docType.name}」吗？`}
-          </p>
+            </p>
+          )}
           <div class="flex justify-end gap-3">
             <button
               type="button"
@@ -525,7 +562,7 @@ export default function DocumentTypeManagement() {
                 if (confirmAction()?.action === "delete") handleDelete();
                 else handleToggleStatus();
               }}
-              disabled={submitting()}
+              disabled={submitting() || deleteCheckLoading() || (confirmAction()?.action === "delete" && associatedWorkflows().length > 0)}
               class={`px-4 py-2 text-sm text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                 confirmAction()?.action === "delete" || confirmAction()?.docType.isActive
                   ? "bg-red-600 hover:bg-red-700 focus:ring-red-500"

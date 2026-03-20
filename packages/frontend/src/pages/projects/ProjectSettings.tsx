@@ -13,6 +13,7 @@ type ProjectDetail = {
   department: string | null;
   createdBy: string;
   memberCount: number;
+  userRole: "owner" | "participant" | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -70,7 +71,7 @@ export default function ProjectSettings() {
       }
       const proj = data as unknown as ProjectDetail;
       // Check ownership
-      if (proj.createdBy !== auth.user()?.id) {
+      if (proj.userRole !== "owner") {
         navigate(`/projects/${params.id}`, { replace: true });
         return;
       }

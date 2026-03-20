@@ -15,6 +15,7 @@ type ProjectDetail = {
   department: string | null;
   createdBy: string;
   memberCount: number;
+  userRole: "owner" | "participant" | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -161,7 +162,7 @@ export default function ProjectHome() {
     }
   });
 
-  const isOwner = () => project()?.createdBy === auth.user()?.id;
+  const isOwner = () => project()?.userRole === "owner";
   const totalPages = () => Math.ceil(docsTotal() / PAGE_SIZE);
 
   function handleSearch() {

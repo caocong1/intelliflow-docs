@@ -13,6 +13,9 @@ import ModelConfiguration from "./pages/admin/ModelConfiguration";
 import UserManagement from "./pages/admin/UserManagement";
 import WorkflowManagement from "./pages/admin/WorkflowManagement";
 import WorkflowEditor from "./pages/admin/WorkflowEditor";
+import ProjectList from "./pages/projects/ProjectList";
+import ProjectHome from "./pages/projects/ProjectHome";
+import ProjectSettings from "./pages/projects/ProjectSettings";
 
 const AdminRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -43,6 +46,9 @@ const App: Component = () => {
       />
       <Route path="/" component={AppLayout}>
         <Route path="/" component={Dashboard} />
+        <Route path="/projects" component={ProjectList} />
+        <Route path="/projects/:id" component={ProjectHome} />
+        <Route path="/projects/:id/settings" component={ProjectSettings} />
         <Route
           path="/admin/users"
           component={() => (

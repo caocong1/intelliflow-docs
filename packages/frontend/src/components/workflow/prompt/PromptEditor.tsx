@@ -2,6 +2,7 @@ import { For, Show, createSignal, onCleanup } from "solid-js";
 import type { VariableRef } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
 import VariablePicker from "./VariablePicker";
+import PromptOptimizeDialog from "./PromptOptimizeDialog";
 
 // Colors per node type for tag rendering in preview
 const NODE_TYPE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -66,6 +67,7 @@ function resolveNodeType(varName: string, upstreamNodes: FlowNodeData[]): string
 
 export default function PromptEditor(props: PromptEditorProps) {
   const [showPicker, setShowPicker] = createSignal(false);
+  const [showOptimize, setShowOptimize] = createSignal(false);
   const [textareaRef, setTextareaRef] = createSignal<HTMLTextAreaElement | null>(null);
 
   function handleInput(e: InputEvent & { currentTarget: HTMLTextAreaElement }) {
@@ -159,18 +161,42 @@ export default function PromptEditor(props: PromptEditorProps) {
         </Show>
       </div>
 
-      {/* Insert Variable Button */}
-      <button
-        type="button"
-        onClick={handleOpenPicker}
-        class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-md transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
-      >
-        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <title>插入变量</title>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-        </svg>
-        插入变量
-      </button>
+      {/* Action Buttons */}
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={handleOpenPicker}
+          class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-md transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        >
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <title>插入变量</title>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+          </svg>
+          插入变量
+        </button>
+
+        <Show when={props.value.trim().length > 0}>
+          <button
+            type="button"
+            onClick={() => setShowOptimize(true)}
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 border border-amber-200 rounded-md transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <title>优化提示词</title>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+            优化提示词
+          </button>
+        </Show>
+      </div>
+
+      {/* Prompt Optimize Dialog */}
+      <PromptOptimizeDialog
+        open={showOptimize()}
+        currentPrompt={props.value}
+        onClose={() => setShowOptimize(false)}
+        onAccept={(text) => props.onChange(text)}
+      />
 
       {/* Preview with colored tags */}
       <Show when={props.value.includes("{{")}>

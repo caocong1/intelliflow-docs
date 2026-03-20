@@ -3,6 +3,7 @@ import { requireAdmin } from "../auth/auth.guard";
 import {
   createDocumentType,
   deleteDocumentType,
+  getAssociatedWorkflows,
   listDocumentTypes,
   toggleDocumentTypeStatus,
   updateDocumentType,
@@ -108,6 +109,16 @@ export const documentTypeRoutes = new Elysia({ prefix: "/document-types" })
       params: t.Object({ id: t.String() }),
     },
   )
+  .get(
+    "/:id/associations",
+    async ({ params }) => {
+      const workflows = await getAssociatedWorkflows(params.id);
+      return { workflows };
+    },
+    {
+      params: t.Object({ id: t.String() }),
+    },
+  )
   .delete(
     "/:id",
     async ({ params, set }) => {
@@ -118,6 +129,10 @@ export const documentTypeRoutes = new Elysia({ prefix: "/document-types" })
         if (message === "DOCUMENT_TYPE_NOT_FOUND") {
           set.status = 404;
           return { error: "Document type not found" };
+        }
+        if (message === "HAS_ASSOCIATED_WORKFLOWS") {
+          set.status = 409;
+          return { error: "Cannot delete: associated workflows exist", workflows: [] as { id: string; name: string }[] };
         }
         if (message === "HAS_ASSOCIATED_DOCUMENTS") {
           set.status = 409;

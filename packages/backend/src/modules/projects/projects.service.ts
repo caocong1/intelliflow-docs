@@ -178,7 +178,7 @@ export async function listProjects(
   return { data: rows as ProjectListItem[], total };
 }
 
-export async function getProject(projectId: string) {
+export async function getProject(projectId: string, userId: string) {
   const memberCountSq = db
     .select({
       projectId: projectMembers.projectId,
@@ -187,6 +187,15 @@ export async function getProject(projectId: string) {
     .from(projectMembers)
     .groupBy(projectMembers.projectId)
     .as("mc");
+
+  const userRoleSq = db
+    .select({
+      projectId: projectMembers.projectId,
+      role: projectMembers.role,
+    })
+    .from(projectMembers)
+    .where(eq(projectMembers.userId, userId))
+    .as("ur");
 
   const rows = await db
     .select({
@@ -200,9 +209,11 @@ export async function getProject(projectId: string) {
       createdAt: projects.createdAt,
       updatedAt: projects.updatedAt,
       memberCount: sql<number>`COALESCE(${memberCountSq.cnt}, 0)`.as("member_count"),
+      userRole: sql<"owner" | "participant" | null>`${userRoleSq.role}`.as("user_role"),
     })
     .from(projects)
     .leftJoin(memberCountSq, eq(projects.id, memberCountSq.projectId))
+    .leftJoin(userRoleSq, eq(projects.id, userRoleSq.projectId))
     .where(and(eq(projects.id, projectId), eq(projects.isDeleted, false)))
     .limit(1);
 

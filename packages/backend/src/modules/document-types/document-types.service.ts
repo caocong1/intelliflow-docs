@@ -1,6 +1,6 @@
 import { count, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "../../db";
-import { documentTypes } from "../../db/schema";
+import { documentTypes, workflows } from "../../db/schema";
 
 export type DocumentTypeRow = {
   id: string;
@@ -107,7 +107,23 @@ export async function toggleDocumentTypeStatus(id: string): Promise<DocumentType
   return result[0];
 }
 
+export async function getAssociatedWorkflows(
+  documentTypeId: string,
+): Promise<{ id: string; name: string }[]> {
+  const rows = await db
+    .select({ id: workflows.id, name: workflows.name })
+    .from(workflows)
+    .where(eq(workflows.documentTypeId, documentTypeId));
+  return rows;
+}
+
 export async function deleteDocumentType(id: string): Promise<{ success: true }> {
+  // Guard: check for associated workflows
+  const associated = await getAssociatedWorkflows(id);
+  if (associated.length > 0) {
+    throw new Error("HAS_ASSOCIATED_WORKFLOWS");
+  }
+
   // TODO: Phase 4 — check for associated documents in the documents table
   // When the documents table exists, query it to see if any documents reference this type.
   // If found, throw new Error("HAS_ASSOCIATED_DOCUMENTS") to block deletion.

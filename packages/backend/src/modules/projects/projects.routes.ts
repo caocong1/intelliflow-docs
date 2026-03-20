@@ -68,7 +68,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
   .get(
     "/:id",
     async ({ params, user, set }) => {
-      const project = await getProject(params.id);
+      const project = await getProject(params.id, user!.id);
       if (!project) {
         set.status = 404;
         return { error: "Project not found" };

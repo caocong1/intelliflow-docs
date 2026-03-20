@@ -14,6 +14,7 @@ import { runtimeRoutes } from "./modules/runtime/runtime.routes";
 import { inputTransformRoutes } from "./modules/runtime/input-transform.routes";
 import { desensitizeRoutes } from "./modules/runtime/desensitize.routes";
 import { exportRoutes } from "./modules/runtime/export.routes";
+import { modelCallRoutes } from "./modules/runtime/model-call.routes";
 import { restoreRoutes } from "./modules/runtime/restore.routes";
 import { versionRoutes } from "./modules/versions/versions.routes";
 import { workflowAdminRoutes, workflowReadRoutes } from "./modules/workflows/workflows.routes";
@@ -41,6 +42,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(inputTransformRoutes)
   .use(desensitizeRoutes)
   .use(exportRoutes)
+  .use(modelCallRoutes)
   .use(restoreRoutes)
   .listen({ port: 3001, hostname: "0.0.0.0" });
 

@@ -234,7 +234,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 **Goal:** Fix the workflow visual editor so it produces valid, runtime-compatible workflows — with node/edge deletion, config panel alignment to shared types, auto-derived outputs, undo/redo, real-time autosave, comprehensive validation, prompt optimization, and polished UI/UX
 **Requirements**: FLOW-02, FLOW-03, FLOW-04, FLOW-05, FLOW-06, FLOW-07, FLOW-08, FLOW-09, FLOW-10, FLOW-11, FLOW-13
 **Depends on:** Phase 11
-**Plans:** 6 plans
+**Plans:** 7 plans
 
 Plans:
 - [ ] 12-01-PLAN.md — Shared type updates (DesensitizeConfig categories, ExportConfig ppt, FormFieldDef) + flow engine library (types, store, coordinate, edge-paths, derive-outputs)
@@ -242,4 +242,5 @@ Plans:
 - [ ] 12-03-PLAN.md — Selection system (click, multi-select, rubber-band), deletion with confirmation, batch drag, MiniMap
 - [ ] 12-04-PLAN.md — Config panel overhaul (all 5 panels aligned to shared types, RuntimeSettings, remove OutputsEditor)
 - [ ] 12-05-PLAN.md — Undo/redo + debounced autosave + validation expansion (full-field + linear flow) + 变量→节点输出 rename
-- [ ] 12-06-PLAN.md — UI/UX polish (edge animation, alignment guides, node design, NodeLibraryPanel) + human verification
+- [ ] 12-06-PLAN.md — UI/UX polish (edge animation, edge midpoint drag, alignment guides, node design, NodeLibraryPanel) + human verification
+- [ ] 12-07-PLAN.md — Prompt optimization (backend endpoint + frontend dialog with model picker and meta-prompt)

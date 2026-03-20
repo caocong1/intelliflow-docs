@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-20T15:14:00.695Z"
+last_updated: "2026-03-20T15:23:04Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 37
-  completed_plans: 35
+  completed_plans: 36
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 12 of 12 (Workflow Editor Fixes & Config Panel Alignment)
-Plan: 7 of 7 in current phase (12-07 complete)
+Plan: 7 of 7 in current phase (12-05 complete)
 Status: In Progress
-Last activity: 2026-03-20 — Completed 12-07 (Prompt Optimization)
+Last activity: 2026-03-20 — Completed 12-05 (Undo/Redo, Autosave, Validation)
 
-Progress: [█████████░] 95% (35/37 plans)
+Progress: [██████████] 97% (36/37 plans)
 
 ## Performance Metrics
 
@@ -84,6 +84,7 @@ Progress: [█████████░] 95% (35/37 plans)
 | Phase 12 P02 | 17min | 2 tasks | 21 files |
 | Phase 12 P07 | 4min | 2 tasks | 5 files |
 | Phase 12 P03 | 8min | 2 tasks | 5 files |
+| Phase 12 P05 | 7min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -183,6 +184,8 @@ Recent decisions affecting current work:
 - [Phase 12]: Connection target detection uses data-handle-type/data-node-id DOM attributes instead of coordinate hit testing
 - [Phase 12]: [12-07] Non-streaming OpenAI-compatible API call for prompt optimization; default Chinese meta-prompt preserves variable references
 - [Phase 12]: [12-03] Left-click canvas: drag=rubber-band, click=deselect (5px threshold); selection store separate from flow store
+- [Phase 12]: [12-05] Snapshot-based undo/redo with structuredClone; pushes on state-changing ops only (not every drag pixel)
+- [Phase 12]: [12-05] 1.5s debounced autosave with in-flight queue replaces manual save button; validation status resets to unvalidated after each save
 
 ### Roadmap Evolution
 
@@ -199,5 +202,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 12-03-PLAN.md (Selection, Deletion, MiniMap)
+Stopped at: Completed 12-05-PLAN.md (Undo/Redo, Autosave, Validation)
 Resume file: None

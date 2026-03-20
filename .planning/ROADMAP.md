@@ -83,13 +83,13 @@ Plans:
   3. User can view, search, filter, and soft-delete documents within a project; document creator can set visibility (self/project/specific members)
   4. Version snapshots are created per node completion; user can view version timeline and diff two versions
   5. Each document has a working directory with standardized structure; node outputs write to step subdirectories with DB indexing; directories archive on document deletion
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
-- [ ] 04-04: TBD
+- [ ] 04-01-PLAN.md — DB schema (projects, documents, versions, files tables + enums) and shared TypeScript types
+- [ ] 04-02-PLAN.md — Project CRUD API with member management + frontend pages (list with tabs, home, settings)
+- [ ] 04-03-PLAN.md — Document CRUD API with visibility controls, recycle bin, workspace directory creation + frontend integration
+- [ ] 04-04-PLAN.md — Version snapshot API with diff logic + Timeline component, VersionDiff component, document detail page
 
 ### Phase 5: Document Creation Runtime
 **Goal**: Users can create documents and execute the full workflow end-to-end — from input through AI generation, desensitization, recovery, to final export — with streaming output, multi-model comparison, and failure recovery

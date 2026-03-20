@@ -113,14 +113,17 @@ Plans:
   7. Export node lets user choose format (Word/PDF/Markdown), preview the result, set filename, and download; exported file is stored in working directory export/ folder
   8. User can confirm/next, inline-edit current output, skip optional nodes, and roll back to previous nodes (resetting downstream state) at any node
   9. System auto-saves drafts per node; user can close browser and resume from last state; user can cancel in-progress AI generation
-**Plans**: 1 plan
+**Plans**: 8 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-- [ ] 05-03: TBD
-- [ ] 05-04: TBD
-- [ ] 05-05: TBD
+- [ ] 05-01-PLAN.md — Runtime DB schema (nodeExecutions, desensitizeMappings), shared runtime types, node config augmentation (autoAdvance, allowEdit, skippable, modelIds)
+- [ ] 05-02-PLAN.md — Runtime orchestration API (init, advance, rollback, skip, draft save) + workspace UI shell (stepper, node area, history panel, action bar)
+- [ ] 05-03-PLAN.md — Input transform node executor (file upload with txt/pdf/docx parsing, editable results, confirm to step directory)
+- [ ] 05-04-PLAN.md — Desensitize node executor (local model detection, inline highlight + checklist UI, mapping storage, sanitized rule injection)
+- [ ] 05-05-PLAN.md — Model call node executor (OpenAI-compatible API with SSE streaming, multi-model parallel, tab switching, side-by-side comparison, retry, output selection)
+- [ ] 05-06-PLAN.md — Restore node executor (placeholder replacement from mappings, before/after diff with green/red highlights, inline manual correction)
+- [ ] 05-07-PLAN.md — Export node executor (Word/PDF/Markdown generation, in-page preview, filename editor, download with export/ storage)
+- [ ] 05-08-PLAN.md — Inline Markdown WYSIWYG editor, skip logic wiring, auto-save on edit, RECV-03 deferred acknowledgement
 
 ### Phase 6: Phase 1 Formal Verification & Housekeeping
 **Goal**: Formally verify Phase 1 implementation and close all housekeeping gaps (stale checkboxes, missing VERIFICATION.md, ROADMAP status)
@@ -218,7 +221,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
 | 3. Workflow Orchestration | 5/5 | Complete   | 2026-03-19 |
 | 4. Project + Document + Version + File System Infrastructure | 6/6 | Complete | 2026-03-20 |
-| 5. Document Creation Runtime | 0/5 | Not started | - |
+| 5. Document Creation Runtime | 0/8 | Not started | - |
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |
 | 8. Integration Bug Fixes | 1/1 | Complete | 2026-03-20 |

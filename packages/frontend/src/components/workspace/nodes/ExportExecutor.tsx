@@ -2,7 +2,7 @@ import { createSignal, onMount, Show } from "solid-js";
 import { api } from "../../../api/client";
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
 
-type ExportFormat = "word" | "pdf" | "markdown";
+type ExportFormat = "word" | "pdf" | "markdown" | "ppt";
 
 interface Props {
   nodeExecution: NodeExecution;
@@ -16,6 +16,7 @@ const FORMAT_OPTIONS: { value: ExportFormat; label: string; ext: string }[] = [
   { value: "word", label: "Word (.docx)", ext: ".docx" },
   { value: "pdf", label: "PDF (.pdf)", ext: ".pdf" },
   { value: "markdown", label: "Markdown (.md)", ext: ".md" },
+  { value: "ppt", label: "PPT (.pptx)", ext: ".pptx" },
 ];
 
 function getExtension(format: ExportFormat): string {

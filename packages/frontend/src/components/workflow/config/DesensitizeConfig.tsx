@@ -1,16 +1,6 @@
-import { For, createResource } from "solid-js";
+import { For, createResource, createSignal } from "solid-js";
 import type { DesensitizeConfig } from "@intelliflow/shared";
 import { api } from "../../../api/client";
-
-const RULE_TYPE_OPTIONS = [
-  { value: "姓名", label: "姓名" },
-  { value: "身份证号", label: "身份证号" },
-  { value: "手机号", label: "手机号" },
-  { value: "地址", label: "地址" },
-  { value: "银行卡号", label: "银行卡号" },
-  { value: "邮箱", label: "邮箱" },
-  { value: "自定义", label: "自定义" },
-];
 
 type LocalModel = {
   id: string;
@@ -41,61 +31,103 @@ interface DesensitizeConfigProps {
 
 export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
   const [localModels] = createResource(fetchLocalModels);
+  const [newCategoryName, setNewCategoryName] = createSignal("");
+  const [newCategoryDesc, setNewCategoryDesc] = createSignal("");
 
-  function toggleRuleType(ruleType: string) {
-    const current = props.config.ruleTypes;
-    const next = current.includes(ruleType)
-      ? current.filter((r) => r !== ruleType)
-      : [...current, ruleType];
-    props.onChange({ ...props.config, ruleTypes: next });
+  function addCategory() {
+    const name = newCategoryName().trim();
+    const description = newCategoryDesc().trim();
+    if (!name) return;
+    const current = props.config.categories ?? [];
+    props.onChange({
+      ...props.config,
+      categories: [...current, { name, description: description || name }],
+    });
+    setNewCategoryName("");
+    setNewCategoryDesc("");
+  }
+
+  function removeCategory(index: number) {
+    const current = [...(props.config.categories ?? [])];
+    current.splice(index, 1);
+    props.onChange({ ...props.config, categories: current });
   }
 
   return (
     <div class="space-y-4">
-      {/* Rule Types */}
+      {/* Categories */}
       <div>
-        <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">脱敏规则类型</h4>
-        <div class="flex flex-wrap gap-1.5">
-          <For each={RULE_TYPE_OPTIONS}>
-            {(opt) => {
-              const selected = () => props.config.ruleTypes.includes(opt.value);
-              return (
+        <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">脱敏类别</h4>
+
+        <div class="space-y-1.5 mb-2">
+          <For
+            each={props.config.categories ?? []}
+            fallback={
+              <p class="text-xs text-slate-400 italic text-center py-2">
+                暂无类别 — 请添加脱敏类别
+              </p>
+            }
+          >
+            {(cat, index) => (
+              <div class="flex items-center gap-1.5 p-1.5 bg-orange-50 rounded border border-orange-200">
+                <div class="flex-1 min-w-0">
+                  <span class="text-xs font-medium text-orange-800">{cat.name}</span>
+                  <span class="text-xs text-orange-600 ml-1">— {cat.description}</span>
+                </div>
                 <button
                   type="button"
-                  onClick={() => toggleRuleType(opt.value)}
-                  class={`px-2.5 py-1 text-xs rounded-full border transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                    selected()
-                      ? "bg-orange-500 text-white border-orange-500"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-orange-300"
-                  }`}
+                  onClick={() => removeCategory(index())}
+                  class="p-0.5 text-orange-300 hover:text-red-500 transition-colors cursor-pointer focus:outline-none"
+                  title="删除类别"
                 >
-                  {opt.label}
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <title>删除</title>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
-              );
-            }}
+              </div>
+            )}
           </For>
         </div>
-        {props.config.ruleTypes.length === 0 && (
-          <p class="text-xs text-amber-600 mt-1.5">请至少选择一种脱敏规则</p>
+
+        {/* Add new category */}
+        <div class="flex items-end gap-1.5">
+          <div class="flex-1">
+            <input
+              type="text"
+              value={newCategoryName()}
+              onInput={(e) => setNewCategoryName(e.currentTarget.value)}
+              placeholder="类别名称"
+              class="w-full text-xs px-2 py-1 border border-slate-200 rounded bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400 focus:border-orange-400"
+            />
+          </div>
+          <div class="flex-1">
+            <input
+              type="text"
+              value={newCategoryDesc()}
+              onInput={(e) => setNewCategoryDesc(e.currentTarget.value)}
+              placeholder="描述"
+              class="w-full text-xs px-2 py-1 border border-slate-200 rounded bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400 focus:border-orange-400"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={addCategory}
+            class="px-2 py-1 text-xs font-medium text-orange-600 hover:text-orange-700 hover:bg-orange-50 rounded transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-orange-500"
+          >
+            添加
+          </button>
+        </div>
+
+        {(props.config.categories ?? []).length === 0 && (
+          <p class="text-xs text-amber-600 mt-1.5">请至少添加一种脱敏类别</p>
         )}
       </div>
 
-      {/* Placeholder Format */}
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">
-          占位符格式
-        </label>
-        <input
-          type="text"
-          value={props.config.placeholderFormat}
-          onInput={(e) =>
-            props.onChange({ ...props.config, placeholderFormat: e.currentTarget.value })
-          }
-          placeholder="[MASKED_{type}_{index}]"
-          class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-md bg-white text-slate-800 placeholder-slate-400 font-mono focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
-        />
-        <p class="text-xs text-slate-400 mt-1">
-          变量：{"{type}"} 规则类型，{"{index}"} 序号
+      {/* Placeholder format info */}
+      <div class="bg-slate-50 rounded-md p-2 border border-slate-100">
+        <p class="text-xs text-slate-500">
+          占位符格式：<code class="font-mono text-slate-700">[TYPE_N]</code>（系统内定，不可配置）
         </p>
       </div>
 

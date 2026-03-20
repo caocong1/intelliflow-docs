@@ -62,7 +62,7 @@ function buildDefaultConfig(nodeType: WorkflowNodeType): Record<string, unknown>
     case "input_transform":
       return { type: "input_transform", formFields: [], allowFileUpload: false };
     case "desensitize":
-      return { type: "desensitize", ruleTypes: [], placeholderFormat: "[REDACTED]", localModelId: null };
+      return { type: "desensitize", categories: [], localModelId: null };
     case "model_call":
       return { type: "model_call", displayName: DEFAULT_LABELS.model_call, modelId: null, promptTemplate: "", inputRefs: [] };
     case "restore":

@@ -36,7 +36,7 @@ export default function InputTransformExecutor(props: Props) {
 
   const initialFields: Record<string, string> = {};
   for (const field of props.config.formFields ?? []) {
-    initialFields[field.name] = existingOutput?.fields?.[field.name] ?? "";
+    initialFields[field.id] = existingOutput?.fields?.[field.id] ?? "";
   }
 
   const [formData, setFormData] = createSignal<Record<string, string>>(initialFields);
@@ -200,7 +200,7 @@ export default function InputTransformExecutor(props: Props) {
     // Validate required fields
     const data = formData();
     for (const field of props.config.formFields ?? []) {
-      if (field.required && !data[field.name]?.trim()) {
+      if (field.required && !data[field.id]?.trim()) {
         setConfirmError(`"${field.label}" is required`);
         return;
       }
@@ -258,8 +258,8 @@ export default function InputTransformExecutor(props: Props) {
           </label>
           <input
             type="text"
-            value={formData()[field.name] ?? ""}
-            onInput={(e) => handleFieldChange(field.name, e.currentTarget.value)}
+            value={formData()[field.id] ?? ""}
+            onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
             disabled={props.readOnly}
             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
             placeholder={field.label}
@@ -278,8 +278,8 @@ export default function InputTransformExecutor(props: Props) {
             </Show>
           </label>
           <textarea
-            value={formData()[field.name] ?? ""}
-            onInput={(e) => handleFieldChange(field.name, e.currentTarget.value)}
+            value={formData()[field.id] ?? ""}
+            onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
             disabled={props.readOnly}
             rows={4}
             class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 resize-y"

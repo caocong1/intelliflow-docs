@@ -100,9 +100,8 @@ export default function DesensitizeExecutor(props: Props) {
     ).length;
     const count = checkedOfType + 1;
 
-    const placeholder = props.config.placeholderFormat
-      .replace("{TYPE}", form.sensitiveType.toUpperCase())
-      .replace("{N}", String(count));
+    // System-defined placeholder format: [TYPE_N]
+    const placeholder = `[${form.sensitiveType.toUpperCase()}_${count}]`;
 
     const newItem: DetectedItem = {
       original: form.original,

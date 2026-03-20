@@ -25,7 +25,6 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
   function addField() {
     const newField: FormFieldDef = {
       id: crypto.randomUUID(),
-      name: "",
       label: "",
       type: "text",
       required: false,
@@ -122,12 +121,12 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
                     </button>
                   </div>
 
-                  {/* Name */}
+                  {/* Label (primary identifier, name auto-derived) */}
                   <input
                     type="text"
-                    value={field.name}
-                    onInput={(e) => updateField(field.id, { name: e.currentTarget.value })}
-                    placeholder="字段名 (英文)"
+                    value={field.label}
+                    onInput={(e) => updateField(field.id, { label: e.currentTarget.value })}
+                    placeholder="显示标签"
                     class="flex-1 text-xs px-2 py-1 border border-slate-200 rounded bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
                   />
 
@@ -146,14 +145,6 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
                 </div>
 
                 <div class="flex items-center gap-2 pl-7">
-                  <input
-                    type="text"
-                    value={field.label}
-                    onInput={(e) => updateField(field.id, { label: e.currentTarget.value })}
-                    placeholder="显示标签"
-                    class="flex-1 text-xs px-2 py-1 border border-slate-200 rounded bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
-                  />
-
                   <select
                     value={field.type}
                     onChange={(e) => updateField(field.id, { type: e.currentTarget.value as FormFieldDef["type"] })}

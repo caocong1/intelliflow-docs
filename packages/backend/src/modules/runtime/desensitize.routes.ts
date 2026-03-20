@@ -64,8 +64,7 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
         const items = await detectSensitiveInfo(
           body.text,
           config.localModelId,
-          config.ruleTypes,
-          config.placeholderFormat,
+          config.categories,
         );
 
         return { items };

@@ -11,8 +11,8 @@ type WorkflowNodeData = {
 };
 
 function isConfigured(config: Record<string, unknown>): boolean {
-  const rules = config.ruleTypes as unknown[] | undefined;
-  return Array.isArray(rules) && rules.length > 0;
+  const categories = config.categories as unknown[] | undefined;
+  return Array.isArray(categories) && categories.length > 0;
 }
 
 export default function DesensitizeNode(props: NodeProps<WorkflowNodeData, "desensitize">) {

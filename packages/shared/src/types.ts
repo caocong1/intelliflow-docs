@@ -97,7 +97,6 @@ export interface VariableRef {
 /** Form field definition for input transform node */
 export interface FormFieldDef {
   id: string;
-  name: string;
   label: string;
   type: "text" | "textarea" | "file";
   required: boolean;
@@ -116,8 +115,7 @@ export interface InputTransformConfig {
 
 export interface DesensitizeConfig {
   type: "desensitize";
-  ruleTypes: string[];
-  placeholderFormat: string;
+  categories: Array<{ name: string; description: string }>;
   localModelId: string | null;
   autoAdvance?: boolean;
   allowEdit?: boolean;
@@ -147,7 +145,7 @@ export interface RestoreConfig {
 
 export interface ExportConfig {
   type: "export";
-  format: "word" | "pdf" | "markdown";
+  format: "word" | "pdf" | "markdown" | "ppt";
   templateId: string | null;
   contentMapping: VariableRef[];
   autoAdvance?: boolean;

@@ -19,18 +19,21 @@ export interface DetectedSensitiveItem {
 /**
  * Detect sensitive info in text using a local model API or regex fallback.
  */
+/** System-defined placeholder format: [TYPE_N] */
+const PLACEHOLDER_FORMAT = "[{TYPE}_{N}]";
+
 export async function detectSensitiveInfo(
   text: string,
   localModelId: string | null,
-  ruleTypes: string[],
-  placeholderFormat: string,
+  categories: Array<{ name: string; description: string }>,
 ): Promise<DetectedSensitiveItem[]> {
+  const categoryNames = categories.map((c) => c.name);
   let rawItems: Array<{ original: string; type: string; description: string }>;
 
   if (localModelId) {
-    rawItems = await detectViaModel(text, localModelId, ruleTypes);
+    rawItems = await detectViaModel(text, localModelId, categoryNames);
   } else {
-    rawItems = detectViaRegex(text, ruleTypes);
+    rawItems = detectViaRegex(text, categoryNames);
   }
 
   // Generate placeholders with incrementing counters per type
@@ -41,8 +44,8 @@ export async function detectSensitiveInfo(
     const count = (counters.get(item.type) ?? 0) + 1;
     counters.set(item.type, count);
 
-    // placeholderFormat e.g. "[{TYPE}_{N}]" -> "[PERSON_NAME_1]"
-    const placeholder = placeholderFormat
+    // System-defined placeholder format: [TYPE_N]
+    const placeholder = PLACEHOLDER_FORMAT
       .replace("{TYPE}", item.type.toUpperCase())
       .replace("{N}", String(count));
 
@@ -66,7 +69,7 @@ export async function detectSensitiveInfo(
 async function detectViaModel(
   text: string,
   localModelId: string,
-  ruleTypes: string[],
+  categoryNames: string[],
 ): Promise<Array<{ original: string; type: string; description: string }>> {
   // Look up model + provider
   const rows = await db
@@ -86,7 +89,7 @@ async function detectViaModel(
 
   const { modelId, baseUrl, apiKey } = rows[0];
 
-  const typesDesc = ruleTypes.join(", ");
+  const typesDesc = categoryNames.join(", ");
   const systemPrompt = `你是一个敏感信息检测工具。请分析以下文本，识别其中属于以下类型的敏感信息：${typesDesc}。
 
 返回一个JSON数组，每个元素包含：
@@ -137,7 +140,7 @@ async function detectViaModel(
 
 function detectViaRegex(
   text: string,
-  ruleTypes: string[],
+  categoryNames: string[],
 ): Array<{ original: string; type: string; description: string }> {
   const results: Array<{ original: string; type: string; description: string }> = [];
   const seen = new Set<string>();
@@ -162,7 +165,7 @@ function detectViaRegex(
   };
 
   // Only apply patterns for requested rule types, or all if empty
-  const typesToCheck = ruleTypes.length > 0 ? ruleTypes : Object.keys(patterns);
+  const typesToCheck = categoryNames.length > 0 ? categoryNames : Object.keys(patterns);
 
   for (const ruleType of typesToCheck) {
     const pattern = patterns[ruleType];

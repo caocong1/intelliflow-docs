@@ -242,7 +242,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROJ-07 | Phase 4 | Complete |
 | PROJ-08 | Phase 4 | Complete |
 | PROJ-09 | Phase 4 | Complete |
-| DMGT-01 | Phase 4 | Complete |
+| DMGT-01 | Phase 4, Phase 10 | Complete |
 | DMGT-02 | Phase 4 | Complete |
 | DMGT-03 | Phase 4 | Complete |
 | DMGT-04 | Phase 4 | Complete |

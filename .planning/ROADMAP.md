@@ -20,11 +20,12 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status (completed 2026-03-19)
 - [x] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09 (completed 2026-03-19)
 - [x] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync (completed 2026-03-20)
-- [ ] **Phase 9: Integration Polish & UX Guards** - Association check guard for document type delete, fix frontend ownership derivation
+- [x] **Phase 9: Integration Polish & UX Guards** - Association check guard for document type delete, fix frontend ownership derivation (completed 2026-03-20)
+- [ ] **Phase 10: Non-Admin Read API Access** - Split doc-type/workflow listing to requireAuth so non-admin users can create documents
 
 ## Phase Details
 
-> **Note:** Phase 5 is the primary remaining work. Phase 9 addresses minor integration polish found during audit.
+> **Note:** Phase 5 is the primary remaining work. Phase 10 fixes a cross-phase integration issue (INT-NEW-01) that blocks non-admin document creation.
 
 ### Phase 1: Foundation + Auth + Document Types
 **Goal**: Administrators can manage users and document types on a working application with role-based access
@@ -175,6 +176,20 @@ Plans:
 Plans:
 - [ ] 09-01-PLAN.md — Association check in deleteDocumentType + fix isOwner() in ProjectHome.tsx
 
+### Phase 10: Non-Admin Read API Access
+**Goal**: Non-admin users can list active document types and workflows when creating documents, fixing the cross-phase wiring gap between admin-only Phase 1/3 endpoints and Phase 4's non-admin user flows
+**Depends on**: Phase 1, Phase 3
+**Requirements**: DMGT-01
+**Gap Closure:** Closes integration gap INT-NEW-01 from v1.0 audit (re-audit #4)
+**Success Criteria** (what must be TRUE):
+  1. Non-admin authenticated users can call GET /api/document-types and GET /api/workflows to list active items (requireAuth, not requireAdmin)
+  2. Admin-only mutations (create, edit, delete, toggle) remain behind requireAdmin
+  3. ProjectHome document creation modal shows populated doc type and workflow selectors for non-admin users
+**Plans**: 1 plan
+
+Plans:
+- [ ] 10-01-PLAN.md — Split doc-type/workflow routes: requireAuth for listing, requireAdmin for mutations
+
 ## Progress
 
 **Execution Order:**
@@ -191,4 +206,5 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |
 | 8. Integration Bug Fixes | 1/1 | Complete | 2026-03-20 |
-| 9. Integration Polish & UX Guards | 0/1 | Not started | - |
+| 9. Integration Polish & UX Guards | 1/1 | Complete | 2026-03-20 |
+| 10. Non-Admin Read API Access | 0/1 | Not started | - |

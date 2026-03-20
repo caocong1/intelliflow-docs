@@ -4,7 +4,8 @@ import { api } from "../../api/client";
 import StepperBar from "../../components/workspace/StepperBar";
 import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
 import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExecutor";
-import type { DesensitizeConfig, DocumentRuntimeState, NodeExecution } from "@intelliflow/shared";
+import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
+import type { DesensitizeConfig, ExportConfig, DocumentRuntimeState, NodeExecution } from "@intelliflow/shared";
 
 type ViewMode = "current" | "history";
 
@@ -186,9 +187,8 @@ export default function DocumentWorkspace() {
                 {/* Current in-progress node */}
                 <Match when={viewMode() === "current" && currentNode()}>
                   <div class="space-y-6">
-                    {/* Node executor — desensitize or generic placeholder */}
-                    <Show
-                      when={currentNode()?.nodeType === "desensitize"}
+                    {/* Node executor — route by nodeType */}
+                    <Switch
                       fallback={
                         <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
                           <div class="text-gray-400 text-sm mb-2">Node Executor</div>
@@ -204,16 +204,29 @@ export default function DocumentWorkspace() {
                         </div>
                       }
                     >
-                      <DesensitizeExecutor
-                        nodeExecution={currentNode()!}
-                        config={({} as DesensitizeConfig)}
-                        documentId={params.documentId}
-                        onDraftSave={(data) => {
-                          /* draft saved via executor */
-                        }}
-                        readOnly={false}
-                      />
-                    </Show>
+                      <Match when={currentNode()?.nodeType === "desensitize"}>
+                        <DesensitizeExecutor
+                          nodeExecution={currentNode()!}
+                          config={({} as DesensitizeConfig)}
+                          documentId={params.documentId}
+                          onDraftSave={(data) => {
+                            /* draft saved via executor */
+                          }}
+                          readOnly={false}
+                        />
+                      </Match>
+                      <Match when={currentNode()?.nodeType === "export"}>
+                        <ExportExecutor
+                          nodeExecution={currentNode()!}
+                          config={({} as ExportConfig)}
+                          documentId={params.documentId}
+                          onDraftSave={(data) => {
+                            /* draft saved via executor */
+                          }}
+                          readOnly={false}
+                        />
+                      </Match>
+                    </Switch>
 
                     {/* Completed node history list */}
                     <Show when={completedNodes().length > 0}>

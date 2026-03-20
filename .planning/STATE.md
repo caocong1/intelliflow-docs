@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-03-20T14:38:44Z"
+last_updated: "2026-03-20T14:54:49Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 37
-  completed_plans: 31
+  completed_plans: 32
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 12 of 12 (Workflow Editor Fixes & Config Panel Alignment)
-Plan: 1 of 7 in current phase (12-01 complete)
+Plan: 4 of 7 in current phase (12-04 complete)
 Status: In Progress
-Last activity: 2026-03-20 — Completed 12-01 (Shared Types & Flow Engine Foundation)
+Last activity: 2026-03-20 — Completed 12-04 (Config Panel Alignment)
 
-Progress: [████████░░] 84% (31/37 plans)
+Progress: [████████░░] 86% (32/37 plans)
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [████████░░] 84% (31/37 plans)
 | Phase 05 P06 | 4min | 2 tasks | 5 files |
 | Phase 05 P08 | 4min | 2 tasks | 4 files |
 | Phase 12 P01 | 6min | 2 tasks | 15 files |
+| Phase 12 P04 | 12min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,9 @@ Recent decisions affecting current work:
 - [12-01] DesensitizeConfig categories replaces ruleTypes+placeholderFormat; placeholder format [TYPE_N] is system constant
 - [12-01] Flow engine as pure library (lib/flow-engine/) with reactive store, coordinate transforms, edge paths, derive-outputs
 - [12-01] addEdge enforces linear constraint; applySnapshot uses reconcile for fine-grained reactivity
+- [12-04] RuntimeSettings defaults: autoAdvance=false, allowEdit=true, skippable=false
+- [12-04] Config panels migrated from WFNode/WFEdge to FlowNodeData/FlowEdgeData for flow engine consistency
+- [12-04] OutputsEditor deleted; auto-derived outputs shown as read-only badges in ConfigPanel
 
 ### Roadmap Evolution
 
@@ -187,5 +191,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 12-01-PLAN.md (Shared Types & Flow Engine Foundation)
+Stopped at: Completed 12-04-PLAN.md (Config Panel Alignment)
 Resume file: None

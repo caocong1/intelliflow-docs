@@ -91,8 +91,8 @@ export default function WorkflowEditor() {
         data: {
           nodeType: n.type,
           label: n.label || DEFAULT_LABELS[n.type],
-          config: (n.config || buildDefaultConfig(n.type)) as NodeConfig,
-          outputs: (n.outputs || []) as OutputDef[],
+          config: (n.config || buildDefaultConfig(n.type)) as unknown as NodeConfig,
+          outputs: (n.outputs || []) as unknown as OutputDef[],
         },
         sourceHandle: "right" as const,
         targetHandle: "left" as const,
@@ -121,8 +121,8 @@ export default function WorkflowEditor() {
         type: n.data.nodeType,
         label: n.data.label,
         position: n.position,
-        config: n.data.config as Record<string, unknown>,
-        outputs: n.data.outputs as Array<{ name: string; label: string }>,
+        config: n.data.config as unknown as Record<string, unknown>,
+        outputs: n.data.outputs as unknown as Array<{ name: string; label: string }>,
       }));
 
       const backendEdges = [...store.edges].map((e) => ({

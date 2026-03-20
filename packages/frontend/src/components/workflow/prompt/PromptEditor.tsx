@@ -1,6 +1,6 @@
 import { For, Show, createSignal, onCleanup } from "solid-js";
 import type { VariableRef } from "@intelliflow/shared";
-import type { WFNode } from "../../../pages/admin/WorkflowEditor";
+import type { FlowNodeData } from "../../../lib/flow-engine/types";
 import VariablePicker from "./VariablePicker";
 
 // Colors per node type for tag rendering in preview
@@ -18,7 +18,7 @@ const SYSTEM_VAR_NAMES = new Set(["工作目录", "输入目录", "输出目录"
 interface PromptEditorProps {
   value: string;
   availableVariables: VariableRef[];
-  upstreamNodes: WFNode[];
+  upstreamNodes: FlowNodeData[];
   onChange: (value: string) => void;
 }
 
@@ -29,7 +29,7 @@ interface ParsedSegment {
 }
 
 /** Parse prompt template string into text/variable segments */
-function parsePrompt(template: string, upstreamNodes: WFNode[]): ParsedSegment[] {
+function parsePrompt(template: string, upstreamNodes: FlowNodeData[]): ParsedSegment[] {
   const parts: ParsedSegment[] = [];
   const regex = /\{\{([^}]+)\}\}/g;
   let lastIndex = 0;
@@ -53,7 +53,7 @@ function parsePrompt(template: string, upstreamNodes: WFNode[]): ParsedSegment[]
 }
 
 /** Resolve which node type owns this variable name */
-function resolveNodeType(varName: string, upstreamNodes: WFNode[]): string {
+function resolveNodeType(varName: string, upstreamNodes: FlowNodeData[]): string {
   if (SYSTEM_VAR_NAMES.has(varName)) return "system";
   for (const node of upstreamNodes) {
     const nodePrefix = `${node.data.label}.`;

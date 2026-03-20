@@ -1,6 +1,6 @@
 import { For, Show, createSignal } from "solid-js";
 import type { VariableRef, OutputDef } from "@intelliflow/shared";
-import type { WFNode } from "../../../pages/admin/WorkflowEditor";
+import type { FlowNodeData } from "../../../lib/flow-engine/types";
 
 const SYSTEM_VARIABLES: Array<{ name: string; label: string }> = [
   { name: "工作目录", label: "工作目录" },
@@ -10,7 +10,7 @@ const SYSTEM_VARIABLES: Array<{ name: string; label: string }> = [
 ];
 
 interface VariablePickerProps {
-  upstreamNodes: WFNode[];
+  upstreamNodes: FlowNodeData[];
   onSelect: (variableName: string, ref: VariableRef | null) => void;
   onClose: () => void;
 }
@@ -18,7 +18,7 @@ interface VariablePickerProps {
 export default function VariablePicker(props: VariablePickerProps) {
   const [search, setSearch] = createSignal("");
 
-  function nodeOutputs(node: WFNode): OutputDef[] {
+  function nodeOutputs(node: FlowNodeData): OutputDef[] {
     return (node.data.outputs as OutputDef[]).filter((o) => o.name);
   }
 
@@ -27,7 +27,7 @@ export default function VariablePicker(props: VariablePickerProps) {
     return q === "" || text.toLowerCase().includes(q);
   }
 
-  function handleSelectOutput(node: WFNode, output: OutputDef) {
+  function handleSelectOutput(node: FlowNodeData, output: OutputDef) {
     const variableName = `${node.data.label}.${output.name}`;
     const ref: VariableRef = {
       nodeId: node.id,

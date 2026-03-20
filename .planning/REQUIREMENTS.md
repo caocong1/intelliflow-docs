@@ -102,9 +102,9 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 节点执行 — 文件导出
 
-- [ ] **NODE-20**: 用户可选择导出格式（Word/PDF/Markdown）
-- [ ] **NODE-21**: 用户可预览导出效果
-- [ ] **NODE-22**: 用户可设置文件名并下载，导出文件存储在工作目录 export/ 下
+- [x] **NODE-20**: 用户可选择导出格式（Word/PDF/Markdown）
+- [x] **NODE-21**: 用户可预览导出效果
+- [x] **NODE-22**: 用户可设置文件名并下载，导出文件存储在工作目录 export/ 下
 
 ### 节点通用操作
 
@@ -279,9 +279,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NODE-17 | Phase 5 | Pending |
 | NODE-18 | Phase 5 | Pending |
 | NODE-19 | Phase 5 | Pending |
-| NODE-20 | Phase 5 | Pending |
-| NODE-21 | Phase 5 | Pending |
-| NODE-22 | Phase 5 | Pending |
+| NODE-20 | Phase 5 | Complete |
+| NODE-21 | Phase 5 | Complete |
+| NODE-22 | Phase 5 | Complete |
 | NOPS-01 | Phase 5 | Complete |
 | NOPS-02 | Phase 5 | Pending |
 | NOPS-03 | Phase 5 | Pending |

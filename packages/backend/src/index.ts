@@ -8,6 +8,7 @@ import { projectRoutes } from "./modules/projects/projects.routes";
 import { workflowRoutes } from "./modules/workflows/workflows.routes";
 import { documentMgmtRoutes } from "./modules/documents/documents.routes";
 import { versionRoutes } from "./modules/versions/versions.routes";
+import { fileRoutes } from "./modules/files/files.routes";
 
 const app = new Elysia({ prefix: "/api" })
   .get("/health", () => ({
@@ -23,6 +24,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(projectRoutes)
   .use(documentMgmtRoutes)
   .use(versionRoutes)
+  .use(fileRoutes)
   .listen({ port: 3001, hostname: "0.0.0.0" });
 
 console.log(`Backend running on http://localhost:${app.server?.port}`);

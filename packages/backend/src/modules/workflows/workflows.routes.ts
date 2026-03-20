@@ -1,5 +1,5 @@
 import Elysia, { t } from "elysia";
-import { requireAdmin } from "../auth/auth.guard";
+import { requireAdmin, requireAuth } from "../auth/auth.guard";
 import {
   copyWorkflow,
   createWorkflow,
@@ -30,18 +30,22 @@ const edgeSchema = t.Object({
   targetHandle: t.Optional(t.String()),
 });
 
-export const workflowRoutes = new Elysia({ prefix: "/workflows" })
-  .use(requireAdmin)
+// ── Read routes (any authenticated user) ─────────────────────────────────────
 
-  // GET / — list with optional filters
+export const workflowReadRoutes = new Elysia({ prefix: "/workflows" })
+  .use(requireAuth)
+
+  // GET / — list with optional filters (non-admin sees only active)
   .get(
     "/",
-    async ({ query }) => {
+    async ({ query, user }) => {
+      const statusFilter = user?.role !== "admin" ? "active" : undefined;
       const result = await listWorkflows({
         documentTypeId: query.documentTypeId,
         search: query.search,
         page: query.page ? Number(query.page) : undefined,
         pageSize: query.pageSize ? Number(query.pageSize) : undefined,
+        status: statusFilter,
       });
       return result;
     },
@@ -53,7 +57,12 @@ export const workflowRoutes = new Elysia({ prefix: "/workflows" })
         pageSize: t.Optional(t.String()),
       }),
     },
-  )
+  );
+
+// ── Admin routes (admin only) ────────────────────────────────────────────────
+
+export const workflowAdminRoutes = new Elysia({ prefix: "/workflows" })
+  .use(requireAdmin)
 
   // GET /:id — get single workflow with full graph
   .get(

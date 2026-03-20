@@ -1,5 +1,5 @@
 import Elysia, { t } from "elysia";
-import { requireAdmin } from "../auth/auth.guard";
+import { requireAdmin, requireAuth } from "../auth/auth.guard";
 import {
   createDocumentType,
   deleteDocumentType,
@@ -9,15 +9,18 @@ import {
   updateDocumentType,
 } from "./document-types.service";
 
-export const documentTypeRoutes = new Elysia({ prefix: "/document-types" })
-  .use(requireAdmin)
+// ── Read routes (any authenticated user) ─────────────────────────────────────
+
+export const documentTypeReadRoutes = new Elysia({ prefix: "/document-types" })
+  .use(requireAuth)
   .get(
     "/",
-    async ({ query }) => {
+    async ({ query, user }) => {
       const page = Number(query.page) || 1;
       const pageSize = Number(query.pageSize) || 20;
       const search = query.search || undefined;
-      const { data, total } = await listDocumentTypes(page, pageSize, search);
+      const activeOnly = user?.role !== "admin";
+      const { data, total } = await listDocumentTypes(page, pageSize, search, activeOnly);
       return { data, total, page, pageSize };
     },
     {
@@ -27,7 +30,12 @@ export const documentTypeRoutes = new Elysia({ prefix: "/document-types" })
         search: t.Optional(t.String()),
       }),
     },
-  )
+  );
+
+// ── Admin routes (admin only) ────────────────────────────────────────────────
+
+export const documentTypeAdminRoutes = new Elysia({ prefix: "/document-types" })
+  .use(requireAdmin)
   .post(
     "/",
     async ({ body, set }) => {

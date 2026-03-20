@@ -1,11 +1,11 @@
 import { Elysia } from "elysia";
 import { authRoutes } from "./modules/auth/auth.routes";
-import { documentTypeRoutes } from "./modules/document-types/document-types.routes";
+import { documentTypeReadRoutes, documentTypeAdminRoutes } from "./modules/document-types/document-types.routes";
 import { modelRoutes } from "./modules/models/models.routes";
 import { providerRoutes } from "./modules/providers/providers.routes";
 import { userRoutes } from "./modules/users/users.routes";
 import { projectRoutes } from "./modules/projects/projects.routes";
-import { workflowRoutes } from "./modules/workflows/workflows.routes";
+import { workflowReadRoutes, workflowAdminRoutes } from "./modules/workflows/workflows.routes";
 import { documentMgmtRoutes } from "./modules/documents/documents.routes";
 import { versionRoutes } from "./modules/versions/versions.routes";
 import { fileRoutes } from "./modules/files/files.routes";
@@ -17,10 +17,12 @@ const app = new Elysia({ prefix: "/api" })
   }))
   .use(authRoutes)
   .use(userRoutes)
-  .use(documentTypeRoutes)
+  .use(documentTypeReadRoutes)
+  .use(documentTypeAdminRoutes)
   .use(providerRoutes)
   .use(modelRoutes)
-  .use(workflowRoutes)
+  .use(workflowReadRoutes)
+  .use(workflowAdminRoutes)
   .use(projectRoutes)
   .use(documentMgmtRoutes)
   .use(versionRoutes)

@@ -185,3 +185,103 @@ export interface WorkflowListItem extends BaseEntity {
   isDefault: boolean;
   nodeCount: number;
 }
+
+// ─── Project & Document types ────────────────────────────────────────────────
+
+/** Project member roles */
+export type ProjectRole = "owner" | "participant";
+
+/** Document visibility scope */
+export type DocumentVisibility = "self" | "project" | "specific";
+
+/** Document lifecycle status */
+export type DocumentStatus = "draft" | "in_progress" | "completed";
+
+/** Project entity */
+export interface Project extends BaseEntity {
+  name: string;
+  description: string | null;
+  department: string | null;
+  createdBy: string;
+  isDeleted: boolean;
+  deletedAt: string | null;
+}
+
+/** Project member (user assigned to a project) */
+export interface ProjectMember {
+  id: string;
+  projectId: string;
+  userId: string;
+  role: ProjectRole;
+  joinedAt: string;
+  /** Joined fields (optional, for list views) */
+  displayName?: string;
+  username?: string;
+}
+
+/** Project list item with aggregated info */
+export interface ProjectListItem extends Project {
+  memberCount: number;
+  /** null if user is not a member (admin viewing "all") */
+  userRole: ProjectRole | null;
+}
+
+/** Document entity */
+export interface Document extends BaseEntity {
+  projectId: string;
+  workflowId: string;
+  title: string;
+  description: string | null;
+  status: DocumentStatus;
+  visibility: DocumentVisibility;
+  createdBy: string;
+  isDeleted: boolean;
+  deletedAt: string | null;
+  isArchived: boolean;
+  /** Joined fields (optional) */
+  creatorName?: string;
+  workflowName?: string;
+}
+
+/** Document version snapshot */
+export interface DocumentVersion {
+  id: string;
+  documentId: string;
+  versionNumber: number;
+  nodeId: string;
+  nodeLabel: string;
+  snapshotData: Record<string, unknown>;
+  createdBy: string;
+  createdAt: string;
+  /** Joined fields */
+  creatorName?: string;
+}
+
+/** Document file (uploaded or exported) */
+export interface DocumentFile {
+  id: string;
+  documentId: string;
+  category: "upload" | "export";
+  originalName: string;
+  storagePath: string;
+  mimeType: string | null;
+  fileSize: number | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+/** A single line in a version diff */
+export interface VersionDiffLine {
+  type: "added" | "removed" | "unchanged";
+  content: string;
+  oldLineNumber?: number;
+  newLineNumber?: number;
+}
+
+/** Result of comparing two document versions */
+export interface VersionDiffResult {
+  versionA: DocumentVersion;
+  versionB: DocumentVersion;
+  /** Keyed by content field name */
+  diffs: Record<string, VersionDiffLine[]>;
+}

@@ -11,7 +11,9 @@ import { projectRoutes } from "./modules/projects/projects.routes";
 import { providerRoutes } from "./modules/providers/providers.routes";
 import { userAdminRoutes, userReadRoutes } from "./modules/users/users.routes";
 import { runtimeRoutes } from "./modules/runtime/runtime.routes";
+import { inputTransformRoutes } from "./modules/runtime/input-transform.routes";
 import { desensitizeRoutes } from "./modules/runtime/desensitize.routes";
+import { exportRoutes } from "./modules/runtime/export.routes";
 import { versionRoutes } from "./modules/versions/versions.routes";
 import { workflowAdminRoutes, workflowReadRoutes } from "./modules/workflows/workflows.routes";
 
@@ -35,7 +37,9 @@ const app = new Elysia({ prefix: "/api" })
   .use(versionRoutes)
   .use(fileRoutes)
   .use(runtimeRoutes)
+  .use(inputTransformRoutes)
   .use(desensitizeRoutes)
+  .use(exportRoutes)
   .listen({ port: 3001, hostname: "0.0.0.0" });
 
 console.log(`Backend running on http://localhost:${app.server?.port}`);

@@ -1,4 +1,4 @@
-import { For, Show, Switch, Match, createSignal, createMemo, onCleanup } from "solid-js";
+import { For, Show, Switch, Match, createSignal, createMemo, onMount, onCleanup } from "solid-js";
 import type { FlowNodeData, FlowEdgeData, Viewport, HandlePosition } from "../../../lib/flow-engine/types";
 import type { WorkflowNodeType } from "@intelliflow/shared";
 import { screenToFlow, getHandlePosition } from "../../../lib/flow-engine/coordinate";
@@ -9,6 +9,7 @@ import FlowNode from "./nodes/FlowNode";
 import EdgeRenderer from "./edges/EdgeRenderer";
 import TempEdge from "./edges/TempEdge";
 import SelectionBox from "./SelectionBox";
+import FlowMiniMap from "./FlowMiniMap";
 import InputTransformNode from "./nodes/InputTransformNode";
 import DesensitizeNode from "./nodes/DesensitizeNode";
 import ModelCallNode from "./nodes/ModelCallNode";
@@ -75,6 +76,25 @@ export default function FlowCanvas(props: FlowCanvasProps) {
     currentPos: { x: number; y: number };
     active: boolean;
   } | null>(null);
+
+  // Canvas dimensions for minimap
+  const [canvasSize, setCanvasSize] = createSignal({ width: 800, height: 600 });
+
+  onMount(() => {
+    if (!canvasRef) return;
+    const rect = canvasRef.getBoundingClientRect();
+    setCanvasSize({ width: rect.width, height: rect.height });
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setCanvasSize({ width, height });
+        }
+      }
+    });
+    observer.observe(canvasRef);
+    onCleanup(() => observer.disconnect());
+  });
 
   // Delete confirmation dialog state
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
@@ -530,6 +550,14 @@ export default function FlowCanvas(props: FlowCanvasProps) {
         </For>
       </FlowViewport>
       <FlowControls viewport={props.viewport} setViewport={props.setViewport} fitView={fitView} />
+      <FlowMiniMap
+        nodes={[...props.nodes]}
+        edges={[...props.edges]}
+        viewport={props.viewport}
+        canvasWidth={canvasSize().width}
+        canvasHeight={canvasSize().height}
+        onViewportChange={props.setViewport}
+      />
 
       {/* Delete confirmation dialog */}
       <Show when={showDeleteConfirm()}>

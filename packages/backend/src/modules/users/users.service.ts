@@ -1,4 +1,4 @@
-import { and, count, desc, eq, ne } from "drizzle-orm";
+import { and, count, desc, eq, ilike, ne, or } from "drizzle-orm";
 import { db } from "../../db";
 import { users } from "../../db/schema";
 import { deleteUserSessions } from "../auth/auth.service";
@@ -26,17 +26,31 @@ const userColumns = {
 export async function listUsers(
   page: number,
   pageSize: number,
+  search?: string,
+  activeOnly?: boolean,
 ): Promise<{ data: UserRow[]; total: number }> {
   const offset = (page - 1) * pageSize;
+
+  const conditions = [];
+  if (search) {
+    conditions.push(
+      or(ilike(users.username, `%${search}%`), ilike(users.displayName, `%${search}%`)),
+    );
+  }
+  if (activeOnly) {
+    conditions.push(eq(users.isActive, true));
+  }
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [data, totalResult] = await Promise.all([
     db
       .select(userColumns)
       .from(users)
+      .where(whereClause)
       .orderBy(desc(users.createdAt))
       .limit(pageSize)
       .offset(offset),
-    db.select({ count: count() }).from(users),
+    db.select({ count: count() }).from(users).where(whereClause),
   ]);
 
   return { data, total: totalResult[0]?.count ?? 0 };

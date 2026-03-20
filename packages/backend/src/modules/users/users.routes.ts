@@ -1,24 +1,32 @@
 import Elysia, { t } from "elysia";
-import { requireAdmin } from "../auth/auth.guard";
+import { requireAdmin, requireAuth } from "../auth/auth.guard";
 import { createUser, listUsers, toggleUserStatus, updateUser } from "./users.service";
 
-export const userRoutes = new Elysia({ prefix: "/users" })
+// ── Read routes (any authenticated user) ─────────────────────────────────────
+
+export const userReadRoutes = new Elysia({ prefix: "/users" }).use(requireAuth).get(
+  "/",
+  async ({ query, user }) => {
+    const page = Number(query.page) || 1;
+    const pageSize = Number(query.pageSize) || 20;
+    const search = query.search || undefined;
+    const activeOnly = user?.role !== "admin";
+    const { data, total } = await listUsers(page, pageSize, search, activeOnly);
+    return { data, total, page, pageSize };
+  },
+  {
+    query: t.Object({
+      page: t.Optional(t.String()),
+      pageSize: t.Optional(t.String()),
+      search: t.Optional(t.String()),
+    }),
+  },
+);
+
+// ── Admin routes (admin only) ────────────────────────────────────────────────
+
+export const userAdminRoutes = new Elysia({ prefix: "/users" })
   .use(requireAdmin)
-  .get(
-    "/",
-    async ({ query }) => {
-      const page = Number(query.page) || 1;
-      const pageSize = Number(query.pageSize) || 20;
-      const { data, total } = await listUsers(page, pageSize);
-      return { data, total, page, pageSize };
-    },
-    {
-      query: t.Object({
-        page: t.Optional(t.String()),
-        pageSize: t.Optional(t.String()),
-      }),
-    },
-  )
   .post(
     "/",
     async ({ body, set }) => {

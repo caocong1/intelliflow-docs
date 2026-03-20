@@ -3,7 +3,7 @@ import { authRoutes } from "./modules/auth/auth.routes";
 import { documentTypeReadRoutes, documentTypeAdminRoutes } from "./modules/document-types/document-types.routes";
 import { modelRoutes } from "./modules/models/models.routes";
 import { providerRoutes } from "./modules/providers/providers.routes";
-import { userRoutes } from "./modules/users/users.routes";
+import { userReadRoutes, userAdminRoutes } from "./modules/users/users.routes";
 import { projectRoutes } from "./modules/projects/projects.routes";
 import { workflowReadRoutes, workflowAdminRoutes } from "./modules/workflows/workflows.routes";
 import { documentMgmtRoutes } from "./modules/documents/documents.routes";
@@ -16,7 +16,8 @@ const app = new Elysia({ prefix: "/api" })
     timestamp: new Date().toISOString(),
   }))
   .use(authRoutes)
-  .use(userRoutes)
+  .use(userReadRoutes)
+  .use(userAdminRoutes)
   .use(documentTypeReadRoutes)
   .use(documentTypeAdminRoutes)
   .use(providerRoutes)

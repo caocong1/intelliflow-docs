@@ -167,13 +167,17 @@ Recent decisions affecting current work:
 - [Phase 05]: Split-view editor (textarea+preview) over contenteditable for robustness
 - [Phase 05]: RECV-03 cancel AI generation deferred to v2 per user decision
 
+### Roadmap Evolution
+
+- Phase 12 added: Workflow Editor Fixes & Config Panel Alignment — fix node/edge deletion, config panel field mismatches with runtime, connection handling, variable system, and validation gaps
+
 ### Pending Todos
 
 None yet.
 
 ### Blockers/Concerns
 
-None yet.
+- Phase 5 UAT blocked until Phase 12 (workflow editor fixes) is complete — cannot create valid workflows for testing
 
 ## Session Continuity
 

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-20T08:01:58.637Z"
+last_updated: "2026-03-20T08:49:52Z"
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 21
-  completed_plans: 21
+  total_phases: 10
+  completed_phases: 10
+  total_plans: 22
+  completed_plans: 22
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 10: Non-Admin Read API Access -- COMPLETE
+**Current focus:** Phase 11: Pre-Phase 5 API Access Fixes -- COMPLETE
 
 ## Current Position
 
-Phase: 10 of 10 (Non-Admin Read API Access) -- COMPLETE
+Phase: 11 of 11 (Pre-Phase 5 API Access Fixes) -- COMPLETE
 Plan: 1 of 1 in current phase
-Status: Phase 10 Complete
-Last activity: 2026-03-20 — Completed 10-01 (Non-Admin Read API Access)
+Status: Phase 11 Complete
+Last activity: 2026-03-20 — Completed 11-01 (Non-Admin Read API Access)
 
-Progress: [██████████] 100% (21/21 plans)
+Progress: [██████████] 100% (22/22 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Average duration: 8.5min
-- Total execution time: ~1.5 hours
+- Total plans completed: 12
+- Average duration: 8.1min
+- Total execution time: ~1.6 hours
 
 **By Phase:**
 
@@ -49,6 +49,7 @@ Progress: [██████████] 100% (21/21 plans)
 | 08    | 1/1   | 2min  | 2min     |
 | 09    | 1/1   | 3min  | 3min     |
 | 10    | 1/1   | 3min  | 3min     |
+| 11    | 1/1   | 3min  | 3min     |
 
 **Recent Trend:**
 - Last 5 plans: ~30min, 3min, 2min, 5min, 12min
@@ -70,6 +71,7 @@ Progress: [██████████] 100% (21/21 plans)
 | Phase 08 P01 | 2min | 2 tasks | 4 files |
 | Phase 09 P01 | 3min | 2 tasks | 7 files |
 | Phase 10 P01 | 3min | 2 tasks | 5 files |
+| Phase 11 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -139,6 +141,8 @@ Recent decisions affecting current work:
 - [10-01] Route split pattern: one read group (requireAuth) + one admin group (requireAdmin) per module, both sharing same URL prefix
 - [10-01] Role-aware filtering via user?.role check in route handler, passing activeOnly/status params to service layer
 - [10-01] Status type cast as union literal for Drizzle PgEnum compatibility in eq() calls
+- [11-01] Followed Phase 10 route split pattern exactly for consistency across all modules
+- [11-01] Search uses ilike with or() on both username and displayName for flexible matching
 
 ### Pending Todos
 
@@ -151,5 +155,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 10-01-PLAN.md (Non-Admin Read API Access) -- Phase 10 complete
+Stopped at: Completed 11-01-PLAN.md (Non-Admin Read API Access) -- Phase 11 complete
 Resume file: None

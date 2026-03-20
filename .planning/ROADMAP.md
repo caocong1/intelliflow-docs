@@ -22,7 +22,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync (completed 2026-03-20)
 - [x] **Phase 9: Integration Polish & UX Guards** - Association check guard for document type delete, fix frontend ownership derivation (completed 2026-03-20)
 - [x] **Phase 10: Non-Admin Read API Access** - Split doc-type/workflow listing to requireAuth so non-admin users can create documents (completed 2026-03-20)
-- [ ] **Phase 11: Pre-Phase 5 API Access Fixes** - Split user/model/workflow-detail routes to requireAuth for non-admin access, closing INT-NEW-02/INT-NEW-03
+- [x] **Phase 11: Pre-Phase 5 API Access Fixes** - Split user/model/workflow-detail routes to requireAuth for non-admin access, closing INT-NEW-02/INT-NEW-03 (completed 2026-03-20)
 
 ## Phase Details
 
@@ -224,4 +224,4 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 8. Integration Bug Fixes | 1/1 | Complete | 2026-03-20 |
 | 9. Integration Polish & UX Guards | 1/1 | Complete | 2026-03-20 |
 | 10. Non-Admin Read API Access | 1/1 | Complete    | 2026-03-20 |
-| 11. Pre-Phase 5 API Access Fixes | 0/1 | Not started | - |
+| 11. Pre-Phase 5 API Access Fixes | 1/1 | Complete   | 2026-03-20 |

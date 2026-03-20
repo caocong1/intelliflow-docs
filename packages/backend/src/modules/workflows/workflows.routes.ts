@@ -1,5 +1,7 @@
+import type { WorkflowEdgeDef, WorkflowNodeDef, WorkflowStatus } from "@intelliflow/shared";
 import Elysia, { t } from "elysia";
 import { requireAdmin, requireAuth } from "../auth/auth.guard";
+import { validateWorkflow } from "./validation";
 import {
   copyWorkflow,
   createWorkflow,
@@ -10,8 +12,6 @@ import {
   toggleWorkflowStatus,
   updateWorkflow,
 } from "./workflows.service";
-import { validateWorkflow } from "./validation";
-import type { WorkflowEdgeDef, WorkflowNodeDef, WorkflowStatus } from "@intelliflow/shared";
 
 const nodeSchema = t.Object({
   id: t.String(),
@@ -57,12 +57,7 @@ export const workflowReadRoutes = new Elysia({ prefix: "/workflows" })
         pageSize: t.Optional(t.String()),
       }),
     },
-  );
-
-// ── Admin routes (admin only) ────────────────────────────────────────────────
-
-export const workflowAdminRoutes = new Elysia({ prefix: "/workflows" })
-  .use(requireAdmin)
+  )
 
   // GET /:id — get single workflow with full graph
   .get(
@@ -83,7 +78,12 @@ export const workflowAdminRoutes = new Elysia({ prefix: "/workflows" })
     {
       params: t.Object({ id: t.String() }),
     },
-  )
+  );
+
+// ── Admin routes (admin only) ────────────────────────────────────────────────
+
+export const workflowAdminRoutes = new Elysia({ prefix: "/workflows" })
+  .use(requireAdmin)
 
   // POST / — create workflow
   .post(

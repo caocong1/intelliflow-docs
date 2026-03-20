@@ -1,14 +1,17 @@
 import { Elysia } from "elysia";
 import { authRoutes } from "./modules/auth/auth.routes";
-import { documentTypeReadRoutes, documentTypeAdminRoutes } from "./modules/document-types/document-types.routes";
-import { modelRoutes } from "./modules/models/models.routes";
-import { providerRoutes } from "./modules/providers/providers.routes";
-import { userReadRoutes, userAdminRoutes } from "./modules/users/users.routes";
-import { projectRoutes } from "./modules/projects/projects.routes";
-import { workflowReadRoutes, workflowAdminRoutes } from "./modules/workflows/workflows.routes";
+import {
+  documentTypeAdminRoutes,
+  documentTypeReadRoutes,
+} from "./modules/document-types/document-types.routes";
 import { documentMgmtRoutes } from "./modules/documents/documents.routes";
-import { versionRoutes } from "./modules/versions/versions.routes";
 import { fileRoutes } from "./modules/files/files.routes";
+import { modelAdminRoutes, modelReadRoutes } from "./modules/models/models.routes";
+import { projectRoutes } from "./modules/projects/projects.routes";
+import { providerRoutes } from "./modules/providers/providers.routes";
+import { userAdminRoutes, userReadRoutes } from "./modules/users/users.routes";
+import { versionRoutes } from "./modules/versions/versions.routes";
+import { workflowAdminRoutes, workflowReadRoutes } from "./modules/workflows/workflows.routes";
 
 const app = new Elysia({ prefix: "/api" })
   .get("/health", () => ({
@@ -21,7 +24,8 @@ const app = new Elysia({ prefix: "/api" })
   .use(documentTypeReadRoutes)
   .use(documentTypeAdminRoutes)
   .use(providerRoutes)
-  .use(modelRoutes)
+  .use(modelReadRoutes)
+  .use(modelAdminRoutes)
   .use(workflowReadRoutes)
   .use(workflowAdminRoutes)
   .use(projectRoutes)

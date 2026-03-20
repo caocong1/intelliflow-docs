@@ -1,5 +1,5 @@
 import Elysia, { t } from "elysia";
-import { requireAdmin } from "../auth/auth.guard";
+import { requireAdmin, requireAuth } from "../auth/auth.guard";
 import {
   createModel,
   deleteModel,
@@ -9,15 +9,19 @@ import {
   updateModel,
 } from "./models.service";
 
-export const modelRoutes = new Elysia({ prefix: "/models" })
+// ── Read routes (any authenticated user) ─────────────────────────────────────
+
+export const modelReadRoutes = new Elysia({ prefix: "/models" })
+  .use(requireAuth)
+  .get("/", async () => {
+    const data = await listActiveModels();
+    return { data };
+  });
+
+// ── Admin routes (admin only) ────────────────────────────────────────────────
+
+export const modelAdminRoutes = new Elysia({ prefix: "/models" })
   .use(requireAdmin)
-  .get(
-    "/",
-    async () => {
-      const data = await listActiveModels();
-      return { data };
-    },
-  )
   .get(
     "/by-provider/:providerId",
     async ({ params }) => {

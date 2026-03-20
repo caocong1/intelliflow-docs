@@ -51,15 +51,15 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 项目管理
 
-- [ ] **PROJ-01**: 用户可创建项目（名称、描述、所属部门）
-- [ ] **PROJ-02**: 用户可编辑项目信息
-- [ ] **PROJ-03**: 项目负责人可删除项目（软删除）
-- [ ] **PROJ-04**: 用户可查看项目列表（我创建的/我参与的/全部项目）并搜索筛选
-- [ ] **PROJ-05**: 项目负责人可邀请和移除项目成员
-- [ ] **PROJ-06**: 项目成员可自行退出项目（负责人须先移交角色）
+- [x] **PROJ-01**: 用户可创建项目（名称、描述、所属部门）
+- [x] **PROJ-02**: 用户可编辑项目信息
+- [x] **PROJ-03**: 项目负责人可删除项目（软删除）
+- [x] **PROJ-04**: 用户可查看项目列表（我创建的/我参与的/全部项目）并搜索筛选
+- [x] **PROJ-05**: 项目负责人可邀请和移除项目成员
+- [x] **PROJ-06**: 项目成员可自行退出项目（负责人须先移交角色）
 - [x] **PROJ-07**: 项目支持两种角色：项目负责人（全部权限）和项目参与者（限定权限）
 - [x] **PROJ-08**: 项目创建人默认为项目负责人，可添加多个负责人
-- [ ] **PROJ-09**: 项目主页根据角色展示不同视图（文档列表、进行中任务、成员管理等）
+- [x] **PROJ-09**: 项目主页根据角色展示不同视图（文档列表、进行中任务、成员管理等）
 
 ### 文档创建与工作台
 
@@ -233,15 +233,15 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FLOW-11 | Phase 3 | Complete |
 | FLOW-12 | Phase 3 | Complete |
 | FLOW-13 | Phase 3 | Complete |
-| PROJ-01 | Phase 4 | Pending |
-| PROJ-02 | Phase 4 | Pending |
-| PROJ-03 | Phase 4 | Pending |
-| PROJ-04 | Phase 4 | Pending |
-| PROJ-05 | Phase 4 | Pending |
-| PROJ-06 | Phase 4 | Pending |
+| PROJ-01 | Phase 4 | Complete |
+| PROJ-02 | Phase 4 | Complete |
+| PROJ-03 | Phase 4 | Complete |
+| PROJ-04 | Phase 4 | Complete |
+| PROJ-05 | Phase 4 | Complete |
+| PROJ-06 | Phase 4 | Complete |
 | PROJ-07 | Phase 4 | Complete |
 | PROJ-08 | Phase 4 | Complete |
-| PROJ-09 | Phase 4 | Pending |
+| PROJ-09 | Phase 4 | Complete |
 | DMGT-01 | Phase 4 | Pending |
 | DMGT-02 | Phase 4 | Pending |
 | DMGT-03 | Phase 4 | Pending |

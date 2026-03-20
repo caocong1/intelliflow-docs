@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in-progress
-last_updated: "2026-03-20T03:34:13Z"
+status: unknown
+last_updated: "2026-03-20T03:42:47.734Z"
 progress:
-  total_phases: 7
+  total_phases: 6
   completed_phases: 5
-  total_plans: 21
-  completed_plans: 13
+  total_plans: 16
+  completed_plans: 14
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 4 of 7 (Project, Document, Version & File System Infrastructure)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: Executing Phase 4
-Last activity: 2026-03-20 — Completed 04-01 (Schema & Types)
+Last activity: 2026-03-20 — Completed 04-02 (Project Management)
 
-Progress: [████████░░] 62% (13/21 plans)
+Progress: [████████░░] 67% (14/21 plans)
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [████████░░] 62% (13/21 plans)
 | Phase 03 P04 | 5min | 2 tasks | 10 files |
 | Phase 03 P05 | 15min | 2 tasks | 8 files |
 | Phase 04 P01 | 2min | 2 tasks | 2 files |
+| Phase 04 P02 | 5min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,9 @@ Recent decisions affecting current work:
 - [03-05] ValidationOverlay auto-opens when errors exist after save; manual close button available; does not block save
 - [03-05] hasError prop pattern: each node accepts boolean derived from errorNodeIds.has(nodeId), threaded from WorkflowEditor signal
 - [04-01] db:push runs from packages/backend directory, not workspace root
+- [04-02] Project list uses tab-based filtering (created/joined/all) with server-side tab parameter
+- [04-02] Member invitation uses username lookup against users list API (simple v1 approach)
+- [04-02] Owner permission check done in route handler via isProjectOwner helper, not middleware
 
 ### Pending Todos
 
@@ -121,5 +125,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 04-01-PLAN.md (Schema & Types)
+Stopped at: Completed 04-02-PLAN.md (Project Management)
 Resume file: None

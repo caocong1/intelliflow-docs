@@ -7,7 +7,7 @@ import type {
   RestoreConfig,
   ExportConfig,
 } from "@intelliflow/shared";
-import type { WFNode, WFEdge } from "../../../pages/admin/WorkflowEditor";
+import type { FlowNodeData, FlowEdgeData } from "../../../lib/flow-engine/types";
 import { deriveOutputs } from "../../../lib/flow-engine/derive-outputs";
 import RuntimeSettings from "./RuntimeSettings";
 import InputTransformConfigPanel from "./InputTransformConfig";
@@ -41,16 +41,16 @@ const NODE_TYPE_COLORS: Record<string, string> = {
 };
 
 interface ConfigPanelProps {
-  selectedNode: WFNode | null;
-  allNodes: WFNode[];
-  edges: WFEdge[];
+  selectedNode: FlowNodeData | null;
+  allNodes: FlowNodeData[];
+  edges: FlowEdgeData[];
   onConfigChange: (nodeId: string, config: Record<string, unknown>) => void;
   onLabelChange: (nodeId: string, label: string) => void;
   onClose: () => void;
 }
 
 /** Traverse edges backward from nodeId to find all upstream node IDs */
-function getUpstreamNodeIds(nodeId: string, edges: WFEdge[]): Set<string> {
+function getUpstreamNodeIds(nodeId: string, edges: FlowEdgeData[]): Set<string> {
   const visited = new Set<string>();
   const queue = [nodeId];
   while (queue.length > 0) {

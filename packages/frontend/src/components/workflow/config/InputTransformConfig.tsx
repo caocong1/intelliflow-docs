@@ -1,5 +1,11 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show } from "solid-js";
 import type { InputTransformConfig, FormFieldDef } from "@intelliflow/shared";
+
+const FIELD_TYPE_OPTIONS: { value: FormFieldDef["type"]; label: string }[] = [
+  { value: "text", label: "单行文本" },
+  { value: "textarea", label: "多行文本" },
+  { value: "file", label: "文件上传" },
+];
 
 const FILE_TYPE_OPTIONS = [
   { value: ".pdf", label: "PDF" },
@@ -8,12 +14,6 @@ const FILE_TYPE_OPTIONS = [
   { value: ".txt", label: "文本" },
   { value: ".md", label: "Markdown" },
   { value: ".png,.jpg,.jpeg", label: "图片" },
-];
-
-const FIELD_TYPE_OPTIONS: { value: FormFieldDef["type"]; label: string }[] = [
-  { value: "text", label: "单行文本" },
-  { value: "textarea", label: "多行文本" },
-  { value: "file", label: "文件上传" },
 ];
 
 interface InputTransformConfigProps {
@@ -54,6 +54,9 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
     props.onChange({ ...props.config, formFields: fields });
   }
 
+  /** allowFileUpload is also implicitly true when any field has type "file" */
+  const hasFileField = () => props.config.formFields.some((f) => f.type === "file");
+
   function toggleFileType(fileType: string) {
     const current = props.config.acceptedFileTypes ?? [];
     const next = current.includes(fileType)
@@ -64,10 +67,10 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
 
   return (
     <div class="space-y-4">
-      {/* Form Fields */}
+      {/* Form Fields — renamed from "表单字段" to "用户输入项" */}
       <div>
         <div class="flex items-center justify-between mb-2">
-          <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide">表单字段</h4>
+          <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide">用户输入项</h4>
           <button
             type="button"
             onClick={addField}
@@ -77,7 +80,7 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
               <title>添加</title>
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            添加字段
+            添加输入项
           </button>
         </div>
 
@@ -86,7 +89,7 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
             each={props.config.formFields}
             fallback={
               <p class="text-xs text-slate-400 italic text-center py-3">
-                暂无字段 — 点击"添加字段"开始
+                暂无输入项 -- 点击"添加输入项"开始
               </p>
             }
           >
@@ -121,13 +124,13 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
                     </button>
                   </div>
 
-                  {/* Label (primary identifier, name auto-derived) */}
+                  {/* Label — primary identifier, name is auto-derived */}
                   <input
                     type="text"
                     value={field.label}
                     onInput={(e) => updateField(field.id, { label: e.currentTarget.value })}
                     placeholder="显示标签"
-                    class="flex-1 text-xs px-2 py-1 border border-slate-200 rounded bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+                    class="flex-1 text-xs px-2 py-1 border border-gray-300 rounded-md bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
                   />
 
                   {/* Delete */}
@@ -135,7 +138,7 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
                     type="button"
                     onClick={() => removeField(field.id)}
                     class="p-1 text-slate-300 hover:text-red-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-400 rounded"
-                    title="删除字段"
+                    title="删除输入项"
                   >
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                       <title>删除</title>
@@ -144,11 +147,12 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
                   </button>
                 </div>
 
+                {/* Second row: type, required, placeholder */}
                 <div class="flex items-center gap-2 pl-7">
                   <select
                     value={field.type}
                     onChange={(e) => updateField(field.id, { type: e.currentTarget.value as FormFieldDef["type"] })}
-                    class="text-xs px-1.5 py-1 border border-slate-200 rounded bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+                    class="text-xs px-1.5 py-1 border border-gray-300 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
                   >
                     <For each={FIELD_TYPE_OPTIONS}>
                       {(opt) => <option value={opt.value}>{opt.label}</option>}
@@ -160,7 +164,7 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
                       type="checkbox"
                       checked={field.required}
                       onChange={(e) => updateField(field.id, { required: e.currentTarget.checked })}
-                      class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                      class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                     />
                     必填
                   </label>
@@ -176,16 +180,20 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
         <label class="flex items-center gap-2 cursor-pointer select-none">
           <input
             type="checkbox"
-            checked={props.config.allowFileUpload}
+            checked={props.config.allowFileUpload || hasFileField()}
+            disabled={hasFileField()}
             onChange={(e) =>
               props.onChange({ ...props.config, allowFileUpload: e.currentTarget.checked })
             }
-            class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:opacity-50"
           />
-          <span class="text-sm font-medium text-slate-700">允许文件上传</span>
+          <span class="text-sm font-medium text-gray-700">允许文件上传</span>
         </label>
+        <Show when={hasFileField()}>
+          <p class="text-xs text-slate-400 mt-1 pl-6">已有文件类型输入项，自动启用文件上传</p>
+        </Show>
 
-        <Show when={props.config.allowFileUpload}>
+        <Show when={props.config.allowFileUpload || hasFileField()}>
           <div class="mt-2 pl-6">
             <p class="text-xs text-slate-500 mb-1.5">允许的文件类型：</p>
             <div class="flex flex-wrap gap-1.5">

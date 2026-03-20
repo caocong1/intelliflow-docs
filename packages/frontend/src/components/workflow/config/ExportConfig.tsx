@@ -1,21 +1,22 @@
 import { For } from "solid-js";
 import type { ExportConfig, VariableRef, OutputDef } from "@intelliflow/shared";
-import type { WFNode } from "../../../pages/admin/WorkflowEditor";
+import type { FlowNodeData } from "../../../lib/flow-engine/types";
 
 const FORMAT_OPTIONS: { value: ExportConfig["format"]; label: string; desc: string }[] = [
   { value: "word", label: "Word", desc: ".docx 格式，适合正式文档" },
   { value: "pdf", label: "PDF", desc: ".pdf 格式，适合固定版式" },
   { value: "markdown", label: "Markdown", desc: ".md 格式，适合技术文档" },
+  { value: "ppt", label: "PPT", desc: ".pptx 格式，适合演示汇报" },
 ];
 
 interface ExportConfigProps {
   config: ExportConfig;
-  allNodes: WFNode[];
-  upstreamNodes: WFNode[];
+  allNodes: FlowNodeData[];
+  upstreamNodes: FlowNodeData[];
   onChange: (config: ExportConfig) => void;
 }
 
-function getAvailableOutputs(nodes: WFNode[]): Array<{ ref: VariableRef; outputDef: OutputDef; nodeLabel: string }> {
+function getAvailableOutputs(nodes: FlowNodeData[]): Array<{ ref: VariableRef; outputDef: OutputDef; nodeLabel: string }> {
   const result: Array<{ ref: VariableRef; outputDef: OutputDef; nodeLabel: string }> = [];
   for (const node of nodes) {
     const outputs = node.data.outputs as OutputDef[];
@@ -59,7 +60,7 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
     <div class="space-y-4">
       {/* Format Selector */}
       <div>
-        <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">导出格式</h4>
+        <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">导出格式</h4>
         <div class="space-y-1.5">
           <For each={FORMAT_OPTIONS}>
             {(opt) => (
@@ -87,15 +88,16 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
         </div>
       </div>
 
-      {/* Template Selector (placeholder) */}
-      <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">文档模板</label>
+      {/* Template Selector */}
+      <div class="border-t border-slate-100 pt-3">
+        <label for="export-template" class="block text-sm font-medium text-gray-700 mb-1">文档模板</label>
         <select
+          id="export-template"
           value={props.config.templateId ?? ""}
           onChange={(e) =>
             props.onChange({ ...props.config, templateId: e.currentTarget.value || null })
           }
-          class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+          class="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
         >
           <option value="">默认模板</option>
         </select>
@@ -103,8 +105,8 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
       </div>
 
       {/* Content Mapping */}
-      <div>
-        <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">导出内容</h4>
+      <div class="border-t border-slate-100 pt-3">
+        <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">导出内容</h4>
         <p class="text-xs text-slate-500 mb-2">选择要包含在导出文件中的上游输出内容：</p>
 
         {availableOutputs().length === 0 ? (
@@ -120,10 +122,10 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
                     type="checkbox"
                     checked={isSelected(ref)}
                     onChange={() => toggleOutput(ref)}
-                    class="rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                    class="rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
                   />
                   <span class="text-xs text-slate-400">{nodeLabel}</span>
-                  <span class="text-slate-300 text-xs">›</span>
+                  <span class="text-slate-300 text-xs">&rsaquo;</span>
                   <span class="text-xs text-slate-700 font-medium">{outputDef.name}</span>
                 </label>
               )}

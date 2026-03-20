@@ -1,10 +1,10 @@
 import { For } from "solid-js";
 import type { RestoreConfig } from "@intelliflow/shared";
-import type { WFNode } from "../../../pages/admin/WorkflowEditor";
+import type { FlowNodeData } from "../../../lib/flow-engine/types";
 
 interface RestoreConfigProps {
   config: RestoreConfig;
-  allNodes: WFNode[];
+  allNodes: FlowNodeData[];
   onChange: (config: RestoreConfig) => void;
 }
 
@@ -19,12 +19,20 @@ export default function RestoreConfigPanel(props: RestoreConfigProps) {
 
   return (
     <div class="space-y-4">
+      {/* Description */}
+      <div class="bg-slate-50 rounded-md p-2.5 border border-slate-100">
+        <p class="text-xs text-slate-500">
+          系统自动读取脱敏映射，将占位符替换回真实值。无需额外配置。
+        </p>
+      </div>
+
       {/* Paired Node Selector */}
       <div>
-        <label class="block text-xs font-medium text-slate-600 mb-1">
+        <label for="restore-paired-node" class="block text-sm font-medium text-gray-700 mb-1">
           配对的脱敏节点
         </label>
         <select
+          id="restore-paired-node"
           value={props.config.pairedDesensitizeNodeId ?? ""}
           onChange={(e) =>
             props.onChange({
@@ -32,7 +40,7 @@ export default function RestoreConfigPanel(props: RestoreConfigProps) {
               pairedDesensitizeNodeId: e.currentTarget.value || null,
             })
           }
-          class="w-full text-xs px-2.5 py-1.5 border border-slate-200 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+          class="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
         >
           <option value="">(未选择)</option>
           <For each={desensitizeNodes()}>

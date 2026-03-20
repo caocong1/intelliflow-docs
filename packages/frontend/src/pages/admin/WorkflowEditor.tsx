@@ -14,6 +14,7 @@ import NodeLibraryPanel from "../../components/workflow/canvas/NodeLibraryPanel"
 import ConfigPanel from "../../components/workflow/config/ConfigPanel";
 import ValidationOverlay, { type ValidationError } from "../../components/workflow/canvas/ValidationOverlay";
 import type { WorkflowNodeType, OutputDef } from "@intelliflow/shared";
+import type { FlowNodeData, FlowEdgeData } from "../../lib/flow-engine/types";
 
 // Node data shape stored in solid-flow Node.data
 export type WorkflowNodeData = {
@@ -408,9 +409,9 @@ export default function WorkflowEditor() {
 
         {/* Right: Config Panel */}
         <ConfigPanel
-          selectedNode={nodes.find((n) => n.id === selectedNodeId()) ?? null}
-          allNodes={nodes}
-          edges={edges}
+          selectedNode={(nodes.find((n) => n.id === selectedNodeId()) ?? null) as unknown as FlowNodeData | null}
+          allNodes={nodes as unknown as FlowNodeData[]}
+          edges={edges as unknown as FlowEdgeData[]}
           onConfigChange={handleConfigChange}
           onLabelChange={handleLabelChange}
           onClose={() => setSelectedNodeId(null)}

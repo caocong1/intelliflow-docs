@@ -1,22 +1,26 @@
-import { For, Show, Switch, Match, createSignal, createMemo, onMount, onCleanup } from "solid-js";
-import type { FlowNodeData, FlowEdgeData, Viewport, HandlePosition } from "../../../lib/flow-engine/types";
 import type { WorkflowNodeType } from "@intelliflow/shared";
-import { screenToFlow, getHandlePosition } from "../../../lib/flow-engine/coordinate";
-import FlowViewport from "./FlowViewport";
+import { For, Match, Show, Switch, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { type Guide, computeAlignmentGuides } from "../../../lib/flow-engine/alignment";
+import { getHandlePosition, screenToFlow } from "../../../lib/flow-engine/coordinate";
+import type {
+  FlowEdgeData,
+  FlowNodeData,
+  HandlePosition,
+  Viewport,
+} from "../../../lib/flow-engine/types";
+import AlignmentGuides from "./AlignmentGuides";
 import FlowBackground from "./FlowBackground";
 import FlowControls from "./FlowControls";
-import FlowNode from "./nodes/FlowNode";
+import FlowMiniMap from "./FlowMiniMap";
+import FlowViewport from "./FlowViewport";
 import EdgeRenderer from "./edges/EdgeRenderer";
 import TempEdge from "./edges/TempEdge";
-import SelectionBox from "./SelectionBox";
-import AlignmentGuides from "./AlignmentGuides";
-import FlowMiniMap from "./FlowMiniMap";
-import { computeAlignmentGuides, type Guide } from "../../../lib/flow-engine/alignment";
-import InputTransformNode from "./nodes/InputTransformNode";
 import DesensitizeNode from "./nodes/DesensitizeNode";
+import ExportNode from "./nodes/ExportNode";
+import FlowNode from "./nodes/FlowNode";
+import InputTransformNode from "./nodes/InputTransformNode";
 import ModelCallNode from "./nodes/ModelCallNode";
 import RestoreNode from "./nodes/RestoreNode";
-import ExportNode from "./nodes/ExportNode";
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 4;
@@ -53,7 +57,10 @@ export type FlowCanvasProps = {
   onRubberBandSelect: (rect: { x: number; y: number; width: number; height: number }) => void;
   onUndo?: () => void;
   onRedo?: () => void;
-  onUpdateEdgeControlPoints?: (edgeId: string, controlPoints: Array<{ x: number; y: number }> | undefined) => void;
+  onUpdateEdgeControlPoints?: (
+    edgeId: string,
+    controlPoints: Array<{ x: number; y: number }> | undefined,
+  ) => void;
 };
 
 export default function FlowCanvas(props: FlowCanvasProps) {
@@ -77,13 +84,6 @@ export default function FlowCanvas(props: FlowCanvasProps) {
 
   // Connection state
   const [connecting, setConnecting] = createSignal<ConnectingState | null>(null);
-
-  // Rubber-band selection state
-  const [rubberBand, setRubberBand] = createSignal<{
-    startPos: { x: number; y: number };
-    currentPos: { x: number; y: number };
-    active: boolean;
-  } | null>(null);
 
   // Canvas dimensions for minimap
   const [canvasSize, setCanvasSize] = createSignal({ width: 800, height: 600 });
@@ -126,7 +126,7 @@ export default function FlowCanvas(props: FlowCanvasProps) {
     props.setViewport({ x: newX, y: newY, zoom: newZoom });
   }
 
-  // --- Canvas mousedown: pan or rubber-band ---
+  // --- Canvas mousedown: left-click on empty canvas deselects; drag pans ---
   function handleCanvasMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
@@ -135,10 +135,8 @@ export default function FlowCanvas(props: FlowCanvasProps) {
     }
 
     if (!canvasRef) return;
-    const rect = canvasRef.getBoundingClientRect();
     const screenStartX = e.clientX;
     const screenStartY = e.clientY;
-    const flowStart = screenToFlow(e.clientX, e.clientY, rect, props.viewport);
     let movedBeyondThreshold = false;
 
     function onMove(ev: MouseEvent) {
@@ -148,53 +146,26 @@ export default function FlowCanvas(props: FlowCanvasProps) {
 
       if (!movedBeyondThreshold && dist > DRAG_THRESHOLD) {
         movedBeyondThreshold = true;
+        // Begin pan
+        setIsPanning(true);
+        panStart = { x: screenStartX, y: screenStartY };
+        viewportStart = { x: props.viewport.x, y: props.viewport.y };
       }
 
       if (movedBeyondThreshold) {
-        // Middle mouse or Space is pan; left click on canvas = rubber-band
-        if (e.button === 1) {
-          // Pan (middle mouse) - unlikely since we check button===0 above, kept for safety
-          if (!isPanning()) {
-            setIsPanning(true);
-            panStart = { x: screenStartX, y: screenStartY };
-            viewportStart = { x: props.viewport.x, y: props.viewport.y };
-          }
-          props.setViewport({
-            x: viewportStart.x + (ev.clientX - panStart.x),
-            y: viewportStart.y + (ev.clientY - panStart.y),
-            zoom: props.viewport.zoom,
-          });
-        } else {
-          // Rubber-band selection
-          const flowCurrent = screenToFlow(ev.clientX, ev.clientY, rect, props.viewport);
-          setRubberBand({
-            startPos: flowStart,
-            currentPos: flowCurrent,
-            active: true,
-          });
-        }
+        props.setViewport({
+          x: viewportStart.x + (ev.clientX - panStart.x),
+          y: viewportStart.y + (ev.clientY - panStart.y),
+          zoom: props.viewport.zoom,
+        });
       }
     }
 
-    function onUp(ev: MouseEvent) {
+    function onUp(_ev: MouseEvent) {
       if (!movedBeyondThreshold) {
-        // It was a click on empty canvas - deselect all
+        // Plain click on empty canvas — deselect all
         props.onCanvasClick();
-      } else {
-        const rb = rubberBand();
-        if (rb?.active) {
-          // Complete rubber-band selection
-          const x = Math.min(rb.startPos.x, rb.currentPos.x);
-          const y = Math.min(rb.startPos.y, rb.currentPos.y);
-          const width = Math.abs(rb.currentPos.x - rb.startPos.x);
-          const height = Math.abs(rb.currentPos.y - rb.startPos.y);
-          if (width > 2 && height > 2) {
-            props.onRubberBandSelect({ x, y, width, height });
-          }
-        }
       }
-
-      setRubberBand(null);
       setIsPanning(false);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -244,13 +215,18 @@ export default function FlowCanvas(props: FlowCanvasProps) {
           };
           const otherRects = props.nodes
             .filter((n) => n.id !== nodeId)
-            .map((n) => ({ x: n.position.x, y: n.position.y, width: n.size.width, height: n.size.height }));
+            .map((n) => ({
+              x: n.position.x,
+              y: n.position.y,
+              width: n.size.width,
+              height: n.size.height,
+            }));
 
           const result = computeAlignmentGuides(draggingRect, otherRects, 5);
           setActiveGuides(result.guides);
 
-          const finalX = result.snappedX ?? (startPos.x + dx);
-          const finalY = result.snappedY ?? (startPos.y + dy);
+          const finalX = result.snappedX ?? startPos.x + dx;
+          const finalY = result.snappedY ?? startPos.y + dy;
           props.updateNodePosition(nodeId, { x: finalX, y: finalY });
           return;
         }
@@ -294,7 +270,11 @@ export default function FlowCanvas(props: FlowCanvasProps) {
   }
 
   // --- Handle connection ---
-  function handleHandleMouseDown(nodeId: string, handleType: "source" | "target", position: HandlePosition) {
+  function handleHandleMouseDown(
+    nodeId: string,
+    handleType: "source" | "target",
+    position: HandlePosition,
+  ) {
     if (!canvasRef) return;
     const node = props.nodes.find((n) => n.id === nodeId);
     if (!node) return;
@@ -311,7 +291,7 @@ export default function FlowCanvas(props: FlowCanvasProps) {
 
     function onMove(ev: MouseEvent) {
       const flowPos = screenToFlow(ev.clientX, ev.clientY, rect, props.viewport);
-      setConnecting((prev) => prev ? { ...prev, mousePos: flowPos } : null);
+      setConnecting((prev) => (prev ? { ...prev, mousePos: flowPos } : null));
     }
 
     function onUp(ev: MouseEvent) {
@@ -353,7 +333,9 @@ export default function FlowCanvas(props: FlowCanvasProps) {
   function handleDrop(e: DragEvent) {
     e.preventDefault();
     if (!canvasRef) return;
-    const nodeType = e.dataTransfer?.getData("application/solid-flow-node") as WorkflowNodeType | undefined;
+    const nodeType = e.dataTransfer?.getData("application/solid-flow-node") as
+      | WorkflowNodeType
+      | undefined;
     if (!nodeType) return;
 
     const rect = canvasRef.getBoundingClientRect();
@@ -457,7 +439,6 @@ export default function FlowCanvas(props: FlowCanvasProps) {
   const cursorStyle = () => {
     if (connecting()) return "crosshair";
     if (isPanning()) return "grabbing";
-    if (rubberBand()?.active) return "crosshair";
     return "default";
   };
 
@@ -466,6 +447,7 @@ export default function FlowCanvas(props: FlowCanvasProps) {
       ref={canvasRef}
       class="relative w-full h-full overflow-hidden"
       style={{ cursor: cursorStyle() }}
+      // biome-ignore lint/a11y/noNoninteractiveTabindex: canvas needs keyboard focus for shortcuts
       tabIndex={0}
       onWheel={handleWheel}
       onMouseDown={handleCanvasMouseDown}
@@ -475,9 +457,10 @@ export default function FlowCanvas(props: FlowCanvasProps) {
     >
       <FlowBackground viewport={props.viewport} />
       <FlowViewport panX={props.viewport.x} panY={props.viewport.y} zoom={props.viewport.zoom}>
-        {/* SVG layer for edges + selection box */}
+        {/* SVG layer for edges */}
         <svg
           class="flow-background"
+          aria-hidden="true"
           style={{
             position: "absolute",
             top: "0",
@@ -551,16 +534,6 @@ export default function FlowCanvas(props: FlowCanvasProps) {
                 />
               );
             }}
-          </Show>
-          {/* Rubber-band selection box */}
-          <Show when={rubberBand()}>
-            {(rb) => (
-              <SelectionBox
-                startPos={rb().startPos}
-                currentPos={rb().currentPos}
-                visible={rb().active}
-              />
-            )}
           </Show>
           {/* Alignment guides during node drag */}
           <Show when={activeGuides().length > 0}>
@@ -637,7 +610,8 @@ export default function FlowCanvas(props: FlowCanvasProps) {
           <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
             <h3 class="text-base font-semibold text-slate-900 mb-2">确认删除</h3>
             <p class="text-sm text-slate-600 mb-5">
-              确认删除 {props.selectedNodeIds.size > 0 ? `${props.selectedNodeIds.size} 个节点` : ""}
+              确认删除{" "}
+              {props.selectedNodeIds.size > 0 ? `${props.selectedNodeIds.size} 个节点` : ""}
               {props.selectedNodeIds.size > 0 && props.selectedEdgeIds.size > 0 ? "和" : ""}
               {props.selectedEdgeIds.size > 0 ? `${props.selectedEdgeIds.size} 条连接` : ""}
               ？此操作不可撤销。

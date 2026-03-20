@@ -1,4 +1,4 @@
-import { onMount, onCleanup, type JSX } from "solid-js";
+import { type JSX, onCleanup, onMount } from "solid-js";
 import type { FlowNodeData, HandlePosition } from "../../../../lib/flow-engine/types";
 import NodeHandle from "./NodeHandle";
 
@@ -6,7 +6,11 @@ type FlowNodeProps = {
   node: FlowNodeData;
   selected: boolean;
   onDragStart: (nodeId: string, startScreenPos: { x: number; y: number }) => void;
-  onHandleMouseDown: (nodeId: string, handleType: "source" | "target", position: HandlePosition) => void;
+  onHandleMouseDown: (
+    nodeId: string,
+    handleType: "source" | "target",
+    position: HandlePosition,
+  ) => void;
   onNodeClick: (nodeId: string, e: MouseEvent) => void;
   onSizeChange: (nodeId: string, size: { width: number; height: number }) => void;
   children: JSX.Element;
@@ -57,22 +61,29 @@ export default function FlowNode(props: FlowNodeProps) {
         top: `${props.node.position.y}px`,
         "z-index": props.selected ? 10 : 1,
       }}
-      class={`select-none ${props.selected ? "ring-2 ring-indigo-500 ring-offset-1 rounded-lg" : ""}`}
+      class={`select-none ${props.selected ? "ring-2 ring-blue-400 ring-offset-1 rounded-lg" : ""}`}
       onMouseDown={handleMouseDown}
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") handleClick(e as unknown as MouseEvent);
+      }}
     >
       {props.children}
       {/* Target handle (left by default) */}
       <NodeHandle
         type="target"
         position={props.node.targetHandle}
-        onMouseDown={(e) => props.onHandleMouseDown(props.node.id, "target", props.node.targetHandle)}
+        onMouseDown={(e) =>
+          props.onHandleMouseDown(props.node.id, "target", props.node.targetHandle)
+        }
       />
       {/* Source handle (right by default) */}
       <NodeHandle
         type="source"
         position={props.node.sourceHandle}
-        onMouseDown={(e) => props.onHandleMouseDown(props.node.id, "source", props.node.sourceHandle)}
+        onMouseDown={(e) =>
+          props.onHandleMouseDown(props.node.id, "source", props.node.sourceHandle)
+        }
       />
     </div>
   );

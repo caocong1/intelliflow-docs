@@ -29,24 +29,34 @@ export default function DesensitizeNode(props: NodeContentProps) {
 
   return (
     <div
-      class={`min-w-[180px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
-        hasError()
-          ? "bg-red-50 shadow-md shadow-red-100/50 ring-2 ring-red-400"
-          : "bg-orange-50/50 shadow-sm hover:shadow-md"
+      class={`min-w-[180px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 bg-white border shadow-sm hover:shadow-md ${
+        hasError() ? "border-red-300 shadow-red-100/50" : "border-slate-200"
       }`}
-      style={{ "border-left": hasError() ? "4px solid #ef4444" : "4px solid #f97316" }}
     >
+      {/* Top accent bar */}
+      <div class={`h-[3px] w-full ${hasError() ? "bg-red-500" : "bg-orange-500"}`} />
       <div class="px-3 py-2.5">
         <div class="flex items-center gap-2">
-          <div class={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${hasError() ? "bg-red-100" : "bg-orange-100"}`}>
-            <svg class={`w-3.5 h-3.5 ${hasError() ? "text-red-600" : "text-orange-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <div
+            class={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${hasError() ? "bg-red-100" : "bg-orange-100"}`}
+          >
+            <svg
+              class={`w-3 h-3 ${hasError() ? "text-red-600" : "text-orange-600"}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
               <title>信息脱敏</title>
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
             </svg>
           </div>
-          <span class={`text-xs font-semibold flex-1 truncate ${hasError() ? "text-red-700" : "text-orange-700"}`}>
-            {props.data.label}
-          </span>
+          <span class="text-xs font-medium flex-1 truncate text-slate-700">{props.data.label}</span>
           <span
             class={`w-2 h-2 rounded-full flex-shrink-0 ${
               hasError() ? "bg-red-500" : configured() ? "bg-emerald-500" : "bg-amber-400"

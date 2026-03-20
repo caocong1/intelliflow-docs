@@ -29,24 +29,34 @@ export default function ModelCallNode(props: NodeContentProps) {
 
   return (
     <div
-      class={`min-w-[180px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
-        hasError()
-          ? "bg-red-50 shadow-md shadow-red-100/50 ring-2 ring-red-400"
-          : "bg-purple-50/50 shadow-sm hover:shadow-md"
+      class={`min-w-[180px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 bg-white border shadow-sm hover:shadow-md ${
+        hasError() ? "border-red-300 shadow-red-100/50" : "border-slate-200"
       }`}
-      style={{ "border-left": hasError() ? "4px solid #ef4444" : "4px solid #a855f7" }}
     >
+      {/* Top accent bar */}
+      <div class={`h-[3px] w-full ${hasError() ? "bg-red-500" : "bg-purple-500"}`} />
       <div class="px-3 py-2.5">
         <div class="flex items-center gap-2">
-          <div class={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${hasError() ? "bg-red-100" : "bg-purple-100"}`}>
-            <svg class={`w-3.5 h-3.5 ${hasError() ? "text-red-600" : "text-purple-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          <div
+            class={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${hasError() ? "bg-red-100" : "bg-purple-100"}`}
+          >
+            <svg
+              class={`w-3 h-3 ${hasError() ? "text-red-600" : "text-purple-600"}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
               <title>模型调用</title>
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a3.187 3.187 0 01-4.508.032L5 14.5m14 0l.044.044a.5.5 0 01-.044.738l-3 2.5" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714a2.25 2.25 0 00.659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-2.47 2.47a3.187 3.187 0 01-4.508.032L5 14.5m14 0l.044.044a.5.5 0 01-.044.738l-3 2.5"
+              />
             </svg>
           </div>
-          <span class={`text-xs font-semibold flex-1 truncate ${hasError() ? "text-red-700" : "text-purple-700"}`}>
-            {props.data.label}
-          </span>
+          <span class="text-xs font-medium flex-1 truncate text-slate-700">{props.data.label}</span>
           <span
             class={`w-2 h-2 rounded-full flex-shrink-0 ${
               hasError() ? "bg-red-500" : configured() ? "bg-emerald-500" : "bg-amber-400"

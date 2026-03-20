@@ -29,25 +29,31 @@ export default function InputTransformNode(props: NodeContentProps) {
 
   return (
     <div
-      class={`min-w-[180px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 ${
-        hasError()
-          ? "bg-red-50 shadow-md shadow-red-100/50 ring-2 ring-red-400"
-          : "bg-blue-50/50 shadow-sm hover:shadow-md"
+      class={`min-w-[180px] rounded-lg overflow-hidden cursor-pointer transition-all duration-200 bg-white border shadow-sm hover:shadow-md ${
+        hasError() ? "border-red-300 shadow-red-100/50" : "border-slate-200"
       }`}
-      style={{ "border-left": hasError() ? "4px solid #ef4444" : "4px solid #3b82f6" }}
     >
+      {/* Top accent bar */}
+      <div class={`h-[3px] w-full ${hasError() ? "bg-red-500" : "bg-blue-500"}`} />
       <div class="px-3 py-2.5">
         <div class="flex items-center gap-2">
-          {/* SVG icon */}
-          <div class={`w-6 h-6 rounded flex items-center justify-center flex-shrink-0 ${hasError() ? "bg-red-100" : "bg-blue-100"}`}>
-            <svg class={`w-3.5 h-3.5 ${hasError() ? "text-red-600" : "text-blue-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+          {/* Icon */}
+          <div
+            class={`w-5 h-5 rounded flex items-center justify-center flex-shrink-0 ${hasError() ? "bg-red-100" : "bg-blue-100"}`}
+          >
+            <svg
+              class={`w-3 h-3 ${hasError() ? "text-red-600" : "text-blue-600"}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
               <title>输入转换</title>
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
             </svg>
           </div>
-          <span class={`text-xs font-semibold flex-1 truncate ${hasError() ? "text-red-700" : "text-blue-700"}`}>
-            {props.data.label}
-          </span>
+          <span class="text-xs font-medium flex-1 truncate text-slate-700">{props.data.label}</span>
           {/* Status indicator dot */}
           <span
             class={`w-2 h-2 rounded-full flex-shrink-0 ${

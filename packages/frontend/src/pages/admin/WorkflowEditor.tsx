@@ -239,10 +239,16 @@ export default function WorkflowEditor() {
     const label = DEFAULT_LABELS[nodeType];
     const config = buildDefaultConfig(nodeType);
 
+    // Offset position so nodes don't stack when dropped at the same spot
+    const existingAtSameSpot = store.nodes.filter(
+      (n) => Math.abs(n.position.x - position.x) < 50 && Math.abs(n.position.y - position.y) < 50,
+    );
+    const offset = existingAtSameSpot.length * 220;
+
     const newNode: FlowNodeData = {
       id,
       type: nodeType,
-      position,
+      position: { x: position.x + offset, y: position.y },
       size: { width: 180, height: 60 },
       data: { nodeType, label, config, outputs: [] },
       sourceHandle: "right",

@@ -1,23 +1,24 @@
-import { Handle, type NodeProps } from "@dschz/solid-flow";
-import type { WorkflowNodeType } from "@intelliflow/shared";
+import type { NodeConfig, OutputDef } from "@intelliflow/shared";
 
-type WorkflowNodeData = {
-  nodeType: WorkflowNodeType;
-  label: string;
-  config: Record<string, unknown>;
-  outputs: unknown[];
-  onSelect?: (id: string) => void;
+type NodeContentProps = {
+  data: {
+    nodeType: string;
+    label: string;
+    config: NodeConfig;
+    outputs: OutputDef[];
+  };
+  selected: boolean;
   hasError?: boolean;
 };
 
-function isConfigured(config: Record<string, unknown>): boolean {
-  const categories = config.categories as unknown[] | undefined;
-  return Array.isArray(categories) && categories.length > 0;
+function isConfigured(config: NodeConfig): boolean {
+  if (config.type !== "desensitize") return false;
+  return config.categories.length > 0;
 }
 
-export default function DesensitizeNode(props: NodeProps<WorkflowNodeData, "desensitize">) {
-  const configured = () => isConfigured(props.data.config ?? {});
-  const hasError = () => props.data.hasError === true;
+export default function DesensitizeNode(props: NodeContentProps) {
+  const configured = () => isConfigured(props.data.config);
+  const hasError = () => props.hasError === true;
 
   return (
     <div
@@ -27,10 +28,7 @@ export default function DesensitizeNode(props: NodeProps<WorkflowNodeData, "dese
           : "border border-slate-200 hover:shadow-md"
       }`}
       style={{ "border-left": hasError() ? "4px solid #ef4444" : "4px solid #f97316" }}
-      onClick={() => props.data.onSelect?.(props.id)}
     >
-      <Handle type="target" position="left" />
-
       <div class="px-3 py-2.5">
         <div class="flex items-center gap-2">
           <span class="text-base leading-none">🔒</span>
@@ -51,8 +49,6 @@ export default function DesensitizeNode(props: NodeProps<WorkflowNodeData, "dese
         </div>
         <p class="text-xs text-slate-400 mt-1">信息脱敏</p>
       </div>
-
-      <Handle type="source" position="right" />
     </div>
   );
 }

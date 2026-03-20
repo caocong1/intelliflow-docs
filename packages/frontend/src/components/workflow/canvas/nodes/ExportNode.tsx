@@ -1,23 +1,24 @@
-import { Handle, type NodeProps } from "@dschz/solid-flow";
-import type { WorkflowNodeType } from "@intelliflow/shared";
+import type { NodeConfig, OutputDef } from "@intelliflow/shared";
 
-type WorkflowNodeData = {
-  nodeType: WorkflowNodeType;
-  label: string;
-  config: Record<string, unknown>;
-  outputs: unknown[];
-  onSelect?: (id: string) => void;
+type NodeContentProps = {
+  data: {
+    nodeType: string;
+    label: string;
+    config: NodeConfig;
+    outputs: OutputDef[];
+  };
+  selected: boolean;
   hasError?: boolean;
 };
 
-function isConfigured(config: Record<string, unknown>): boolean {
-  const mapping = config.contentMapping as unknown[] | undefined;
-  return Array.isArray(mapping) && mapping.length > 0;
+function isConfigured(config: NodeConfig): boolean {
+  if (config.type !== "export") return false;
+  return config.contentMapping.length > 0;
 }
 
-export default function ExportNode(props: NodeProps<WorkflowNodeData, "export">) {
-  const configured = () => isConfigured(props.data.config ?? {});
-  const hasError = () => props.data.hasError === true;
+export default function ExportNode(props: NodeContentProps) {
+  const configured = () => isConfigured(props.data.config);
+  const hasError = () => props.hasError === true;
 
   return (
     <div
@@ -27,10 +28,7 @@ export default function ExportNode(props: NodeProps<WorkflowNodeData, "export">)
           : "border border-slate-200 hover:shadow-md"
       }`}
       style={{ "border-left": hasError() ? "4px solid #ef4444" : "4px solid #ef4444" }}
-      onClick={() => props.data.onSelect?.(props.id)}
     >
-      <Handle type="target" position="left" />
-
       <div class="px-3 py-2.5">
         <div class="flex items-center gap-2">
           <span class="text-base leading-none">📤</span>
@@ -51,10 +49,6 @@ export default function ExportNode(props: NodeProps<WorkflowNodeData, "export">)
         </div>
         <p class="text-xs text-slate-400 mt-1">文件导出</p>
       </div>
-
-      {/* Export node is a terminal — only target handle, no source */}
-      {/* But we keep source too for flexibility in complex flows */}
-      <Handle type="source" position="right" />
     </div>
   );
 }

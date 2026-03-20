@@ -1,23 +1,24 @@
-import { Handle, type NodeProps } from "@dschz/solid-flow";
-import type { WorkflowNodeType } from "@intelliflow/shared";
+import type { NodeConfig, OutputDef } from "@intelliflow/shared";
 
-type WorkflowNodeData = {
-  nodeType: WorkflowNodeType;
-  label: string;
-  config: Record<string, unknown>;
-  outputs: unknown[];
-  onSelect?: (id: string) => void;
+type NodeContentProps = {
+  data: {
+    nodeType: string;
+    label: string;
+    config: NodeConfig;
+    outputs: OutputDef[];
+  };
+  selected: boolean;
   hasError?: boolean;
 };
 
-function isConfigured(config: Record<string, unknown>): boolean {
-  const fields = config.formFields as unknown[] | undefined;
-  return Array.isArray(fields) && fields.length > 0;
+function isConfigured(config: NodeConfig): boolean {
+  if (config.type !== "input_transform") return false;
+  return config.formFields.length > 0;
 }
 
-export default function InputTransformNode(props: NodeProps<WorkflowNodeData, "input_transform">) {
-  const configured = () => isConfigured(props.data.config ?? {});
-  const hasError = () => props.data.hasError === true;
+export default function InputTransformNode(props: NodeContentProps) {
+  const configured = () => isConfigured(props.data.config);
+  const hasError = () => props.hasError === true;
 
   return (
     <div
@@ -27,12 +28,7 @@ export default function InputTransformNode(props: NodeProps<WorkflowNodeData, "i
           : "border border-slate-200 hover:shadow-md"
       }`}
       style={{ "border-left": hasError() ? "4px solid #ef4444" : "4px solid #3b82f6" }}
-      onClick={() => props.data.onSelect?.(props.id)}
     >
-      {/* Target handle (left) */}
-      <Handle type="target" position="left" />
-
-      {/* Node content */}
       <div class="px-3 py-2.5">
         <div class="flex items-center gap-2">
           <span class="text-base leading-none">📥</span>
@@ -53,9 +49,6 @@ export default function InputTransformNode(props: NodeProps<WorkflowNodeData, "i
         </div>
         <p class="text-xs text-slate-400 mt-1">输入转换</p>
       </div>
-
-      {/* Source handle (right) */}
-      <Handle type="source" position="right" />
     </div>
   );
 }

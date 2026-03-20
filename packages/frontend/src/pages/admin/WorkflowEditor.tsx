@@ -8,6 +8,7 @@ import NodeLibraryPanel from "../../components/workflow/canvas/NodeLibraryPanel"
 import ConfigPanel from "../../components/workflow/config/ConfigPanel";
 import ValidationOverlay, { type ValidationError } from "../../components/workflow/canvas/ValidationOverlay";
 import { createFlowStore } from "../../lib/flow-engine/store";
+import { createSelectionStore } from "../../lib/flow-engine/selection";
 import { deriveOutputs } from "../../lib/flow-engine/derive-outputs";
 import type { FlowNodeData, FlowEdgeData } from "../../lib/flow-engine/types";
 
@@ -63,13 +64,14 @@ export default function WorkflowEditor() {
   const [workflowName, setWorkflowName] = createSignal("");
   const [loading, setLoading] = createSignal(true);
   const [saving, setSaving] = createSignal(false);
-  const [selectedNodeId, setSelectedNodeId] = createSignal<string | null>(null);
-  const [selectedEdgeId, setSelectedEdgeId] = createSignal<string | null>(null);
   const [validationErrors, setValidationErrors] = createSignal<ValidationError[]>([]);
   const [showValidation, setShowValidation] = createSignal(false);
 
   // Flow store
   const store = createFlowStore();
+
+  // Selection store (multi-select)
+  const selection = createSelectionStore();
 
   onMount(async () => {
     try {
@@ -236,6 +238,9 @@ export default function WorkflowEditor() {
         });
       }
     }
+
+    // Select the newly dropped node
+    selection.selectNode(id, false);
   }
 
   function handleConnectionComplete(sourceId: string, targetId: string) {
@@ -247,23 +252,36 @@ export default function WorkflowEditor() {
     });
   }
 
-  function handleNodeSelect(nodeId: string, _e: MouseEvent) {
-    setSelectedNodeId(nodeId);
-    setSelectedEdgeId(null);
+  function handleNodeSelect(nodeId: string, e: MouseEvent) {
+    selection.selectNode(nodeId, e.ctrlKey || e.metaKey || e.shiftKey);
   }
 
   function handleEdgeSelect(edgeId: string) {
-    setSelectedEdgeId(edgeId);
-    setSelectedNodeId(null);
+    selection.selectEdge(edgeId);
   }
 
   function handleCanvasClick() {
-    setSelectedNodeId(null);
-    setSelectedEdgeId(null);
+    selection.clearSelection();
+  }
+
+  function handleDeleteSelected() {
+    const nodeIds = selection.selectedNodeIds();
+    const edgeIds = selection.selectedEdgeIds();
+    if (nodeIds.size > 0) {
+      store.removeNodes(nodeIds);
+    }
+    if (edgeIds.size > 0) {
+      store.removeEdges(edgeIds);
+    }
+    selection.clearSelection();
+  }
+
+  function handleRubberBandSelect(rect: { x: number; y: number; width: number; height: number }) {
+    selection.selectNodesInRect(rect, [...store.nodes]);
   }
 
   function handleNavigateToNode(nodeId: string) {
-    setSelectedNodeId(nodeId);
+    selection.selectNode(nodeId, false);
   }
 
   const errorNodeIds = () => {
@@ -281,6 +299,15 @@ export default function WorkflowEditor() {
       map[n.id] = n.data.label;
     }
     return map;
+  };
+
+  // For ConfigPanel: use the first selected node (or null)
+  const selectedNodeForConfig = () => {
+    const ids = selection.selectedNodeIds();
+    if (ids.size === 0) return null;
+    // Use first selected node
+    const firstId = ids.values().next().value;
+    return store.nodes.find((n) => n.id === firstId) ?? null;
   };
 
   return (
@@ -377,8 +404,8 @@ export default function WorkflowEditor() {
               edges={store.edges}
               viewport={store.viewport()}
               setViewport={store.setViewport}
-              selectedNodeId={selectedNodeId()}
-              selectedEdgeId={selectedEdgeId()}
+              selectedNodeIds={selection.selectedNodeIds()}
+              selectedEdgeIds={selection.selectedEdgeIds()}
               errorNodeIds={errorNodeIds()}
               onNodeSelect={handleNodeSelect}
               onEdgeSelect={handleEdgeSelect}
@@ -388,6 +415,8 @@ export default function WorkflowEditor() {
               onConnectionComplete={handleConnectionComplete}
               onNodeDropped={handleNodeDropped}
               updateNodePosition={(nodeId, pos) => store.updateNodePosition(nodeId, pos)}
+              onDeleteSelected={handleDeleteSelected}
+              onRubberBandSelect={handleRubberBandSelect}
             />
 
             <Show when={showValidation() && validationErrors().length > 0}>
@@ -402,12 +431,12 @@ export default function WorkflowEditor() {
         </div>
 
         <ConfigPanel
-          selectedNode={store.nodes.find((n) => n.id === selectedNodeId()) ?? null}
+          selectedNode={selectedNodeForConfig()}
           allNodes={[...store.nodes]}
           edges={[...store.edges]}
           onConfigChange={handleConfigChange}
           onLabelChange={handleLabelChange}
-          onClose={() => setSelectedNodeId(null)}
+          onClose={() => selection.clearSelection()}
         />
       </div>
     </div>

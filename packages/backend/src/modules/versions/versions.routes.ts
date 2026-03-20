@@ -105,10 +105,10 @@ export const versionRoutes = new Elysia({ prefix: "/versions" })
   // ─── Diff two versions ────────────────────────────────────────────────────
 
   .get(
-    "/:idA/diff/:idB",
+    "/:id/diff/:idB",
     async ({ params, user, set }) => {
       // Check version A exists and user has access
-      const versionA = await getVersion(params.idA);
+      const versionA = await getVersion(params.id);
       if (!versionA) {
         set.status = 404;
         return { error: "Version A not found" };
@@ -120,7 +120,7 @@ export const versionRoutes = new Elysia({ prefix: "/versions" })
         return { error: "Only project members can view version diffs" };
       }
 
-      const diffResult = await getVersionDiff(params.idA, params.idB);
+      const diffResult = await getVersionDiff(params.id, params.idB);
       if (!diffResult) {
         set.status = 404;
         return { error: "One or both versions not found" };
@@ -129,6 +129,6 @@ export const versionRoutes = new Elysia({ prefix: "/versions" })
       return diffResult;
     },
     {
-      params: t.Object({ idA: t.String(), idB: t.String() }),
+      params: t.Object({ id: t.String(), idB: t.String() }),
     },
   );

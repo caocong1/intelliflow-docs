@@ -98,7 +98,7 @@ export default function VersionHistory() {
   async function loadDiff(idA: string, idB: string) {
     setDiffLoading(true);
     try {
-      const res = await (api.api.versions as any)({ idA }).diff({ idB }).get();
+      const res = await (api.api.versions as any)({ id: idA }).diff({ idB }).get();
       if (res.data && "versionA" in res.data) {
         setDiffResult(res.data as unknown as VersionDiffResult);
       }

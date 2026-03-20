@@ -12,6 +12,8 @@ interface Props {
 
 type ExecutionPhase = "idle" | "streaming" | "done";
 
+// RECV-03: Cancel AI generation deferred to v2 per user decision
+
 export default function ModelCallExecutor(props: Props) {
   // Determine initial state from existing outputData
   const existingModels = (): Record<string, ModelOutput> => {

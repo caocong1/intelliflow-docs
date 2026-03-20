@@ -119,9 +119,17 @@ export default function DocumentDetail() {
                 <Show when={docData().status === "draft" || docData().status === "in_progress"}>
                   <A
                     href={`/workspace/${params.id}`}
-                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                    class="inline-flex items-center px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
                   >
                     Enter Workspace
+                  </A>
+                </Show>
+                <Show when={docData().status === "completed"}>
+                  <A
+                    href={`/workspace/${params.id}`}
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
+                  >
+                    View Workspace
                   </A>
                 </Show>
                 <A

@@ -3,6 +3,7 @@ import { createSignal, For, Match, onMount, Show, Switch } from "solid-js";
 import { api } from "../../api/client";
 import StepperBar from "../../components/workspace/StepperBar";
 import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
+import InlineEditor from "../../components/workspace/InlineEditor";
 import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExecutor";
 import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
 import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
@@ -23,6 +24,8 @@ export default function DocumentWorkspace() {
   const [expandedHistory, setExpandedHistory] = createSignal<string | null>(null);
   const [actionLoading, setActionLoading] = createSignal(false);
   const [showRollbackDialog, setShowRollbackDialog] = createSignal(false);
+  const [showInlineEditor, setShowInlineEditor] = createSignal(false);
+  const [savedIndicator, setSavedIndicator] = createSignal(false);
 
   onMount(async () => {
     try {
@@ -57,6 +60,54 @@ export default function DocumentWorkspace() {
     return s.nodes.filter((n) => n.status === "completed" || n.status === "skipped");
   };
 
+  /** Extract the main text content from node outputData based on node type */
+  function getNodeOutputText(node: NodeExecution): string {
+    const data = node.outputData as Record<string, unknown> | null;
+    if (!data) return "";
+
+    // Model call: selectedContent or text
+    if (typeof data.selectedContent === "string") return data.selectedContent;
+    if (typeof data.text === "string") return data.text;
+
+    // Restore: restoredText
+    if (typeof data.restoredText === "string") return data.restoredText;
+
+    // Input transform: concatenate field values
+    if (data.fields && typeof data.fields === "object") {
+      return Object.values(data.fields as Record<string, string>).join("\n\n");
+    }
+
+    // Fallback: try to stringify
+    return "";
+  }
+
+  /** Auto-save edited content via PUT /draft endpoint */
+  async function handleInlineEditorSave(content: string) {
+    const node = currentNode();
+    if (!node) return;
+
+    try {
+      const token = localStorage.getItem("auth_token");
+      await fetch(
+        `/api/runtime/${params.documentId}/nodes/${node.id}/draft`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ text: content }),
+        },
+      );
+
+      // Show saved indicator briefly
+      setSavedIndicator(true);
+      setTimeout(() => setSavedIndicator(false), 1500);
+    } catch {
+      // Silent fail for auto-save
+    }
+  }
+
   function handleStepperClick(index: number) {
     const s = state();
     if (!s) return;
@@ -64,6 +115,7 @@ export default function DocumentWorkspace() {
     if (node.status === "completed" || node.status === "skipped") {
       setViewMode("history");
       setViewIndex(index);
+      setShowInlineEditor(false);
     }
   }
 
@@ -77,6 +129,7 @@ export default function DocumentWorkspace() {
     const node = currentNode();
     if (!node) return;
     setActionLoading(true);
+    setShowInlineEditor(false);
     try {
       const res = await (api.api.runtime as any)[params.documentId].advance[node.id].post();
       if (res.data && !("error" in res.data)) {
@@ -94,6 +147,7 @@ export default function DocumentWorkspace() {
     const node = currentNode();
     if (!node) return;
     setActionLoading(true);
+    setShowInlineEditor(false);
     try {
       const res = await (api.api.runtime as any)[params.documentId].skip[node.id].post();
       if (res.data && !("error" in res.data)) {
@@ -110,6 +164,7 @@ export default function DocumentWorkspace() {
   async function handleRollback(targetStepOrder: number) {
     setActionLoading(true);
     setShowRollbackDialog(false);
+    setShowInlineEditor(false);
     try {
       const res = await (api.api.runtime as any)[params.documentId].rollback.post({
         targetStepOrder,
@@ -123,6 +178,23 @@ export default function DocumentWorkspace() {
     } finally {
       setActionLoading(false);
     }
+  }
+
+  /** Check if current node type supports inline editing (export nodes do not) */
+  function isNodeEditable(): boolean {
+    const node = currentNode();
+    if (!node) return false;
+    // Export nodes are not editable
+    if (node.nodeType === "export") return false;
+    // allowEdit defaults to true when not explicitly set to false
+    return true;
+  }
+
+  /** Check if current node has output data to edit */
+  function hasOutputToEdit(): boolean {
+    const node = currentNode();
+    if (!node) return false;
+    return !!node.outputData && getNodeOutputText(node).length > 0;
   }
 
   return (
@@ -190,7 +262,7 @@ export default function DocumentWorkspace() {
                 {/* Current in-progress node */}
                 <Match when={viewMode() === "current" && currentNode()}>
                   <div class="space-y-6">
-                    {/* Node executor — route by nodeType */}
+                    {/* Node executor -- route by nodeType */}
                     <Switch
                       fallback={
                         <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
@@ -264,6 +336,43 @@ export default function DocumentWorkspace() {
                       </Match>
                     </Switch>
 
+                    {/* Inline editor toggle -- shown when node has editable output */}
+                    <Show when={isNodeEditable() && hasOutputToEdit()}>
+                      <div class="space-y-3">
+                        <div class="flex items-center gap-3">
+                          <button
+                            type="button"
+                            class={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              showInlineEditor()
+                                ? "text-indigo-700 bg-indigo-100 border border-indigo-300"
+                                : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
+                            }`}
+                            onClick={() => setShowInlineEditor(!showInlineEditor())}
+                          >
+                            {showInlineEditor() ? "Close Editor" : "Edit Output"}
+                          </button>
+
+                          {/* Saved indicator */}
+                          <Show when={savedIndicator()}>
+                            <span class="text-xs text-green-600 font-medium animate-pulse">
+                              Saved
+                            </span>
+                          </Show>
+                        </div>
+
+                        <Show when={showInlineEditor() && currentNode()}>
+                          {(node) => (
+                            <InlineEditor
+                              content={getNodeOutputText(node())}
+                              onChange={handleInlineEditorSave}
+                              readOnly={false}
+                              placeholder="Edit node output content..."
+                            />
+                          )}
+                        </Show>
+                      </div>
+                    </Show>
+
                     {/* Completed node history list */}
                     <Show when={completedNodes().length > 0}>
                       <div class="space-y-2">
@@ -317,15 +426,17 @@ export default function DocumentWorkspace() {
               {/* Right: skip + confirm */}
               <div class="flex items-center gap-3">
                 <Show when={currentNode()}>
-                  {/* Skip button - only show placeholder, real skippable check needs workflow config */}
-                  <button
-                    type="button"
-                    class="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    disabled={actionLoading()}
-                    onClick={handleSkip}
-                  >
-                    Skip
-                  </button>
+                  {/* Skip button -- server validates skippable flag; shown for all non-export nodes */}
+                  <Show when={currentNode()?.nodeType !== "export"}>
+                    <button
+                      type="button"
+                      class="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      disabled={actionLoading()}
+                      onClick={handleSkip}
+                    >
+                      Skip
+                    </button>
+                  </Show>
                   <button
                     type="button"
                     class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"

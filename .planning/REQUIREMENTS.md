@@ -109,8 +109,8 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 ### 节点通用操作
 
 - [x] **NOPS-01**: 用户可在任意节点点击"确认/下一步"流转到下一个节点
-- [ ] **NOPS-02**: 用户可在任意节点展开内联编辑器修改当前节点输出内容
-- [ ] **NOPS-03**: 用户可跳过后续可选节点，直接流转至下一个必经节点或文件导出
+- [x] **NOPS-02**: 用户可在任意节点展开内联编辑器修改当前节点输出内容
+- [x] **NOPS-03**: 用户可跳过后续可选节点，直接流转至下一个必经节点或文件导出
 - [x] **NOPS-04**: 用户可回退到之前的节点重新执行，后续节点状态重置
 
 ### 文档管理
@@ -139,7 +139,7 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 - [x] **RECV-01**: 每个节点操作过程自动保存草稿
 - [x] **RECV-02**: 浏览器关闭后重新进入文档可恢复到上次操作状态
-- [ ] **RECV-03**: 支持取消正在进行的 AI 生成任务
+- [x] **RECV-03**: 支持取消正在进行的 AI 生成任务
 
 ## v2 Requirements
 
@@ -283,12 +283,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NODE-21 | Phase 5 | Complete |
 | NODE-22 | Phase 5 | Complete |
 | NOPS-01 | Phase 5 | Complete |
-| NOPS-02 | Phase 5 | Pending |
-| NOPS-03 | Phase 5 | Pending |
+| NOPS-02 | Phase 5 | Complete |
+| NOPS-03 | Phase 5 | Complete |
 | NOPS-04 | Phase 5 | Complete |
 | RECV-01 | Phase 5 | Complete |
 | RECV-02 | Phase 5 | Complete |
-| RECV-03 | Phase 5 | Pending |
+| RECV-03 | Phase 5 | Complete |
 
 **Coverage:**
 - v1 requirements: 86 total (AIMC-08 moved to Out of Scope)

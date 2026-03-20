@@ -54,6 +54,10 @@ export interface Model extends BaseEntity {
   displayName: string;
   isActive: boolean;
   isProviderDisabled: boolean;
+  temperature?: number | null;
+  maxTokens?: number | null;
+  topP?: number | null;
+  providerName?: string;
 }
 
 /** Provider with its models */

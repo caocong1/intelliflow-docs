@@ -3,6 +3,7 @@ import { requireAdmin } from "../auth/auth.guard";
 import {
   createModel,
   deleteModel,
+  listActiveModels,
   listModelsByProvider,
   toggleModelStatus,
   updateModel,
@@ -10,6 +11,13 @@ import {
 
 export const modelRoutes = new Elysia({ prefix: "/models" })
   .use(requireAdmin)
+  .get(
+    "/",
+    async () => {
+      const data = await listActiveModels();
+      return { data };
+    },
+  )
   .get(
     "/by-provider/:providerId",
     async ({ params }) => {

@@ -12,6 +12,7 @@ export type ModelRow = {
   temperature: number | null;
   maxTokens: number | null;
   topP: number | null;
+  providerName?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -29,6 +30,18 @@ const modelColumns = {
   createdAt: models.createdAt,
   updatedAt: models.updatedAt,
 } as const;
+
+export async function listActiveModels() {
+  return db
+    .select({
+      ...modelColumns,
+      providerName: providers.name,
+    })
+    .from(models)
+    .leftJoin(providers, eq(models.providerId, providers.id))
+    .where(eq(models.isActive, true))
+    .orderBy(desc(models.createdAt));
+}
 
 export async function listModelsByProvider(providerId: string): Promise<ModelRow[]> {
   return db

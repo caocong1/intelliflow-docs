@@ -178,8 +178,8 @@ export default function WorkflowEditor() {
         const validateRes = await api.api.workflows({ id: params.id }).validate.post();
 
         if (!validateRes.error && validateRes.data) {
-          const result = validateRes.data as { data?: { errors?: ValidationError[] } };
-          const errors: ValidationError[] = result.data?.errors ?? [];
+          const result = validateRes.data as { valid?: boolean; errors?: ValidationError[] };
+          const errors: ValidationError[] = result.errors ?? [];
           setValidationErrors(errors);
 
           if (errors.length === 0) {

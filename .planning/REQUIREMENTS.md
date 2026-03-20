@@ -71,10 +71,10 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 节点执行 — 输入转换
 
-- [ ] **NODE-01**: 用户可在输入转换节点填写文字、上传文件
-- [ ] **NODE-02**: 上传文件支持 Word/PDF/图片/音频/视频，系统自动解析为文本
-- [ ] **NODE-03**: 用户可查看文件解析结果并修改
-- [ ] **NODE-04**: 确认后输入数据按配置写入步骤子目录
+- [x] **NODE-01**: 用户可在输入转换节点填写文字、上传文件
+- [x] **NODE-02**: 上传文件支持 Word/PDF/图片/音频/视频，系统自动解析为文本
+- [x] **NODE-03**: 用户可查看文件解析结果并修改
+- [x] **NODE-04**: 确认后输入数据按配置写入步骤子目录
 
 ### 节点执行 — 信息脱敏
 
@@ -260,10 +260,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOC-03 | Phase 5 | Complete |
 | DOC-04 | Phase 5 | Complete |
 | DOC-05 | Phase 5 | Complete |
-| NODE-01 | Phase 5 | Pending |
-| NODE-02 | Phase 5 | Pending |
-| NODE-03 | Phase 5 | Pending |
-| NODE-04 | Phase 5 | Pending |
+| NODE-01 | Phase 5 | Complete |
+| NODE-02 | Phase 5 | Complete |
+| NODE-03 | Phase 5 | Complete |
+| NODE-04 | Phase 5 | Complete |
 | NODE-05 | Phase 5 | Complete |
 | NODE-06 | Phase 5 | Complete |
 | NODE-07 | Phase 5 | Complete |

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-20T10:20:12.603Z"
+last_updated: "2026-03-20T10:22:13.369Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 30
-  completed_plans: 26
+  completed_plans: 27
 ---
 
 # Project State
@@ -75,6 +75,7 @@ Progress: [████████░░] 83% (25/30 plans)
 | Phase 05 P02 | 5min | 2 tasks | 8 files |
 | Phase 05 P04 | 4min | 2 tasks | 5 files |
 | Phase 05 P07 | 6min | 2 tasks | 5 files |
+| Phase 05 P03 | 8min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,9 @@ Recent decisions affecting current work:
 - [05-04] Regex fallback covers phone_number, email, id_number, bank_card patterns
 - [05-04] getDesensitizeRules returns type descriptions only, never original values (security by design)
 - [Phase 05]: Used docx+pdfkit for Word/PDF generation with markdown parsing
+- [Phase 05]: pdf-parse v2 uses PDFParse class with getText() instead of default function
+- [Phase 05]: XHR for file upload instead of fetch for progress tracking support
+- [Phase 05]: Input transform confirm lives in executor; page-level advance triggered separately
 
 ### Pending Todos
 

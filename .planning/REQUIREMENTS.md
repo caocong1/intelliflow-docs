@@ -78,10 +78,10 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 节点执行 — 信息脱敏
 
-- [ ] **NODE-05**: 系统使用本地私有模型辅助识别敏感信息并高亮标记
-- [ ] **NODE-06**: 用户可逐条确认是否脱敏，可手动标记额外敏感信息
-- [ ] **NODE-07**: 脱敏映射关系加密存储在数据库中，工作目录保留本地副本
-- [ ] **NODE-08**: 脱敏规则（仅类型描述，不含真实值）自动注入后续模型调用节点提示词
+- [x] **NODE-05**: 系统使用本地私有模型辅助识别敏感信息并高亮标记
+- [x] **NODE-06**: 用户可逐条确认是否脱敏，可手动标记额外敏感信息
+- [x] **NODE-07**: 脱敏映射关系加密存储在数据库中，工作目录保留本地副本
+- [x] **NODE-08**: 脱敏规则（仅类型描述，不含真实值）自动注入后续模型调用节点提示词
 
 ### 节点执行 — 模型调用
 
@@ -264,10 +264,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NODE-02 | Phase 5 | Pending |
 | NODE-03 | Phase 5 | Pending |
 | NODE-04 | Phase 5 | Pending |
-| NODE-05 | Phase 5 | Pending |
-| NODE-06 | Phase 5 | Pending |
-| NODE-07 | Phase 5 | Pending |
-| NODE-08 | Phase 5 | Pending |
+| NODE-05 | Phase 5 | Complete |
+| NODE-06 | Phase 5 | Complete |
+| NODE-07 | Phase 5 | Complete |
+| NODE-08 | Phase 5 | Complete |
 | NODE-09 | Phase 5 | Pending |
 | NODE-10 | Phase 5 | Pending |
 | NODE-11 | Phase 5 | Pending |

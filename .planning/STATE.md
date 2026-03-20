@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-03-20T10:38:02.820Z"
+status: in_progress
+last_updated: "2026-03-20T14:38:44Z"
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 11
-  total_plans: 30
-  completed_plans: 30
+  total_plans: 37
+  completed_plans: 31
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 05: Document Creation Runtime
+**Current focus:** Phase 12: Workflow Editor Fixes & Config Panel Alignment
 
 ## Current Position
 
-Phase: 05 of 11 (Document Creation Runtime)
-Plan: 8 of 8 in current phase (05-08 complete)
-Status: Phase 05 Complete
-Last activity: 2026-03-20 — Completed 05-08 (Inline Editor, Skip Logic & Common Operations)
+Phase: 12 of 12 (Workflow Editor Fixes & Config Panel Alignment)
+Plan: 1 of 7 in current phase (12-01 complete)
+Status: In Progress
+Last activity: 2026-03-20 — Completed 12-01 (Shared Types & Flow Engine Foundation)
 
-Progress: [██████████] 100% (30/30 plans)
+Progress: [████████░░] 84% (31/37 plans)
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: [██████████] 100% (30/30 plans)
 | Phase 05 P05 | 5min | 2 tasks | 6 files |
 | Phase 05 P06 | 4min | 2 tasks | 5 files |
 | Phase 05 P08 | 4min | 2 tasks | 4 files |
+| Phase 12 P01 | 6min | 2 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -166,6 +167,10 @@ Recent decisions affecting current work:
 - [Phase 05]: Restoration tracks per-mapping status; manual correction re-validates by checking placeholder presence
 - [Phase 05]: Split-view editor (textarea+preview) over contenteditable for robustness
 - [Phase 05]: RECV-03 cancel AI generation deferred to v2 per user decision
+- [12-01] FormFieldDef.name removed; field.id used as key in runtime executors
+- [12-01] DesensitizeConfig categories replaces ruleTypes+placeholderFormat; placeholder format [TYPE_N] is system constant
+- [12-01] Flow engine as pure library (lib/flow-engine/) with reactive store, coordinate transforms, edge paths, derive-outputs
+- [12-01] addEdge enforces linear constraint; applySnapshot uses reconcile for fine-grained reactivity
 
 ### Roadmap Evolution
 
@@ -182,5 +187,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 05-08-PLAN.md (Inline Editor, Skip Logic & Common Operations)
+Stopped at: Completed 12-01-PLAN.md (Shared Types & Flow Engine Foundation)
 Resume file: None

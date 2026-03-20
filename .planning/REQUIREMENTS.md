@@ -115,12 +115,12 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 文档管理
 
-- [ ] **DMGT-01**: 用户可查看项目内文档列表（按创建时间/类型/状态筛选排序）
-- [ ] **DMGT-02**: 用户可搜索文档（按标题、描述关键词）
-- [ ] **DMGT-03**: 用户可查看文档详情（基本信息、流程执行历史、工作目录浏览）
-- [ ] **DMGT-04**: 用户可删除文档（软删除，进入回收站）
+- [x] **DMGT-01**: 用户可查看项目内文档列表（按创建时间/类型/状态筛选排序）
+- [x] **DMGT-02**: 用户可搜索文档（按标题、描述关键词）
+- [x] **DMGT-03**: 用户可查看文档详情（基本信息、流程执行历史、工作目录浏览）
+- [x] **DMGT-04**: 用户可删除文档（软删除，进入回收站）
 - [x] **DMGT-05**: 文档创建人可设置文档可见性（仅自己/项目成员/指定成员可见）
-- [ ] **DMGT-06**: 项目负责人可查看项目内所有文档，不受可见性限制
+- [x] **DMGT-06**: 项目负责人可查看项目内所有文档，不受可见性限制
 
 ### 版本管理
 
@@ -132,7 +132,7 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 - [x] **FSYS-01**: 每次文档生成自动创建规范的工作目录结构
 - [x] **FSYS-02**: 每个节点输出文件写入对应步骤子目录，文件在数据库中有索引记录
-- [ ] **FSYS-03**: 节点间通过文件路径引用传递数据
+- [x] **FSYS-03**: 节点间通过文件路径引用传递数据
 - [x] **FSYS-04**: 工作目录与文档绑定，文档删除时工作目录归档不立即物理删除
 
 ### 失败恢复
@@ -242,18 +242,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROJ-07 | Phase 4 | Complete |
 | PROJ-08 | Phase 4 | Complete |
 | PROJ-09 | Phase 4 | Complete |
-| DMGT-01 | Phase 4 | Pending |
-| DMGT-02 | Phase 4 | Pending |
-| DMGT-03 | Phase 4 | Pending |
-| DMGT-04 | Phase 4 | Pending |
+| DMGT-01 | Phase 4 | Complete |
+| DMGT-02 | Phase 4 | Complete |
+| DMGT-03 | Phase 4 | Complete |
+| DMGT-04 | Phase 4 | Complete |
 | DMGT-05 | Phase 4 | Complete |
-| DMGT-06 | Phase 4 | Pending |
+| DMGT-06 | Phase 4 | Complete |
 | VER-01 | Phase 4 | Pending |
 | VER-02 | Phase 4 | Pending |
 | VER-03 | Phase 4 | Pending |
 | FSYS-01 | Phase 4 | Complete |
 | FSYS-02 | Phase 4 | Complete |
-| FSYS-03 | Phase 4 | Pending |
+| FSYS-03 | Phase 4 | Complete |
 | FSYS-04 | Phase 4 | Complete |
 | DOC-01 | Phase 5 | Pending |
 | DOC-02 | Phase 5 | Pending |

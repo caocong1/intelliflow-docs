@@ -8,7 +8,7 @@ progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 16
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 4 of 7 (Project, Document, Version & File System Infrastructure)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: Executing Phase 4
-Last activity: 2026-03-20 — Completed 04-02 (Project Management)
+Last activity: 2026-03-20 — Completed 04-03 (Document Management)
 
-Progress: [████████░░] 67% (14/21 plans)
+Progress: [████████░░] 71% (15/21 plans)
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [████████░░] 67% (14/21 plans)
 | Phase 03 P05 | 15min | 2 tasks | 8 files |
 | Phase 04 P01 | 2min | 2 tasks | 2 files |
 | Phase 04 P02 | 5min | 2 tasks | 8 files |
+| Phase 04 P03 | 6min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,10 @@ Recent decisions affecting current work:
 - [04-02] Project list uses tab-based filtering (created/joined/all) with server-side tab parameter
 - [04-02] Member invitation uses username lookup against users list API (simple v1 approach)
 - [04-02] Owner permission check done in route handler via isProjectOwner helper, not middleware
+- [04-03] getDocumentRaw helper for accessing deleted documents (restore/permanent delete routes)
+- [04-03] Visibility filter uses or() with inArray subquery for specific member check
+- [04-03] Create document modal chains document type -> workflow selection (only active workflows)
+- [04-03] documentMgmtRoutes export name avoids collision with existing documentTypeRoutes
 
 ### Pending Todos
 
@@ -125,5 +130,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 04-02-PLAN.md (Project Management)
+Stopped at: Completed 04-03-PLAN.md (Document Management)
 Resume file: None

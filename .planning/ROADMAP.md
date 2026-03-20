@@ -108,7 +108,7 @@ Plans:
   7. Export node lets user choose format (Word/PDF/Markdown), preview the result, set filename, and download; exported file is stored in working directory export/ folder
   8. User can confirm/next, inline-edit current output, skip optional nodes, and roll back to previous nodes (resetting downstream state) at any node
   9. System auto-saves drafts per node; user can close browser and resume from last state; user can cancel in-progress AI generation
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 05-01: TBD
@@ -154,7 +154,7 @@ Plans:
   1. Workflow validation overlay displays backend validation errors correctly (response shape aligned)
   2. Model call config groups models by provider display name (not UUID)
   3. Shared Model type includes temperature, maxTokens, topP fields from Phase 7
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
 - [ ] 08-01-PLAN.md — Fix validation response shape, add provider JOIN to listActiveModels, sync shared Model type

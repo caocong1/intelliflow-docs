@@ -23,6 +23,7 @@ function getControlPoint(
 
 /**
  * Generate a cubic bezier SVG path between two handle positions.
+ * If controlPoints are provided, use them instead of auto-calculated ones.
  */
 export function getBezierPath(
   sourceX: number,
@@ -32,13 +33,25 @@ export function getBezierPath(
   targetY: number,
   targetPosition: HandlePosition,
   curvature = 0.25,
+  controlPoints?: Array<{ x: number; y: number }>,
 ): PathResult {
-  const dx = Math.abs(targetX - sourceX);
-  const dy = Math.abs(targetY - sourceY);
-  const offset = Math.max(dx, dy) * curvature;
+  let scx: number;
+  let scy: number;
+  let tcx: number;
+  let tcy: number;
 
-  const [scx, scy] = getControlPoint(sourceX, sourceY, sourcePosition, offset);
-  const [tcx, tcy] = getControlPoint(targetX, targetY, targetPosition, offset);
+  if (controlPoints && controlPoints.length >= 2) {
+    scx = controlPoints[0].x;
+    scy = controlPoints[0].y;
+    tcx = controlPoints[1].x;
+    tcy = controlPoints[1].y;
+  } else {
+    const dx = Math.abs(targetX - sourceX);
+    const dy = Math.abs(targetY - sourceY);
+    const offset = Math.max(dx, dy) * curvature;
+    [scx, scy] = getControlPoint(sourceX, sourceY, sourcePosition, offset);
+    [tcx, tcy] = getControlPoint(targetX, targetY, targetPosition, offset);
+  }
 
   const path = `M ${sourceX},${sourceY} C ${scx},${scy} ${tcx},${tcy} ${targetX},${targetY}`;
   const labelX = (sourceX + targetX) / 2;
@@ -74,6 +87,7 @@ export function getStepPath(
   targetY: number,
   _targetPosition: HandlePosition,
   _padding = 20,
+  controlPoints?: Array<{ x: number; y: number }>,
 ): PathResult {
   // For horizontal flow (right->left), route via midpoint X
   // For vertical flow (bottom->top), route via midpoint Y
@@ -84,12 +98,12 @@ export function getStepPath(
   let labelY: number;
 
   if (isHorizontal) {
-    const midX = (sourceX + targetX) / 2;
+    const midX = controlPoints?.[0]?.x ?? (sourceX + targetX) / 2;
     path = `M ${sourceX},${sourceY} L ${midX},${sourceY} L ${midX},${targetY} L ${targetX},${targetY}`;
     labelX = midX;
     labelY = (sourceY + targetY) / 2;
   } else {
-    const midY = (sourceY + targetY) / 2;
+    const midY = controlPoints?.[0]?.y ?? (sourceY + targetY) / 2;
     path = `M ${sourceX},${sourceY} L ${sourceX},${midY} L ${targetX},${midY} L ${targetX},${targetY}`;
     labelX = (sourceX + targetX) / 2;
     labelY = midY;

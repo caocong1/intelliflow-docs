@@ -77,6 +77,15 @@ export function createFlowStore(
     setEdges((prev) => prev.filter((e) => !ids.has(e.id)));
   }
 
+  /** Update edge control points (for midpoint drag reshaping) */
+  function updateEdgeControlPoints(id: string, controlPoints: Array<{ x: number; y: number }> | undefined) {
+    setEdges(
+      (edge) => edge.id === id,
+      "controlPoints",
+      controlPoints,
+    );
+  }
+
   /** Get a deep-cloned snapshot for undo/redo and autosave */
   function getSnapshot(): { nodes: FlowNodeData[]; edges: FlowEdgeData[] } {
     return structuredClone({ nodes: [...nodes], edges: [...edges] });
@@ -104,6 +113,7 @@ export function createFlowStore(
     addEdge,
     removeEdge,
     removeEdges,
+    updateEdgeControlPoints,
     getSnapshot,
     applySnapshot,
   };

@@ -49,6 +49,9 @@ export type FlowCanvasProps = {
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
   onDeleteSelected: () => void;
   onRubberBandSelect: (rect: { x: number; y: number; width: number; height: number }) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  onUpdateEdgeControlPoints?: (edgeId: string, controlPoints: Array<{ x: number; y: number }> | undefined) => void;
 };
 
 export default function FlowCanvas(props: FlowCanvasProps) {
@@ -367,15 +370,29 @@ export default function FlowCanvas(props: FlowCanvasProps) {
     return { sourcePos, targetPos, sourceHandlePos, targetHandlePos };
   }
 
-  // --- Keyboard handler for delete ---
+  // --- Keyboard handler for delete + undo/redo ---
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Delete" || e.key === "Backspace") {
-      // Don't intercept if user is typing in an input
-      const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
-        return;
-      }
+    // Don't intercept if user is typing in an input
+    const target = e.target as HTMLElement;
+    if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+      return;
+    }
 
+    // Undo: Ctrl+Z (without Shift)
+    if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+      e.preventDefault();
+      props.onUndo?.();
+      return;
+    }
+
+    // Redo: Ctrl+Shift+Z
+    if ((e.ctrlKey || e.metaKey) && e.key === "z" && e.shiftKey) {
+      e.preventDefault();
+      props.onRedo?.();
+      return;
+    }
+
+    if (e.key === "Delete" || e.key === "Backspace") {
       const nodeCount = props.selectedNodeIds.size;
       const edgeCount = props.selectedEdgeIds.size;
       if (nodeCount > 0 || edgeCount > 0) {
@@ -440,9 +457,16 @@ export default function FlowCanvas(props: FlowCanvasProps) {
                 from { stroke-dashoffset: 24; }
                 to { stroke-dashoffset: 0; }
               }
-              .edge-animated {
-                stroke-dasharray: 8 4;
-                animation: edge-flow 0.6s linear infinite;
+              @media (prefers-reduced-motion: no-preference) {
+                .edge-animated {
+                  stroke-dasharray: 8 4;
+                  animation: edge-flow 0.6s linear infinite;
+                }
+              }
+              @media (prefers-reduced-motion: reduce) {
+                .edge-animated {
+                  stroke-dasharray: 8 4;
+                }
               }
             `}</style>
           </defs>
@@ -460,6 +484,12 @@ export default function FlowCanvas(props: FlowCanvasProps) {
                       targetHandlePos={ep().targetHandlePos}
                       selected={props.selectedEdgeIds.has(edge.id)}
                       onSelect={props.onEdgeSelect}
+                      onUpdateControlPoints={props.onUpdateEdgeControlPoints}
+                      screenToFlow={(clientX: number, clientY: number) => {
+                        if (!canvasRef) return { x: 0, y: 0 };
+                        const rect = canvasRef.getBoundingClientRect();
+                        return screenToFlow(clientX, clientY, rect, props.viewport);
+                      }}
                     />
                   )}
                 </Show>

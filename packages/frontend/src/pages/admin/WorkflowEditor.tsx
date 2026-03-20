@@ -1,4 +1,4 @@
-import { Show, createSignal, onMount } from "solid-js";
+import { Show, createSignal, onMount, onCleanup } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import type { WorkflowNodeType, OutputDef, NodeConfig } from "@intelliflow/shared";
 import { api } from "../../api/client";
@@ -10,6 +10,8 @@ import ValidationOverlay, { type ValidationError } from "../../components/workfl
 import { createFlowStore } from "../../lib/flow-engine/store";
 import { createSelectionStore } from "../../lib/flow-engine/selection";
 import { deriveOutputs } from "../../lib/flow-engine/derive-outputs";
+import { createUndoRedo } from "../../lib/flow-engine/undo-redo";
+import { createAutosave } from "../../lib/flow-engine/autosave";
 import type { FlowNodeData, FlowEdgeData } from "../../lib/flow-engine/types";
 
 // Raw API workflow shape
@@ -57,21 +59,71 @@ function buildDefaultConfig(nodeType: WorkflowNodeType): NodeConfig {
   }
 }
 
+function formatTime(date: Date): string {
+  const h = String(date.getHours()).padStart(2, "0");
+  const m = String(date.getMinutes()).padStart(2, "0");
+  const s = String(date.getSeconds()).padStart(2, "0");
+  return `${h}:${m}:${s}`;
+}
+
+export type ValidationStatus = "unvalidated" | "valid" | "invalid";
+
 export default function WorkflowEditor() {
   const params = useParams<{ id: string }>();
   const navigate = useNavigate();
 
   const [workflowName, setWorkflowName] = createSignal("");
   const [loading, setLoading] = createSignal(true);
-  const [saving, setSaving] = createSignal(false);
   const [validationErrors, setValidationErrors] = createSignal<ValidationError[]>([]);
   const [showValidation, setShowValidation] = createSignal(false);
+  const [validationStatus, setValidationStatus] = createSignal<ValidationStatus>("unvalidated");
 
   // Flow store
   const store = createFlowStore();
 
   // Selection store (multi-select)
   const selection = createSelectionStore();
+
+  // Undo/redo (initialized after load)
+  let undoRedo: ReturnType<typeof createUndoRedo> | null = null;
+
+  // Autosave
+  const autosave = createAutosave(async (snapshot) => {
+    const backendNodes = snapshot.nodes.map((n) => ({
+      id: n.id,
+      type: n.data.nodeType,
+      label: n.data.label,
+      position: n.position,
+      config: n.data.config as unknown as Record<string, unknown>,
+      outputs: n.data.outputs as unknown as Array<{ name: string; label: string }>,
+    }));
+    const backendEdges = snapshot.edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+    }));
+    const saveRes = await api.api.workflows({ id: params.id }).put({
+      name: workflowName(),
+      nodes: backendNodes,
+      edges: backendEdges,
+    });
+    if (saveRes.error) {
+      throw new Error("Save failed");
+    }
+    // After successful save, mark validation as stale
+    setValidationStatus("unvalidated");
+  });
+
+  onCleanup(() => {
+    autosave.dispose();
+  });
+
+  /** Push current state to undo stack and trigger autosave */
+  function pushStateChange() {
+    const snapshot = store.getSnapshot();
+    if (undoRedo) undoRedo.push(snapshot);
+    autosave.trigger(snapshot);
+  }
 
   onMount(async () => {
     try {
@@ -108,6 +160,9 @@ export default function WorkflowEditor() {
       }));
 
       store.applySnapshot({ nodes: flowNodes, edges: flowEdges });
+
+      // Initialize undo/redo with loaded state
+      undoRedo = createUndoRedo({ nodes: flowNodes, edges: flowEdges });
     } catch {
       showToast("网络错误，请稍后重试", "error");
     } finally {
@@ -115,67 +170,42 @@ export default function WorkflowEditor() {
     }
   });
 
-  async function handleSave() {
-    setSaving(true);
+  function handleUndo() {
+    if (!undoRedo) return;
+    const snap = undoRedo.undo();
+    if (snap) {
+      store.applySnapshot(snap);
+      autosave.trigger(snap);
+    }
+  }
+
+  function handleRedo() {
+    if (!undoRedo) return;
+    const snap = undoRedo.redo();
+    if (snap) {
+      store.applySnapshot(snap);
+      autosave.trigger(snap);
+    }
+  }
+
+  async function handleValidate() {
     try {
-      const backendNodes = [...store.nodes].map((n) => ({
-        id: n.id,
-        type: n.data.nodeType,
-        label: n.data.label,
-        position: n.position,
-        config: n.data.config as unknown as Record<string, unknown>,
-        outputs: n.data.outputs as unknown as Array<{ name: string; label: string }>,
-      }));
-
-      const backendEdges = [...store.edges].map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-      }));
-
-      // Step 1: Save the workflow (draft always saves)
-      const saveRes = await api.api.workflows({ id: params.id }).put({
-        name: workflowName(),
-        nodes: backendNodes,
-        edges: backendEdges,
-      });
-
-      if (saveRes.error) {
-        const errData = saveRes.error as { value?: { error?: string } };
-        showToast(errData.value?.error ?? "保存工作流失败", "error");
-        return;
-      }
-
-      // Step 2: Validate the workflow after save
-      try {
-        const validateRes = await api.api.workflows({ id: params.id }).validate.post();
-
-        if (!validateRes.error && validateRes.data) {
-          const result = validateRes.data as { valid?: boolean; errors?: ValidationError[] };
-          const errors: ValidationError[] = result.errors ?? [];
-          setValidationErrors(errors);
-
-          if (errors.length === 0) {
-            setShowValidation(false);
-            showToast("保存成功", "success");
-          } else {
-            setShowValidation(true);
-            showToast("保存成功，但流程存在校验问题", "error");
-          }
-        } else {
-          setValidationErrors([]);
+      const validateRes = await api.api.workflows({ id: params.id }).validate.post();
+      if (!validateRes.error && validateRes.data) {
+        const result = validateRes.data as { valid?: boolean; errors?: ValidationError[] };
+        const errors: ValidationError[] = result.errors ?? [];
+        setValidationErrors(errors);
+        if (errors.length === 0) {
+          setValidationStatus("valid");
           setShowValidation(false);
-          showToast("工作流已保存", "success");
+          showToast("验证通过", "success");
+        } else {
+          setValidationStatus("invalid");
+          setShowValidation(true);
         }
-      } catch {
-        setValidationErrors([]);
-        setShowValidation(false);
-        showToast("工作流已保存", "success");
       }
     } catch {
-      showToast("网络错误，请稍后重试", "error");
-    } finally {
-      setSaving(false);
+      showToast("验证请求失败", "error");
     }
   }
 
@@ -192,6 +222,7 @@ export default function WorkflowEditor() {
         outputs,
       },
     });
+    pushStateChange();
   }
 
   function handleLabelChange(nodeId: string, label: string) {
@@ -200,6 +231,7 @@ export default function WorkflowEditor() {
     store.updateNode(nodeId, {
       data: { ...node.data, label },
     });
+    pushStateChange();
   }
 
   function handleNodeDropped(nodeType: WorkflowNodeType, position: { x: number; y: number }) {
@@ -241,6 +273,7 @@ export default function WorkflowEditor() {
 
     // Select the newly dropped node
     selection.selectNode(id, false);
+    pushStateChange();
   }
 
   function handleConnectionComplete(sourceId: string, targetId: string) {
@@ -250,6 +283,7 @@ export default function WorkflowEditor() {
       target: targetId,
       type: "bezier",
     });
+    pushStateChange();
   }
 
   function handleNodeSelect(nodeId: string, e: MouseEvent) {
@@ -274,6 +308,12 @@ export default function WorkflowEditor() {
       store.removeEdges(edgeIds);
     }
     selection.clearSelection();
+    pushStateChange();
+  }
+
+  function handleNodeDragEnd(nodeId: string, pos: { x: number; y: number }) {
+    store.updateNodePosition(nodeId, pos);
+    pushStateChange();
   }
 
   function handleRubberBandSelect(rect: { x: number; y: number; width: number; height: number }) {
@@ -335,46 +375,81 @@ export default function WorkflowEditor() {
             placeholder="工作流名称"
           />
         </div>
-        <div class="flex items-center gap-2">
-          <Show when={validationErrors().length > 0}>
-            <button
-              type="button"
-              onClick={() => setShowValidation(true)}
-              class="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-700 text-sm font-medium rounded-lg hover:bg-red-100 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ring-1 ring-red-200"
-            >
-              <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <title>校验错误</title>
-                <path
-                  fill-rule="evenodd"
-                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z"
-                  clip-rule="evenodd"
-                />
+        <div class="flex items-center gap-3">
+          {/* Save status indicator */}
+          <div class="flex items-center gap-1.5 text-xs text-slate-500">
+            <Show when={autosave.status() === "saving"}>
+              <svg class="w-3.5 h-3.5 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <title>保存中</title>
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
-              校验错误 ({validationErrors().length})
-            </button>
-          </Show>
+              <span class="text-slate-400">保存中...</span>
+            </Show>
+            <Show when={autosave.status() === "saved"}>
+              <svg class="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <title>已保存</title>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span class="text-green-600">已保存</span>
+              <Show when={autosave.lastSavedAt()} keyed>
+                {(date) => <span class="text-slate-400">{formatTime(date)}</span>}
+              </Show>
+            </Show>
+            <Show when={autosave.status() === "error"}>
+              <svg class="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <title>保存失败</title>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="text-red-600">保存失败</span>
+            </Show>
+          </div>
+
+          <div class="w-px h-5 bg-slate-200" />
+
+          {/* Validation status indicator */}
+          <div class="flex items-center gap-1.5 text-xs">
+            <Show when={validationStatus() === "valid"}>
+              <svg class="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <title>已验证</title>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="text-green-600">已验证</span>
+            </Show>
+            <Show when={validationStatus() === "invalid"}>
+              <button
+                type="button"
+                onClick={() => setShowValidation(true)}
+                class="inline-flex items-center gap-1 text-red-600 hover:text-red-700 cursor-pointer focus:outline-none"
+              >
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <title>验证失败</title>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>验证失败 ({validationErrors().length})</span>
+              </button>
+            </Show>
+            <Show when={validationStatus() === "unvalidated"}>
+              <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <title>未验证</title>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4" />
+              </svg>
+              <span class="text-slate-400">未验证</span>
+            </Show>
+          </div>
+
+          {/* Validate button */}
           <button
             type="button"
-            onClick={handleSave}
-            disabled={saving() || loading()}
-            class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            onClick={handleValidate}
+            disabled={loading()}
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            <Show
-              when={!saving()}
-              fallback={
-                <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                  <title>保存中</title>
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-              }
-            >
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <title>保存</title>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
-            </Show>
-            {saving() ? "保存中..." : "保存"}
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <title>验证流程</title>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            验证流程
           </button>
         </div>
       </div>
@@ -410,13 +485,15 @@ export default function WorkflowEditor() {
               onNodeSelect={handleNodeSelect}
               onEdgeSelect={handleEdgeSelect}
               onCanvasClick={handleCanvasClick}
-              onNodeDragEnd={(nodeId, pos) => store.updateNodePosition(nodeId, pos)}
+              onNodeDragEnd={handleNodeDragEnd}
               onNodeSizeChange={(nodeId, size) => store.updateNodeSize(nodeId, size)}
               onConnectionComplete={handleConnectionComplete}
               onNodeDropped={handleNodeDropped}
               updateNodePosition={(nodeId, pos) => store.updateNodePosition(nodeId, pos)}
               onDeleteSelected={handleDeleteSelected}
               onRubberBandSelect={handleRubberBandSelect}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
             />
 
             <Show when={showValidation() && validationErrors().length > 0}>

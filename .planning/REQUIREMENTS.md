@@ -57,8 +57,8 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 - [ ] **PROJ-04**: 用户可查看项目列表（我创建的/我参与的/全部项目）并搜索筛选
 - [ ] **PROJ-05**: 项目负责人可邀请和移除项目成员
 - [ ] **PROJ-06**: 项目成员可自行退出项目（负责人须先移交角色）
-- [ ] **PROJ-07**: 项目支持两种角色：项目负责人（全部权限）和项目参与者（限定权限）
-- [ ] **PROJ-08**: 项目创建人默认为项目负责人，可添加多个负责人
+- [x] **PROJ-07**: 项目支持两种角色：项目负责人（全部权限）和项目参与者（限定权限）
+- [x] **PROJ-08**: 项目创建人默认为项目负责人，可添加多个负责人
 - [ ] **PROJ-09**: 项目主页根据角色展示不同视图（文档列表、进行中任务、成员管理等）
 
 ### 文档创建与工作台
@@ -119,7 +119,7 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 - [ ] **DMGT-02**: 用户可搜索文档（按标题、描述关键词）
 - [ ] **DMGT-03**: 用户可查看文档详情（基本信息、流程执行历史、工作目录浏览）
 - [ ] **DMGT-04**: 用户可删除文档（软删除，进入回收站）
-- [ ] **DMGT-05**: 文档创建人可设置文档可见性（仅自己/项目成员/指定成员可见）
+- [x] **DMGT-05**: 文档创建人可设置文档可见性（仅自己/项目成员/指定成员可见）
 - [ ] **DMGT-06**: 项目负责人可查看项目内所有文档，不受可见性限制
 
 ### 版本管理
@@ -130,10 +130,10 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 文件系统与工作目录
 
-- [ ] **FSYS-01**: 每次文档生成自动创建规范的工作目录结构
-- [ ] **FSYS-02**: 每个节点输出文件写入对应步骤子目录，文件在数据库中有索引记录
+- [x] **FSYS-01**: 每次文档生成自动创建规范的工作目录结构
+- [x] **FSYS-02**: 每个节点输出文件写入对应步骤子目录，文件在数据库中有索引记录
 - [ ] **FSYS-03**: 节点间通过文件路径引用传递数据
-- [ ] **FSYS-04**: 工作目录与文档绑定，文档删除时工作目录归档不立即物理删除
+- [x] **FSYS-04**: 工作目录与文档绑定，文档删除时工作目录归档不立即物理删除
 
 ### 失败恢复
 
@@ -239,22 +239,22 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROJ-04 | Phase 4 | Pending |
 | PROJ-05 | Phase 4 | Pending |
 | PROJ-06 | Phase 4 | Pending |
-| PROJ-07 | Phase 4 | Pending |
-| PROJ-08 | Phase 4 | Pending |
+| PROJ-07 | Phase 4 | Complete |
+| PROJ-08 | Phase 4 | Complete |
 | PROJ-09 | Phase 4 | Pending |
 | DMGT-01 | Phase 4 | Pending |
 | DMGT-02 | Phase 4 | Pending |
 | DMGT-03 | Phase 4 | Pending |
 | DMGT-04 | Phase 4 | Pending |
-| DMGT-05 | Phase 4 | Pending |
+| DMGT-05 | Phase 4 | Complete |
 | DMGT-06 | Phase 4 | Pending |
 | VER-01 | Phase 4 | Pending |
 | VER-02 | Phase 4 | Pending |
 | VER-03 | Phase 4 | Pending |
-| FSYS-01 | Phase 4 | Pending |
-| FSYS-02 | Phase 4 | Pending |
+| FSYS-01 | Phase 4 | Complete |
+| FSYS-02 | Phase 4 | Complete |
 | FSYS-03 | Phase 4 | Pending |
-| FSYS-04 | Phase 4 | Pending |
+| FSYS-04 | Phase 4 | Complete |
 | DOC-01 | Phase 5 | Pending |
 | DOC-02 | Phase 5 | Pending |
 | DOC-03 | Phase 5 | Pending |

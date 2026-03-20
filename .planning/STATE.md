@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: unknown
-last_updated: "2026-03-20T01:41:54.351Z"
+status: in-progress
+last_updated: "2026-03-20T03:34:13Z"
 progress:
-  total_phases: 5
+  total_phases: 7
   completed_phases: 5
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 21
+  completed_plans: 13
 ---
 
 # Project State
@@ -18,23 +18,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 3: Workflow Orchestration (complete) — Phase 4 next
+**Current focus:** Phase 4: Project, Document, Version & File System Infrastructure
 
 ## Current Position
 
-Phase: 3 of 7 (Workflow Orchestration)
-Plan: 5 of 5 in current phase (phase complete)
-Status: Phase 3 Complete
-Last activity: 2026-03-19 — Completed 03-05 (Validation Display and Workflow Editor Verification)
+Phase: 4 of 7 (Project, Document, Version & File System Infrastructure)
+Plan: 1 of 4 in current phase
+Status: Executing Phase 4
+Last activity: 2026-03-20 — Completed 04-01 (Schema & Types)
 
-Progress: [████████░░] 57% (12/21 plans)
+Progress: [████████░░] 62% (13/21 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 10
-- Average duration: 8.8min
-- Total execution time: ~1.47 hours
+- Total plans completed: 11
+- Average duration: 8.5min
+- Total execution time: ~1.5 hours
 
 **By Phase:**
 
@@ -57,6 +57,7 @@ Progress: [████████░░] 57% (12/21 plans)
 | Phase 03 P03 | 12min | 2 tasks | 11 files |
 | Phase 03 P04 | 5min | 2 tasks | 10 files |
 | Phase 03 P05 | 15min | 2 tasks | 8 files |
+| Phase 04 P01 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,7 @@ Recent decisions affecting current work:
 - [03-05] errorNodeIds computed as a JS Set from WorkflowValidationError[] for O(1) per-node hasError lookup
 - [03-05] ValidationOverlay auto-opens when errors exist after save; manual close button available; does not block save
 - [03-05] hasError prop pattern: each node accepts boolean derived from errorNodeIds.has(nodeId), threaded from WorkflowEditor signal
+- [04-01] db:push runs from packages/backend directory, not workspace root
 
 ### Pending Todos
 
@@ -118,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19
-Stopped at: Completed 03-05-PLAN.md (Validation Display and Workflow Editor Verification) — Phase 3 complete
+Last session: 2026-03-20
+Stopped at: Completed 04-01-PLAN.md (Schema & Types)
 Resume file: None

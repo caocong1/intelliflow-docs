@@ -1,4 +1,4 @@
-import { count, desc, eq, ilike, or } from "drizzle-orm";
+import { and, count, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "../../db";
 import { documentTypes, workflows } from "../../db/schema";
 
@@ -26,22 +26,29 @@ export async function listDocumentTypes(
   page: number,
   pageSize: number,
   search?: string,
+  activeOnly?: boolean,
 ): Promise<{ data: DocumentTypeRow[]; total: number }> {
   const offset = (page - 1) * pageSize;
 
-  const searchCondition = search
-    ? or(ilike(documentTypes.name, `%${search}%`), ilike(documentTypes.code, `%${search}%`))
-    : undefined;
+  const conditions = [];
+  if (search) {
+    conditions.push(or(ilike(documentTypes.name, `%${search}%`), ilike(documentTypes.code, `%${search}%`)));
+  }
+  if (activeOnly) {
+    conditions.push(eq(documentTypes.isActive, true));
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [data, totalResult] = await Promise.all([
     db
       .select(documentTypeColumns)
       .from(documentTypes)
-      .where(searchCondition)
+      .where(whereClause)
       .orderBy(desc(documentTypes.createdAt))
       .limit(pageSize)
       .offset(offset),
-    db.select({ count: count() }).from(documentTypes).where(searchCondition),
+    db.select({ count: count() }).from(documentTypes).where(whereClause),
   ]);
 
   return { data, total: totalResult[0]?.count ?? 0 };

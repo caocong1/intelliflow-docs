@@ -27,6 +27,7 @@ export async function listWorkflows(params: {
   search?: string;
   page?: number;
   pageSize?: number;
+  status?: string;
 }): Promise<{ data: WorkflowListItem[]; total: number }> {
   const page = Math.max(1, params.page ?? 1);
   const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
@@ -38,6 +39,9 @@ export async function listWorkflows(params: {
   }
   if (params.search) {
     conditions.push(ilike(workflows.name, `%${params.search}%`));
+  }
+  if (params.status) {
+    conditions.push(eq(workflows.status, params.status as "draft" | "active" | "disabled"));
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

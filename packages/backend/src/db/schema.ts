@@ -66,6 +66,10 @@ export const models = pgTable("models", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const projectRoleEnum = pgEnum("project_role", ["owner", "participant"]);
+export const documentVisibilityEnum = pgEnum("document_visibility", ["self", "project", "specific"]);
+export const documentStatusEnum = pgEnum("document_status", ["draft", "in_progress", "completed"]);
+
 export const workflowStatusEnum = pgEnum("workflow_status", ["draft", "active", "disabled"]);
 
 export const workflows = pgTable("workflows", {
@@ -82,4 +86,95 @@ export const workflows = pgTable("workflows", {
   schemaVersion: integer("schema_version").default(1).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ─── Phase 4: Project, Document, Version, File tables ────────────────────────
+
+export const projects = pgTable("projects", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 200 }).notNull(),
+  description: varchar("description", { length: 1000 }),
+  department: varchar("department", { length: 100 }),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const projectMembers = pgTable("project_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  role: projectRoleEnum("role").default("participant").notNull(),
+  joinedAt: timestamp("joined_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const documents = pgTable("documents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  workflowId: uuid("workflow_id")
+    .notNull()
+    .references(() => workflows.id),
+  title: varchar("title", { length: 300 }).notNull(),
+  description: varchar("description", { length: 1000 }),
+  status: documentStatusEnum("status").default("draft").notNull(),
+  visibility: documentVisibilityEnum("visibility").default("project").notNull(),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  isArchived: boolean("is_archived").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const documentVisibilityMembers = pgTable("document_visibility_members", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+});
+
+export const documentVersions = pgTable("document_versions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id),
+  versionNumber: integer("version_number").notNull(),
+  nodeId: varchar("node_id", { length: 100 }).notNull(),
+  nodeLabel: varchar("node_label", { length: 200 }).notNull(),
+  snapshotData: jsonb("snapshot_data").notNull(),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const documentFiles = pgTable("document_files", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id),
+  category: varchar("category", { length: 20 }).notNull(),
+  originalName: varchar("original_name", { length: 500 }).notNull(),
+  storagePath: varchar("storage_path", { length: 1000 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }),
+  fileSize: integer("file_size"),
+  createdBy: uuid("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -146,7 +146,7 @@ export default function PromptEditor(props: PromptEditorProps) {
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
-          placeholder="输入提示词模板。输入 {{ 可插入变量引用，例如：{{输入转换.原始文本}}"
+          placeholder="输入提示词模板。输入 {{ 可插入节点输出引用，例如：{{输入转换.原始文本}}"
           rows={6}
           class="w-full text-xs px-2.5 py-2 border border-slate-200 rounded-md bg-white text-slate-800 placeholder-slate-400 font-mono resize-y focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
         />
@@ -169,10 +169,10 @@ export default function PromptEditor(props: PromptEditorProps) {
           class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-md transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <title>插入变量</title>
+            <title>插入节点输出</title>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
           </svg>
-          插入变量
+          插入节点输出
         </button>
 
         <Show when={props.value.trim().length > 0}>
@@ -223,7 +223,7 @@ export default function PromptEditor(props: PromptEditorProps) {
       </Show>
 
       <p class="text-xs text-slate-400">
-        输入 <code class="bg-slate-100 px-1 rounded font-mono">{"{{"}  </code> 触发变量选择器
+        输入 <code class="bg-slate-100 px-1 rounded font-mono">{"{{"}  </code> 触发节点输出选择器
       </p>
     </div>
   );

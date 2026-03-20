@@ -151,6 +151,62 @@ export function validateWorkflow(
 
   // ── Rule 6: Required fields per node type ─────────────────────────────────
   for (const node of nodes) {
+    if (node.config.type === "input_transform") {
+      const fields = node.config.formFields;
+      if (!fields || fields.length === 0) {
+        errors.push({
+          nodeId: node.id,
+          field: "formFields",
+          message: `【输入转换】节点 "${node.label}" 至少需要一个表单字段`,
+          severity: "error",
+        });
+      } else {
+        const hasValidField = fields.some(
+          (f: { label?: string }) => f.label && f.label.trim() !== "",
+        );
+        if (!hasValidField) {
+          errors.push({
+            nodeId: node.id,
+            field: "formFields",
+            message: `【输入转换】节点 "${node.label}" 的表单字段标签不能为空`,
+            severity: "error",
+          });
+        }
+      }
+    }
+
+    if (node.config.type === "desensitize") {
+      const categories = node.config.categories;
+      if (!categories || categories.length === 0) {
+        errors.push({
+          nodeId: node.id,
+          field: "categories",
+          message: `【信息脱敏】节点 "${node.label}" 至少需要一个脱敏类别`,
+          severity: "error",
+        });
+      } else {
+        const hasValidCategory = categories.some(
+          (c: { name?: string }) => c.name && c.name.trim() !== "",
+        );
+        if (!hasValidCategory) {
+          errors.push({
+            nodeId: node.id,
+            field: "categories",
+            message: `【信息脱敏】节点 "${node.label}" 的脱敏类别名称不能为空`,
+            severity: "error",
+          });
+        }
+      }
+      if (!node.config.localModelId) {
+        errors.push({
+          nodeId: node.id,
+          field: "localModelId",
+          message: `【信息脱敏】节点 "${node.label}" 未选择本地模型`,
+          severity: "error",
+        });
+      }
+    }
+
     if (node.config.type === "model_call") {
       if (!node.config.promptTemplate || node.config.promptTemplate.trim() === "") {
         errors.push({
@@ -164,7 +220,7 @@ export function validateWorkflow(
         errors.push({
           nodeId: node.id,
           field: "modelIds",
-          message: `【模型调用】节点 "${node.label}" 未指定模型`,
+          message: `【模型调用】节点 "${node.label}" 未选择任何模型`,
           severity: "warning",
         });
       }
@@ -179,6 +235,32 @@ export function validateWorkflow(
           severity: "error",
         });
       }
+    }
+  }
+
+  // ── Rule 7: Linear flow constraint (max 1 input + 1 output per node) ────
+  const incomingCount = new Map<string, number>();
+  const outgoingCount = new Map<string, number>();
+  for (const edge of edges) {
+    incomingCount.set(edge.target, (incomingCount.get(edge.target) ?? 0) + 1);
+    outgoingCount.set(edge.source, (outgoingCount.get(edge.source) ?? 0) + 1);
+  }
+  for (const node of nodes) {
+    const incoming = incomingCount.get(node.id) ?? 0;
+    if (incoming > 1) {
+      errors.push({
+        nodeId: node.id,
+        message: `节点 "${node.label}" 有多条输入连接，流程必须为线性`,
+        severity: "error",
+      });
+    }
+    const outgoing = outgoingCount.get(node.id) ?? 0;
+    if (outgoing > 1) {
+      errors.push({
+        nodeId: node.id,
+        message: `节点 "${node.label}" 有多条输出连接，流程必须为线性`,
+        severity: "error",
+      });
     }
   }
 

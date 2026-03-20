@@ -65,7 +65,7 @@ export default function VariablePicker(props: VariablePickerProps) {
           type="text"
           value={search()}
           onInput={(e) => setSearch(e.currentTarget.value)}
-          placeholder="搜索变量..."
+          placeholder="搜索节点输出..."
           autofocus
           class="w-full text-xs px-2 py-1.5 border border-slate-200 rounded bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
         />
@@ -73,7 +73,7 @@ export default function VariablePicker(props: VariablePickerProps) {
 
       <div class="max-h-60 overflow-y-auto">
         <Show when={!hasResults()}>
-          <p class="text-xs text-slate-400 text-center py-4">无匹配变量</p>
+          <p class="text-xs text-slate-400 text-center py-4">无匹配节点输出</p>
         </Show>
 
         {/* Upstream node variables */}
@@ -90,7 +90,7 @@ export default function VariablePicker(props: VariablePickerProps) {
                 {/* Group header */}
                 <div class="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5">
                   <span class="text-sm leading-none">{getNodeIcon(node.data.nodeType)}</span>
-                  <span class="text-xs font-semibold text-slate-600">{node.data.label}</span>
+                  <span class="text-xs font-semibold text-slate-600">插入 {node.data.label} 的输出</span>
                 </div>
                 {/* Outputs */}
                 <For each={outputs()}>
@@ -114,7 +114,7 @@ export default function VariablePicker(props: VariablePickerProps) {
         <Show when={filteredSystemVars().length > 0}>
           <div>
             <div class="px-3 py-1.5 bg-slate-50 border-b border-slate-100">
-              <span class="text-xs font-semibold text-slate-500">系统变量</span>
+              <span class="text-xs font-semibold text-slate-500">系统节点输出</span>
             </div>
             <For each={filteredSystemVars()}>
               {(sysVar) => (

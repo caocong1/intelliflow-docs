@@ -1,7 +1,7 @@
 import { Show, createSignal, onMount, For } from "solid-js";
 
 const DEFAULT_META_PROMPT_PLACEHOLDER = `你是一个提示词优化专家。请优化以下提示词，使其更加清晰、具体、结构化。
-保留原始意图和所有变量引用（如 {{节点名.输出名}}），不要改变变量格式。
+保留原始意图和所有节点输出引用（如 {{节点名.输出名}}），不要改变引用格式。
 只返回优化后的提示词文本，不要添加解释。`;
 
 interface ModelOption {

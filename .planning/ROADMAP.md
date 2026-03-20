@@ -17,9 +17,9 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Workflow Orchestration** - Visual flow editor, 5 node types, variable system, flow validation, flow management (completed 2026-03-19)
 - [x] **Phase 4: Project + Document + Version + File System Infrastructure** - Project CRUD with members, document management, version snapshots, working directory lifecycle (completed 2026-03-20)
 - [ ] **Phase 5: Document Creation Runtime** - Workspace UI, all 5 node executors, multi-model streaming, common operations, failure recovery
-- [ ] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status
-- [ ] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09
-- [ ] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync
+- [x] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status (completed 2026-03-19)
+- [x] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09 (completed 2026-03-19)
+- [x] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync (completed 2026-03-20)
 
 ## Phase Details
 
@@ -170,8 +170,8 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 1. Foundation + Auth + Document Types | 3/3 | Complete | 2026-03-19 |
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
 | 3. Workflow Orchestration | 5/5 | Complete   | 2026-03-19 |
-| 4. Project + Document + Version + File System Infrastructure | 4/6 | Gap Closure | 2026-03-20 |
+| 4. Project + Document + Version + File System Infrastructure | 6/6 | Complete | 2026-03-20 |
 | 5. Document Creation Runtime | 0/5 | Not started | - |
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |
-| 8. Integration Bug Fixes | 0/1 | Not started | - |
+| 8. Integration Bug Fixes | 1/1 | Complete | 2026-03-20 |

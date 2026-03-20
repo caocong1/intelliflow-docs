@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 05 of 11 (Document Creation Runtime)
-Plan: 4 of 8 in current phase (05-04 complete)
+Plan: 5 of 8 in current phase (05-05 complete)
 Status: Executing Phase 05
-Last activity: 2026-03-20 — Completed 05-04 (Desensitize Node Executor)
+Last activity: 2026-03-20 — Completed 05-05 (Model Call Node Executor)
 
-Progress: [████████░░] 83% (25/30 plans)
+Progress: [█████████░] 90% (27/30 plans)
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [████████░░] 83% (25/30 plans)
 | Phase 05 P04 | 4min | 2 tasks | 5 files |
 | Phase 05 P07 | 6min | 2 tasks | 5 files |
 | Phase 05 P03 | 8min | 2 tasks | 5 files |
+| Phase 05 P05 | 5min | 2 tasks | 6 files |
 | Phase 05 P06 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
@@ -158,6 +159,9 @@ Recent decisions affecting current work:
 - [Phase 05]: pdf-parse v2 uses PDFParse class with getText() instead of default function
 - [Phase 05]: XHR for file upload instead of fetch for progress tracking support
 - [Phase 05]: Input transform confirm lives in executor; page-level advance triggered separately
+- [05-05] fetch+ReadableStream for SSE instead of EventSource — cannot send Authorization headers
+- [05-05] Multiplexed SSE stream — all models share one stream with modelId-tagged events
+- [05-05] Output selection stores content as both selectedContent and text for downstream compat
 - [Phase 05]: Restoration tracks per-mapping status; manual correction re-validates by checking placeholder presence
 
 ### Pending Todos
@@ -171,5 +175,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-20
-Stopped at: Completed 05-04-PLAN.md (Desensitize Node Executor)
+Stopped at: Completed 05-05-PLAN.md (Model Call Node Executor)
 Resume file: None

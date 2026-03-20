@@ -85,14 +85,14 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 节点执行 — 模型调用
 
-- [ ] **NODE-09**: 系统通过统一抽象层执行模型调用（v1 CLI 命令行方式）
-- [ ] **NODE-10**: 用户可选择单模型（系统推荐）或多模型对比模式
-- [ ] **NODE-11**: 多模型并行调用，各模型输出到同一步骤目录的不同文件
-- [ ] **NODE-12**: 模型生成过程通过 SSE 流式输出展示（等待中→思考中→生成中→完成/失败）
-- [ ] **NODE-13**: 用户可切换查看不同模型输出（Markdown 渲染/源码视图）
-- [ ] **NODE-14**: 单个模型失败可单独重试，已成功的输出保留
-- [ ] **NODE-15**: 多模型时支持左右分栏对比
-- [ ] **NODE-16**: 用户选定最佳输出作为本节点最终输出
+- [x] **NODE-09**: 系统通过统一抽象层执行模型调用（v1 CLI 命令行方式）
+- [x] **NODE-10**: 用户可选择单模型（系统推荐）或多模型对比模式
+- [x] **NODE-11**: 多模型并行调用，各模型输出到同一步骤目录的不同文件
+- [x] **NODE-12**: 模型生成过程通过 SSE 流式输出展示（等待中→思考中→生成中→完成/失败）
+- [x] **NODE-13**: 用户可切换查看不同模型输出（Markdown 渲染/源码视图）
+- [x] **NODE-14**: 单个模型失败可单独重试，已成功的输出保留
+- [x] **NODE-15**: 多模型时支持左右分栏对比
+- [x] **NODE-16**: 用户选定最佳输出作为本节点最终输出
 
 ### 节点执行 — 信息恢复
 
@@ -268,14 +268,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NODE-06 | Phase 5 | Complete |
 | NODE-07 | Phase 5 | Complete |
 | NODE-08 | Phase 5 | Complete |
-| NODE-09 | Phase 5 | Pending |
-| NODE-10 | Phase 5 | Pending |
-| NODE-11 | Phase 5 | Pending |
-| NODE-12 | Phase 5 | Pending |
-| NODE-13 | Phase 5 | Pending |
-| NODE-14 | Phase 5 | Pending |
-| NODE-15 | Phase 5 | Pending |
-| NODE-16 | Phase 5 | Pending |
+| NODE-09 | Phase 5 | Complete |
+| NODE-10 | Phase 5 | Complete |
+| NODE-11 | Phase 5 | Complete |
+| NODE-12 | Phase 5 | Complete |
+| NODE-13 | Phase 5 | Complete |
+| NODE-14 | Phase 5 | Complete |
+| NODE-15 | Phase 5 | Complete |
+| NODE-16 | Phase 5 | Complete |
 | NODE-17 | Phase 5 | Complete |
 | NODE-18 | Phase 5 | Complete |
 | NODE-19 | Phase 5 | Complete |

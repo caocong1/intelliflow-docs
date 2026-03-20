@@ -237,7 +237,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROJ-02 | Phase 4 | Complete |
 | PROJ-03 | Phase 4 | Complete |
 | PROJ-04 | Phase 4 | Complete |
-| PROJ-05 | Phase 4, Phase 9 | Complete |
+| PROJ-05 | Phase 4, Phase 9, Phase 11 | Complete |
 | PROJ-06 | Phase 4 | Complete |
 | PROJ-07 | Phase 4 | Complete |
 | PROJ-08 | Phase 4 | Complete |

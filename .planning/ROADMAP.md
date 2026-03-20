@@ -22,10 +22,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync (completed 2026-03-20)
 - [x] **Phase 9: Integration Polish & UX Guards** - Association check guard for document type delete, fix frontend ownership derivation (completed 2026-03-20)
 - [x] **Phase 10: Non-Admin Read API Access** - Split doc-type/workflow listing to requireAuth so non-admin users can create documents (completed 2026-03-20)
+- [ ] **Phase 11: Pre-Phase 5 API Access Fixes** - Split user/model/workflow-detail routes to requireAuth for non-admin access, closing INT-NEW-02/INT-NEW-03
 
 ## Phase Details
 
-> **Note:** Phase 5 is the primary remaining work. Phase 10 fixes a cross-phase integration issue (INT-NEW-01) that blocks non-admin document creation.
+> **Note:** Phase 5 is the primary remaining work (34 requirements). Phase 11 fixes integration issues (INT-NEW-02, INT-NEW-03) and Phase 5 readiness blockers discovered in re-audit #5.
 
 ### Phase 1: Foundation + Auth + Document Types
 **Goal**: Administrators can manage users and document types on a working application with role-based access
@@ -190,6 +191,21 @@ Plans:
 Plans:
 - [ ] 10-01-PLAN.md — Split doc-type/workflow routes: requireAuth for listing, requireAdmin for mutations
 
+### Phase 11: Pre-Phase 5 API Access Fixes
+**Goal**: Non-admin project owners can invite members and Phase 5 runtime can access models and workflow details without admin privileges
+**Depends on**: Phase 1, Phase 2, Phase 3, Phase 10
+**Requirements**: PROJ-05
+**Gap Closure:** Closes integration gaps INT-NEW-02, INT-NEW-03 and Phase 5 readiness blockers from v1.0 audit (re-audit #5)
+**Success Criteria** (what must be TRUE):
+  1. Non-admin project owner can search users and invite members without 403 (requireAuth user search endpoint)
+  2. Non-admin authenticated users can call GET /api/models to list active models (requireAuth, not requireAdmin)
+  3. Non-admin authenticated users can call GET /api/workflows/:id to load a single workflow definition (requireAuth, not requireAdmin)
+  4. Admin-only mutations (create, edit, delete users/models) remain behind requireAdmin
+**Plans**: 1 plan
+
+Plans:
+- [ ] 11-01-PLAN.md — Split user/model/workflow-detail routes: requireAuth for read, requireAdmin for mutations (Phase 10 pattern)
+
 ## Progress
 
 **Execution Order:**
@@ -208,3 +224,4 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 8. Integration Bug Fixes | 1/1 | Complete | 2026-03-20 |
 | 9. Integration Polish & UX Guards | 1/1 | Complete | 2026-03-20 |
 | 10. Non-Admin Read API Access | 1/1 | Complete    | 2026-03-20 |
+| 11. Pre-Phase 5 API Access Fixes | 0/1 | Not started | - |

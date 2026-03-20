@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-20T10:22:13.369Z"
+last_updated: "2026-03-20T10:29:45.389Z"
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 30
-  completed_plans: 27
+  completed_plans: 28
 ---
 
 # Project State
@@ -76,6 +76,7 @@ Progress: [████████░░] 83% (25/30 plans)
 | Phase 05 P04 | 4min | 2 tasks | 5 files |
 | Phase 05 P07 | 6min | 2 tasks | 5 files |
 | Phase 05 P03 | 8min | 2 tasks | 5 files |
+| Phase 05 P06 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,7 @@ Recent decisions affecting current work:
 - [Phase 05]: pdf-parse v2 uses PDFParse class with getText() instead of default function
 - [Phase 05]: XHR for file upload instead of fetch for progress tracking support
 - [Phase 05]: Input transform confirm lives in executor; page-level advance triggered separately
+- [Phase 05]: Restoration tracks per-mapping status; manual correction re-validates by checking placeholder presence
 
 ### Pending Todos
 

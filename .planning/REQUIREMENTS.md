@@ -96,9 +96,9 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 ### 节点执行 — 信息恢复
 
-- [ ] **NODE-17**: 系统纯本地处理，读取脱敏映射将占位符替换回真实值
-- [ ] **NODE-18**: 页面展示恢复前后对比（高亮已恢复位置）
-- [ ] **NODE-19**: 恢复失败的项高亮标记，允许用户手动修正
+- [x] **NODE-17**: 系统纯本地处理，读取脱敏映射将占位符替换回真实值
+- [x] **NODE-18**: 页面展示恢复前后对比（高亮已恢复位置）
+- [x] **NODE-19**: 恢复失败的项高亮标记，允许用户手动修正
 
 ### 节点执行 — 文件导出
 
@@ -276,9 +276,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NODE-14 | Phase 5 | Pending |
 | NODE-15 | Phase 5 | Pending |
 | NODE-16 | Phase 5 | Pending |
-| NODE-17 | Phase 5 | Pending |
-| NODE-18 | Phase 5 | Pending |
-| NODE-19 | Phase 5 | Pending |
+| NODE-17 | Phase 5 | Complete |
+| NODE-18 | Phase 5 | Complete |
+| NODE-19 | Phase 5 | Complete |
 | NODE-20 | Phase 5 | Complete |
 | NODE-21 | Phase 5 | Complete |
 | NODE-22 | Phase 5 | Complete |

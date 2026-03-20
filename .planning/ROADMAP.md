@@ -237,9 +237,9 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 **Plans:** 6 plans
 
 Plans:
-- [ ] 12-01-PLAN.md — Shared type updates (DesensitizeConfig categories, ExportConfig ppt, FormFieldDef) + auto-derived outputs utility
-- [ ] 12-02-PLAN.md — Config panel overhaul (all 5 panels aligned to shared types, RuntimeSettings, remove OutputsEditor)
-- [ ] 12-03-PLAN.md — Canvas interactions (node/edge deletion, multi-select, linear connection enforcement, smart auto-connect)
-- [ ] 12-04-PLAN.md — Undo/redo + debounced autosave + toolbar status indicators
-- [ ] 12-05-PLAN.md — Full-field validation + linear flow validation + variable rename to 节点输出 + prompt optimization
-- [ ] 12-06-PLAN.md — UI/UX polish (edge animation, node design, MiniMap colors, alignment guides) + human verification
+- [ ] 12-01-PLAN.md — Shared type updates (DesensitizeConfig categories, ExportConfig ppt, FormFieldDef) + flow engine library (types, store, coordinate, edge-paths, derive-outputs)
+- [ ] 12-02-PLAN.md — Custom SVG+HTML canvas infrastructure (FlowCanvas, FlowViewport, FlowNode, EdgeRenderer) + migrate from @dschz/solid-flow
+- [ ] 12-03-PLAN.md — Selection system (click, multi-select, rubber-band), deletion with confirmation, batch drag, MiniMap
+- [ ] 12-04-PLAN.md — Config panel overhaul (all 5 panels aligned to shared types, RuntimeSettings, remove OutputsEditor)
+- [ ] 12-05-PLAN.md — Undo/redo + debounced autosave + validation expansion (full-field + linear flow) + 变量→节点输出 rename
+- [ ] 12-06-PLAN.md — UI/UX polish (edge animation, alignment guides, node design, NodeLibraryPanel) + human verification

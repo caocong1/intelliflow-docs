@@ -95,7 +95,7 @@ export default function WorkflowEditor() {
       label: n.data.label,
       position: n.position,
       config: n.data.config as unknown as Record<string, unknown>,
-      outputs: n.data.outputs as unknown as Array<{ name: string; label: string }>,
+      outputs: n.data.outputs as unknown as Array<{ id: string; name: string; description?: string }>,
     }));
     const backendEdges = snapshot.edges.map((e) => ({
       id: e.id,

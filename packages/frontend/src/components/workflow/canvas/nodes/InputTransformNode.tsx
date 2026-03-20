@@ -13,13 +13,13 @@ type NodeContentProps = {
 
 function getConfigSummary(config: NodeConfig): string {
   if (config.type !== "input_transform") return "";
-  const count = config.formFields.length;
+  const count = config.formFields?.length ?? 0;
   return count > 0 ? `${count} 个输入项` : "暂无输入项";
 }
 
 function isConfigured(config: NodeConfig): boolean {
   if (config.type !== "input_transform") return false;
-  return config.formFields.length > 0;
+  return (config.formFields?.length ?? 0) > 0;
 }
 
 export default function InputTransformNode(props: NodeContentProps) {

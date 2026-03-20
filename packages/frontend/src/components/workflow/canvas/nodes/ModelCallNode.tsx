@@ -13,13 +13,13 @@ type NodeContentProps = {
 
 function getConfigSummary(config: NodeConfig): string {
   if (config.type !== "model_call") return "";
-  const count = config.modelIds.length;
+  const count = config.modelIds?.length ?? 0;
   return count > 0 ? `${count} 个模型` : "暂未选择模型";
 }
 
 function isConfigured(config: NodeConfig): boolean {
   if (config.type !== "model_call") return false;
-  return config.modelIds.length > 0;
+  return (config.modelIds?.length ?? 0) > 0;
 }
 
 export default function ModelCallNode(props: NodeContentProps) {

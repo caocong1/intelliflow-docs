@@ -19,7 +19,7 @@ const nodeSchema = t.Object({
   label: t.String(),
   position: t.Object({ x: t.Number(), y: t.Number() }),
   config: t.Record(t.String(), t.Unknown()),
-  outputs: t.Array(t.Object({ name: t.String(), label: t.String() })),
+  outputs: t.Array(t.Object({ id: t.String(), name: t.String(), description: t.Optional(t.String()) })),
 });
 
 const edgeSchema = t.Object({

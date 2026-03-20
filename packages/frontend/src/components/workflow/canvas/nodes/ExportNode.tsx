@@ -13,14 +13,14 @@ type NodeContentProps = {
 
 function isConfigured(config: NodeConfig): boolean {
   if (config.type !== "export") return false;
-  return config.contentMapping.length > 0;
+  return (config.contentMapping?.length ?? 0) > 0;
 }
 
 function getConfigSummary(config: NodeConfig): string {
   if (config.type !== "export") return "";
   const parts: string[] = [];
   if (config.format) parts.push(config.format.toUpperCase());
-  const mappingCount = config.contentMapping.length;
+  const mappingCount = config.contentMapping?.length ?? 0;
   if (mappingCount > 0) parts.push(`${mappingCount} 个映射`);
   return parts.length > 0 ? parts.join(", ") : "暂未配置导出";
 }

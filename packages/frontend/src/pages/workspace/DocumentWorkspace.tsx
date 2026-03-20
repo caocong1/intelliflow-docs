@@ -6,7 +6,8 @@ import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
 import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExecutor";
 import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
 import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
-import type { DesensitizeConfig, ExportConfig, InputTransformConfig, DocumentRuntimeState, NodeExecution } from "@intelliflow/shared";
+import RestoreExecutor from "../../components/workspace/nodes/RestoreExecutor";
+import type { DesensitizeConfig, ExportConfig, InputTransformConfig, RestoreConfig, DocumentRuntimeState, NodeExecution } from "@intelliflow/shared";
 
 type ViewMode = "current" | "history";
 
@@ -220,6 +221,17 @@ export default function DocumentWorkspace() {
                         <DesensitizeExecutor
                           nodeExecution={currentNode()!}
                           config={({} as DesensitizeConfig)}
+                          documentId={params.documentId}
+                          onDraftSave={(data) => {
+                            /* draft saved via executor */
+                          }}
+                          readOnly={false}
+                        />
+                      </Match>
+                      <Match when={currentNode()?.nodeType === "restore"}>
+                        <RestoreExecutor
+                          nodeExecution={currentNode()!}
+                          config={({} as RestoreConfig)}
                           documentId={params.documentId}
                           onDraftSave={(data) => {
                             /* draft saved via executor */

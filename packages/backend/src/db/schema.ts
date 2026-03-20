@@ -163,6 +163,50 @@ export const documentVersions = pgTable("document_versions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ─── Phase 5: Runtime Execution tables ───────────────────────────────────────
+
+export const nodeExecutionStatusEnum = pgEnum("node_execution_status", [
+  "pending",
+  "in_progress",
+  "completed",
+  "skipped",
+  "failed",
+]);
+
+export const nodeExecutions = pgTable("node_executions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id),
+  nodeId: varchar("node_id", { length: 100 }).notNull(),
+  nodeLabel: varchar("node_label", { length: 200 }).notNull(),
+  nodeType: varchar("node_type", { length: 50 }).notNull(),
+  status: nodeExecutionStatusEnum("status").default("pending").notNull(),
+  stepOrder: integer("step_order").notNull(),
+  inputData: jsonb("input_data"),
+  outputData: jsonb("output_data"),
+  selectedOutputKey: varchar("selected_output_key", { length: 200 }),
+  errorMessage: varchar("error_message", { length: 2000 }),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const desensitizeMappings = pgTable("desensitize_mappings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id),
+  nodeExecutionId: uuid("node_execution_id")
+    .notNull()
+    .references(() => nodeExecutions.id),
+  placeholder: varchar("placeholder", { length: 200 }).notNull(),
+  originalValue: varchar("original_value", { length: 2000 }).notNull(),
+  sensitiveType: varchar("sensitive_type", { length: 100 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const documentFiles = pgTable("document_files", {
   id: uuid("id").defaultRandom().primaryKey(),
   documentId: uuid("document_id")

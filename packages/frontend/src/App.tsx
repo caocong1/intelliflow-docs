@@ -48,6 +48,22 @@ const App: Component = () => {
           </AuthLayout>
         )}
       />
+      {/* Workspace: full-screen without sidebar */}
+      <Route
+        path="/workspace/:documentId"
+        component={() => {
+          const auth = useAuth();
+          return (
+            <Show when={!auth.loading()}>
+              <Show when={auth.user()} fallback={<Navigate href="/login" />}>
+                <div class="min-h-screen bg-[#f7f9fb]">
+                  <DocumentWorkspace />
+                </div>
+              </Show>
+            </Show>
+          );
+        }}
+      />
       <Route path="/" component={AppLayout}>
         <Route path="/" component={Dashboard} />
         <Route path="/projects" component={ProjectList} />
@@ -55,7 +71,6 @@ const App: Component = () => {
         <Route path="/projects/:id/settings" component={ProjectSettings} />
         <Route path="/documents/:id" component={DocumentDetail} />
         <Route path="/documents/:id/versions" component={VersionHistory} />
-        <Route path="/workspace/:documentId" component={DocumentWorkspace} />
         <Route
           path="/admin/users"
           component={() => (

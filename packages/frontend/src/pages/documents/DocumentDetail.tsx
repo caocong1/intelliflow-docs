@@ -75,7 +75,7 @@ export default function DocumentDetail() {
               </div>
 
               {/* Document info card */}
-              <div class="bg-white rounded-xl border border-gray-200 p-6">
+              <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] p-6">
                 <div class="flex items-start justify-between mb-6">
                   <div>
                     <h1 class="text-2xl font-bold text-gray-900 mb-2">
@@ -119,9 +119,9 @@ export default function DocumentDetail() {
                 <Show when={docData().status === "draft" || docData().status === "in_progress"}>
                   <A
                     href={`/workspace/${params.id}`}
-                    class="inline-flex items-center px-5 py-2.5 text-sm font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                    class="inline-flex items-center px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-br from-[#3525cd] to-[#4f46e5] rounded-lg hover:scale-[1.02] transition-all shadow-sm"
                   >
-                    Enter Workspace
+                    进入工作台
                   </A>
                 </Show>
                 <Show when={docData().status === "completed"}>
@@ -129,14 +129,14 @@ export default function DocumentDetail() {
                     href={`/workspace/${params.id}`}
                     class="inline-flex items-center px-4 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors"
                   >
-                    View Workspace
+                    查看工作台
                   </A>
                 </Show>
                 <A
                   href={`/documents/${params.id}/versions`}
-                  class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+                  class="inline-flex items-center px-4 py-2 text-sm font-medium text-[#191c1e] bg-[#e6e8ea] rounded-lg hover:bg-[#d8dadc] transition-colors"
                 >
-                  Version History
+                  版本历史
                 </A>
                 <A
                   href={`/projects/${docData().projectId}`}

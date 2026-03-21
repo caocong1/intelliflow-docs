@@ -1,27 +1,28 @@
-import { useParams } from "@solidjs/router";
-import { createSignal, For, Match, onCleanup, onMount, Show, Switch, createMemo } from "solid-js";
+import type {
+  DesensitizeConfig,
+  DocumentRuntimeState,
+  ExportConfig,
+  InputTransformConfig,
+  ModelCallConfig,
+  NodeConfig,
+  NodeExecution,
+  RestoreConfig,
+} from "@intelliflow/shared";
+import { A, useParams } from "@solidjs/router";
+import { For, Match, Show, Switch, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { api } from "../../api/client";
-import StepperBar from "../../components/workspace/StepperBar";
-import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
-import InlineEditor from "../../components/workspace/InlineEditor";
-import NetworkBanner from "../../components/workspace/NetworkBanner";
+import ActionBar from "../../components/workspace/ActionBar";
 import AutoSaveIndicator from "../../components/workspace/AutoSaveIndicator";
 import type { SaveStatus } from "../../components/workspace/AutoSaveIndicator";
+import InlineEditor from "../../components/workspace/InlineEditor";
+import NetworkBanner from "../../components/workspace/NetworkBanner";
+import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
+import StepperBar from "../../components/workspace/StepperBar";
 import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExecutor";
 import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
 import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
 import ModelCallExecutor from "../../components/workspace/nodes/ModelCallExecutor";
 import RestoreExecutor from "../../components/workspace/nodes/RestoreExecutor";
-import type {
-  DesensitizeConfig,
-  ExportConfig,
-  InputTransformConfig,
-  ModelCallConfig,
-  RestoreConfig,
-  NodeConfig,
-  DocumentRuntimeState,
-  NodeExecution,
-} from "@intelliflow/shared";
 
 type ViewMode = "current" | "history";
 
@@ -52,17 +53,14 @@ export default function DocumentWorkspace() {
       setSaveStatus("saving");
       try {
         const token = localStorage.getItem("auth_token");
-        await fetch(
-          `/api/runtime/${params.documentId}/nodes/${node.id}/draft`,
-          {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify(data),
+        await fetch(`/api/runtime/${params.documentId}/nodes/${node.id}/draft`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-        );
+          body: JSON.stringify(data),
+        });
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       } catch {
@@ -85,9 +83,7 @@ export default function DocumentWorkspace() {
           (n) => n.status !== "completed" && n.status !== "skipped",
         );
         if (firstPendingIdx >= 0 && firstPendingIdx !== runtimeState.currentNodeIndex) {
-          setState((prev) =>
-            prev ? { ...prev, currentNodeIndex: firstPendingIdx } : prev,
-          );
+          setState((prev) => (prev ? { ...prev, currentNodeIndex: firstPendingIdx } : prev));
         }
       } else {
         setError((res.data as any)?.error ?? "加载工作台失败");
@@ -160,17 +156,14 @@ export default function DocumentWorkspace() {
 
     try {
       const token = localStorage.getItem("auth_token");
-      await fetch(
-        `/api/runtime/${params.documentId}/nodes/${node.id}/draft`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ text: content }),
+      await fetch(`/api/runtime/${params.documentId}/nodes/${node.id}/draft`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-      );
+        body: JSON.stringify({ text: content }),
+      });
 
       // Show saved indicator briefly
       setSavedIndicator(true);
@@ -273,8 +266,14 @@ export default function DocumentWorkspace() {
     const config = getNodeConfig(node);
     if (!config) {
       return (
-        <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
-          <div class="text-gray-400 text-sm">
+        <div
+          class="rounded-xl p-8 text-center"
+          style={{
+            background: "#ffffff",
+            "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
+          }}
+        >
+          <div class="text-sm" style={{ color: "#464555" }}>
             加载节点配置中...
           </div>
         </div>
@@ -340,10 +339,26 @@ export default function DocumentWorkspace() {
         );
       default:
         return (
-          <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
-            <div class="text-gray-400 text-sm mb-2">节点执行器</div>
-            <div class="text-lg font-semibold text-gray-700">{node.nodeLabel}</div>
-            <div class="mt-2 inline-flex px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium">
+          <div
+            class="rounded-xl p-8 text-center"
+            style={{
+              background: "#ffffff",
+              "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
+            }}
+          >
+            <div class="text-sm mb-2" style={{ color: "#464555" }}>
+              节点执行器
+            </div>
+            <div class="text-lg font-semibold" style={{ color: "#191c1e" }}>
+              {node.nodeLabel}
+            </div>
+            <div
+              class="mt-2 inline-flex px-3 py-1 rounded-full text-xs font-medium"
+              style={{
+                background: "rgba(79,70,229,0.08)",
+                color: "#4f46e5",
+              }}
+            >
               {node.nodeType}
             </div>
           </div>
@@ -351,31 +366,113 @@ export default function DocumentWorkspace() {
     }
   }
 
+  const backHref = () => {
+    const s = state();
+    const projectId = s ? (s as unknown as Record<string, unknown>).projectId : undefined;
+    if (projectId) return `/projects/${projectId}`;
+    return "/projects";
+  };
+
   return (
-    <div class="flex flex-col h-full min-h-0">
+    <div class="flex flex-col min-h-screen" style={{ background: "#f7f9fb" }}>
       {/* Network status banner */}
       <NetworkBanner />
 
+      {/* Top navigation bar */}
+      <header
+        class="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-6"
+        style={{
+          height: "3.5rem",
+          background: "#ffffff",
+          "box-shadow": "0 1px 0 rgba(199,196,216,0.3), 0 4px 16px rgba(25,28,30,0.04)",
+        }}
+      >
+        {/* Left: back button */}
+        <A
+          href={backHref()}
+          class="flex items-center gap-1.5 text-sm font-medium transition-colors no-underline"
+          style={{ color: "#464555" }}
+        >
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M15 19l-7-7 7-7"
+            />
+          </svg>
+          返回项目
+        </A>
+
+        {/* Center: document title */}
+        <div class="flex items-center gap-2">
+          <span class="text-sm font-semibold" style={{ color: "#191c1e" }}>
+            {state()?.workflowName ?? "文档工作台"}
+          </span>
+          <Show when={state()}>
+            <span
+              class="text-xs px-2 py-0.5 rounded-full font-medium"
+              style={{
+                background: "rgba(53,37,205,0.08)",
+                color: "#3525cd",
+              }}
+            >
+              工作台
+            </span>
+          </Show>
+        </div>
+
+        {/* Right: autosave + label */}
+        <div class="flex items-center gap-3">
+          <AutoSaveIndicator status={saveStatus()} />
+          <span class="text-xs" style={{ color: "#464555" }}>
+            {state()?.workflowName ?? ""}
+          </span>
+        </div>
+      </header>
+
+      {/* Spacer for fixed header */}
+      <div style={{ height: "3.5rem" }} />
+
       {/* Loading skeleton */}
       <Show when={loading()}>
-        <div class="space-y-4 p-6">
-          <div class="h-10 bg-gray-200 rounded animate-pulse w-full" />
-          <div class="h-64 bg-gray-200 rounded animate-pulse w-full" />
-          <div class="h-12 bg-gray-200 rounded animate-pulse w-48 ml-auto" />
+        <div class="max-w-[960px] mx-auto w-full px-6 py-8 space-y-4">
+          <div
+            class="h-10 rounded-xl animate-pulse"
+            style={{ background: "rgba(199,196,216,0.3)" }}
+          />
+          <div
+            class="h-64 rounded-xl animate-pulse"
+            style={{ background: "rgba(199,196,216,0.3)" }}
+          />
+          <div
+            class="h-12 rounded-xl animate-pulse w-48 ml-auto"
+            style={{ background: "rgba(199,196,216,0.3)" }}
+          />
         </div>
       </Show>
 
       {/* Error state */}
       <Show when={!loading() && error()}>
-        <div class="p-6">
-          <div class="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm">{error()}</div>
+        <div class="max-w-[960px] mx-auto w-full px-6 py-8">
+          <div class="rounded-xl px-5 py-4 text-sm text-red-600" style={{ background: "#fef2f2" }}>
+            {error()}
+          </div>
         </div>
       </Show>
 
       {/* Empty state */}
       <Show when={!loading() && !error() && !state()}>
-        <div class="p-6 text-center">
-          <p class="text-gray-500 text-sm">未找到文档</p>
+        <div class="max-w-[960px] mx-auto w-full px-6 py-8 text-center">
+          <p class="text-sm" style={{ color: "#464555" }}>
+            未找到文档
+          </p>
         </div>
       </Show>
 
@@ -383,211 +480,215 @@ export default function DocumentWorkspace() {
       <Show when={!loading() && !error() && state()}>
         {(s) => (
           <>
-            {/* Header with workflow name */}
-            <div class="px-6 pt-4 pb-2">
-              <div class="flex items-center justify-between">
-                <h1 class="text-lg font-bold text-gray-900">{s().workflowName}</h1>
-                <div class="flex items-center gap-3">
-                  <AutoSaveIndicator status={saveStatus()} />
-                  <span class="text-xs text-gray-400">文档工作台</span>
-                </div>
-              </div>
-            </div>
-
             {/* Stepper bar */}
-            <div class="px-6 py-3 border-b border-gray-200 bg-white">
-              <StepperBar
-                nodes={s().nodes}
-                currentIndex={viewMode() === "current" ? s().currentNodeIndex : viewIndex()}
-                onNodeClick={handleStepperClick}
-              />
+            <div
+              class="sticky z-20 px-6 py-4"
+              style={{
+                top: "3.5rem",
+                background: "#ffffff",
+                "box-shadow": "0 1px 0 rgba(199,196,216,0.2)",
+              }}
+            >
+              <div class="max-w-[960px] mx-auto">
+                <StepperBar
+                  nodes={s().nodes}
+                  currentIndex={viewMode() === "current" ? s().currentNodeIndex : viewIndex()}
+                  onNodeClick={handleStepperClick}
+                />
+              </div>
             </div>
 
             {/* Content area */}
-            <div class="flex-1 overflow-y-auto p-6">
-              <Switch>
-                {/* Viewing completed node history */}
-                <Match when={viewMode() === "history" ? viewedNode() : undefined}>
-                  {(viewed) => (
-                    <div class="space-y-4">
-                      <div class="flex items-center justify-between">
-                        <h2 class="text-sm font-medium text-gray-700">
-                          历史记录: {viewed().nodeLabel}
-                        </h2>
-                        <button
-                          type="button"
-                          class="text-sm text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer"
-                          onClick={handleBackToCurrent}
-                        >
-                          返回当前节点
-                        </button>
-                      </div>
-                      <NodeHistoryPanel
-                        node={viewed()}
-                        isExpanded={true}
-                        onToggle={() => {}}
-                      />
-                    </div>
-                  )}
-                </Match>
-
-                {/* Current in-progress node */}
-                <Match when={viewMode() === "current" ? currentNode() : undefined}>
-                  {(curNode) => (
-                  <div class="space-y-6">
-                    {/* Node executor -- route by nodeType with real config */}
-                    {renderExecutor(curNode())}
-
-                    {/* Inline editor toggle -- shown when node has editable output */}
-                    <Show when={!readOnly() && isNodeEditable() && hasOutputToEdit()}>
-                      <div class="space-y-3">
-                        <div class="flex items-center gap-3">
+            <div
+              class="flex-1 overflow-y-auto px-6 py-6"
+              style={{
+                /* leave room for the fixed ActionBar when active */
+                "padding-bottom": !readOnly() && currentNode() ? "6rem" : "2rem",
+              }}
+            >
+              <div class="max-w-[960px] mx-auto space-y-6">
+                <Switch>
+                  {/* Viewing completed node history */}
+                  <Match when={viewMode() === "history" ? viewedNode() : undefined}>
+                    {(viewed) => (
+                      <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                          <h2 class="text-sm font-medium" style={{ color: "#191c1e" }}>
+                            历史记录: {viewed().nodeLabel}
+                          </h2>
                           <button
                             type="button"
-                            class={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
-                              showInlineEditor()
-                                ? "text-indigo-700 bg-indigo-100 border border-indigo-300"
-                                : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
-                            }`}
-                            onClick={() => setShowInlineEditor(!showInlineEditor())}
+                            class="text-sm font-medium cursor-pointer bg-transparent border-0 transition-colors"
+                            style={{ color: "#4f46e5" }}
+                            onClick={handleBackToCurrent}
                           >
-                            {showInlineEditor() ? "关闭编辑器" : "编辑输出"}
+                            返回当前节点
                           </button>
-
-                          {/* Saved indicator */}
-                          <Show when={savedIndicator()}>
-                            <span class="text-xs text-green-600 font-medium animate-pulse">
-                              已自动保存
-                            </span>
-                          </Show>
                         </div>
+                        <NodeHistoryPanel node={viewed()} isExpanded={true} onToggle={() => {}} />
+                      </div>
+                    )}
+                  </Match>
 
-                        <Show when={showInlineEditor() && currentNode()}>
-                          {(node) => (
-                            <InlineEditor
-                              content={getNodeOutputText(node())}
-                              onChange={handleInlineEditorSave}
-                              readOnly={false}
-                              placeholder="编辑节点输出内容..."
-                            />
-                          )}
+                  {/* Current in-progress node */}
+                  <Match when={viewMode() === "current" ? currentNode() : undefined}>
+                    {(curNode) => (
+                      <div class="space-y-6">
+                        {/* Node executor -- route by nodeType with real config */}
+                        {renderExecutor(curNode())}
+
+                        {/* Inline editor toggle -- shown when node has editable output */}
+                        <Show when={!readOnly() && isNodeEditable() && hasOutputToEdit()}>
+                          <div class="space-y-3">
+                            <div class="flex items-center gap-3">
+                              <button
+                                type="button"
+                                class="px-4 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer border-0"
+                                style={{
+                                  background: showInlineEditor()
+                                    ? "rgba(79,70,229,0.08)"
+                                    : "#e6e8ea",
+                                  color: showInlineEditor() ? "#4f46e5" : "#191c1e",
+                                }}
+                                onClick={() => setShowInlineEditor(!showInlineEditor())}
+                              >
+                                {showInlineEditor() ? "关闭编辑器" : "编辑输出"}
+                              </button>
+
+                              {/* Saved indicator */}
+                              <Show when={savedIndicator()}>
+                                <span class="text-xs text-green-600 font-medium animate-pulse">
+                                  已自动保存
+                                </span>
+                              </Show>
+                            </div>
+
+                            <Show when={showInlineEditor() && currentNode()}>
+                              {(node) => (
+                                <InlineEditor
+                                  content={getNodeOutputText(node())}
+                                  onChange={handleInlineEditorSave}
+                                  readOnly={false}
+                                  placeholder="编辑节点输出内容..."
+                                />
+                              )}
+                            </Show>
+                          </div>
+                        </Show>
+
+                        {/* Completed node history list */}
+                        <Show when={completedNodes().length > 0}>
+                          <div class="space-y-2">
+                            <h3 class="text-sm font-medium" style={{ color: "#464555" }}>
+                              已完成步骤
+                            </h3>
+                            <For each={completedNodes()}>
+                              {(node) => (
+                                <NodeHistoryPanel
+                                  node={node}
+                                  isExpanded={expandedHistory() === node.id}
+                                  onToggle={() =>
+                                    setExpandedHistory(
+                                      expandedHistory() === node.id ? null : node.id,
+                                    )
+                                  }
+                                />
+                              )}
+                            </For>
+                          </div>
                         </Show>
                       </div>
-                    </Show>
+                    )}
+                  </Match>
 
-                    {/* Completed node history list */}
-                    <Show when={completedNodes().length > 0}>
+                  {/* All nodes completed -- read-only mode */}
+                  <Match when={viewMode() === "current" && !currentNode()}>
+                    <div class="space-y-6">
+                      <div
+                        class="rounded-xl p-8 text-center"
+                        style={{
+                          background: "#f0fdf4",
+                          "box-shadow": "0 12px 40px rgba(25,28,30,0.04)",
+                        }}
+                      >
+                        <div class="text-lg font-semibold text-green-700">所有步骤已完成</div>
+                        <p class="mt-2 text-sm text-green-600">文档生成流程已结束。</p>
+                      </div>
+
+                      {/* Show all completed nodes with re-execute option */}
                       <div class="space-y-2">
-                        <h3 class="text-sm font-medium text-gray-600">已完成步骤</h3>
-                        <For each={completedNodes()}>
-                          {(node) => (
-                            <NodeHistoryPanel
-                              node={node}
-                              isExpanded={expandedHistory() === node.id}
-                              onToggle={() =>
-                                setExpandedHistory(
-                                  expandedHistory() === node.id ? null : node.id,
-                                )
-                              }
-                            />
+                        <h3 class="text-sm font-medium" style={{ color: "#464555" }}>
+                          执行记录
+                        </h3>
+                        <For each={s().nodes}>
+                          {(node, index) => (
+                            <div
+                              class="rounded-xl"
+                              style={{
+                                background: "#ffffff",
+                                "box-shadow": "0 2px 8px rgba(25,28,30,0.04)",
+                              }}
+                            >
+                              <div class="flex items-center justify-between px-5 py-3.5">
+                                <div class="flex items-center gap-3">
+                                  <span class="text-sm font-medium" style={{ color: "#191c1e" }}>
+                                    {node.nodeLabel}
+                                  </span>
+                                  <span class="text-xs" style={{ color: "#464555" }}>
+                                    {node.status === "completed" ? "已完成" : "已跳过"}
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  class="text-xs font-medium cursor-pointer bg-transparent border-0"
+                                  style={{ color: "#4f46e5" }}
+                                  onClick={() => setShowReexecDialog(index())}
+                                >
+                                  从此节点重新执行
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </For>
                       </div>
-                    </Show>
-                  </div>
-                  )}
-                </Match>
-
-                {/* All nodes completed -- read-only mode */}
-                <Match when={viewMode() === "current" && !currentNode()}>
-                  <div class="space-y-6">
-                    <div class="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
-                      <div class="text-green-600 text-lg font-semibold">所有步骤已完成</div>
-                      <p class="mt-2 text-sm text-green-500">
-                        文档生成流程已结束。
-                      </p>
                     </div>
-
-                    {/* Show all completed nodes with re-execute option */}
-                    <div class="space-y-2">
-                      <h3 class="text-sm font-medium text-gray-600">执行记录</h3>
-                      <For each={s().nodes}>
-                        {(node, index) => (
-                          <div class="border border-gray-200 rounded-lg bg-white">
-                            <div class="flex items-center justify-between px-4 py-3">
-                              <div class="flex items-center gap-3">
-                                <span class="text-sm font-medium text-gray-800">
-                                  {node.nodeLabel}
-                                </span>
-                                <span class="text-xs text-gray-400">
-                                  {node.status === "completed" ? "已完成" : "已跳过"}
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                class="text-xs text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer"
-                                onClick={() => setShowReexecDialog(index())}
-                              >
-                                从此节点重新执行
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </For>
-                    </div>
-                  </div>
-                </Match>
-              </Switch>
+                  </Match>
+                </Switch>
+              </div>
             </div>
 
-            {/* Bottom action bar */}
+            {/* Bottom action bar (fixed, via ActionBar component) */}
             <Show when={!readOnly() && currentNode()}>
-              <div class="border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-between">
-                {/* Left: rollback */}
-                <div>
-                  <Show when={s().currentNodeIndex > 0}>
-                    <button
-                      type="button"
-                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
-                      disabled={actionLoading()}
-                      onClick={() => setShowRollbackDialog(true)}
-                    >
-                      回退
-                    </button>
-                  </Show>
-                </div>
-
-                {/* Right: skip + confirm */}
-                <div class="flex items-center gap-3">
-                  {/* Skip button -- server validates skippable flag; shown for all non-export nodes */}
-                  <Show when={currentNode()?.nodeType !== "export"}>
-                    <button
-                      type="button"
-                      class="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
-                      disabled={actionLoading()}
-                      onClick={handleSkip}
-                    >
-                      跳过此节点
-                    </button>
-                  </Show>
-                  <button
-                    type="button"
-                    class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 cursor-pointer"
-                    disabled={actionLoading()}
-                    onClick={handleAdvance}
-                  >
-                    {actionLoading() ? "处理中..." : "确认并继续"}
-                  </button>
-                </div>
-              </div>
+              <ActionBar
+                loading={actionLoading()}
+                canSkip={currentNode()?.nodeType !== "export"}
+                canRollback={s().currentNodeIndex > 0}
+                isSaving={saveStatus() === "saving"}
+                hasSaved={saveStatus() === "saved"}
+                onConfirm={handleAdvance}
+                onSkip={handleSkip}
+                onRollback={() => setShowRollbackDialog(true)}
+              />
             </Show>
 
             {/* Rollback dialog */}
             <Show when={showRollbackDialog()}>
-              <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-                  <h3 class="text-lg font-semibold text-gray-900 mb-4">回退到</h3>
-                  <p class="text-sm text-gray-500 mb-4">
+              <div
+                class="fixed inset-0 flex items-center justify-center z-50"
+                style={{ background: "rgba(25,28,30,0.4)" }}
+              >
+                <div
+                  class="rounded-xl p-6 w-full mx-4"
+                  style={{
+                    background: "#ffffff",
+                    "box-shadow": "0 24px 64px rgba(25,28,30,0.16)",
+                    "max-width": "28rem",
+                  }}
+                >
+                  <h3 class="text-lg font-semibold mb-3" style={{ color: "#191c1e" }}>
+                    回退到
+                  </h3>
+                  <p class="text-sm mb-4" style={{ color: "#464555" }}>
                     选择要回退到的步骤。回退后，该步骤之后的所有步骤将需要重新执行。
                   </p>
                   <div class="space-y-2 max-h-64 overflow-y-auto">
@@ -595,13 +696,23 @@ export default function DocumentWorkspace() {
                       {(node) => (
                         <button
                           type="button"
-                          class="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors cursor-pointer"
+                          class="w-full text-left px-4 py-3 rounded-xl transition-all cursor-pointer border-0"
+                          style={{ background: "#f7f9fb", color: "#191c1e" }}
+                          onMouseEnter={(e) => {
+                            (e.currentTarget as HTMLElement).style.background =
+                              "rgba(79,70,229,0.06)";
+                          }}
+                          onMouseLeave={(e) => {
+                            (e.currentTarget as HTMLElement).style.background = "#f7f9fb";
+                          }}
                           onClick={() => handleRollback(node.stepOrder)}
                         >
-                          <span class="text-sm font-medium text-gray-800">
+                          <span class="text-sm font-medium" style={{ color: "#191c1e" }}>
                             步骤 {node.stepOrder + 1}: {node.nodeLabel}
                           </span>
-                          <span class="block text-xs text-gray-400 mt-0.5">{node.nodeType}</span>
+                          <span class="block text-xs mt-0.5" style={{ color: "#464555" }}>
+                            {node.nodeType}
+                          </span>
                         </button>
                       )}
                     </For>
@@ -609,7 +720,8 @@ export default function DocumentWorkspace() {
                   <div class="mt-4 flex justify-end">
                     <button
                       type="button"
-                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      class="px-4 py-2 text-sm font-medium rounded-lg cursor-pointer border-0"
+                      style={{ background: "#e6e8ea", color: "#191c1e" }}
                       onClick={() => setShowRollbackDialog(false)}
                     >
                       取消
@@ -621,23 +733,39 @@ export default function DocumentWorkspace() {
 
             {/* Re-execute confirmation dialog */}
             <Show when={showReexecDialog() !== null}>
-              <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-                  <h3 class="text-lg font-semibold text-gray-900 mb-4">确认重新执行</h3>
-                  <p class="text-sm text-gray-500 mb-4">
+              <div
+                class="fixed inset-0 flex items-center justify-center z-50"
+                style={{ background: "rgba(25,28,30,0.4)" }}
+              >
+                <div
+                  class="rounded-xl p-6 w-full mx-4"
+                  style={{
+                    background: "#ffffff",
+                    "box-shadow": "0 24px 64px rgba(25,28,30,0.16)",
+                    "max-width": "28rem",
+                  }}
+                >
+                  <h3 class="text-lg font-semibold mb-3" style={{ color: "#191c1e" }}>
+                    确认重新执行
+                  </h3>
+                  <p class="text-sm mb-4" style={{ color: "#464555" }}>
                     确认重新执行？后续节点状态将被重置。
                   </p>
                   <div class="flex justify-end gap-3">
                     <button
                       type="button"
-                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      class="px-4 py-2 text-sm font-medium rounded-lg cursor-pointer border-0"
+                      style={{ background: "#e6e8ea", color: "#191c1e" }}
                       onClick={() => setShowReexecDialog(null)}
                     >
                       取消
                     </button>
                     <button
                       type="button"
-                      class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
+                      class="px-4 py-2 text-sm font-semibold text-white rounded-lg transition-all cursor-pointer border-0 disabled:opacity-50"
+                      style={{
+                        background: "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)",
+                      }}
                       disabled={actionLoading()}
                       onClick={() => {
                         const idx = showReexecDialog();

@@ -27,6 +27,21 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getFileExtColor(ext: string): string {
+  const map: Record<string, string> = {
+    pdf: "bg-red-100 text-red-700",
+    docx: "bg-blue-100 text-blue-700",
+    doc: "bg-blue-100 text-blue-700",
+    txt: "bg-gray-100 text-gray-600",
+    png: "bg-purple-100 text-purple-700",
+    jpg: "bg-purple-100 text-purple-700",
+    jpeg: "bg-purple-100 text-purple-700",
+    mp3: "bg-amber-100 text-amber-700",
+    mp4: "bg-amber-100 text-amber-700",
+  };
+  return map[ext.toLowerCase()] ?? "bg-indigo-100 text-indigo-700";
+}
+
 export default function InputTransformExecutor(props: Props) {
   // Initialize form data from existing outputData (resume case) or empty
   const existingOutput = props.nodeExecution.outputData as {
@@ -244,87 +259,130 @@ export default function InputTransformExecutor(props: Props) {
     ).join(",");
 
   // Render form field based on type
-  function renderField(field: FormFieldDef) {
-    if (field.type === "text") {
-      return (
-        <label class="block space-y-1.5">
-          <span class="block text-sm font-medium text-gray-700">
-            {field.label}
-            <Show when={field.required}>
-              <span class="text-red-500 ml-0.5">*</span>
-            </Show>
-          </span>
-          <input
-            type="text"
-            value={formData()[field.id] ?? ""}
-            onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
-            disabled={props.readOnly}
-            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 transition-colors"
-            placeholder={`请输入${field.label}`}
-          />
-        </label>
-      );
+  function renderField(field: FormFieldDef, isWide: boolean) {
+    const inputClass =
+      "w-full bg-white px-4 py-3 border border-[rgba(199,196,216,0.35)] rounded-xl text-sm text-[#191c1e] placeholder-[#9fa0a8] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] disabled:bg-[#f7f9fb] disabled:text-[#9fa0a8] transition-all";
+
+    if (field.type === "textarea" || isWide) {
+      if (field.type === "textarea") {
+        return (
+          <div class="col-span-2 space-y-1.5">
+            <label for={`field-${field.id}`} class="block text-sm font-medium text-[#191c1e]">
+              {field.label}
+              <Show when={field.required}>
+                <span class="text-red-500 ml-0.5">*</span>
+              </Show>
+            </label>
+            <textarea
+              id={`field-${field.id}`}
+              value={formData()[field.id] ?? ""}
+              onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
+              disabled={props.readOnly}
+              rows={4}
+              class={`${inputClass} resize-y`}
+              placeholder={`请输入${field.label}`}
+            />
+          </div>
+        );
+      }
     }
 
-    if (field.type === "textarea") {
-      return (
-        <label class="block space-y-1.5">
-          <span class="block text-sm font-medium text-gray-700">
-            {field.label}
-            <Show when={field.required}>
-              <span class="text-red-500 ml-0.5">*</span>
-            </Show>
-          </span>
-          <textarea
-            value={formData()[field.id] ?? ""}
-            onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
-            disabled={props.readOnly}
-            rows={4}
-            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 resize-y transition-colors"
-            placeholder={`请输入${field.label}`}
-          />
+    return (
+      <div class="space-y-1.5">
+        <label for={`field-${field.id}`} class="block text-sm font-medium text-[#191c1e]">
+          {field.label}
+          <Show when={field.required}>
+            <span class="text-red-500 ml-0.5">*</span>
+          </Show>
         </label>
-      );
-    }
-
-    // field.type === "file" is handled by the upload area below
-    return null;
+        <input
+          id={`field-${field.id}`}
+          type="text"
+          value={formData()[field.id] ?? ""}
+          onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
+          disabled={props.readOnly}
+          class={inputClass}
+          placeholder={`请输入${field.label}`}
+        />
+      </div>
+    );
   }
 
   const hasFileFields = () =>
     props.config?.allowFileUpload ||
     (props.config?.formFields ?? []).some((f) => f.type === "file");
 
+  const textFields = () => (props.config?.formFields ?? []).filter((f) => f.type !== "file");
+
   return (
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
       {/* Header */}
-      <div class="px-6 py-4 bg-gradient-to-r from-indigo-50 to-white border-b border-gray-100">
-        <h2 class="text-lg font-semibold text-gray-800">
-          {props.nodeExecution.nodeLabel || "输入转换"}
-        </h2>
-        <p class="text-sm text-gray-500 mt-0.5">填写表单信息并上传所需文件</p>
+      <div class="px-6 py-5 bg-gradient-to-r from-[#f2f4f6] to-white border-b border-[rgba(199,196,216,0.15)]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#3525cd] to-[#4f46e5] flex items-center justify-center flex-shrink-0">
+            {/* Document / upload icon */}
+            <svg
+              aria-hidden="true"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="12" y1="18" x2="12" y2="12" />
+              <line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base font-semibold text-[#191c1e]">
+              {props.nodeExecution.nodeLabel || "输入转换"}
+            </h2>
+            <p class="text-xs text-[#464555] mt-0.5">
+              填写表单信息并上传所需文件，AI 将自动分析文档结构并准备后续处理
+            </p>
+          </div>
+        </div>
       </div>
 
       <div class="p-6 space-y-6">
         {/* Null guard: no form fields configured */}
         <Show when={!props.config?.formFields || props.config.formFields.length === 0}>
-          <div class="text-center py-8 text-gray-400">
-            <div class="text-4xl mb-3">-</div>
+          <div class="text-center py-10 text-[#9fa0a8]">
+            <div class="w-12 h-12 rounded-full bg-[#f7f9fb] flex items-center justify-center mx-auto mb-3">
+              <svg
+                aria-hidden="true"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
             <p class="text-sm">未配置表单字段</p>
-            <p class="text-xs mt-1 text-gray-300">请在工作流编辑器中添加表单字段配置</p>
+            <p class="text-xs mt-1 text-[#c4c4cc]">请在工作流编辑器中添加表单字段配置</p>
           </div>
         </Show>
 
         {/* Form fields section */}
-        <Show when={(props.config?.formFields ?? []).length > 0}>
-          <div class="space-y-1.5">
-            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span class="w-1 h-4 bg-indigo-500 rounded-full" />
+        <Show when={textFields().length > 0}>
+          <div class="space-y-3">
+            <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+              <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
               表单填写
             </h3>
-            <div class="space-y-4 pl-3">
-              <For each={props.config.formFields?.filter((f) => f.type !== "file") ?? []}>
-                {(field) => renderField(field)}
+            <div class="grid grid-cols-2 gap-4">
+              <For each={textFields()}>
+                {(field) => renderField(field, field.type === "textarea")}
               </For>
             </div>
           </div>
@@ -333,18 +391,18 @@ export default function InputTransformExecutor(props: Props) {
         {/* File upload area */}
         <Show when={hasFileFields() && !props.readOnly}>
           <div class="space-y-3">
-            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span class="w-1 h-4 bg-indigo-500 rounded-full" />
+            <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+              <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
               文件上传
             </h3>
 
             {/* Drop zone */}
             <button
               type="button"
-              class={`w-full border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+              class={`w-full border-2 border-dashed rounded-xl py-10 text-center transition-all cursor-pointer ${
                 dragOver()
-                  ? "border-indigo-400 bg-indigo-50 scale-[1.01]"
-                  : "border-gray-300 hover:border-indigo-300 hover:bg-gray-50"
+                  ? "border-[#4f46e5] bg-[#f0efff] scale-[1.01]"
+                  : "border-[rgba(199,196,216,0.6)] hover:border-[#4f46e5] hover:bg-[#fafafe]"
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -357,9 +415,26 @@ export default function InputTransformExecutor(props: Props) {
                 input?.click();
               }}
             >
-              <div class="text-gray-400">
-                <p class="text-sm font-medium text-gray-500">拖拽文件到此处，或点击选择文件</p>
-                <p class="mt-1.5 text-xs text-gray-400">支持格式：{acceptedTypes()}</p>
+              <div class="flex flex-col items-center gap-2">
+                <div class="w-10 h-10 rounded-full bg-[#f0efff] flex items-center justify-center">
+                  <svg
+                    aria-hidden="true"
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#4f46e5"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <polyline points="16 16 12 12 8 16" />
+                    <line x1="12" y1="12" x2="12" y2="21" />
+                    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+                  </svg>
+                </div>
+                <p class="text-sm font-medium text-[#464555]">拖拽文件到此处，或点击选择文件</p>
+                <p class="text-xs text-[#9fa0a8]">支持格式：{acceptedTypes()}</p>
               </div>
               <input
                 id="file-input-transform"
@@ -376,106 +451,116 @@ export default function InputTransformExecutor(props: Props) {
         {/* Uploaded files list */}
         <Show when={files().length > 0}>
           <div class="space-y-3">
-            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-              <span class="w-1 h-4 bg-indigo-500 rounded-full" />
+            <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+              <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
               已上传文件
-              <span class="text-xs text-gray-400 font-normal">({files().length})</span>
+              <span class="text-xs text-[#9fa0a8] font-normal">({files().length})</span>
             </h3>
             <div class="space-y-2">
               <For each={files()}>
-                {(file) => (
-                  <div class="border border-gray-200 rounded-lg p-4 space-y-2 hover:border-gray-300 transition-colors">
-                    {/* File header */}
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-3 min-w-0">
-                        <div class="flex-shrink-0 w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-xs text-indigo-600 font-semibold">
-                          {file.originalName.split(".").pop()?.toUpperCase()?.slice(0, 3) ?? "?"}
+                {(file) => {
+                  const ext = file.originalName.split(".").pop()?.toLowerCase() ?? "";
+                  const extLabel = ext.toUpperCase().slice(0, 4) || "?";
+                  const extColor = getFileExtColor(ext);
+                  return (
+                    <div class="rounded-xl bg-[#f7f9fb] px-4 py-3 space-y-2">
+                      {/* File header */}
+                      <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3 min-w-0">
+                          <div
+                            class={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold ${extColor}`}
+                          >
+                            {extLabel}
+                          </div>
+                          <div class="min-w-0">
+                            <p class="text-sm font-medium text-[#191c1e] truncate">
+                              {file.originalName}
+                            </p>
+                            <Show when={file.fileSize > 0}>
+                              <p class="text-xs text-[#9fa0a8]">{formatFileSize(file.fileSize)}</p>
+                            </Show>
+                          </div>
                         </div>
-                        <div class="min-w-0">
-                          <p class="text-sm font-medium text-gray-800 truncate">
-                            {file.originalName}
-                          </p>
-                          <Show when={file.fileSize > 0}>
-                            <p class="text-xs text-gray-400">{formatFileSize(file.fileSize)}</p>
+
+                        <div class="flex items-center gap-2 flex-shrink-0">
+                          {/* Status badge */}
+                          <Show when={file.uploading}>
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">
+                              上传中 {file.progress}%
+                            </span>
+                          </Show>
+                          <Show when={!file.uploading && !file.error}>
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-xs font-medium">
+                              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              解析完成
+                            </span>
+                          </Show>
+                          <Show when={file.error}>
+                            <span class="inline-flex px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 text-xs font-medium">
+                              上传失败
+                            </span>
+                          </Show>
+
+                          {/* View parsed button */}
+                          <Show when={!file.uploading && !file.error}>
+                            <button
+                              type="button"
+                              class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium transition-colors"
+                              onClick={() => toggleParsedView(file.fileId)}
+                            >
+                              {file.showParsed ? "收起" : "查看解析结果"}
+                            </button>
+                          </Show>
+
+                          {/* Remove button */}
+                          <Show when={!props.readOnly}>
+                            <button
+                              type="button"
+                              class="text-xs text-[#9fa0a8] hover:text-red-500 transition-colors"
+                              onClick={() => removeFile(file.fileId)}
+                            >
+                              移除
+                            </button>
                           </Show>
                         </div>
                       </div>
 
-                      <div class="flex items-center gap-2 flex-shrink-0">
-                        {/* Status badge */}
-                        <Show when={file.uploading}>
-                          <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs">
-                            上传中 {file.progress}%
-                          </span>
-                        </Show>
-                        <Show when={!file.uploading && !file.error}>
-                          <span class="inline-flex px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-xs">
-                            解析完成
-                          </span>
-                        </Show>
-                        <Show when={file.error}>
-                          <span class="inline-flex px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-xs">
-                            上传失败
-                          </span>
-                        </Show>
+                      {/* Upload progress bar */}
+                      <Show when={file.uploading}>
+                        <div class="w-full bg-[#e6e8ea] rounded-full h-1.5">
+                          <div
+                            class="bg-gradient-to-r from-[#3525cd] to-[#4f46e5] h-1.5 rounded-full transition-all"
+                            style={{ width: `${file.progress}%` }}
+                          />
+                        </div>
+                      </Show>
 
-                        {/* View parsed button */}
-                        <Show when={!file.uploading && !file.error}>
-                          <button
-                            type="button"
-                            class="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                            onClick={() => toggleParsedView(file.fileId)}
-                          >
-                            {file.showParsed ? "收起" : "查看解析结果"}
-                          </button>
-                        </Show>
+                      {/* Error message */}
+                      <Show when={file.error}>
+                        <p class="text-xs text-red-500">{file.error}</p>
+                      </Show>
 
-                        {/* Remove button */}
-                        <Show when={!props.readOnly}>
-                          <button
-                            type="button"
-                            class="text-xs text-red-500 hover:text-red-600"
-                            onClick={() => removeFile(file.fileId)}
-                          >
-                            移除
-                          </button>
-                        </Show>
-                      </div>
+                      {/* Parsed text preview / edit */}
+                      <Show when={file.showParsed && !file.uploading}>
+                        <div class="mt-2">
+                          <p class="block text-xs font-medium text-[#464555] mb-1.5">
+                            解析内容（可编辑）
+                          </p>
+                          <textarea
+                            value={file.parsedText}
+                            onInput={(e) =>
+                              handleParsedTextEdit(file.fileId, e.currentTarget.value)
+                            }
+                            disabled={props.readOnly}
+                            rows={6}
+                            aria-label={`${file.originalName} 解析内容`}
+                            class="w-full px-4 py-3 border border-[rgba(199,196,216,0.35)] rounded-xl text-sm font-mono bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] disabled:bg-[#f7f9fb] disabled:text-[#9fa0a8] resize-y transition-all"
+                          />
+                        </div>
+                      </Show>
                     </div>
-
-                    {/* Upload progress bar */}
-                    <Show when={file.uploading}>
-                      <div class="w-full bg-gray-200 rounded-full h-1.5">
-                        <div
-                          class="bg-indigo-500 h-1.5 rounded-full transition-all"
-                          style={{ width: `${file.progress}%` }}
-                        />
-                      </div>
-                    </Show>
-
-                    {/* Error message */}
-                    <Show when={file.error}>
-                      <p class="text-xs text-red-500">{file.error}</p>
-                    </Show>
-
-                    {/* Parsed text preview / edit */}
-                    <Show when={file.showParsed && !file.uploading}>
-                      <div class="mt-2">
-                        <p class="block text-xs font-medium text-gray-600 mb-1">
-                          解析内容（可编辑）
-                        </p>
-                        <textarea
-                          value={file.parsedText}
-                          onInput={(e) => handleParsedTextEdit(file.fileId, e.currentTarget.value)}
-                          disabled={props.readOnly}
-                          rows={6}
-                          aria-label={`${file.originalName} 解析内容`}
-                          class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 resize-y"
-                        />
-                      </div>
-                    </Show>
-                  </div>
-                )}
+                  );
+                }}
               </For>
             </div>
           </div>
@@ -483,22 +568,8 @@ export default function InputTransformExecutor(props: Props) {
 
         {/* Confirm error */}
         <Show when={confirmError()}>
-          <div class="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-100">
+          <div class="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm border border-red-100">
             {confirmError()}
-          </div>
-        </Show>
-
-        {/* Confirm button (only in active mode, not readOnly) */}
-        <Show when={!props.readOnly}>
-          <div class="flex justify-end pt-2">
-            <button
-              type="button"
-              class="px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors disabled:opacity-50 shadow-sm"
-              disabled={files().some((f) => f.uploading)}
-              onClick={handleConfirm}
-            >
-              确认并继续
-            </button>
           </div>
         </Show>
       </div>

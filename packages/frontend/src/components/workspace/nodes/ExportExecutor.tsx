@@ -1,6 +1,6 @@
-import { createSignal, For, onMount, Show } from "solid-js";
-import { api } from "../../../api/client";
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
+import { For, Show, createSignal, onMount } from "solid-js";
+import { api } from "../../../api/client";
 
 type ExportFormat = "word" | "pdf" | "markdown";
 
@@ -34,8 +34,8 @@ export default function ExportExecutor(props: Props) {
   // ─── Null guard ──────────────────────────────────────────────────────────
   if (!props.config) {
     return (
-      <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
-        <div class="text-gray-400 text-sm">正在加载导出配置...</div>
+      <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] p-8 text-center">
+        <div class="text-[#464555] text-sm">正在加载导出配置...</div>
       </div>
     );
   }
@@ -45,7 +45,11 @@ export default function ExportExecutor(props: Props) {
 
   const defaultFormat = (): ExportFormat => {
     const configured = props.config?.format;
-    if (configured && configured !== "ppt" && availableFormats.includes(configured as ExportFormat)) {
+    if (
+      configured &&
+      configured !== "ppt" &&
+      availableFormats.includes(configured as ExportFormat)
+    ) {
       return configured as ExportFormat;
     }
     return "markdown";
@@ -182,21 +186,25 @@ export default function ExportExecutor(props: Props) {
   if (props.readOnly && existingOutput()) {
     const result = existingOutput()!;
     return (
-      <div class="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 class="text-sm font-medium text-gray-700 mb-4">导出完成</h2>
-        <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-          <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 text-lg font-bold">
+      <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] p-6">
+        <div class="flex items-center gap-2 mb-4">
+          <div class="w-1 h-4 bg-[#4f46e5] rounded-full" />
+          <h2 class="text-sm font-medium text-[#191c1e]">导出完成</h2>
+        </div>
+        <div class="flex items-center gap-4 p-4 bg-[#f7f9fb] rounded-xl">
+          <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 text-lg font-bold">
             {FORMAT_ICONS[result.format as ExportFormat] ?? "F"}
           </div>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 truncate">{result.filename}</p>
-            <p class="text-xs text-gray-500">
-              {FORMAT_LABELS[result.format as ExportFormat] ?? result.format.toUpperCase()} &middot; {formatFileSize(result.fileSize)}
+            <p class="text-sm font-medium text-[#191c1e] truncate">{result.filename}</p>
+            <p class="text-xs text-[#464555]">
+              {FORMAT_LABELS[result.format as ExportFormat] ?? result.format.toUpperCase()} &middot;{" "}
+              {formatFileSize(result.fileSize)}
             </p>
           </div>
           <button
             type="button"
-            class="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+            class="px-4 py-2 text-sm font-medium text-[#4f46e5] bg-[#e2dfff] rounded-xl hover:bg-[#d4d0ff] transition-colors"
             onClick={triggerDownload}
           >
             重新下载
@@ -209,29 +217,57 @@ export default function ExportExecutor(props: Props) {
   // ─── Active export mode ─────────────────────────────────────────────────
 
   return (
-    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
       {/* Header */}
-      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-        <h2 class="text-sm font-semibold text-gray-800">文件导出</h2>
-        <div class="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">
-          导出
+      <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)] flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+            <svg
+              class="w-5 h-5 text-indigo-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="1.8"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <div class="w-1 h-4 bg-[#4f46e5] rounded-full" />
+              <h2 class="text-sm font-semibold text-[#191c1e]">文件导出</h2>
+            </div>
+            <p class="text-xs text-[#464555] mt-0.5">选择导出格式并下载文档</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50">
+          <div class="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+          <span class="text-xs text-indigo-600 font-medium">导出</span>
         </div>
       </div>
 
       {/* Format selector + filename */}
-      <div class="px-6 py-4 border-b border-gray-100 space-y-4">
+      <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)] space-y-4">
         {/* Format selector */}
         <div>
-          <span class="block text-xs font-medium text-gray-500 mb-2">导出格式</span>
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-1 h-4 bg-[#4f46e5] rounded-full" />
+            <span class="text-xs font-medium text-[#191c1e]">导出格式</span>
+          </div>
           <div class="flex gap-2">
             <For each={availableFormats}>
               {(fmt) => (
                 <button
                   type="button"
-                  class={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                  class={`px-4 py-2 text-sm font-medium rounded-xl border transition-all ${
                     format() === fmt
-                      ? "bg-indigo-600 text-white border-indigo-600"
-                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                      ? "bg-[#e2dfff] text-[#3525cd] border-[#4f46e5] ring-2 ring-[#4f46e5]"
+                      : "bg-[#f7f9fb] text-[#464555] border-[rgba(199,196,216,0.3)] hover:bg-[#eeebff] hover:border-[#c3c0ff]"
                   }`}
                   onClick={() => handleFormatChange(fmt)}
                   disabled={!!exportResult()}
@@ -245,17 +281,17 @@ export default function ExportExecutor(props: Props) {
 
         {/* Filename input */}
         <div>
-          <span class="block text-xs font-medium text-gray-500 mb-1">文件名称</span>
+          <span class="block text-xs font-medium text-[#464555] mb-1">文件名称</span>
           <div class="flex items-center gap-2">
             <input
               type="text"
-              class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              class="flex-1 px-3 py-2 text-sm border border-[rgba(199,196,216,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] bg-[#f7f9fb] text-[#191c1e] placeholder:text-[rgba(70,69,85,0.4)]"
               value={filename()}
               onInput={(e) => setFilename(e.currentTarget.value)}
               disabled={!!exportResult()}
               placeholder="请输入文件名..."
             />
-            <span class="text-xs text-gray-400 whitespace-nowrap">
+            <span class="text-xs text-[#464555] opacity-60 whitespace-nowrap">
               {FORMAT_EXTENSIONS[format()]}
             </span>
           </div>
@@ -263,31 +299,34 @@ export default function ExportExecutor(props: Props) {
       </div>
 
       {/* Preview area */}
-      <div class="px-6 py-4 border-b border-gray-100">
+      <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)]">
         <div class="flex items-center justify-between mb-2">
-          <span class="text-xs font-medium text-gray-500">文件预览</span>
+          <div class="flex items-center gap-2">
+            <div class="w-1 h-4 bg-[#4f46e5] rounded-full" />
+            <span class="text-xs font-medium text-[#464555]">文件预览</span>
+          </div>
           <Show when={format() !== "markdown"}>
-            <span class="text-xs text-gray-400">
+            <span class="text-xs text-[#464555] opacity-60">
               实际导出格式：{FORMAT_LABELS[format()]}
             </span>
           </Show>
         </div>
 
         <Show when={previewLoading()}>
-          <div class="h-48 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
-            <span class="text-sm text-gray-400">正在生成预览...</span>
+          <div class="h-48 bg-[#f7f9fb] rounded-xl animate-pulse flex items-center justify-center">
+            <span class="text-sm text-[#464555] opacity-60">正在生成预览...</span>
           </div>
         </Show>
 
         <Show when={!previewLoading() && previewContent()}>
           <div
-            class="prose prose-sm max-w-none max-h-96 overflow-y-auto p-4 bg-gray-50 rounded-lg border border-gray-200 text-sm leading-relaxed"
+            class="prose prose-sm max-w-none max-h-96 overflow-y-auto p-4 bg-[#f7f9fb] rounded-xl border border-[rgba(199,196,216,0.15)] text-sm leading-relaxed"
             innerHTML={renderMarkdown(previewContent())}
           />
         </Show>
 
         <Show when={!previewLoading() && !previewContent() && !error()}>
-          <div class="h-48 flex items-center justify-center text-sm text-gray-400 bg-gray-50 rounded-lg">
+          <div class="h-48 flex items-center justify-center text-sm text-[#464555] opacity-60 bg-[#f7f9fb] rounded-xl">
             暂无可预览内容
           </div>
         </Show>
@@ -296,28 +335,29 @@ export default function ExportExecutor(props: Props) {
       {/* Error display */}
       <Show when={error()}>
         <div class="px-6 py-3">
-          <div class="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm">{error()}</div>
+          <div class="bg-red-50 text-red-600 px-4 py-2 rounded-xl text-sm">{error()}</div>
         </div>
       </Show>
 
       {/* Export result */}
       <Show when={exportResult()}>
         {(result) => (
-          <div class="px-6 py-4 border-b border-gray-100">
-            <div class="flex items-center gap-4 p-4 bg-green-50 rounded-lg border border-green-200">
-              <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold">
+          <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)]">
+            <div class="flex items-center gap-4 p-4 bg-green-50 rounded-xl border border-[rgba(199,196,216,0.15)]">
+              <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold">
                 {FORMAT_ICONS[result().format as ExportFormat] ?? "F"}
               </div>
               <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-gray-900 truncate">{result().filename}</p>
+                <p class="text-sm font-medium text-[#191c1e] truncate">{result().filename}</p>
                 <p class="text-xs text-green-600">
-                  导出完成 &middot; {FORMAT_LABELS[result().format as ExportFormat] ?? result().format.toUpperCase()} &middot;{" "}
-                  {formatFileSize(result().fileSize)}
+                  导出完成 &middot;{" "}
+                  {FORMAT_LABELS[result().format as ExportFormat] ?? result().format.toUpperCase()}{" "}
+                  &middot; {formatFileSize(result().fileSize)}
                 </p>
               </div>
               <button
                 type="button"
-                class="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
+                class="px-4 py-2 text-sm font-medium text-[#4f46e5] bg-[#e2dfff] rounded-xl hover:bg-[#d4d0ff] transition-colors"
                 onClick={triggerDownload}
               >
                 下载文件
@@ -332,13 +372,24 @@ export default function ExportExecutor(props: Props) {
         <div class="px-6 py-4 flex justify-end">
           <button
             type="button"
-            class="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+            class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
             disabled={exporting() || previewLoading() || !filename()}
             onClick={handleExport}
           >
             <Show when={!exporting()}>
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              <svg
+                class="w-4 h-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                />
               </svg>
             </Show>
             {exporting() ? "正在生成..." : "下载文件"}

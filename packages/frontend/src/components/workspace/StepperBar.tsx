@@ -1,26 +1,10 @@
-import { For } from "solid-js";
 import type { NodeExecution, WorkflowNodeType } from "@intelliflow/shared";
+import { For } from "solid-js";
 
 type StepperBarProps = {
   nodes: NodeExecution[];
   currentIndex: number;
   onNodeClick: (index: number) => void;
-};
-
-const statusStyles: Record<string, string> = {
-  completed: "bg-green-500 text-white",
-  in_progress: "bg-indigo-500 text-white animate-pulse",
-  pending: "bg-gray-300 text-gray-600",
-  skipped: "bg-yellow-400 text-white",
-  failed: "bg-red-500 text-white",
-};
-
-const statusLabels: Record<string, string> = {
-  completed: "已完成",
-  in_progress: "执行中",
-  pending: "待执行",
-  skipped: "已跳过",
-  failed: "失败",
 };
 
 const nodeTypeLabels: Record<WorkflowNodeType, string> = {
@@ -31,69 +15,129 @@ const nodeTypeLabels: Record<WorkflowNodeType, string> = {
   export: "文件导出",
 };
 
-const lineStyles: Record<string, string> = {
-  completed: "bg-green-400",
-  skipped: "bg-yellow-300",
-  in_progress: "bg-gray-300",
-  pending: "bg-gray-300",
-  failed: "bg-red-300",
+const nodeTypeIcons: Record<WorkflowNodeType, string> = {
+  input_transform: "M4 6h16M4 12h8m-8 6h16",
+  desensitize:
+    "M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z",
+  model_call:
+    "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
+  restore:
+    "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
+  export: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12",
 };
+
+function CheckIcon() {
+  return (
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+    </svg>
+  );
+}
+
+function NodeIcon(props: { nodeType: WorkflowNodeType }) {
+  const d = nodeTypeIcons[props.nodeType] ?? nodeTypeIcons.model_call;
+  return (
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d={d} />
+    </svg>
+  );
+}
+
+function getCircleStyle(
+  status: string,
+  isActive: boolean,
+): { bg: string; color: string; ring?: string } {
+  if (status === "completed") return { bg: "#22c55e", color: "#ffffff" };
+  if (status === "skipped") return { bg: "#f59e0b", color: "#ffffff" };
+  if (status === "failed") return { bg: "#ef4444", color: "#ffffff" };
+  if (isActive || status === "in_progress")
+    return { bg: "#4f46e5", color: "#ffffff", ring: "0 0 0 4px rgba(199,196,216,0.5)" };
+  return { bg: "#e6e8ea", color: "#464555" };
+}
+
+function getLineStyle(status: string, nextStatus: string): string {
+  if (status === "completed" || status === "skipped") return "#22c55e";
+  if (status === "in_progress") return "#c7c4d8";
+  return "#e0e3e5";
+}
 
 export default function StepperBar(props: StepperBarProps) {
   return (
-    <div class="flex items-start overflow-x-auto pb-2 px-2">
+    <div class="flex items-start overflow-x-auto pb-2 px-1">
       <For each={props.nodes}>
-        {(node, index) => (
-          <div class="flex items-start flex-shrink-0">
-            {/* Step circle + label */}
-            <button
-              type="button"
-              class="flex flex-col items-center cursor-pointer group bg-transparent border-0 p-0"
-              onClick={() => {
-                if (node.status === "completed" || node.status === "skipped") {
-                  props.onNodeClick(index());
-                }
-              }}
-            >
-              <div
-                class={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-transform ${
-                  statusStyles[node.status] ?? statusStyles.pending
-                } ${
-                  node.status === "completed" || node.status === "skipped"
-                    ? "group-hover:scale-110"
-                    : ""
-                }`}
-                title={`${statusLabels[node.status] ?? node.status}`}
-              >
-                {index() + 1}
-              </div>
-              <span
-                class={`mt-1.5 text-xs max-w-[80px] text-center truncate ${
-                  index() === props.currentIndex
-                    ? "text-indigo-700 font-semibold"
-                    : "text-gray-500"
-                }`}
+        {(node, index) => {
+          const isActive = () => index() === props.currentIndex;
+          const circleStyle = () => getCircleStyle(node.status, isActive());
+          const isClickable = node.status === "completed" || node.status === "skipped";
+          const nextNode = () => props.nodes[index() + 1];
+
+          return (
+            <div class="flex items-start flex-shrink-0">
+              {/* Step circle + labels */}
+              <button
+                type="button"
+                class="flex flex-col items-center bg-transparent border-0 p-0 group"
+                style={{ cursor: isClickable ? "pointer" : "default", "min-width": "5rem" }}
+                onClick={() => {
+                  if (isClickable) props.onNodeClick(index());
+                }}
                 title={`${node.nodeLabel} (${nodeTypeLabels[node.nodeType] ?? node.nodeType})`}
               >
-                {node.nodeLabel}
-              </span>
-              <span class="text-[10px] text-gray-400 mt-0.5">
-                {statusLabels[node.status] ?? node.status}
-              </span>
-            </button>
-
-            {/* Connecting line */}
-            {index() < props.nodes.length - 1 && (
-              <div class="flex items-center mt-4 mx-1">
+                {/* Circle */}
                 <div
-                  class={`h-0.5 w-8 ${
-                    lineStyles[node.status] ?? lineStyles.pending
-                  }`}
-                />
-              </div>
-            )}
-          </div>
-        )}
+                  class="w-10 h-10 rounded-full flex items-center justify-center transition-transform"
+                  style={{
+                    background: circleStyle().bg,
+                    color: circleStyle().color,
+                    "box-shadow": circleStyle().ring ? "0 0 0 4px rgba(99,102,241,0.2)" : "none",
+                    transform: isClickable ? undefined : "none",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (isClickable)
+                      (e.currentTarget as HTMLElement).style.transform = "scale(1.08)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+                  }}
+                >
+                  {node.status === "completed" ? (
+                    <CheckIcon />
+                  ) : (
+                    <NodeIcon nodeType={node.nodeType} />
+                  )}
+                </div>
+
+                {/* Node label */}
+                <span
+                  class="mt-2 text-xs text-center leading-tight max-w-[72px] line-clamp-2"
+                  style={{
+                    color: isActive() ? "#3525cd" : "#191c1e",
+                    "font-weight": isActive() ? "600" : "500",
+                  }}
+                >
+                  {node.nodeLabel}
+                </span>
+
+                {/* Node type badge */}
+                <span class="mt-0.5 text-[10px] text-center" style={{ color: "#464555" }}>
+                  {nodeTypeLabels[node.nodeType] ?? node.nodeType}
+                </span>
+              </button>
+
+              {/* Connecting line */}
+              {index() < props.nodes.length - 1 && (
+                <div class="flex items-center mt-5 mx-1 flex-shrink-0">
+                  <div
+                    class="h-0.5 w-8 rounded-full transition-colors"
+                    style={{
+                      background: getLineStyle(node.status, nextNode()?.status ?? "pending"),
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        }}
       </For>
     </div>
   );

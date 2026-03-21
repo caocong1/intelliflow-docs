@@ -1,4 +1,4 @@
-import { createSignal, Show } from "solid-js";
+import { Show, createSignal } from "solid-js";
 
 interface Props {
   content: string;
@@ -9,46 +9,43 @@ interface Props {
 
 /** Simple markdown to HTML for preview */
 function markdownToHtml(text: string): string {
-  if (!text) return '<p class="text-gray-400 italic">暂无内容</p>';
+  if (!text) return '<p class="text-[rgba(70,69,85,0.4)] italic">暂无内容</p>';
 
   let html = text;
 
   // Escape HTML entities first
-  html = html
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  html = html.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   // Code blocks (triple backtick)
   html = html.replace(
     /```(\w*)\n([\s\S]*?)```/g,
-    '<pre class="bg-gray-100 rounded-lg p-3 my-2 overflow-x-auto"><code class="text-sm font-mono">$2</code></pre>',
+    '<pre class="bg-[#f7f9fb] rounded-xl p-3 my-2 overflow-x-auto"><code class="text-sm font-mono text-[#464555]">$2</code></pre>',
   );
 
   // Headers
   html = html.replace(
     /^######\s+(.+)$/gm,
-    '<h6 class="text-xs font-semibold text-gray-800 mt-3 mb-1">$1</h6>',
+    '<h6 class="text-xs font-semibold text-[#191c1e] mt-3 mb-1">$1</h6>',
   );
   html = html.replace(
     /^#####\s+(.+)$/gm,
-    '<h5 class="text-sm font-semibold text-gray-800 mt-3 mb-1">$1</h5>',
+    '<h5 class="text-sm font-semibold text-[#191c1e] mt-3 mb-1">$1</h5>',
   );
   html = html.replace(
     /^####\s+(.+)$/gm,
-    '<h4 class="text-sm font-bold text-gray-800 mt-3 mb-1">$1</h4>',
+    '<h4 class="text-sm font-bold text-[#191c1e] mt-3 mb-1">$1</h4>',
   );
   html = html.replace(
     /^###\s+(.+)$/gm,
-    '<h3 class="text-base font-medium text-gray-800 mt-3 mb-1">$1</h3>',
+    '<h3 class="text-base font-medium text-[#191c1e] mt-3 mb-1">$1</h3>',
   );
   html = html.replace(
     /^##\s+(.+)$/gm,
-    '<h2 class="text-lg font-semibold text-gray-900 mt-4 mb-1.5">$1</h2>',
+    '<h2 class="text-lg font-semibold text-[#191c1e] mt-4 mb-1.5">$1</h2>',
   );
   html = html.replace(
     /^#\s+(.+)$/gm,
-    '<h1 class="text-xl font-bold text-gray-900 mt-4 mb-2">$1</h1>',
+    '<h1 class="text-xl font-bold text-[#191c1e] mt-4 mb-2">$1</h1>',
   );
 
   // Bold and italic
@@ -58,19 +55,16 @@ function markdownToHtml(text: string): string {
   // Inline code
   html = html.replace(
     /`(.+?)`/g,
-    '<code class="px-1 py-0.5 bg-gray-100 rounded text-sm font-mono">$1</code>',
+    '<code class="px-1 py-0.5 bg-[#f7f9fb] rounded text-sm font-mono text-[#464555]">$1</code>',
   );
 
   // Unordered lists
-  html = html.replace(
-    /^\s*[-*]\s+(.+)$/gm,
-    '<li class="ml-4 text-sm text-gray-800">$1</li>',
-  );
+  html = html.replace(/^\s*[-*]\s+(.+)$/gm, '<li class="ml-4 text-sm text-[#191c1e]">$1</li>');
 
   // Ordered lists
   html = html.replace(
     /^\s*\d+\.\s+(.+)$/gm,
-    '<li class="ml-4 text-sm text-gray-800 list-decimal">$1</li>',
+    '<li class="ml-4 text-sm text-[#191c1e] list-decimal">$1</li>',
   );
 
   // Paragraphs: wrap remaining non-tag lines
@@ -80,7 +74,7 @@ function markdownToHtml(text: string): string {
       const trimmed = line.trim();
       if (!trimmed) return '<div class="h-2"></div>';
       if (trimmed.startsWith("<")) return line;
-      return `<p class="text-sm text-gray-800 leading-relaxed">${trimmed}</p>`;
+      return `<p class="text-sm text-[#191c1e] leading-relaxed">${trimmed}</p>`;
     })
     .join("\n");
 
@@ -90,10 +84,9 @@ function markdownToHtml(text: string): string {
 type ViewMode = "edit" | "preview" | "split";
 
 export default function InlineEditor(props: Props) {
-  const [viewMode, setViewMode] = createSignal<ViewMode>(
-    props.readOnly ? "preview" : "split",
-  );
+  const [viewMode, setViewMode] = createSignal<ViewMode>(props.readOnly ? "preview" : "split");
   const [localContent, setLocalContent] = createSignal(props.content);
+  const [focused, setFocused] = createSignal(false);
 
   function handleInput(value: string) {
     setLocalContent(value);
@@ -102,7 +95,9 @@ export default function InlineEditor(props: Props) {
 
   /** Insert markdown syntax at cursor position in textarea */
   function insertMarkdown(prefix: string, suffix: string) {
-    const textarea = document.getElementById("inline-editor-textarea") as HTMLTextAreaElement | null;
+    const textarea = document.getElementById(
+      "inline-editor-textarea",
+    ) as HTMLTextAreaElement | null;
     if (!textarea) return;
 
     const start = textarea.selectionStart;
@@ -110,8 +105,7 @@ export default function InlineEditor(props: Props) {
     const text = localContent();
     const selected = text.slice(start, end);
 
-    const newText =
-      text.slice(0, start) + prefix + selected + suffix + text.slice(end);
+    const newText = text.slice(0, start) + prefix + selected + suffix + text.slice(end);
     setLocalContent(newText);
     props.onChange(newText);
 
@@ -119,15 +113,14 @@ export default function InlineEditor(props: Props) {
     requestAnimationFrame(() => {
       textarea.focus();
       const newPos = start + prefix.length + selected.length + suffix.length;
-      textarea.setSelectionRange(
-        start + prefix.length,
-        start + prefix.length + selected.length,
-      );
+      textarea.setSelectionRange(start + prefix.length, start + prefix.length + selected.length);
     });
   }
 
   function insertLinePrefix(prefix: string) {
-    const textarea = document.getElementById("inline-editor-textarea") as HTMLTextAreaElement | null;
+    const textarea = document.getElementById(
+      "inline-editor-textarea",
+    ) as HTMLTextAreaElement | null;
     if (!textarea) return;
 
     const start = textarea.selectionStart;
@@ -149,20 +142,28 @@ export default function InlineEditor(props: Props) {
   // Read-only: just show rendered preview
   if (props.readOnly) {
     return (
-      <div class="border border-gray-200 rounded-lg p-4 min-h-[200px] max-h-[60vh] overflow-y-auto bg-gray-50">
+      <div class="border border-[rgba(199,196,216,0.3)] rounded-xl p-4 min-h-[200px] max-h-[60vh] overflow-y-auto bg-[#f7f9fb] shadow-[0_4px_16px_rgba(25,28,30,0.04)]">
         <div class="prose prose-sm max-w-none" innerHTML={markdownToHtml(localContent())} />
       </div>
     );
   }
 
+  const wrapperClass = () =>
+    [
+      "rounded-xl overflow-hidden transition-all duration-150",
+      focused()
+        ? "ring-2 ring-[#c3c0ff] border border-[#4f46e5] shadow-[0_0_0_4px_rgba(195,192,255,0.15)]"
+        : "border border-[rgba(199,196,216,0.3)] shadow-[0_4px_16px_rgba(25,28,30,0.04)] hover:border-[rgba(199,196,216,0.6)]",
+    ].join(" ");
+
   return (
-    <div class="border border-gray-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500 focus-within:border-indigo-500">
+    <div class={wrapperClass()}>
       {/* Toolbar */}
-      <div class="flex items-center gap-1 px-3 py-2 bg-gray-50 border-b border-gray-200">
+      <div class="flex items-center gap-1 px-3 py-2 bg-[#f7f9fb] border-b border-[rgba(199,196,216,0.2)]">
         {/* Formatting buttons */}
         <button
           type="button"
-          class="p-1.5 rounded hover:bg-gray-200 text-gray-600 text-xs font-bold transition-colors"
+          class="p-1.5 rounded-lg hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5] text-[#464555] text-xs font-bold transition-colors"
           title="加粗 (Ctrl+B)"
           onClick={() => insertMarkdown("**", "**")}
         >
@@ -170,7 +171,7 @@ export default function InlineEditor(props: Props) {
         </button>
         <button
           type="button"
-          class="p-1.5 rounded hover:bg-gray-200 text-gray-600 text-xs italic transition-colors"
+          class="p-1.5 rounded-lg hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5] text-[#464555] text-xs italic transition-colors"
           title="斜体 (Ctrl+I)"
           onClick={() => insertMarkdown("*", "*")}
         >
@@ -178,19 +179,19 @@ export default function InlineEditor(props: Props) {
         </button>
         <button
           type="button"
-          class="p-1.5 rounded hover:bg-gray-200 text-gray-600 text-xs font-mono transition-colors"
+          class="p-1.5 rounded-lg hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5] text-[#464555] text-xs font-mono transition-colors"
           title="代码"
           onClick={() => insertMarkdown("`", "`")}
         >
           {"<>"}
         </button>
 
-        <div class="w-px h-4 bg-gray-300 mx-1" />
+        <div class="w-px h-4 bg-[rgba(199,196,216,0.4)] mx-1" />
 
         {/* Heading buttons */}
         <button
           type="button"
-          class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs font-semibold transition-colors"
+          class="px-1.5 py-1 rounded-lg hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5] text-[#464555] text-xs font-semibold transition-colors"
           title="标题1"
           onClick={() => insertLinePrefix("# ")}
         >
@@ -198,7 +199,7 @@ export default function InlineEditor(props: Props) {
         </button>
         <button
           type="button"
-          class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs font-semibold transition-colors"
+          class="px-1.5 py-1 rounded-lg hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5] text-[#464555] text-xs font-semibold transition-colors"
           title="标题2"
           onClick={() => insertLinePrefix("## ")}
         >
@@ -206,19 +207,19 @@ export default function InlineEditor(props: Props) {
         </button>
         <button
           type="button"
-          class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs font-semibold transition-colors"
+          class="px-1.5 py-1 rounded-lg hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5] text-[#464555] text-xs font-semibold transition-colors"
           title="标题3"
           onClick={() => insertLinePrefix("### ")}
         >
           H3
         </button>
 
-        <div class="w-px h-4 bg-gray-300 mx-1" />
+        <div class="w-px h-4 bg-[rgba(199,196,216,0.4)] mx-1" />
 
         {/* List buttons */}
         <button
           type="button"
-          class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs transition-colors"
+          class="px-1.5 py-1 rounded-lg hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5] text-[#464555] text-xs transition-colors"
           title="无序列表"
           onClick={() => insertLinePrefix("- ")}
         >
@@ -226,7 +227,7 @@ export default function InlineEditor(props: Props) {
         </button>
         <button
           type="button"
-          class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs transition-colors"
+          class="px-1.5 py-1 rounded-lg hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5] text-[#464555] text-xs transition-colors"
           title="有序列表"
           onClick={() => insertLinePrefix("1. ")}
         >
@@ -237,10 +238,10 @@ export default function InlineEditor(props: Props) {
         <div class="ml-auto flex items-center gap-1">
           <button
             type="button"
-            class={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+            class={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
               viewMode() === "edit"
-                ? "bg-indigo-100 text-indigo-700"
-                : "text-gray-500 hover:bg-gray-200"
+                ? "bg-[#e2dfff] text-[#3525cd]"
+                : "text-[#464555] hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5]"
             }`}
             onClick={() => setViewMode("edit")}
           >
@@ -248,10 +249,10 @@ export default function InlineEditor(props: Props) {
           </button>
           <button
             type="button"
-            class={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+            class={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
               viewMode() === "split"
-                ? "bg-indigo-100 text-indigo-700"
-                : "text-gray-500 hover:bg-gray-200"
+                ? "bg-[#e2dfff] text-[#3525cd]"
+                : "text-[#464555] hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5]"
             }`}
             onClick={() => setViewMode("split")}
           >
@@ -259,10 +260,10 @@ export default function InlineEditor(props: Props) {
           </button>
           <button
             type="button"
-            class={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+            class={`px-2 py-1 rounded-lg text-xs font-medium transition-colors ${
               viewMode() === "preview"
-                ? "bg-indigo-100 text-indigo-700"
-                : "text-gray-500 hover:bg-gray-200"
+                ? "bg-[#e2dfff] text-[#3525cd]"
+                : "text-[#464555] hover:bg-[rgba(79,70,229,0.08)] hover:text-[#4f46e5]"
             }`}
             onClick={() => setViewMode("preview")}
           >
@@ -273,7 +274,7 @@ export default function InlineEditor(props: Props) {
 
       {/* Content area */}
       <div
-        class={`${viewMode() === "split" ? "grid grid-cols-2 divide-x divide-gray-200" : ""}`}
+        class={`${viewMode() === "split" ? "grid grid-cols-2 divide-x divide-[rgba(199,196,216,0.2)]" : ""}`}
       >
         {/* Textarea */}
         <Show when={viewMode() !== "preview"}>
@@ -281,6 +282,8 @@ export default function InlineEditor(props: Props) {
             id="inline-editor-textarea"
             value={localContent()}
             onInput={(e) => handleInput(e.currentTarget.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             onKeyDown={(e) => {
               // Ctrl+B / Cmd+B for bold
               if ((e.ctrlKey || e.metaKey) && e.key === "b") {
@@ -294,17 +297,14 @@ export default function InlineEditor(props: Props) {
               }
             }}
             placeholder={props.placeholder ?? "输入 Markdown 内容..."}
-            class="w-full min-h-[200px] max-h-[60vh] p-4 text-sm font-mono text-gray-800 bg-white border-0 focus:outline-none resize-y"
+            class="w-full min-h-[200px] max-h-[60vh] p-4 text-sm font-mono text-[#191c1e] bg-white border-0 focus:outline-none focus:ring-0 resize-y placeholder:text-[rgba(70,69,85,0.4)]"
           />
         </Show>
 
         {/* Preview */}
         <Show when={viewMode() !== "edit"}>
           <div class="p-4 min-h-[200px] max-h-[60vh] overflow-y-auto bg-white">
-            <div
-              class="prose prose-sm max-w-none"
-              innerHTML={markdownToHtml(localContent())}
-            />
+            <div class="prose prose-sm max-w-none" innerHTML={markdownToHtml(localContent())} />
           </div>
         </Show>
       </div>

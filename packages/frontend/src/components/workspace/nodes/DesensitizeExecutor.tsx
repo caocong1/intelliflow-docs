@@ -27,6 +27,16 @@ interface Props {
 
 type Phase = "detect" | "review" | "confirmed";
 
+// Group items by sensitiveType for collapsible category sections
+function groupByType(items: DetectedItem[]): Record<string, DetectedItem[]> {
+  const groups: Record<string, DetectedItem[]> = {};
+  for (const item of items) {
+    if (!groups[item.sensitiveType]) groups[item.sensitiveType] = [];
+    groups[item.sensitiveType].push(item);
+  }
+  return groups;
+}
+
 export default function DesensitizeExecutor(props: Props) {
   // Determine initial phase from existing outputData
   const initialPhase = (): Phase => {
@@ -52,6 +62,7 @@ export default function DesensitizeExecutor(props: Props) {
     sensitiveType: "person_name",
   });
   const [selectedItemIndex, setSelectedItemIndex] = createSignal<number | null>(null);
+  const [collapsedTypes, setCollapsedTypes] = createSignal<Set<string>>(new Set());
 
   // Auto-detect on mount when in detect phase with input text
   onMount(() => {
@@ -75,9 +86,14 @@ export default function DesensitizeExecutor(props: Props) {
     try {
       const runtimeApi = api.api.runtime as unknown as Record<
         string,
-        Record<string, Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>>
+        Record<
+          string,
+          Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>
+        >
       >;
-      const res = await runtimeApi[props.documentId].desensitize[props.nodeExecution.id].detect.post({ text });
+      const res = await runtimeApi[props.documentId].desensitize[
+        props.nodeExecution.id
+      ].detect.post({ text });
 
       const data = res.data as Record<string, unknown> | null;
       if (data && !("error" in data)) {
@@ -103,6 +119,15 @@ export default function DesensitizeExecutor(props: Props) {
     setItems((prev) =>
       prev.map((item, i) => (i === index ? { ...item, checked: !item.checked } : item)),
     );
+  }
+
+  function toggleTypeCollapsed(type: string) {
+    setCollapsedTypes((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
   }
 
   function handleManualAdd() {
@@ -159,9 +184,14 @@ export default function DesensitizeExecutor(props: Props) {
     try {
       const runtimeApi = api.api.runtime as unknown as Record<
         string,
-        Record<string, Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>>
+        Record<
+          string,
+          Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>
+        >
       >;
-      const res = await runtimeApi[props.documentId].desensitize[props.nodeExecution.id].confirm.post({
+      const res = await runtimeApi[props.documentId].desensitize[
+        props.nodeExecution.id
+      ].confirm.post({
         items: confirmed.map((it) => ({
           original: it.original,
           placeholder: it.placeholder,
@@ -241,7 +271,7 @@ export default function DesensitizeExecutor(props: Props) {
     );
   }
 
-  // ─── Type badge color ─────────────────────────────────────────────────────
+  // ─── Type label / badge ───────────────────────────────────────────────────
 
   const typeLabels: Record<string, string> = {
     person_name: "姓名",
@@ -253,17 +283,18 @@ export default function DesensitizeExecutor(props: Props) {
     address: "地址",
   };
 
-  function typeBadgeColor(type: string): string {
-    const colors: Record<string, string> = {
-      person_name: "bg-blue-100 text-blue-700",
-      phone_number: "bg-green-100 text-green-700",
-      email: "bg-purple-100 text-purple-700",
-      id_number: "bg-red-100 text-red-700",
-      bank_card: "bg-orange-100 text-orange-700",
-      company_name: "bg-teal-100 text-teal-700",
-      address: "bg-pink-100 text-pink-700",
+  // Surface-tone pills per design system — no hard colored badges
+  function typeBadgeClass(type: string): string {
+    const map: Record<string, string> = {
+      person_name: "bg-indigo-50 text-indigo-700",
+      phone_number: "bg-emerald-50 text-emerald-700",
+      email: "bg-violet-50 text-violet-700",
+      id_number: "bg-rose-50 text-rose-700",
+      bank_card: "bg-amber-50 text-amber-700",
+      company_name: "bg-teal-50 text-teal-700",
+      address: "bg-pink-50 text-pink-700",
     };
-    return colors[type] ?? "bg-gray-100 text-gray-700";
+    return map[type] ?? "bg-[#f7f9fb] text-[#464555]";
   }
 
   function getTypeLabel(type: string): string {
@@ -285,17 +316,37 @@ export default function DesensitizeExecutor(props: Props) {
       ((props.nodeExecution.outputData as Record<string, unknown>)?.mappingCount as number) ?? 0;
 
     return (
-      <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div class="px-6 py-4 bg-gradient-to-r from-amber-50 to-white border-b border-gray-100">
+      <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
+        {/* Header */}
+        <div class="px-6 py-5 bg-gradient-to-r from-[#f2f4f6] to-white border-b border-[rgba(199,196,216,0.15)]">
           <div class="flex items-center gap-3">
-            <h2 class="text-lg font-semibold text-gray-800">信息脱敏</h2>
-            <span class="text-xs px-2.5 py-1 rounded-full bg-green-100 text-green-700 font-medium">
-              审核完成 - 已脱敏 {mappingCount} 项
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#3525cd] to-[#4f46e5] flex items-center justify-center flex-shrink-0">
+              <svg
+                aria-hidden="true"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <div class="flex-1 min-w-0">
+              <h2 class="text-base font-semibold text-[#191c1e]">信息脱敏</h2>
+              <p class="text-xs text-[#464555] mt-0.5">自动检测敏感信息并进行脱敏处理</p>
+            </div>
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              审核完成 · 已脱敏 {mappingCount} 项
             </span>
           </div>
         </div>
         <div class="p-6">
-          <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+          <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed">
             {outputText}
           </div>
         </div>
@@ -310,32 +361,65 @@ export default function DesensitizeExecutor(props: Props) {
   // ─── Main render ──────────────────────────────────────────────────────────
 
   return (
-    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+    <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
       {/* Header */}
-      <div class="px-6 py-4 bg-gradient-to-r from-amber-50 to-white border-b border-gray-100">
-        <h2 class="text-lg font-semibold text-gray-800">
-          {props.nodeExecution.nodeLabel || "信息脱敏"}
-        </h2>
-        <p class="text-sm text-gray-500 mt-0.5">自动检测并脱敏敏感信息</p>
+      <div class="px-6 py-5 bg-gradient-to-r from-[#f2f4f6] to-white border-b border-[rgba(199,196,216,0.15)]">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#3525cd] to-[#4f46e5] flex items-center justify-center flex-shrink-0">
+            <svg
+              aria-hidden="true"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            </svg>
+          </div>
+          <div>
+            <h2 class="text-base font-semibold text-[#191c1e]">
+              {props.nodeExecution.nodeLabel || "信息脱敏"}
+            </h2>
+            <p class="text-xs text-[#464555] mt-0.5">自动检测敏感信息并进行脱敏处理</p>
+          </div>
+        </div>
       </div>
 
-      <div class="p-6 space-y-4">
+      <div class="p-6 space-y-5">
         {/* Null guard */}
         <Show when={!categoriesConfigured()}>
-          <div class="text-center py-8 text-gray-400">
-            <div class="text-4xl mb-3">-</div>
+          <div class="text-center py-10 text-[#9fa0a8]">
+            <div class="w-12 h-12 rounded-full bg-[#f7f9fb] flex items-center justify-center mx-auto mb-3">
+              <svg
+                aria-hidden="true"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
             <p class="text-sm">未配置脱敏类别</p>
-            <p class="text-xs mt-1 text-gray-300">请在工作流编辑器中配置脱敏类别</p>
+            <p class="text-xs mt-1 text-[#c4c4cc]">请在工作流编辑器中配置脱敏类别</p>
           </div>
         </Show>
 
         <Show when={categoriesConfigured()}>
-          {/* Configured categories display */}
-          <div class="flex flex-wrap gap-1.5">
-            <span class="text-xs text-gray-500 mr-1 leading-6">检测类别：</span>
+          {/* Configured categories chips */}
+          <div class="flex flex-wrap gap-1.5 items-center">
+            <span class="text-xs text-[#9fa0a8]">检测类别：</span>
             <For each={props.config.categories}>
               {(cat) => (
-                <span class="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                <span class="text-xs px-2.5 py-0.5 rounded-full bg-[#f7f9fb] text-[#464555]">
                   {cat.name}
                 </span>
               )}
@@ -344,108 +428,103 @@ export default function DesensitizeExecutor(props: Props) {
 
           {/* Error display */}
           <Show when={error()}>
-            <div class="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-100">
+            <div class="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm border border-red-100">
               {error()}
             </div>
           </Show>
 
-          {/* Phase 1: Detection (auto-triggered, show loading state) */}
+          {/* ── Phase 1: Detection (auto-triggered) ── */}
           <Show when={phase() === "detect"}>
-            <div class="space-y-4">
-              <Show when={loading()}>
-                <div class="flex flex-col items-center py-12 gap-3">
-                  <div class="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-                  <p class="text-sm text-gray-500">正在检测敏感信息...</p>
+            <Show when={loading()}>
+              {/* Status banner: scanning */}
+              <div class="bg-[#fff7ed] rounded-xl px-4 py-3 flex items-center gap-3">
+                <div class="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                <span class="text-sm text-amber-700 font-medium">正在扫描敏感信息...</span>
+              </div>
+            </Show>
+            <Show when={!loading()}>
+              <div class="space-y-3">
+                <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+                  <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
+                  输入文本
+                </h3>
+                <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
+                  {inputText()}
                 </div>
-              </Show>
-              <Show when={!loading()}>
-                <div class="space-y-3">
-                  <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <span class="w-1 h-4 bg-amber-500 rounded-full" />
-                    输入文本
-                  </h3>
-                  <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
-                    {inputText()}
-                  </div>
-                  <Show when={!inputText().trim()}>
-                    <p class="text-sm text-gray-400 text-center py-4">
-                      暂无输入文本，请等待上游节点完成
-                    </p>
-                  </Show>
-                </div>
-              </Show>
-            </div>
+                <Show when={!inputText().trim()}>
+                  <p class="text-sm text-[#9fa0a8] text-center py-4">
+                    暂无输入文本，请等待上游节点完成
+                  </p>
+                </Show>
+              </div>
+            </Show>
           </Show>
 
-          {/* Phase 2: Review */}
+          {/* ── Phase 2: Review ── */}
           <Show when={phase() === "review"}>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Status banner */}
+            <div class="bg-[#f0fdf4] rounded-xl px-4 py-3 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+                <span class="text-sm text-emerald-700 font-medium">
+                  检测完成，共发现 {items().length} 项敏感信息
+                </span>
+              </div>
+              <button
+                type="button"
+                class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium transition-colors"
+                onClick={() => {
+                  setPhase("detect");
+                  handleDetect();
+                }}
+              >
+                重新检测
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Left panel: highlighted text */}
               <div class="space-y-3">
-                <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                  <span class="w-1 h-4 bg-amber-500 rounded-full" />
+                <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+                  <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
                   文本预览
                 </h3>
-                <div class="bg-white border border-gray-200 rounded-lg p-4 text-sm text-gray-800 whitespace-pre-wrap leading-relaxed max-h-[500px] overflow-y-auto">
+                <div class="bg-white border border-[rgba(199,196,216,0.35)] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed max-h-[500px] overflow-y-auto">
                   {renderHighlightedText()}
                 </div>
 
-                {/* Sanitized preview */}
-                <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2 mt-4">
-                  <span class="w-1 h-4 bg-amber-500 rounded-full" />
+                <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2 mt-4">
+                  <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
                   脱敏预览
                 </h3>
-                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-600 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
+                <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#464555] whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
                   {getSanitizedPreview()}
                 </div>
               </div>
 
-              {/* Right panel: checklist */}
+              {/* Right panel: category sections + checklist */}
               <div class="space-y-3">
                 <div class="flex items-center justify-between">
-                  <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                    <span class="w-1 h-4 bg-amber-500 rounded-full" />
+                  <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+                    <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
                     敏感信息审核
-                    <span class="text-xs text-gray-400 font-normal">
-                      ({items().filter((it) => it.checked).length}/{items().length})
-                    </span>
                   </h3>
-                  <div class="flex gap-2">
-                    <button
-                      type="button"
-                      class="text-xs text-amber-600 hover:text-amber-700 font-medium"
-                      onClick={() => {
-                        setPhase("detect");
-                        handleDetect();
-                      }}
-                    >
-                      重新检测
-                    </button>
-                    <button
-                      type="button"
-                      class="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                      onClick={() => setShowManualAdd(!showManualAdd())}
-                    >
-                      {showManualAdd() ? "取消" : "手动添加"}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Status summary */}
-                <div class="px-3 py-2 rounded-lg bg-amber-50 border border-amber-100 text-sm text-amber-700">
-                  <Show when={items().length > 0} fallback={<span>未检测到敏感信息</span>}>
-                    已检测到 {items().length} 条敏感信息，已勾选{" "}
-                    {items().filter((it) => it.checked).length} 条
-                  </Show>
+                  <button
+                    type="button"
+                    class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium transition-colors"
+                    onClick={() => setShowManualAdd(!showManualAdd())}
+                  >
+                    {showManualAdd() ? "取消" : "手动添加"}
+                  </button>
                 </div>
 
                 {/* Manual add form */}
                 <Show when={showManualAdd()}>
-                  <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
+                  <div class="bg-[#f7f9fb] rounded-xl p-3 space-y-2 border border-[rgba(199,196,216,0.35)]">
                     <input
                       type="text"
                       placeholder="输入需要脱敏的文本..."
-                      class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      class="w-full px-4 py-2.5 text-sm bg-white border border-[rgba(199,196,216,0.35)] rounded-xl text-[#191c1e] placeholder-[#9fa0a8] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] transition-all"
                       value={manualForm().original}
                       onInput={(e) =>
                         setManualForm((prev) => ({ ...prev, original: e.currentTarget.value }))
@@ -453,7 +532,7 @@ export default function DesensitizeExecutor(props: Props) {
                     />
                     <div class="flex gap-2">
                       <select
-                        class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        class="flex-1 px-3 py-2 text-sm bg-white border border-[rgba(199,196,216,0.35)] rounded-xl text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] transition-all"
                         value={manualForm().sensitiveType}
                         onChange={(e) =>
                           setManualForm((prev) => ({
@@ -473,7 +552,7 @@ export default function DesensitizeExecutor(props: Props) {
                       </select>
                       <button
                         type="button"
-                        class="px-3 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                        class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-lg hover:scale-[1.02] transition-transform"
                         onClick={handleManualAdd}
                       >
                         添加
@@ -482,55 +561,128 @@ export default function DesensitizeExecutor(props: Props) {
                   </div>
                 </Show>
 
-                {/* Item checklist */}
-                <div class="space-y-1 max-h-[500px] overflow-y-auto">
-                  <For each={items()}>
-                    {(item, index) => (
-                      <div
-                        class={`flex items-center gap-3 p-2.5 rounded-lg border transition-colors cursor-pointer ${
-                          selectedItemIndex() === index()
-                            ? "border-amber-400 bg-amber-50"
-                            : item.checked
-                              ? "border-gray-200 bg-white hover:bg-gray-50"
-                              : "border-gray-100 bg-gray-50 opacity-60"
-                        }`}
-                        onClick={() => setSelectedItemIndex(index())}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") setSelectedItemIndex(index());
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={item.checked}
-                          onChange={() => toggleItem(index())}
-                          class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          aria-label={`${item.checked ? "保留原文" : "确认脱敏"}: ${maskOriginal(item.original)}`}
-                        />
-                        <div class="flex-1 min-w-0">
-                          <div class="flex items-center gap-2">
-                            <span class="text-sm font-mono text-gray-700 truncate">
-                              {maskOriginal(item.original)}
-                            </span>
-                            <span
-                              class={`text-xs px-1.5 py-0.5 rounded-full font-medium ${typeBadgeColor(item.sensitiveType)}`}
+                {/* Category sections */}
+                <div class="space-y-2 max-h-[520px] overflow-y-auto pr-0.5">
+                  <For each={Object.entries(groupByType(items()))}>
+                    {([type, typeItems]) => {
+                      const checkedCount = () => typeItems.filter((it) => it.checked).length;
+                      const isCollapsed = () => collapsedTypes().has(type);
+                      return (
+                        <div class="rounded-xl border border-[rgba(199,196,216,0.35)] overflow-hidden">
+                          {/* Category header */}
+                          <button
+                            type="button"
+                            class="w-full flex items-center justify-between px-3 py-2.5 bg-[#f7f9fb] hover:bg-[#f0efff] transition-colors"
+                            onClick={() => toggleTypeCollapsed(type)}
+                          >
+                            <div class="flex items-center gap-2">
+                              <span
+                                class={`text-xs px-2 py-0.5 rounded-full font-medium ${typeBadgeClass(type)}`}
+                              >
+                                {getTypeLabel(type)}
+                              </span>
+                              <span class="text-xs text-[#9fa0a8]">
+                                ({checkedCount()}/{typeItems.length} 项)
+                              </span>
+                            </div>
+                            <svg
+                              aria-hidden="true"
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              class={`text-[#9fa0a8] transition-transform ${isCollapsed() ? "" : "rotate-180"}`}
                             >
-                              {getTypeLabel(item.sensitiveType)}
-                            </span>
-                          </div>
-                          <div class="text-xs text-gray-400 mt-0.5 font-mono">
-                            -&gt; {item.placeholder}
-                          </div>
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                          </button>
+
+                          {/* Items list */}
+                          <Show when={!isCollapsed()}>
+                            <div class="divide-y divide-[rgba(199,196,216,0.15)]">
+                              <For each={typeItems}>
+                                {(item) => {
+                                  const index = () => items().indexOf(item);
+                                  return (
+                                    <div
+                                      class={`flex items-center gap-3 px-3 py-2.5 bg-white cursor-pointer transition-colors ${
+                                        selectedItemIndex() === index()
+                                          ? "bg-[#f0efff]"
+                                          : "hover:bg-[#fafafe]"
+                                      } ${!item.checked ? "opacity-50" : ""}`}
+                                      onClick={() => setSelectedItemIndex(index())}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ")
+                                          setSelectedItemIndex(index());
+                                      }}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        checked={item.checked}
+                                        onChange={() => toggleItem(index())}
+                                        class="w-4 h-4 rounded border-[rgba(199,196,216,0.6)] text-[#4f46e5] focus:ring-[#c3c0ff] flex-shrink-0"
+                                        aria-label={`${item.checked ? "取消脱敏" : "确认脱敏"}: ${maskOriginal(item.original)}`}
+                                      />
+                                      {/* original with line-through → masked replacement */}
+                                      <div class="flex-1 min-w-0 flex items-center gap-2 text-sm">
+                                        <span class="font-mono text-red-400 line-through truncate">
+                                          {maskOriginal(item.original)}
+                                        </span>
+                                        <span class="text-[#9fa0a8] flex-shrink-0">→</span>
+                                        <span class="font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded text-xs truncate">
+                                          {item.placeholder}
+                                        </span>
+                                      </div>
+                                      {/* Toggle switch */}
+                                      <button
+                                        type="button"
+                                        aria-label={item.checked ? "禁用此项脱敏" : "启用此项脱敏"}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toggleItem(index());
+                                        }}
+                                        class={`relative flex-shrink-0 w-9 h-5 rounded-full transition-colors ${
+                                          item.checked ? "bg-[#4f46e5]" : "bg-[#e6e8ea]"
+                                        }`}
+                                      >
+                                        <span
+                                          class={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                            item.checked ? "translate-x-4" : "translate-x-0.5"
+                                          }`}
+                                        />
+                                      </button>
+                                    </div>
+                                  );
+                                }}
+                              </For>
+                            </div>
+                          </Show>
                         </div>
-                      </div>
-                    )}
+                      );
+                    }}
                   </For>
                 </div>
 
-                {/* Confirm button */}
-                <div class="pt-3 border-t border-gray-200">
+                {/* Summary bar + confirm */}
+                <div class="pt-3 border-t border-[rgba(199,196,216,0.2)] space-y-3">
+                  <div class="flex items-center justify-between text-xs text-[#464555]">
+                    <span>
+                      已选择{" "}
+                      <span class="font-semibold text-[#191c1e]">
+                        {items().filter((it) => it.checked).length}
+                      </span>{" "}
+                      / {items().length} 项
+                    </span>
+                    <Show when={items().filter((it) => it.checked).length === 0}>
+                      <span class="text-amber-600">请至少选择一项进行脱敏</span>
+                    </Show>
+                  </div>
                   <button
                     type="button"
-                    class="w-full px-4 py-2.5 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 active:bg-amber-800 transition-colors disabled:opacity-50 shadow-sm"
+                    class="w-full px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-lg hover:scale-[1.02] active:scale-[0.99] transition-transform disabled:opacity-50 disabled:scale-100 shadow-sm"
                     disabled={loading() || items().filter((it) => it.checked).length === 0}
                     onClick={handleConfirm}
                   >

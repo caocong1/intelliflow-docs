@@ -1,5 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
 import type { NodeExecution } from "@intelliflow/shared";
+import { For, Show, createSignal } from "solid-js";
 import Badge from "../ui/Badge";
 
 type NodeHistoryPanelProps = {
@@ -10,7 +10,10 @@ type NodeHistoryPanelProps = {
   allExecutions?: NodeExecution[];
 };
 
-const statusBadge: Record<string, { label: string; variant: "success" | "warning" | "error" | "info" }> = {
+const statusBadge: Record<
+  string,
+  { label: string; variant: "success" | "warning" | "error" | "info" }
+> = {
   completed: { label: "已完成", variant: "success" },
   in_progress: { label: "执行中", variant: "warning" },
   pending: { label: "待执行", variant: "info" },
@@ -56,50 +59,60 @@ export default function NodeHistoryPanel(props: NodeHistoryPanelProps) {
   };
 
   return (
-    <div class="border border-gray-200 rounded-lg bg-white">
+    <div class="rounded-xl bg-[#f7f9fb] overflow-hidden transition-all">
       {/* Collapsed header */}
       <button
         type="button"
-        class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-gray-50 transition-colors cursor-pointer"
+        class="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-[rgba(199,196,216,0.12)] transition-colors cursor-pointer"
         onClick={props.onToggle}
       >
         <div class="flex items-center gap-3">
-          <span class="text-sm font-medium text-gray-800">{props.node.nodeLabel}</span>
+          <span class="text-sm font-medium text-[#191c1e]">{props.node.nodeLabel}</span>
           <Badge label={badge().label} variant={badge().variant} />
         </div>
         <div class="flex items-center gap-3">
           <Show when={props.node.completedAt}>
-            <span class="text-xs text-gray-400">{formatTime(props.node.completedAt)}</span>
+            <span class="text-xs text-[#464555] opacity-60">
+              {formatTime(props.node.completedAt)}
+            </span>
           </Show>
           <svg
-            class={`w-4 h-4 text-gray-400 transition-transform ${props.isExpanded ? "rotate-180" : ""}`}
+            class={`w-4 h-4 text-[#464555] transition-transform duration-200 ${props.isExpanded ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
             aria-hidden="true"
           >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M19 9l-7 7-7-7"
+            />
           </svg>
         </div>
       </button>
 
       {/* Expanded content */}
       <Show when={props.isExpanded}>
-        <div class="border-t border-gray-100 px-4 py-3 space-y-3">
+        <div class="px-4 pb-4 space-y-3">
+          {/* Divider */}
+          <div class="h-px bg-[rgba(199,196,216,0.2)]" />
+
           {/* Execution round selector */}
           <Show when={hasMultipleRounds()}>
             <div class="flex items-center gap-2 mb-2">
-              <label for="exec-round-select" class="text-xs font-medium text-gray-500">执行轮次:</label>
+              <label for="exec-round-select" class="text-xs font-medium text-[#464555]">
+                执行轮次:
+              </label>
               <select
                 id="exec-round-select"
-                class="text-xs border border-gray-200 rounded px-2 py-1 bg-white text-gray-700"
+                class="text-xs border border-[rgba(199,196,216,0.3)] rounded-lg px-2 py-1 bg-white text-[#464555] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5]"
                 value={selectedRound()}
                 onChange={(e) => setSelectedRound(Number(e.currentTarget.value))}
               >
                 <For each={Array.from({ length: maxRound() }, (_, i) => i + 1)}>
-                  {(round) => (
-                    <option value={round}>第{round}次</option>
-                  )}
+                  {(round) => <option value={round}>第{round}次</option>}
                 </For>
               </select>
             </div>
@@ -107,7 +120,7 @@ export default function NodeHistoryPanel(props: NodeHistoryPanelProps) {
 
           {/* Status */}
           <div class="flex items-center gap-2">
-            <span class="text-xs font-medium text-gray-500">状态:</span>
+            <span class="text-xs font-medium text-[#464555]">状态:</span>
             <Badge
               label={(statusBadge[displayedNode().status] ?? statusBadge.pending).label}
               variant={(statusBadge[displayedNode().status] ?? statusBadge.pending).variant}
@@ -117,8 +130,8 @@ export default function NodeHistoryPanel(props: NodeHistoryPanelProps) {
           {/* Execution time */}
           <Show when={displayedNode().startedAt || displayedNode().completedAt}>
             <div>
-              <p class="text-xs font-medium text-gray-500 mb-1">执行时间</p>
-              <div class="text-xs text-gray-600">
+              <p class="text-xs font-medium text-[#464555] mb-1">执行时间</p>
+              <div class="text-xs text-[#464555]">
                 <Show when={displayedNode().startedAt}>
                   <span>开始: {formatTime(displayedNode().startedAt)}</span>
                 </Show>
@@ -131,24 +144,35 @@ export default function NodeHistoryPanel(props: NodeHistoryPanelProps) {
 
           <Show when={displayedNode().inputData}>
             <div>
-              <p class="text-xs font-medium text-gray-500 mb-1">输入数据</p>
-              <pre class="text-xs bg-gray-50 rounded p-2 overflow-x-auto max-h-48 text-gray-700">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="w-1 h-3 bg-[#4f46e5] rounded-full" />
+                <p class="text-xs font-medium text-[#191c1e]">输入数据</p>
+              </div>
+              <pre class="text-xs bg-white rounded-xl p-3 overflow-x-auto max-h-48 text-[#464555] border border-[rgba(199,196,216,0.15)]">
                 {formatJson(displayedNode().inputData)}
               </pre>
             </div>
           </Show>
           <Show when={displayedNode().outputData}>
             <div>
-              <p class="text-xs font-medium text-gray-500 mb-1">输出数据</p>
-              <pre class="text-xs bg-gray-50 rounded p-2 overflow-x-auto max-h-48 text-gray-700">
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="w-1 h-3 bg-[#4f46e5] rounded-full" />
+                <p class="text-xs font-medium text-[#191c1e]">输出数据</p>
+              </div>
+              <pre class="text-xs bg-white rounded-xl p-3 overflow-x-auto max-h-48 text-[#464555] border border-[rgba(199,196,216,0.15)]">
                 {formatJson(displayedNode().outputData)}
               </pre>
             </div>
           </Show>
           <Show when={displayedNode().errorMessage}>
             <div>
-              <p class="text-xs font-medium text-red-500 mb-1">错误信息</p>
-              <p class="text-xs text-red-600 bg-red-50 rounded p-2">{displayedNode().errorMessage}</p>
+              <div class="flex items-center gap-1.5 mb-1">
+                <div class="w-1 h-3 bg-red-500 rounded-full" />
+                <p class="text-xs font-medium text-red-600">错误信息</p>
+              </div>
+              <p class="text-xs text-red-600 bg-red-50 rounded-xl p-3">
+                {displayedNode().errorMessage}
+              </p>
             </div>
           </Show>
         </div>

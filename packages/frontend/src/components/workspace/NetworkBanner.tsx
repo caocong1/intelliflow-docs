@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { Show, createSignal, onCleanup, onMount } from "solid-js";
 
 type BannerState = "hidden" | "offline" | "reconnected";
 
@@ -103,23 +103,59 @@ export default function NetworkBanner() {
   return (
     <>
       <Show when={bannerState() === "offline"}>
-        <div class="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-center py-2 px-4 text-sm font-medium shadow-md">
+        <div
+          class="fixed top-0 left-0 right-0 z-50 text-center py-2 px-4 text-sm font-medium"
+          style={{
+            background: "linear-gradient(135deg, #92400e 0%, #b45309 100%)",
+            color: "#fffbeb",
+            "box-shadow": "0 2px 12px rgba(146,64,14,0.18)",
+          }}
+        >
           <div class="flex items-center justify-center gap-2">
             <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
               <title>reconnecting</title>
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
             </svg>
             <span>网络连接已断开，正在尝试重新连接...</span>
           </div>
         </div>
       </Show>
       <Show when={bannerState() === "reconnected"}>
-        <div class="fixed top-0 left-0 right-0 z-50 bg-green-500 text-white text-center py-2 px-4 text-sm font-medium shadow-md">
+        <div
+          class="fixed top-0 left-0 right-0 z-50 text-center py-2 px-4 text-sm font-medium"
+          style={{
+            background: "linear-gradient(135deg, #14532d 0%, #16a34a 100%)",
+            color: "#f0fdf4",
+            "box-shadow": "0 2px 12px rgba(20,83,45,0.18)",
+          }}
+        >
           <div class="flex items-center justify-center gap-2">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
               <title>connected</title>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2.5"
+                d="M5 13l4 4L19 7"
+              />
             </svg>
             <span>已重新连接</span>
           </div>

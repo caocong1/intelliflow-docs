@@ -228,6 +228,8 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 9. Integration Polish & UX Guards | 1/1 | Complete | 2026-03-20 |
 | 10. Non-Admin Read API Access | 1/1 | Complete    | 2026-03-20 |
 | 11. Pre-Phase 5 API Access Fixes | 1/1 | Complete    | 2026-03-20 |
+| 12. Workflow Editor Fixes & Config Panel Alignment | 7/7 | Complete | 2026-03-20 |
+| 13. Document Runtime Refactor | 0/? | Not started | - |
 
 ### Phase 12: Workflow Editor Fixes & Config Panel Alignment
 
@@ -244,3 +246,16 @@ Plans:
 - [ ] 12-05-PLAN.md — Undo/redo + debounced autosave + validation expansion (full-field + linear flow) + 变量→节点输出 rename
 - [ ] 12-06-PLAN.md — UI/UX polish (edge animation, edge midpoint drag, alignment guides, node design, NodeLibraryPanel) + human verification
 - [ ] 12-07-PLAN.md — Prompt optimization (backend endpoint + frontend dialog with model picker and meta-prompt)
+
+### Phase 13: Document Runtime Refactor — Align with Phase 12 Editor
+
+**Goal:** Refactor the document creation runtime (workspace UI, all 5 node executors, orchestration) to align with Phase 12's restructured shared types, flow engine, and config panel changes — so users can create documents and execute workflows end-to-end with the new editor output
+**Depends on:** Phase 5, Phase 12
+**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, NODE-01 through NODE-22, NOPS-01 through NOPS-04, RECV-01, RECV-02
+**Success Criteria** (what must be TRUE):
+  1. DocumentWorkspace loads workflow config from backend and passes real configs (not empty objects) to each executor component
+  2. Runtime advanceNode propagates upstream outputData to downstream node inputData
+  3. Export resolveContent correctly finds model outputs from the `models` Record structure (not stale `modelOutputs` Array)
+  4. All 5 executor UIs display in Chinese and work correctly with the new config structures (categories, modelIds[], VariableRef, etc.)
+  5. User can create a document, execute a workflow created in the Phase 12 editor end-to-end, and export the result
+**Plans**: TBD

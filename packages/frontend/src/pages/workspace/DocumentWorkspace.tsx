@@ -1,5 +1,5 @@
 import { useParams } from "@solidjs/router";
-import { createSignal, For, Match, onMount, Show, Switch } from "solid-js";
+import { createSignal, For, Match, onMount, Show, Switch, createMemo } from "solid-js";
 import { api } from "../../api/client";
 import StepperBar from "../../components/workspace/StepperBar";
 import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
@@ -9,7 +9,16 @@ import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
 import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
 import ModelCallExecutor from "../../components/workspace/nodes/ModelCallExecutor";
 import RestoreExecutor from "../../components/workspace/nodes/RestoreExecutor";
-import type { DesensitizeConfig, ExportConfig, InputTransformConfig, ModelCallConfig, RestoreConfig, DocumentRuntimeState, NodeExecution } from "@intelliflow/shared";
+import type {
+  DesensitizeConfig,
+  ExportConfig,
+  InputTransformConfig,
+  ModelCallConfig,
+  RestoreConfig,
+  NodeConfig,
+  DocumentRuntimeState,
+  NodeExecution,
+} from "@intelliflow/shared";
 
 type ViewMode = "current" | "history";
 
@@ -24,6 +33,7 @@ export default function DocumentWorkspace() {
   const [expandedHistory, setExpandedHistory] = createSignal<string | null>(null);
   const [actionLoading, setActionLoading] = createSignal(false);
   const [showRollbackDialog, setShowRollbackDialog] = createSignal(false);
+  const [showReexecDialog, setShowReexecDialog] = createSignal<number | null>(null);
   const [showInlineEditor, setShowInlineEditor] = createSignal(false);
   const [savedIndicator, setSavedIndicator] = createSignal(false);
 
@@ -33,14 +43,22 @@ export default function DocumentWorkspace() {
       if (res.data && !("error" in res.data)) {
         setState(res.data as unknown as DocumentRuntimeState);
       } else {
-        setError((res.data as any)?.error ?? "Failed to initialize workspace");
+        setError((res.data as any)?.error ?? "加载工作台失败");
       }
     } catch {
-      setError("Failed to load workspace");
+      setError("加载失败，请重试");
     } finally {
       setLoading(false);
     }
   });
+
+  /** Look up config from workflowNodes by nodeId */
+  const getNodeConfig = (nodeExec: NodeExecution): NodeConfig | undefined => {
+    const s = state();
+    if (!s?.workflowNodes) return undefined;
+    const wfNode = s.workflowNodes.find((n) => n.id === nodeExec.nodeId);
+    return wfNode?.config;
+  };
 
   const currentNode = (): NodeExecution | undefined => {
     const s = state();
@@ -60,6 +78,13 @@ export default function DocumentWorkspace() {
     return s.nodes.filter((n) => n.status === "completed" || n.status === "skipped");
   };
 
+  /** Read-only mode: all nodes completed (no currentNode) */
+  const readOnly = createMemo(() => {
+    const s = state();
+    if (!s) return false;
+    return s.nodes.every((n) => n.status === "completed" || n.status === "skipped");
+  });
+
   /** Extract the main text content from node outputData based on node type */
   function getNodeOutputText(node: NodeExecution): string {
     const data = node.outputData as Record<string, unknown> | null;
@@ -77,7 +102,7 @@ export default function DocumentWorkspace() {
       return Object.values(data.fields as Record<string, string>).join("\n\n");
     }
 
-    // Fallback: try to stringify
+    // Fallback
     return "";
   }
 
@@ -164,6 +189,7 @@ export default function DocumentWorkspace() {
   async function handleRollback(targetStepOrder: number) {
     setActionLoading(true);
     setShowRollbackDialog(false);
+    setShowReexecDialog(null);
     setShowInlineEditor(false);
     try {
       const res = await (api.api.runtime as any)[params.documentId].rollback.post({
@@ -184,9 +210,7 @@ export default function DocumentWorkspace() {
   function isNodeEditable(): boolean {
     const node = currentNode();
     if (!node) return false;
-    // Export nodes are not editable
     if (node.nodeType === "export") return false;
-    // allowEdit defaults to true when not explicitly set to false
     return true;
   }
 
@@ -195,6 +219,87 @@ export default function DocumentWorkspace() {
     const node = currentNode();
     if (!node) return false;
     return !!node.outputData && getNodeOutputText(node).length > 0;
+  }
+
+  /** Render executor with real config from workflowNodes */
+  function renderExecutor(node: NodeExecution) {
+    const config = getNodeConfig(node);
+    if (!config) {
+      return (
+        <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
+          <div class="text-gray-400 text-sm">
+            加载节点配置中...
+          </div>
+        </div>
+      );
+    }
+
+    const isReadOnly = readOnly();
+    const docId = params.documentId;
+    const draftSave = (_data: unknown) => { /* draft saved via executor */ };
+
+    switch (node.nodeType) {
+      case "input_transform":
+        return (
+          <InputTransformExecutor
+            nodeExecution={node}
+            config={config as InputTransformConfig}
+            documentId={docId}
+            onDraftSave={draftSave}
+            readOnly={isReadOnly}
+          />
+        );
+      case "desensitize":
+        return (
+          <DesensitizeExecutor
+            nodeExecution={node}
+            config={config as DesensitizeConfig}
+            documentId={docId}
+            onDraftSave={draftSave}
+            readOnly={isReadOnly}
+          />
+        );
+      case "model_call":
+        return (
+          <ModelCallExecutor
+            nodeExecution={node}
+            config={config as ModelCallConfig}
+            documentId={docId}
+            onDraftSave={draftSave}
+            readOnly={isReadOnly}
+          />
+        );
+      case "restore":
+        return (
+          <RestoreExecutor
+            nodeExecution={node}
+            config={config as RestoreConfig}
+            documentId={docId}
+            onDraftSave={draftSave}
+            readOnly={isReadOnly}
+          />
+        );
+      case "export":
+        return (
+          <ExportExecutor
+            nodeExecution={node}
+            config={config as ExportConfig}
+            documentId={docId}
+            onDraftSave={draftSave}
+            readOnly={isReadOnly}
+          />
+        );
+      default:
+        return (
+          <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
+            <div class="text-gray-400 text-sm mb-2">节点执行器</div>
+            <div class="text-lg font-semibold text-gray-700">{node.nodeLabel}</div>
+            <div class="mt-2 inline-flex px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium">
+              {node.nodeType}
+            </div>
+          </div>
+        );
+    }
   }
 
   return (
@@ -215,13 +320,23 @@ export default function DocumentWorkspace() {
         </div>
       </Show>
 
+      {/* Empty state */}
+      <Show when={!loading() && !error() && !state()}>
+        <div class="p-6 text-center">
+          <p class="text-gray-500 text-sm">未找到文档</p>
+        </div>
+      </Show>
+
       {/* Main workspace */}
       <Show when={!loading() && !error() && state()}>
         {(s) => (
           <>
             {/* Header with workflow name */}
             <div class="px-6 pt-4 pb-2">
-              <h1 class="text-lg font-bold text-gray-900">{s().workflowName}</h1>
+              <div class="flex items-center justify-between">
+                <h1 class="text-lg font-bold text-gray-900">{s().workflowName}</h1>
+                <span class="text-xs text-gray-400">文档工作台</span>
+              </div>
             </div>
 
             {/* Stepper bar */}
@@ -237,125 +352,57 @@ export default function DocumentWorkspace() {
             <div class="flex-1 overflow-y-auto p-6">
               <Switch>
                 {/* Viewing completed node history */}
-                <Match when={viewMode() === "history" && viewedNode()}>
-                  <div class="space-y-4">
-                    <div class="flex items-center justify-between">
-                      <h2 class="text-sm font-medium text-gray-700">
-                        History: {viewedNode()!.nodeLabel}
-                      </h2>
-                      <button
-                        type="button"
-                        class="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
-                        onClick={handleBackToCurrent}
-                      >
-                        Back to current
-                      </button>
+                <Match when={viewMode() === "history" ? viewedNode() : undefined}>
+                  {(viewed) => (
+                    <div class="space-y-4">
+                      <div class="flex items-center justify-between">
+                        <h2 class="text-sm font-medium text-gray-700">
+                          历史记录: {viewed().nodeLabel}
+                        </h2>
+                        <button
+                          type="button"
+                          class="text-sm text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer"
+                          onClick={handleBackToCurrent}
+                        >
+                          返回当前节点
+                        </button>
+                      </div>
+                      <NodeHistoryPanel
+                        node={viewed()}
+                        isExpanded={true}
+                        onToggle={() => {}}
+                      />
                     </div>
-                    <NodeHistoryPanel
-                      node={viewedNode()!}
-                      isExpanded={true}
-                      onToggle={() => {}}
-                    />
-                  </div>
+                  )}
                 </Match>
 
                 {/* Current in-progress node */}
-                <Match when={viewMode() === "current" && currentNode()}>
+                <Match when={viewMode() === "current" ? currentNode() : undefined}>
+                  {(curNode) => (
                   <div class="space-y-6">
-                    {/* Node executor -- route by nodeType */}
-                    <Switch
-                      fallback={
-                        <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
-                          <div class="text-gray-400 text-sm mb-2">Node Executor</div>
-                          <div class="text-lg font-semibold text-gray-700">
-                            {currentNode()?.nodeLabel}
-                          </div>
-                          <div class="mt-2 inline-flex px-3 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-medium">
-                            {currentNode()?.nodeType}
-                          </div>
-                          <p class="mt-4 text-sm text-gray-400">
-                            Node executor for {currentNode()?.nodeType} (placeholder)
-                          </p>
-                        </div>
-                      }
-                    >
-                      <Match when={currentNode()?.nodeType === "input_transform"}>
-                        <InputTransformExecutor
-                          nodeExecution={currentNode()!}
-                          config={({} as InputTransformConfig)}
-                          documentId={params.documentId}
-                          onDraftSave={(data) => {
-                            /* draft saved via executor */
-                          }}
-                          readOnly={false}
-                        />
-                      </Match>
-                      <Match when={currentNode()?.nodeType === "desensitize"}>
-                        <DesensitizeExecutor
-                          nodeExecution={currentNode()!}
-                          config={({} as DesensitizeConfig)}
-                          documentId={params.documentId}
-                          onDraftSave={(data) => {
-                            /* draft saved via executor */
-                          }}
-                          readOnly={false}
-                        />
-                      </Match>
-                      <Match when={currentNode()?.nodeType === "restore"}>
-                        <RestoreExecutor
-                          nodeExecution={currentNode()!}
-                          config={({} as RestoreConfig)}
-                          documentId={params.documentId}
-                          onDraftSave={(data) => {
-                            /* draft saved via executor */
-                          }}
-                          readOnly={false}
-                        />
-                      </Match>
-                      <Match when={currentNode()?.nodeType === "model_call"}>
-                        <ModelCallExecutor
-                          nodeExecution={currentNode()!}
-                          config={({} as ModelCallConfig)}
-                          documentId={params.documentId}
-                          onDraftSave={(data) => {
-                            /* draft saved via executor */
-                          }}
-                          readOnly={false}
-                        />
-                      </Match>
-                      <Match when={currentNode()?.nodeType === "export"}>
-                        <ExportExecutor
-                          nodeExecution={currentNode()!}
-                          config={({} as ExportConfig)}
-                          documentId={params.documentId}
-                          onDraftSave={(data) => {
-                            /* draft saved via executor */
-                          }}
-                          readOnly={false}
-                        />
-                      </Match>
-                    </Switch>
+                    {/* Node executor -- route by nodeType with real config */}
+                    {renderExecutor(curNode())}
 
                     {/* Inline editor toggle -- shown when node has editable output */}
-                    <Show when={isNodeEditable() && hasOutputToEdit()}>
+                    <Show when={!readOnly() && isNodeEditable() && hasOutputToEdit()}>
                       <div class="space-y-3">
                         <div class="flex items-center gap-3">
                           <button
                             type="button"
-                            class={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                            class={`px-4 py-2 text-sm font-medium rounded-lg transition-colors cursor-pointer ${
                               showInlineEditor()
                                 ? "text-indigo-700 bg-indigo-100 border border-indigo-300"
                                 : "text-gray-600 bg-white border border-gray-300 hover:bg-gray-50"
                             }`}
                             onClick={() => setShowInlineEditor(!showInlineEditor())}
                           >
-                            {showInlineEditor() ? "Close Editor" : "Edit Output"}
+                            {showInlineEditor() ? "关闭编辑器" : "编辑输出"}
                           </button>
 
                           {/* Saved indicator */}
                           <Show when={savedIndicator()}>
                             <span class="text-xs text-green-600 font-medium animate-pulse">
-                              Saved
+                              已自动保存
                             </span>
                           </Show>
                         </div>
@@ -366,7 +413,7 @@ export default function DocumentWorkspace() {
                               content={getNodeOutputText(node())}
                               onChange={handleInlineEditorSave}
                               readOnly={false}
-                              placeholder="Edit node output content..."
+                              placeholder="编辑节点输出内容..."
                             />
                           )}
                         </Show>
@@ -376,7 +423,7 @@ export default function DocumentWorkspace() {
                     {/* Completed node history list */}
                     <Show when={completedNodes().length > 0}>
                       <div class="space-y-2">
-                        <h3 class="text-sm font-medium text-gray-600">Completed Steps</h3>
+                        <h3 class="text-sm font-medium text-gray-600">已完成步骤</h3>
                         <For each={completedNodes()}>
                           {(node) => (
                             <NodeHistoryPanel
@@ -393,80 +440,111 @@ export default function DocumentWorkspace() {
                       </div>
                     </Show>
                   </div>
+                  )}
                 </Match>
 
-                {/* All nodes completed */}
+                {/* All nodes completed -- read-only mode */}
                 <Match when={viewMode() === "current" && !currentNode()}>
-                  <div class="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
-                    <div class="text-green-600 text-lg font-semibold">All steps completed</div>
-                    <p class="mt-2 text-sm text-green-500">
-                      Document generation workflow has finished.
-                    </p>
+                  <div class="space-y-6">
+                    <div class="bg-green-50 border border-green-200 rounded-xl p-8 text-center">
+                      <div class="text-green-600 text-lg font-semibold">所有步骤已完成</div>
+                      <p class="mt-2 text-sm text-green-500">
+                        文档生成流程已结束。
+                      </p>
+                    </div>
+
+                    {/* Show all completed nodes with re-execute option */}
+                    <div class="space-y-2">
+                      <h3 class="text-sm font-medium text-gray-600">执行记录</h3>
+                      <For each={s().nodes}>
+                        {(node, index) => (
+                          <div class="border border-gray-200 rounded-lg bg-white">
+                            <div class="flex items-center justify-between px-4 py-3">
+                              <div class="flex items-center gap-3">
+                                <span class="text-sm font-medium text-gray-800">
+                                  {node.nodeLabel}
+                                </span>
+                                <span class="text-xs text-gray-400">
+                                  {node.status === "completed" ? "已完成" : "已跳过"}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                class="text-xs text-indigo-600 hover:text-indigo-700 font-medium cursor-pointer"
+                                onClick={() => setShowReexecDialog(index())}
+                              >
+                                从此节点重新执行
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </For>
+                    </div>
                   </div>
                 </Match>
               </Switch>
             </div>
 
             {/* Bottom action bar */}
-            <div class="border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-between">
-              {/* Left: rollback */}
-              <div>
-                <Show when={s().currentNodeIndex > 0 && currentNode()}>
-                  <button
-                    type="button"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                    disabled={actionLoading()}
-                    onClick={() => setShowRollbackDialog(true)}
-                  >
-                    Rollback
-                  </button>
-                </Show>
-              </div>
+            <Show when={!readOnly() && currentNode()}>
+              <div class="border-t border-gray-200 bg-white px-6 py-3 flex items-center justify-between">
+                {/* Left: rollback */}
+                <div>
+                  <Show when={s().currentNodeIndex > 0}>
+                    <button
+                      type="button"
+                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
+                      disabled={actionLoading()}
+                      onClick={() => setShowRollbackDialog(true)}
+                    >
+                      回退
+                    </button>
+                  </Show>
+                </div>
 
-              {/* Right: skip + confirm */}
-              <div class="flex items-center gap-3">
-                <Show when={currentNode()}>
+                {/* Right: skip + confirm */}
+                <div class="flex items-center gap-3">
                   {/* Skip button -- server validates skippable flag; shown for all non-export nodes */}
                   <Show when={currentNode()?.nodeType !== "export"}>
                     <button
                       type="button"
-                      class="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+                      class="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 cursor-pointer"
                       disabled={actionLoading()}
                       onClick={handleSkip}
                     >
-                      Skip
+                      跳过此节点
                     </button>
                   </Show>
                   <button
                     type="button"
-                    class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+                    class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 cursor-pointer"
                     disabled={actionLoading()}
                     onClick={handleAdvance}
                   >
-                    {actionLoading() ? "Processing..." : "Confirm / Next"}
+                    {actionLoading() ? "处理中..." : "确认并继续"}
                   </button>
-                </Show>
+                </div>
               </div>
-            </div>
+            </Show>
 
             {/* Rollback dialog */}
             <Show when={showRollbackDialog()}>
               <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
                 <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-                  <h3 class="text-lg font-semibold text-gray-900 mb-4">Roll Back To</h3>
+                  <h3 class="text-lg font-semibold text-gray-900 mb-4">回退到</h3>
                   <p class="text-sm text-gray-500 mb-4">
-                    Select a previous step to roll back to. All steps after it will need re-execution.
+                    选择要回退到的步骤。回退后，该步骤之后的所有步骤将需要重新执行。
                   </p>
                   <div class="space-y-2 max-h-64 overflow-y-auto">
-                    <For each={s().nodes.filter((n, i) => i < s().currentNodeIndex)}>
+                    <For each={s().nodes.filter((_n, i) => i < s().currentNodeIndex)}>
                       {(node) => (
                         <button
                           type="button"
-                          class="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors"
+                          class="w-full text-left px-4 py-3 rounded-lg border border-gray-200 hover:border-indigo-300 hover:bg-indigo-50 transition-colors cursor-pointer"
                           onClick={() => handleRollback(node.stepOrder)}
                         >
                           <span class="text-sm font-medium text-gray-800">
-                            Step {node.stepOrder + 1}: {node.nodeLabel}
+                            步骤 {node.stepOrder + 1}: {node.nodeLabel}
                           </span>
                           <span class="block text-xs text-gray-400 mt-0.5">{node.nodeType}</span>
                         </button>
@@ -476,10 +554,44 @@ export default function DocumentWorkspace() {
                   <div class="mt-4 flex justify-end">
                     <button
                       type="button"
-                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
                       onClick={() => setShowRollbackDialog(false)}
                     >
-                      Cancel
+                      取消
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </Show>
+
+            {/* Re-execute confirmation dialog */}
+            <Show when={showReexecDialog() !== null}>
+              <div class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+                  <h3 class="text-lg font-semibold text-gray-900 mb-4">确认重新执行</h3>
+                  <p class="text-sm text-gray-500 mb-4">
+                    确认重新执行？后续节点状态将被重置。
+                  </p>
+                  <div class="flex justify-end gap-3">
+                    <button
+                      type="button"
+                      class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+                      onClick={() => setShowReexecDialog(null)}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer"
+                      disabled={actionLoading()}
+                      onClick={() => {
+                        const idx = showReexecDialog();
+                        if (idx !== null) {
+                          handleRollback(s().nodes[idx].stepOrder);
+                        }
+                      }}
+                    >
+                      确认重新执行
                     </button>
                   </div>
                 </div>

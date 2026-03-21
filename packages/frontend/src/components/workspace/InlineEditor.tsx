@@ -9,7 +9,7 @@ interface Props {
 
 /** Simple markdown to HTML for preview */
 function markdownToHtml(text: string): string {
-  if (!text) return '<p class="text-gray-400 italic">No content</p>';
+  if (!text) return '<p class="text-gray-400 italic">暂无内容</p>';
 
   let html = text;
 
@@ -163,7 +163,7 @@ export default function InlineEditor(props: Props) {
         <button
           type="button"
           class="p-1.5 rounded hover:bg-gray-200 text-gray-600 text-xs font-bold transition-colors"
-          title="Bold (Ctrl+B)"
+          title="加粗 (Ctrl+B)"
           onClick={() => insertMarkdown("**", "**")}
         >
           B
@@ -171,7 +171,7 @@ export default function InlineEditor(props: Props) {
         <button
           type="button"
           class="p-1.5 rounded hover:bg-gray-200 text-gray-600 text-xs italic transition-colors"
-          title="Italic (Ctrl+I)"
+          title="斜体 (Ctrl+I)"
           onClick={() => insertMarkdown("*", "*")}
         >
           I
@@ -179,7 +179,7 @@ export default function InlineEditor(props: Props) {
         <button
           type="button"
           class="p-1.5 rounded hover:bg-gray-200 text-gray-600 text-xs font-mono transition-colors"
-          title="Code"
+          title="代码"
           onClick={() => insertMarkdown("`", "`")}
         >
           {"<>"}
@@ -191,7 +191,7 @@ export default function InlineEditor(props: Props) {
         <button
           type="button"
           class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs font-semibold transition-colors"
-          title="Heading 1"
+          title="标题1"
           onClick={() => insertLinePrefix("# ")}
         >
           H1
@@ -199,7 +199,7 @@ export default function InlineEditor(props: Props) {
         <button
           type="button"
           class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs font-semibold transition-colors"
-          title="Heading 2"
+          title="标题2"
           onClick={() => insertLinePrefix("## ")}
         >
           H2
@@ -207,7 +207,7 @@ export default function InlineEditor(props: Props) {
         <button
           type="button"
           class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs font-semibold transition-colors"
-          title="Heading 3"
+          title="标题3"
           onClick={() => insertLinePrefix("### ")}
         >
           H3
@@ -219,21 +219,21 @@ export default function InlineEditor(props: Props) {
         <button
           type="button"
           class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs transition-colors"
-          title="Bullet list"
+          title="无序列表"
           onClick={() => insertLinePrefix("- ")}
         >
-          List
+          列表
         </button>
         <button
           type="button"
           class="px-1.5 py-1 rounded hover:bg-gray-200 text-gray-600 text-xs transition-colors"
-          title="Numbered list"
+          title="有序列表"
           onClick={() => insertLinePrefix("1. ")}
         >
           1.
         </button>
 
-        {/* View mode toggle — right side */}
+        {/* View mode toggle -- right side */}
         <div class="ml-auto flex items-center gap-1">
           <button
             type="button"
@@ -244,7 +244,7 @@ export default function InlineEditor(props: Props) {
             }`}
             onClick={() => setViewMode("edit")}
           >
-            Edit
+            编辑
           </button>
           <button
             type="button"
@@ -255,7 +255,7 @@ export default function InlineEditor(props: Props) {
             }`}
             onClick={() => setViewMode("split")}
           >
-            Split
+            分栏
           </button>
           <button
             type="button"
@@ -266,7 +266,7 @@ export default function InlineEditor(props: Props) {
             }`}
             onClick={() => setViewMode("preview")}
           >
-            Preview
+            预览
           </button>
         </div>
       </div>
@@ -293,7 +293,7 @@ export default function InlineEditor(props: Props) {
                 insertMarkdown("*", "*");
               }
             }}
-            placeholder={props.placeholder ?? "Enter Markdown content..."}
+            placeholder={props.placeholder ?? "输入 Markdown 内容..."}
             class="w-full min-h-[200px] max-h-[60vh] p-4 text-sm font-mono text-gray-800 bg-white border-0 focus:outline-none resize-y"
           />
         </Show>

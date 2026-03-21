@@ -1,5 +1,5 @@
 import { For } from "solid-js";
-import type { NodeExecution } from "@intelliflow/shared";
+import type { NodeExecution, WorkflowNodeType } from "@intelliflow/shared";
 
 type StepperBarProps = {
   nodes: NodeExecution[];
@@ -13,6 +13,22 @@ const statusStyles: Record<string, string> = {
   pending: "bg-gray-300 text-gray-600",
   skipped: "bg-yellow-400 text-white",
   failed: "bg-red-500 text-white",
+};
+
+const statusLabels: Record<string, string> = {
+  completed: "已完成",
+  in_progress: "执行中",
+  pending: "待执行",
+  skipped: "已跳过",
+  failed: "失败",
+};
+
+const nodeTypeLabels: Record<WorkflowNodeType, string> = {
+  input_transform: "输入转换",
+  desensitize: "信息脱敏",
+  model_call: "模型调用",
+  restore: "信息恢复",
+  export: "文件导出",
 };
 
 const lineStyles: Record<string, string> = {
@@ -30,8 +46,9 @@ export default function StepperBar(props: StepperBarProps) {
         {(node, index) => (
           <div class="flex items-start flex-shrink-0">
             {/* Step circle + label */}
-            <div
-              class="flex flex-col items-center cursor-pointer group"
+            <button
+              type="button"
+              class="flex flex-col items-center cursor-pointer group bg-transparent border-0 p-0"
               onClick={() => {
                 if (node.status === "completed" || node.status === "skipped") {
                   props.onNodeClick(index());
@@ -46,6 +63,7 @@ export default function StepperBar(props: StepperBarProps) {
                     ? "group-hover:scale-110"
                     : ""
                 }`}
+                title={`${statusLabels[node.status] ?? node.status}`}
               >
                 {index() + 1}
               </div>
@@ -55,11 +73,14 @@ export default function StepperBar(props: StepperBarProps) {
                     ? "text-indigo-700 font-semibold"
                     : "text-gray-500"
                 }`}
-                title={node.nodeLabel}
+                title={`${node.nodeLabel} (${nodeTypeLabels[node.nodeType] ?? node.nodeType})`}
               >
                 {node.nodeLabel}
               </span>
-            </div>
+              <span class="text-[10px] text-gray-400 mt-0.5">
+                {statusLabels[node.status] ?? node.status}
+              </span>
+            </button>
 
             {/* Connecting line */}
             {index() < props.nodes.length - 1 && (

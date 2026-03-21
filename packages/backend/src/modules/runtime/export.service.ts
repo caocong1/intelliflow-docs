@@ -56,7 +56,19 @@ async function resolveContent(
       return output.content;
     }
 
-    // Check model outputs array (model_call node)
+    // Check models Record structure (Phase 12+ format)
+    if (output.models && typeof output.models === "object" && !Array.isArray(output.models)) {
+      const modelsMap = output.models as Record<string, { content: string; status: string }>;
+      const selectedKey = exec.selectedOutputKey;
+      if (selectedKey && modelsMap[selectedKey]?.content) {
+        return modelsMap[selectedKey].content;
+      }
+      // Fallback: first completed model
+      const first = Object.values(modelsMap).find((m) => m.status === "completed" && m.content);
+      if (first?.content) return first.content;
+    }
+
+    // Check model outputs array (legacy format, keep as fallback)
     if (Array.isArray(output.modelOutputs)) {
       const selected = output.selectedOutputKey as string | undefined;
       const modelOutputs = output.modelOutputs as Array<{

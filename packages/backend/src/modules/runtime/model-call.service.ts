@@ -1,38 +1,47 @@
 import { asc, eq, and, inArray } from "drizzle-orm";
 import { db } from "../../db";
-import { desensitizeMappings, models, nodeExecutions, providers, documents, workflows } from "../../db/schema";
+import { desensitizeMappings, modelCallLogs, models, nodeExecutions, providers, documents, workflows } from "../../db/schema";
 import type { DesensitizeRuleDesc, ModelOutput, NodeExecution, SSEEvent, WorkflowNodeDef } from "@intelliflow/shared";
 
 // ─── Prompt Resolution ──────────────────────────────────────────────────────
 
+/** Result of resolving a prompt template */
+export interface ResolvedPromptResult {
+  resolved: string;
+  mapping: Record<string, string>;
+}
+
 /**
- * Resolve a prompt template by replacing {{nodeLabel.outputName}} with upstream output data
+ * Resolve a prompt template by replacing {{nodeId.outputId}} with upstream output data
  * and appending desensitize rules if present.
  */
 export async function resolvePromptTemplate(
   template: string,
   documentId: string,
-  nodeExecs: Array<{ nodeLabel: string; outputData: Record<string, unknown> | null }>,
+  nodeExecs: Array<{ nodeId: string; nodeLabel: string; outputData: Record<string, unknown> | null }>,
   desensitizeRules: DesensitizeRuleDesc[],
-): Promise<string> {
+): Promise<ResolvedPromptResult> {
   let resolved = template;
+  const mapping: Record<string, string> = {};
 
-  // Replace {{nodeLabel.outputName}} with upstream node output values
+  // Replace {{nodeId.outputId}} with upstream node output values
   resolved = resolved.replace(/\{\{([^}]+)\}\}/g, (_match, varName: string) => {
     const dotIndex = varName.indexOf(".");
     if (dotIndex < 0) return _match;
 
-    const nodeLabel = varName.slice(0, dotIndex).trim();
-    const outputName = varName.slice(dotIndex + 1).trim();
+    const nodeId = varName.slice(0, dotIndex).trim();
+    const outputId = varName.slice(dotIndex + 1).trim();
 
-    // Find matching node execution by label
-    const exec = nodeExecs.find((ne) => ne.nodeLabel === nodeLabel);
+    // Find matching node execution by nodeId
+    const exec = nodeExecs.find((ne) => ne.nodeId === nodeId);
     if (!exec?.outputData) return _match;
 
     // Extract value from outputData
-    const value = exec.outputData[outputName];
+    const value = (exec.outputData as Record<string, unknown>)[outputId];
     if (value === undefined || value === null) return _match;
-    return typeof value === "string" ? value : JSON.stringify(value);
+    const resolvedValue = typeof value === "string" ? value : JSON.stringify(value);
+    mapping[`{{${varName}}}`] = resolvedValue;
+    return resolvedValue;
   });
 
   // Append desensitize rule descriptions if present
@@ -43,7 +52,7 @@ export async function resolvePromptTemplate(
     resolved += `\n\n注意：以下文本中包含已脱敏的占位符，请保留这些占位符不要修改：\n${rulesText}`;
   }
 
-  return resolved;
+  return { resolved, mapping };
 }
 
 // ─── Model Execution ────────────────────────────────────────────────────────
@@ -56,6 +65,8 @@ export async function executeModelCall(
   nodeExecutionId: string,
   modelIds: string[],
   resolvedPrompt: string,
+  promptTemplate?: string,
+  variableMapping?: Record<string, string>,
 ): Promise<ReadableStream<Uint8Array>> {
   // Look up all models + providers
   const modelRows = await db
@@ -116,6 +127,7 @@ export async function executeModelCall(
       // Run all models in parallel
       const results = await Promise.allSettled(
         requestedModels.map(async (model) => {
+          const startTime = Date.now();
           // Send status event
           sendEvent({
             type: "status",
@@ -203,6 +215,24 @@ export async function executeModelCall(
               timestamp: new Date().toISOString(),
             });
 
+            // Log model call
+            await db.insert(modelCallLogs).values({
+              documentId,
+              nodeExecutionId,
+              modelId: model.id,
+              modelName: model.displayName,
+              promptTemplate: promptTemplate ?? null,
+              resolvedPrompt,
+              variableMapping: variableMapping ?? null,
+              temperature: model.temperature,
+              maxTokens: model.maxTokens,
+              responseStatus: "completed",
+              contentLength: fullContent.length,
+              tokenUsage: null,
+              duration: Date.now() - startTime,
+              errorMessage: null,
+            });
+
             return { modelId: model.id, content: fullContent, status: "completed" as const };
           } catch (err: unknown) {
             const errorMessage = err instanceof Error ? err.message : String(err);
@@ -212,6 +242,25 @@ export async function executeModelCall(
               data: errorMessage,
               timestamp: new Date().toISOString(),
             });
+
+            // Log failed model call
+            await db.insert(modelCallLogs).values({
+              documentId,
+              nodeExecutionId,
+              modelId: model.id,
+              modelName: model.displayName,
+              promptTemplate: promptTemplate ?? null,
+              resolvedPrompt,
+              variableMapping: variableMapping ?? null,
+              temperature: model.temperature,
+              maxTokens: model.maxTokens,
+              responseStatus: "failed",
+              contentLength: fullContent.length || null,
+              tokenUsage: null,
+              duration: Date.now() - startTime,
+              errorMessage,
+            });
+
             return { modelId: model.id, content: fullContent, status: "failed" as const, errorMessage };
           }
         }),
@@ -255,6 +304,8 @@ export async function retryModelCall(
   nodeExecutionId: string,
   modelId: string,
   resolvedPrompt: string,
+  promptTemplate?: string,
+  variableMapping?: Record<string, string>,
 ): Promise<ReadableStream<Uint8Array>> {
   // Get current outputData to preserve other models
   const [exec] = await db
@@ -289,6 +340,8 @@ export async function retryModelCall(
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
+      const startTime = Date.now();
+
       function sendEvent(event: SSEEvent) {
         const line = `data: ${JSON.stringify(event)}\n\n`;
         try {
@@ -386,6 +439,24 @@ export async function retryModelCall(
           content: fullContent,
           status: "completed",
         };
+
+        // Log retry model call
+        await db.insert(modelCallLogs).values({
+          documentId,
+          nodeExecutionId,
+          modelId: model.id,
+          modelName: model.displayName,
+          promptTemplate: promptTemplate ?? null,
+          resolvedPrompt,
+          variableMapping: variableMapping ?? null,
+          temperature: model.temperature,
+          maxTokens: model.maxTokens,
+          responseStatus: "completed",
+          contentLength: fullContent.length,
+          tokenUsage: null,
+          duration: Date.now() - startTime,
+          errorMessage: null,
+        });
       } catch (err: unknown) {
         const errorMessage = err instanceof Error ? err.message : String(err);
         sendEvent({
@@ -402,6 +473,24 @@ export async function retryModelCall(
           status: "failed",
           errorMessage,
         };
+
+        // Log failed retry model call
+        await db.insert(modelCallLogs).values({
+          documentId,
+          nodeExecutionId,
+          modelId: model.id,
+          modelName: model.displayName,
+          promptTemplate: promptTemplate ?? null,
+          resolvedPrompt,
+          variableMapping: variableMapping ?? null,
+          temperature: model.temperature,
+          maxTokens: model.maxTokens,
+          responseStatus: "failed",
+          contentLength: fullContent.length || null,
+          tokenUsage: null,
+          duration: Date.now() - startTime,
+          errorMessage,
+        });
       }
 
       await db

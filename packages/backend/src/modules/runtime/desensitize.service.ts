@@ -238,6 +238,8 @@ export async function confirmDesensitization(
     nodeType: updated.nodeType as NodeExecution["nodeType"],
     status: updated.status,
     stepOrder: updated.stepOrder,
+    executionRound: updated.executionRound,
+    isCurrent: updated.isCurrent,
     inputData: updated.inputData as Record<string, unknown> | null,
     outputData: updated.outputData as Record<string, unknown> | null,
     selectedOutputKey: updated.selectedOutputKey,

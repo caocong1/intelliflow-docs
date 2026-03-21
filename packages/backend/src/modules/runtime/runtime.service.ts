@@ -1,4 +1,6 @@
-import { and, asc, eq, gt, sql } from "drizzle-orm";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
+import { and, asc, eq, gt, max, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { createVersionSnapshot } from "../versions/versions.service";
@@ -81,7 +83,7 @@ export async function initDocumentExecution(
   const existing = await db
     .select()
     .from(nodeExecutions)
-    .where(eq(nodeExecutions.documentId, documentId))
+    .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
     .orderBy(asc(nodeExecutions.stepOrder));
 
   if (existing.length > 0) {
@@ -127,6 +129,12 @@ export async function initDocumentExecution(
 
   const inserted = await db.insert(nodeExecutions).values(values).returning();
 
+  // Create working directory on disk
+  const workDir = join(process.cwd(), "data", "workspaces", documentId);
+  await mkdir(join(workDir, "input"), { recursive: true });
+  await mkdir(join(workDir, "output"), { recursive: true });
+  await mkdir(join(workDir, "export"), { recursive: true });
+
   // Update document status to in_progress if currently draft
   if (doc.status === "draft") {
     await db
@@ -144,7 +152,7 @@ export async function getDocumentRuntimeState(
   const executions = await db
     .select()
     .from(nodeExecutions)
-    .where(eq(nodeExecutions.documentId, documentId))
+    .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
     .orderBy(asc(nodeExecutions.stepOrder));
 
   if (executions.length === 0) return null;
@@ -183,7 +191,7 @@ export async function advanceNode(
     );
   }
 
-  // Find next pending node by stepOrder
+  // Find next pending node by stepOrder (only current)
   const nextNodes = await db
     .select()
     .from(nodeExecutions)
@@ -191,6 +199,7 @@ export async function advanceNode(
       and(
         eq(nodeExecutions.documentId, documentId),
         eq(nodeExecutions.status, "pending"),
+        eq(nodeExecutions.isCurrent, true),
       ),
     )
     .orderBy(asc(nodeExecutions.stepOrder))
@@ -230,7 +239,7 @@ export async function advanceNode(
   const executions = await db
     .select()
     .from(nodeExecutions)
-    .where(eq(nodeExecutions.documentId, documentId))
+    .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
     .orderBy(asc(nodeExecutions.stepOrder));
 
   return buildRuntimeState(documentId, executions);
@@ -243,27 +252,51 @@ export async function rollbackToNode(
 ): Promise<DocumentRuntimeState> {
   const now = new Date();
 
-  // Set target node to in_progress
-  await db
-    .update(nodeExecutions)
-    .set({ status: "in_progress", startedAt: now, completedAt: null, updatedAt: now })
+  // Get current executions at target and downstream
+  const affectedRows = await db
+    .select()
+    .from(nodeExecutions)
     .where(
       and(
         eq(nodeExecutions.documentId, documentId),
-        eq(nodeExecutions.stepOrder, targetStepOrder),
+        eq(nodeExecutions.isCurrent, true),
       ),
-    );
+    )
+    .orderBy(asc(nodeExecutions.stepOrder));
 
-  // Set all nodes after target to pending (keep outputData for review)
-  await db
-    .update(nodeExecutions)
-    .set({ status: "pending", startedAt: null, completedAt: null, updatedAt: now })
-    .where(
-      and(
-        eq(nodeExecutions.documentId, documentId),
-        gt(nodeExecutions.stepOrder, targetStepOrder),
-      ),
-    );
+  const toRollback = affectedRows.filter((r) => r.stepOrder >= targetStepOrder);
+
+  if (toRollback.length === 0) {
+    throw new Error("No nodes found to rollback");
+  }
+
+  // Find max execution round among affected rows
+  const maxRound = Math.max(...toRollback.map((r) => r.executionRound));
+  const newRound = maxRound + 1;
+
+  // Mark old rows as not current
+  const oldIds = toRollback.map((r) => r.id);
+  for (const id of oldIds) {
+    await db
+      .update(nodeExecutions)
+      .set({ isCurrent: false, updatedAt: now })
+      .where(eq(nodeExecutions.id, id));
+  }
+
+  // Create new execution rows with incremented round
+  const newValues = toRollback.map((row, index) => ({
+    documentId,
+    nodeId: row.nodeId,
+    nodeLabel: row.nodeLabel,
+    nodeType: row.nodeType,
+    status: index === 0 ? ("in_progress" as const) : ("pending" as const),
+    stepOrder: row.stepOrder,
+    executionRound: newRound,
+    isCurrent: true,
+    startedAt: index === 0 ? now : null,
+  }));
+
+  await db.insert(nodeExecutions).values(newValues);
 
   // Ensure document is in_progress
   await db
@@ -274,7 +307,7 @@ export async function rollbackToNode(
   const executions = await db
     .select()
     .from(nodeExecutions)
-    .where(eq(nodeExecutions.documentId, documentId))
+    .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
     .orderBy(asc(nodeExecutions.stepOrder));
 
   return buildRuntimeState(documentId, executions);
@@ -323,7 +356,7 @@ export async function skipNode(
     .set({ status: "skipped", completedAt: now, updatedAt: now })
     .where(eq(nodeExecutions.id, nodeExecutionId));
 
-  // Advance to next node
+  // Advance to next node (only current)
   const nextNodes = await db
     .select()
     .from(nodeExecutions)
@@ -331,6 +364,7 @@ export async function skipNode(
       and(
         eq(nodeExecutions.documentId, documentId),
         eq(nodeExecutions.status, "pending"),
+        eq(nodeExecutions.isCurrent, true),
       ),
     )
     .orderBy(asc(nodeExecutions.stepOrder))
@@ -352,7 +386,7 @@ export async function skipNode(
   const executions = await db
     .select()
     .from(nodeExecutions)
-    .where(eq(nodeExecutions.documentId, documentId))
+    .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
     .orderBy(asc(nodeExecutions.stepOrder));
 
   return buildRuntimeState(documentId, executions);

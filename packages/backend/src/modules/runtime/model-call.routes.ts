@@ -50,10 +50,11 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         // Resolve prompt
         const allExecs = await getUpstreamNodeExecutions(params.documentId);
         const desensitizeRules = await getUpstreamDesensitizeRules(params.documentId);
-        const resolvedPrompt = await resolvePromptTemplate(
+        const { resolved: resolvedPrompt, mapping: variableMapping } = await resolvePromptTemplate(
           mcConfig.promptTemplate,
           params.documentId,
           allExecs.map((e) => ({
+            nodeId: e.nodeId,
             nodeLabel: e.nodeLabel,
             outputData: e.outputData as Record<string, unknown> | null,
           })),
@@ -66,6 +67,8 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           params.nodeExecutionId,
           modelIds,
           resolvedPrompt,
+          mcConfig.promptTemplate,
+          variableMapping,
         );
 
         return new Response(stream, {
@@ -108,10 +111,11 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         const mcConfig = config as ModelCallConfig;
         const allExecs = await getUpstreamNodeExecutions(params.documentId);
         const desensitizeRules = await getUpstreamDesensitizeRules(params.documentId);
-        const resolvedPrompt = await resolvePromptTemplate(
+        const { resolved: resolvedPrompt, mapping: variableMapping } = await resolvePromptTemplate(
           mcConfig.promptTemplate,
           params.documentId,
           allExecs.map((e) => ({
+            nodeId: e.nodeId,
             nodeLabel: e.nodeLabel,
             outputData: e.outputData as Record<string, unknown> | null,
           })),
@@ -123,6 +127,8 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           params.nodeExecutionId,
           params.modelId,
           resolvedPrompt,
+          mcConfig.promptTemplate,
+          variableMapping,
         );
 
         return new Response(stream, {

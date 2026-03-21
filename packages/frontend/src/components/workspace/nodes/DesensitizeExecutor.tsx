@@ -1,6 +1,6 @@
-import { createSignal, For, Show, onMount } from "solid-js";
-import { api } from "../../../api/client";
 import type { DesensitizeConfig, NodeExecution } from "@intelliflow/shared";
+import { For, Show, createSignal, onMount } from "solid-js";
+import { api } from "../../../api/client";
 
 interface DetectedItem {
   original: string;
@@ -30,7 +30,10 @@ type Phase = "detect" | "review" | "confirmed";
 export default function DesensitizeExecutor(props: Props) {
   // Determine initial phase from existing outputData
   const initialPhase = (): Phase => {
-    if (props.nodeExecution.outputData && (props.nodeExecution.outputData as Record<string, unknown>).text) {
+    if (
+      props.nodeExecution.outputData &&
+      (props.nodeExecution.outputData as Record<string, unknown>).text
+    ) {
       return "confirmed";
     }
     return "detect";
@@ -38,13 +41,16 @@ export default function DesensitizeExecutor(props: Props) {
 
   const [phase, setPhase] = createSignal<Phase>(initialPhase());
   const [inputText, setInputText] = createSignal(
-    (props.nodeExecution.inputData as Record<string, unknown>)?.text as string ?? "",
+    ((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? "",
   );
   const [items, setItems] = createSignal<DetectedItem[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [showManualAdd, setShowManualAdd] = createSignal(false);
-  const [manualForm, setManualForm] = createSignal<ManualAddForm>({ original: "", sensitiveType: "person_name" });
+  const [manualForm, setManualForm] = createSignal<ManualAddForm>({
+    original: "",
+    sensitiveType: "person_name",
+  });
   const [selectedItemIndex, setSelectedItemIndex] = createSignal<number | null>(null);
 
   // Auto-detect on mount when in detect phase with input text
@@ -67,8 +73,12 @@ export default function DesensitizeExecutor(props: Props) {
     setError(null);
 
     try {
-      const res = await (api.api.runtime as any)[props.documentId]
-        .desensitize[props.nodeExecution.id].detect.post({ text });
+      const res = await (
+        api.api.runtime as unknown as Record<
+          string,
+          Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>
+        >
+      )[props.documentId].desensitize[props.nodeExecution.id].detect.post({ text });
 
       if (res.data && !("error" in res.data)) {
         const detected = (res.data as { items: DetectedItem[] }).items.map(
@@ -77,7 +87,7 @@ export default function DesensitizeExecutor(props: Props) {
         setItems(detected);
         setPhase("review");
       } else {
-        setError((res.data as any)?.error ?? "检测失败，请重试");
+        setError((res.data as Record<string, unknown> | undefined)?.error ?? "检测失败，请重试");
       }
     } catch {
       setError("检测失败，请重试");
@@ -90,9 +100,7 @@ export default function DesensitizeExecutor(props: Props) {
 
   function toggleItem(index: number) {
     setItems((prev) =>
-      prev.map((item, i) =>
-        i === index ? { ...item, checked: !item.checked } : item,
-      ),
+      prev.map((item, i) => (i === index ? { ...item, checked: !item.checked } : item)),
     );
   }
 
@@ -133,10 +141,7 @@ export default function DesensitizeExecutor(props: Props) {
       .sort((a, b) => b.startIndex - a.startIndex);
 
     for (const item of checked) {
-      text =
-        text.slice(0, item.startIndex) +
-        item.placeholder +
-        text.slice(item.endIndex);
+      text = text.slice(0, item.startIndex) + item.placeholder + text.slice(item.endIndex);
     }
     return text;
   }
@@ -151,21 +156,25 @@ export default function DesensitizeExecutor(props: Props) {
     setError(null);
 
     try {
-      const res = await (api.api.runtime as any)[props.documentId]
-        .desensitize[props.nodeExecution.id].confirm.post({
-          items: confirmed.map((it) => ({
-            original: it.original,
-            placeholder: it.placeholder,
-            sensitiveType: it.sensitiveType,
-          })),
-          sanitizedText,
-        });
+      const res = await (
+        api.api.runtime as unknown as Record<
+          string,
+          Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>
+        >
+      )[props.documentId].desensitize[props.nodeExecution.id].confirm.post({
+        items: confirmed.map((it) => ({
+          original: it.original,
+          placeholder: it.placeholder,
+          sensitiveType: it.sensitiveType,
+        })),
+        sanitizedText,
+      });
 
       if (res.data && !("error" in res.data)) {
         setPhase("confirmed");
         props.onDraftSave({ text: sanitizedText, mappingCount: confirmed.length });
       } else {
-        setError((res.data as any)?.error ?? "确认失败，请重试");
+        setError((res.data as Record<string, unknown> | undefined)?.error ?? "确认失败，请重试");
       }
     } catch {
       setError("确认失败，请重试");
@@ -191,7 +200,11 @@ export default function DesensitizeExecutor(props: Props) {
 
     for (const item of checked) {
       if (item.startIndex > lastEnd) {
-        parts.push({ text: text.slice(lastEnd, item.startIndex), isHighlight: false, itemIndex: -1 });
+        parts.push({
+          text: text.slice(lastEnd, item.startIndex),
+          isHighlight: false,
+          itemIndex: -1,
+        });
       }
       const originalIndex = items().indexOf(item);
       parts.push({ text: item.original, isHighlight: true, itemIndex: originalIndex });
@@ -205,10 +218,7 @@ export default function DesensitizeExecutor(props: Props) {
     return (
       <For each={parts}>
         {(part) => (
-          <Show
-            when={part.isHighlight}
-            fallback={<span>{part.text}</span>}
-          >
+          <Show when={part.isHighlight} fallback={<span>{part.text}</span>}>
             <span
               class={`px-0.5 rounded cursor-pointer transition-colors ${
                 selectedItemIndex() === part.itemIndex
@@ -267,8 +277,10 @@ export default function DesensitizeExecutor(props: Props) {
   // ─── Read-only / confirmed mode ────────────────────────────────────────────
 
   if (props.readOnly || phase() === "confirmed") {
-    const outputText = (props.nodeExecution.outputData as Record<string, unknown>)?.text as string ?? "";
-    const mappingCount = (props.nodeExecution.outputData as Record<string, unknown>)?.mappingCount as number ?? 0;
+    const outputText =
+      ((props.nodeExecution.outputData as Record<string, unknown>)?.text as string) ?? "";
+    const mappingCount =
+      ((props.nodeExecution.outputData as Record<string, unknown>)?.mappingCount as number) ?? 0;
 
     return (
       <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -354,7 +366,9 @@ export default function DesensitizeExecutor(props: Props) {
                     {inputText()}
                   </div>
                   <Show when={!inputText().trim()}>
-                    <p class="text-sm text-gray-400 text-center py-4">暂无输入文本，请等待上游节点完成</p>
+                    <p class="text-sm text-gray-400 text-center py-4">
+                      暂无输入文本，请等待上游节点完成
+                    </p>
                   </Show>
                 </div>
               </Show>
@@ -418,7 +432,8 @@ export default function DesensitizeExecutor(props: Props) {
                 {/* Status summary */}
                 <div class="px-3 py-2 rounded-lg bg-amber-50 border border-amber-100 text-sm text-amber-700">
                   <Show when={items().length > 0} fallback={<span>未检测到敏感信息</span>}>
-                    已检测到 {items().length} 条敏感信息，已勾选 {items().filter((it) => it.checked).length} 条
+                    已检测到 {items().length} 条敏感信息，已勾选{" "}
+                    {items().filter((it) => it.checked).length} 条
                   </Show>
                 </div>
 
@@ -430,13 +445,20 @@ export default function DesensitizeExecutor(props: Props) {
                       placeholder="输入需要脱敏的文本..."
                       class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       value={manualForm().original}
-                      onInput={(e) => setManualForm((prev) => ({ ...prev, original: e.currentTarget.value }))}
+                      onInput={(e) =>
+                        setManualForm((prev) => ({ ...prev, original: e.currentTarget.value }))
+                      }
                     />
                     <div class="flex gap-2">
                       <select
                         class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                         value={manualForm().sensitiveType}
-                        onChange={(e) => setManualForm((prev) => ({ ...prev, sensitiveType: e.currentTarget.value }))}
+                        onChange={(e) =>
+                          setManualForm((prev) => ({
+                            ...prev,
+                            sensitiveType: e.currentTarget.value,
+                          }))
+                        }
                         aria-label="敏感信息类型"
                       >
                         <option value="person_name">姓名</option>
@@ -487,7 +509,9 @@ export default function DesensitizeExecutor(props: Props) {
                             <span class="text-sm font-mono text-gray-700 truncate">
                               {maskOriginal(item.original)}
                             </span>
-                            <span class={`text-xs px-1.5 py-0.5 rounded-full font-medium ${typeBadgeColor(item.sensitiveType)}`}>
+                            <span
+                              class={`text-xs px-1.5 py-0.5 rounded-full font-medium ${typeBadgeColor(item.sensitiveType)}`}
+                            >
                               {getTypeLabel(item.sensitiveType)}
                             </span>
                           </div>
@@ -508,9 +532,10 @@ export default function DesensitizeExecutor(props: Props) {
                     disabled={loading() || items().filter((it) => it.checked).length === 0}
                     onClick={handleConfirm}
                   >
-                    <Show when={loading()} fallback={
-                      <>确认脱敏（{items().filter((it) => it.checked).length} 项）</>
-                    }>
+                    <Show
+                      when={loading()}
+                      fallback={<>确认脱敏（{items().filter((it) => it.checked).length} 项）</>}
+                    >
                       正在确认...
                     </Show>
                   </button>

@@ -1,5 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
-import type { InputTransformConfig, NodeExecution, FormFieldDef } from "@intelliflow/shared";
+import type { FormFieldDef, InputTransformConfig, NodeExecution } from "@intelliflow/shared";
+import { For, Show, createSignal } from "solid-js";
 
 interface UploadedFile {
   fileId: string;
@@ -82,9 +82,7 @@ export default function InputTransformExecutor(props: Props) {
   }
 
   function handleParsedTextEdit(fileId: string, newText: string) {
-    setFiles((prev) =>
-      prev.map((f) => (f.fileId === fileId ? { ...f, parsedText: newText } : f)),
-    );
+    setFiles((prev) => prev.map((f) => (f.fileId === fileId ? { ...f, parsedText: newText } : f)));
     scheduleDraftSave();
   }
 
@@ -164,9 +162,7 @@ export default function InputTransformExecutor(props: Props) {
     } catch (err) {
       const message = err instanceof Error ? err.message : "上传失败";
       setFiles((prev) =>
-        prev.map((f) =>
-          f.fileId === tempId ? { ...f, uploading: false, error: message } : f,
-        ),
+        prev.map((f) => (f.fileId === tempId ? { ...f, uploading: false, error: message } : f)),
       );
     }
   }
@@ -243,19 +239,21 @@ export default function InputTransformExecutor(props: Props) {
   }
 
   const acceptedTypes = () =>
-    (props.config?.acceptedFileTypes ?? [".docx", ".pdf", ".txt", ".png", ".jpg", ".mp3", ".mp4"]).join(",");
+    (
+      props.config?.acceptedFileTypes ?? [".docx", ".pdf", ".txt", ".png", ".jpg", ".mp3", ".mp4"]
+    ).join(",");
 
   // Render form field based on type
   function renderField(field: FormFieldDef) {
     if (field.type === "text") {
       return (
-        <div class="space-y-1.5">
-          <label class="block text-sm font-medium text-gray-700">
+        <label class="block space-y-1.5">
+          <span class="block text-sm font-medium text-gray-700">
             {field.label}
             <Show when={field.required}>
               <span class="text-red-500 ml-0.5">*</span>
             </Show>
-          </label>
+          </span>
           <input
             type="text"
             value={formData()[field.id] ?? ""}
@@ -264,19 +262,19 @@ export default function InputTransformExecutor(props: Props) {
             class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 transition-colors"
             placeholder={`请输入${field.label}`}
           />
-        </div>
+        </label>
       );
     }
 
     if (field.type === "textarea") {
       return (
-        <div class="space-y-1.5">
-          <label class="block text-sm font-medium text-gray-700">
+        <label class="block space-y-1.5">
+          <span class="block text-sm font-medium text-gray-700">
             {field.label}
             <Show when={field.required}>
               <span class="text-red-500 ml-0.5">*</span>
             </Show>
-          </label>
+          </span>
           <textarea
             value={formData()[field.id] ?? ""}
             onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
@@ -285,7 +283,7 @@ export default function InputTransformExecutor(props: Props) {
             class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 resize-y transition-colors"
             placeholder={`请输入${field.label}`}
           />
-        </div>
+        </label>
       );
     }
 
@@ -294,7 +292,8 @@ export default function InputTransformExecutor(props: Props) {
   }
 
   const hasFileFields = () =>
-    props.config?.allowFileUpload || (props.config?.formFields ?? []).some((f) => f.type === "file");
+    props.config?.allowFileUpload ||
+    (props.config?.formFields ?? []).some((f) => f.type === "file");
 
   return (
     <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -359,12 +358,8 @@ export default function InputTransformExecutor(props: Props) {
               }}
             >
               <div class="text-gray-400">
-                <p class="text-sm font-medium text-gray-500">
-                  拖拽文件到此处，或点击选择文件
-                </p>
-                <p class="mt-1.5 text-xs text-gray-400">
-                  支持格式：{acceptedTypes()}
-                </p>
+                <p class="text-sm font-medium text-gray-500">拖拽文件到此处，或点击选择文件</p>
+                <p class="mt-1.5 text-xs text-gray-400">支持格式：{acceptedTypes()}</p>
               </div>
               <input
                 id="file-input-transform"
@@ -397,7 +392,9 @@ export default function InputTransformExecutor(props: Props) {
                           {file.originalName.split(".").pop()?.toUpperCase()?.slice(0, 3) ?? "?"}
                         </div>
                         <div class="min-w-0">
-                          <p class="text-sm font-medium text-gray-800 truncate">{file.originalName}</p>
+                          <p class="text-sm font-medium text-gray-800 truncate">
+                            {file.originalName}
+                          </p>
                           <Show when={file.fileSize > 0}>
                             <p class="text-xs text-gray-400">{formatFileSize(file.fileSize)}</p>
                           </Show>
@@ -469,9 +466,7 @@ export default function InputTransformExecutor(props: Props) {
                         </p>
                         <textarea
                           value={file.parsedText}
-                          onInput={(e) =>
-                            handleParsedTextEdit(file.fileId, e.currentTarget.value)
-                          }
+                          onInput={(e) => handleParsedTextEdit(file.fileId, e.currentTarget.value)}
                           disabled={props.readOnly}
                           rows={6}
                           aria-label={`${file.originalName} 解析内容`}

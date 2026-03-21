@@ -1,8 +1,26 @@
-import { createSignal, onMount, Show } from "solid-js";
+import { createSignal, For, onMount, Show } from "solid-js";
 import { api } from "../../../api/client";
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
 
-type ExportFormat = "word" | "pdf" | "markdown" | "ppt";
+type ExportFormat = "word" | "pdf" | "markdown";
+
+const FORMAT_LABELS: Record<ExportFormat, string> = {
+  word: "Word 文档",
+  pdf: "PDF 文件",
+  markdown: "Markdown 文件",
+};
+
+const FORMAT_EXTENSIONS: Record<ExportFormat, string> = {
+  word: ".docx",
+  pdf: ".pdf",
+  markdown: ".md",
+};
+
+const FORMAT_ICONS: Record<ExportFormat, string> = {
+  word: "W",
+  pdf: "P",
+  markdown: "M",
+};
 
 interface Props {
   nodeExecution: NodeExecution;
@@ -12,21 +30,30 @@ interface Props {
   readOnly: boolean;
 }
 
-const FORMAT_OPTIONS: { value: ExportFormat; label: string; ext: string }[] = [
-  { value: "word", label: "Word (.docx)", ext: ".docx" },
-  { value: "pdf", label: "PDF (.pdf)", ext: ".pdf" },
-  { value: "markdown", label: "Markdown (.md)", ext: ".md" },
-  { value: "ppt", label: "PPT (.pptx)", ext: ".pptx" },
-];
-
-function getExtension(format: ExportFormat): string {
-  return FORMAT_OPTIONS.find((f) => f.value === format)?.ext ?? ".md";
-}
-
 export default function ExportExecutor(props: Props) {
-  const defaultFormat = props.config?.format ?? "markdown";
+  // ─── Null guard ──────────────────────────────────────────────────────────
+  if (!props.config) {
+    return (
+      <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
+        <div class="text-gray-400 text-sm">正在加载导出配置...</div>
+      </div>
+    );
+  }
 
-  const [format, setFormat] = createSignal<ExportFormat>(defaultFormat);
+  // Filter out PPT from available formats
+  const availableFormats = () =>
+    ((props.config?.formats ?? ["word", "pdf", "markdown"]) as string[])
+      .filter((f) => f !== "ppt") as ExportFormat[];
+
+  const defaultFormat = () => {
+    const configured = props.config?.defaultFormat;
+    if (configured && configured !== "ppt" && availableFormats().includes(configured as ExportFormat)) {
+      return configured as ExportFormat;
+    }
+    return availableFormats()[0] ?? "markdown";
+  };
+
+  const [format, setFormat] = createSignal<ExportFormat>(defaultFormat());
   const [filename, setFilename] = createSignal("");
   const [previewContent, setPreviewContent] = createSignal("");
   const [previewLoading, setPreviewLoading] = createSignal(true);
@@ -52,7 +79,6 @@ export default function ExportExecutor(props: Props) {
   };
 
   onMount(async () => {
-    // If already exported, show result
     const existing = existingOutput();
     if (existing) {
       setExportResult(existing);
@@ -60,7 +86,6 @@ export default function ExportExecutor(props: Props) {
       return;
     }
 
-    // Fetch preview content
     try {
       const res = await (api.api.runtime as any)[props.documentId].export[
         props.nodeExecution.id
@@ -69,12 +94,12 @@ export default function ExportExecutor(props: Props) {
       if (res.data && !("error" in res.data)) {
         const data = res.data as { content: string; defaultFilename: string };
         setPreviewContent(data.content);
-        setFilename(`${data.defaultFilename}${getExtension(format())}`);
+        setFilename(`${data.defaultFilename}${FORMAT_EXTENSIONS[format()]}`);
       } else {
-        setError((res.data as any)?.error ?? "Failed to load preview");
+        setError((res.data as any)?.error ?? "预览加载失败");
       }
     } catch {
-      setError("Failed to load preview");
+      setError("预览加载失败");
     } finally {
       setPreviewLoading(false);
     }
@@ -82,10 +107,9 @@ export default function ExportExecutor(props: Props) {
 
   function handleFormatChange(newFormat: ExportFormat) {
     setFormat(newFormat);
-    // Update file extension
     const currentName = filename();
     const baseName = currentName.replace(/\.[^.]+$/, "");
-    setFilename(`${baseName}${getExtension(newFormat)}`);
+    setFilename(`${baseName}${FORMAT_EXTENSIONS[newFormat]}`);
   }
 
   async function handleExport() {
@@ -112,14 +136,12 @@ export default function ExportExecutor(props: Props) {
           format: data.format,
           fileSize: data.fileSize,
         });
-
-        // Trigger browser download
         triggerDownload();
       } else {
-        setError((res.data as any)?.error ?? "Export failed");
+        setError((res.data as any)?.error ?? "导出失败，请重试");
       }
     } catch {
-      setError("Export failed");
+      setError("导出失败，请重试");
     } finally {
       setExporting(false);
     }
@@ -157,21 +179,21 @@ export default function ExportExecutor(props: Props) {
       .replace(/\n{2,}/g, '<div class="my-3"></div>');
   }
 
-  // ─── Read-only mode (already exported) ─────────────────────────────────────
+  // ─── Read-only mode (already exported) ──────────────────────────────────
 
   if (props.readOnly && existingOutput()) {
     const result = existingOutput()!;
     return (
       <div class="bg-white border border-gray-200 rounded-xl p-6">
-        <h2 class="text-sm font-medium text-gray-700 mb-4">Export Complete</h2>
+        <h2 class="text-sm font-medium text-gray-700 mb-4">导出完成</h2>
         <div class="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
           <div class="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-600 text-lg font-bold">
-            {result.format === "word" ? "W" : result.format === "pdf" ? "P" : "M"}
+            {FORMAT_ICONS[result.format as ExportFormat] ?? "F"}
           </div>
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-gray-900 truncate">{result.filename}</p>
             <p class="text-xs text-gray-500">
-              {result.format.toUpperCase()} &middot; {formatFileSize(result.fileSize)}
+              {FORMAT_LABELS[result.format as ExportFormat] ?? result.format.toUpperCase()} &middot; {formatFileSize(result.fileSize)}
             </p>
           </div>
           <button
@@ -179,72 +201,84 @@ export default function ExportExecutor(props: Props) {
             class="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
             onClick={triggerDownload}
           >
-            Re-download
+            重新下载
           </button>
         </div>
       </div>
     );
   }
 
-  // ─── Active export mode ────────────────────────────────────────────────────
+  // ─── Active export mode ─────────────────────────────────────────────────
 
   return (
     <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
       {/* Header */}
-      <div class="px-6 py-4 border-b border-gray-100">
-        <h2 class="text-sm font-medium text-gray-700">Export Document</h2>
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-800">文件导出</h2>
+        <div class="inline-flex px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">
+          导出
+        </div>
       </div>
 
       {/* Format selector + filename */}
       <div class="px-6 py-4 border-b border-gray-100 space-y-4">
-        {/* Format toggle */}
+        {/* Format selector */}
         <div>
-          <label class="block text-xs font-medium text-gray-500 mb-2">Export Format</label>
+          <span class="block text-xs font-medium text-gray-500 mb-2">导出格式</span>
           <div class="flex gap-2">
-            {FORMAT_OPTIONS.map((opt) => (
-              <button
-                type="button"
-                class={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                  format() === opt.value
-                    ? "bg-indigo-600 text-white border-indigo-600"
-                    : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-                }`}
-                onClick={() => handleFormatChange(opt.value)}
-                disabled={!!exportResult()}
-              >
-                {opt.label}
-              </button>
-            ))}
+            <For each={availableFormats()}>
+              {(fmt) => (
+                <button
+                  type="button"
+                  class={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
+                    format() === fmt
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+                  }`}
+                  onClick={() => handleFormatChange(fmt)}
+                  disabled={!!exportResult()}
+                >
+                  {FORMAT_LABELS[fmt]}
+                </button>
+              )}
+            </For>
           </div>
         </div>
 
         {/* Filename input */}
         <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1">Filename</label>
-          <input
-            type="text"
-            class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            value={filename()}
-            onInput={(e) => setFilename(e.currentTarget.value)}
-            disabled={!!exportResult()}
-            placeholder="Enter filename..."
-          />
+          <span class="block text-xs font-medium text-gray-500 mb-1">文件名称</span>
+          <div class="flex items-center gap-2">
+            <input
+              type="text"
+              class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              value={filename()}
+              onInput={(e) => setFilename(e.currentTarget.value)}
+              disabled={!!exportResult()}
+              placeholder="请输入文件名..."
+            />
+            <span class="text-xs text-gray-400 whitespace-nowrap">
+              {FORMAT_EXTENSIONS[format()]}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Preview area */}
       <div class="px-6 py-4 border-b border-gray-100">
         <div class="flex items-center justify-between mb-2">
-          <label class="text-xs font-medium text-gray-500">Preview</label>
+          <span class="text-xs font-medium text-gray-500">文件预览</span>
           <Show when={format() !== "markdown"}>
             <span class="text-xs text-gray-400">
-              Actual export format: {format() === "word" ? "Word (.docx)" : "PDF (.pdf)"}
+              实际导出格式：{FORMAT_LABELS[format()]}
             </span>
           </Show>
         </div>
 
         <Show when={previewLoading()}>
-          <div class="h-48 bg-gray-100 rounded-lg animate-pulse" />
+          <div class="h-48 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
+            <span class="text-sm text-gray-400">正在生成预览...</span>
+          </div>
         </Show>
 
         <Show when={!previewLoading() && previewContent()}>
@@ -256,7 +290,7 @@ export default function ExportExecutor(props: Props) {
 
         <Show when={!previewLoading() && !previewContent() && !error()}>
           <div class="h-48 flex items-center justify-center text-sm text-gray-400 bg-gray-50 rounded-lg">
-            No content available for preview
+            暂无可预览内容
           </div>
         </Show>
       </div>
@@ -274,12 +308,12 @@ export default function ExportExecutor(props: Props) {
           <div class="px-6 py-4 border-b border-gray-100">
             <div class="flex items-center gap-4 p-4 bg-green-50 rounded-lg border border-green-200">
               <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold">
-                {result().format === "word" ? "W" : result().format === "pdf" ? "P" : "M"}
+                {FORMAT_ICONS[result().format as ExportFormat] ?? "F"}
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-medium text-gray-900 truncate">{result().filename}</p>
                 <p class="text-xs text-green-600">
-                  Export successful &middot; {result().format.toUpperCase()} &middot;{" "}
+                  导出完成 &middot; {FORMAT_LABELS[result().format as ExportFormat] ?? result().format.toUpperCase()} &middot;{" "}
                   {formatFileSize(result().fileSize)}
                 </p>
               </div>
@@ -288,7 +322,7 @@ export default function ExportExecutor(props: Props) {
                 class="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors"
                 onClick={triggerDownload}
               >
-                Download
+                下载文件
               </button>
             </div>
           </div>
@@ -300,11 +334,16 @@ export default function ExportExecutor(props: Props) {
         <div class="px-6 py-4 flex justify-end">
           <button
             type="button"
-            class="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            class="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center gap-2"
             disabled={exporting() || previewLoading() || !filename()}
             onClick={handleExport}
           >
-            {exporting() ? "Exporting..." : "Export & Download"}
+            <Show when={!exporting()}>
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            </Show>
+            {exporting() ? "正在生成..." : "下载文件"}
           </button>
         </div>
       </Show>

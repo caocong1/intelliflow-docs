@@ -64,7 +64,7 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 ### 文档创建与工作台
 
 - [x] **DOC-01**: 用户可在项目内从空白创建文档（选择文档类型→选择流程→填写标题）
-- [ ] **DOC-02**: 创建文档时系统自动在服务器创建工作目录
+- [x] **DOC-02**: 创建文档时系统自动在服务器创建工作目录
 - [x] **DOC-03**: 工作台展示流程进度导航栏（已完成/进行中/待执行状态标记）
 - [x] **DOC-04**: 工作台展示当前节点操作区（根据节点类型展示对应界面）
 - [x] **DOC-05**: 工作台展示节点历史面板（查看已完成节点的输入输出记录）
@@ -256,7 +256,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FSYS-03 | Phase 4 | Complete |
 | FSYS-04 | Phase 4 | Complete |
 | DOC-01 | Phase 5 | Complete |
-| DOC-02 | Phase 5 | Pending |
+| DOC-02 | Phase 5 | Complete |
 | DOC-03 | Phase 5 | Complete |
 | DOC-04 | Phase 5 | Complete |
 | DOC-05 | Phase 5 | Complete |

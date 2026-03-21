@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-last_updated: "2026-03-21T12:00:00Z"
+last_updated: "2026-03-21T06:50:00Z"
 progress:
   total_phases: 13
   completed_phases: 12
-  total_plans: 37
-  completed_plans: 37
+  total_plans: 45
+  completed_plans: 38
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 12: Workflow Editor Fixes & Config Panel Alignment
+**Current focus:** Phase 13: Document Runtime Refactor (Align Phase 12)
 
 ## Current Position
 
-Phase: 12 of 12 (Workflow Editor Fixes & Config Panel Alignment)
-Plan: 7 of 7 in current phase (12-06 complete)
-Status: Complete
-Last activity: 2026-03-20 — Completed 12-06 (Visual Polish: Edge Animation, Alignment Guides, Node Cards)
+Phase: 13 of 13 (Document Runtime Refactor — Align Phase 12)
+Plan: 2 of 8 in current phase (13-01 complete)
+Status: In Progress
+Last activity: 2026-03-21 — Completed 13-01 (Backend Data Flow Fixes)
 
-Progress: [██████████] 100% (37/37 plans)
+Progress: [████████░░] 84% (38/45 plans)
 
 ## Performance Metrics
 
@@ -86,6 +86,7 @@ Progress: [██████████] 100% (37/37 plans)
 | Phase 12 P03 | 8min | 2 tasks | 5 files |
 | Phase 12 P05 | 7min | 2 tasks | 8 files |
 | Phase 12 P06 | 15min | 3 tasks | 12 files |
+| Phase 13 P01 | 6min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -189,6 +190,9 @@ Recent decisions affecting current work:
 - [Phase 12]: [12-03] Left-click canvas: drag=rubber-band, click=deselect (5px threshold); selection store separate from flow store
 - [Phase 12]: [12-05] Snapshot-based undo/redo with structuredClone; pushes on state-changing ops only (not every drag pixel)
 - [Phase 12]: [12-05] 1.5s debounced autosave with in-flight queue replaces manual save button; validation status resets to unvalidated after each save
+- [13-01] resolvePromptTemplate returns { resolved, mapping } tuple for model call logging
+- [13-01] rollbackToNode creates new versioned rows (isCurrent=true, executionRound=MAX+1) instead of mutating existing rows
+- [13-01] buildRuntimeState filters by isCurrent=true and includes workflowNodes from workflow JOIN
 
 ### Roadmap Evolution
 
@@ -205,5 +209,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Phase 13 context gathered — ready for /gsd:plan-phase 13
-Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-CONTEXT.md
+Stopped at: Completed 13-01-PLAN.md
+Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-01-SUMMARY.md

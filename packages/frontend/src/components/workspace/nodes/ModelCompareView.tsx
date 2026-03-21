@@ -1,5 +1,5 @@
-import { createSignal, For, Show } from "solid-js";
 import type { ModelOutput } from "@intelliflow/shared";
+import { For, Show, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 
 interface Props {
@@ -13,7 +13,12 @@ type CompareViewMode = "markdown" | "source";
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
   pending: { label: "等待中", bg: "bg-gray-100", text: "text-gray-600", dot: "bg-gray-400" },
-  streaming: { label: "生成中", bg: "bg-yellow-100", text: "text-yellow-700", dot: "bg-yellow-500" },
+  streaming: {
+    label: "生成中",
+    bg: "bg-yellow-100",
+    text: "text-yellow-700",
+    dot: "bg-yellow-500",
+  },
   completed: { label: "已完成", bg: "bg-green-100", text: "text-green-700", dot: "bg-green-500" },
   failed: { label: "失败", bg: "bg-red-100", text: "text-red-700", dot: "bg-red-500" },
 };
@@ -25,8 +30,12 @@ export default function ModelCompareView(props: Props) {
   function statusBadge(status: ModelOutput["status"]) {
     const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
     return (
-      <span class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-        <span class={`w-1.5 h-1.5 rounded-full ${config.dot} ${status === "streaming" ? "animate-ping" : ""}`} />
+      <span
+        class={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}
+      >
+        <span
+          class={`w-1.5 h-1.5 rounded-full ${config.dot} ${status === "streaming" ? "animate-ping" : ""}`}
+        />
         {config.label}
       </span>
     );
@@ -77,15 +86,16 @@ export default function ModelCompareView(props: Props) {
       </div>
 
       {/* Columns — horizontal scroll if >2 models */}
-      <div
-        class="flex gap-4 overflow-x-auto pb-2"
-        style={{ "min-width": "0" }}
-      >
+      <div class="flex gap-4 overflow-x-auto pb-2" style={{ "min-width": "0" }}>
         <For each={modelList()}>
           {(model) => (
             <div
               class="flex-shrink-0 space-y-2"
-              style={{ "min-width": "320px", "max-width": "50%", flex: modelList().length <= 2 ? "1 1 0%" : "0 0 45%" }}
+              style={{
+                "min-width": "320px",
+                "max-width": "50%",
+                flex: modelList().length <= 2 ? "1 1 0%" : "0 0 45%",
+              }}
             >
               {/* Column header: model name + status */}
               <div class="flex items-center justify-between px-1">
@@ -111,7 +121,9 @@ export default function ModelCompareView(props: Props) {
                   fallback={
                     <div class="flex items-center justify-center h-full min-h-[200px]">
                       <span class="text-sm text-gray-400">
-                        {model.status === "failed" ? (model.errorMessage ?? "生成失败") : "等待生成结果..."}
+                        {model.status === "failed"
+                          ? (model.errorMessage ?? "生成失败")
+                          : "等待生成结果..."}
                       </span>
                     </div>
                   }
@@ -134,9 +146,7 @@ export default function ModelCompareView(props: Props) {
 
               {/* Character count footer */}
               <Show when={model.content}>
-                <div class="text-xs text-gray-400 text-right px-1">
-                  {model.content.length} 字符
-                </div>
+                <div class="text-xs text-gray-400 text-right px-1">{model.content.length} 字符</div>
               </Show>
             </div>
           )}

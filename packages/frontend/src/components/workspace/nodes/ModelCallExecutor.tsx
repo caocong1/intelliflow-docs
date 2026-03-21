@@ -1,5 +1,5 @@
-import { createSignal, createEffect, For, Match, Show, Switch, onCleanup } from "solid-js";
 import type { ModelCallConfig, ModelOutput, NodeExecution, SSEEvent } from "@intelliflow/shared";
+import { For, Match, Show, Switch, createEffect, createSignal, onCleanup } from "solid-js";
 import ModelCompareView from "./ModelCompareView";
 
 interface Props {
@@ -348,7 +348,9 @@ export default function ModelCallExecutor(props: Props) {
 
   function allCompleted(): boolean {
     const outputs = modelList();
-    return outputs.length > 0 && outputs.every((m) => m.status === "completed" || m.status === "failed");
+    return (
+      outputs.length > 0 && outputs.every((m) => m.status === "completed" || m.status === "failed")
+    );
   }
 
   function hasAnyCompleted(): boolean {
@@ -375,7 +377,14 @@ export default function ModelCallExecutor(props: Props) {
       case "completed":
         return (
           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <svg
+              class="w-3 h-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
               <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
             </svg>
             {label}
@@ -384,7 +393,14 @@ export default function ModelCallExecutor(props: Props) {
       case "failed":
         return (
           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <svg
+              class="w-3 h-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
               <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
             {label}
@@ -428,7 +444,10 @@ export default function ModelCallExecutor(props: Props) {
     function inlineFormat(text: string) {
       let result = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
       result = result.replace(/\*(.+?)\*/g, "<em>$1</em>");
-      result = result.replace(/`(.+?)`/g, '<code class="px-1 py-0.5 bg-gray-100 rounded text-sm font-mono">$1</code>');
+      result = result.replace(
+        /`(.+?)`/g,
+        '<code class="px-1 py-0.5 bg-gray-100 rounded text-sm font-mono">$1</code>',
+      );
       return result;
     }
 
@@ -436,15 +455,31 @@ export default function ModelCallExecutor(props: Props) {
       <div class="prose prose-sm max-w-none">
         <For each={elements}>
           {(el) => (
-            <Switch fallback={<p class="text-sm text-gray-800 leading-relaxed" innerHTML={inlineFormat(el.content)} />}>
+            <Switch
+              fallback={
+                <p
+                  class="text-sm text-gray-800 leading-relaxed"
+                  innerHTML={inlineFormat(el.content)}
+                />
+              }
+            >
               <Match when={el.type === "header" && el.level === 1}>
-                <h1 class="text-xl font-bold text-gray-900 mt-4 mb-2" innerHTML={inlineFormat(el.content)} />
+                <h1
+                  class="text-xl font-bold text-gray-900 mt-4 mb-2"
+                  innerHTML={inlineFormat(el.content)}
+                />
               </Match>
               <Match when={el.type === "header" && el.level === 2}>
-                <h2 class="text-lg font-semibold text-gray-900 mt-3 mb-1.5" innerHTML={inlineFormat(el.content)} />
+                <h2
+                  class="text-lg font-semibold text-gray-900 mt-3 mb-1.5"
+                  innerHTML={inlineFormat(el.content)}
+                />
               </Match>
               <Match when={el.type === "header" && (el.level ?? 3) >= 3}>
-                <h3 class="text-base font-medium text-gray-800 mt-2 mb-1" innerHTML={inlineFormat(el.content)} />
+                <h3
+                  class="text-base font-medium text-gray-800 mt-2 mb-1"
+                  innerHTML={inlineFormat(el.content)}
+                />
               </Match>
               <Match when={el.type === "li"}>
                 <div class="flex gap-2 ml-4 text-sm text-gray-800">
@@ -472,9 +507,10 @@ export default function ModelCallExecutor(props: Props) {
   if (props.readOnly) {
     const selected = selectedModelId();
     const output = existingModels()[selected];
-    const content = output?.content
-      ?? ((props.nodeExecution.outputData as Record<string, unknown>)?.selectedContent as string)
-      ?? "";
+    const content =
+      output?.content ??
+      ((props.nodeExecution.outputData as Record<string, unknown>)?.selectedContent as string) ??
+      "";
 
     return (
       <div class="space-y-3">
@@ -499,17 +535,26 @@ export default function ModelCallExecutor(props: Props) {
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-            <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+            <svg
+              class="w-4 h-4 text-indigo-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"
+              />
             </svg>
           </div>
           <div>
             <h3 class="text-sm font-semibold text-gray-800">
               {props.config.displayName ?? "模型调用"}
             </h3>
-            <p class="text-xs text-gray-500">
-              {isMultiModel() ? "多模型对比模式" : "单模型模式"}
-            </p>
+            <p class="text-xs text-gray-500">{isMultiModel() ? "多模型对比模式" : "单模型模式"}</p>
           </div>
         </div>
 
@@ -545,8 +590,19 @@ export default function ModelCallExecutor(props: Props) {
       {/* Error */}
       <Show when={error()}>
         <div class="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm flex items-center gap-2">
-          <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          <svg
+            class="w-4 h-4 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
+            />
           </svg>
           {error()}
         </div>
@@ -564,15 +620,24 @@ export default function ModelCallExecutor(props: Props) {
       <Show when={phase() === "idle" && hasConfiguredModels()}>
         <div class="bg-white border border-gray-200 rounded-xl p-8 text-center">
           <div class="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center mx-auto mb-3">
-            <svg class="w-6 h-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z" />
+            <svg
+              class="w-6 h-6 text-indigo-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"
+              />
             </svg>
           </div>
           <p class="text-sm text-gray-500 mb-1">请选择模型并开始生成</p>
           <p class="text-xs text-gray-400 mb-4">
-            {isMultiModel()
-              ? `将并行调用 ${props.config.modelIds.length} 个模型`
-              : "准备生成内容"}
+            {isMultiModel() ? `将并行调用 ${props.config.modelIds.length} 个模型` : "准备生成内容"}
           </p>
           <button
             type="button"
@@ -612,21 +677,24 @@ export default function ModelCallExecutor(props: Props) {
                 return (
                   <div class="space-y-3">
                     <div class="flex items-center gap-2">
-                      <h4 class="text-sm font-medium text-gray-700">
-                        {model()?.modelDisplayName}
-                      </h4>
+                      <h4 class="text-sm font-medium text-gray-700">{model()?.modelDisplayName}</h4>
                       {statusBadge(model()?.status ?? "pending")}
                     </div>
 
                     <Show when={model()?.status === "failed"}>
                       <div class="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
                         <span class="text-sm text-red-600">
-                          {model()?.errorMessage ? localizeError(model()?.errorMessage ?? "") : "生成失败"}
+                          {model()?.errorMessage
+                            ? localizeError(model()?.errorMessage ?? "")
+                            : "生成失败"}
                         </span>
                         <button
                           type="button"
                           class="px-3 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-                          onClick={() => { const m = model(); if (m) handleRetry(m.modelId); }}
+                          onClick={() => {
+                            const m = model();
+                            if (m) handleRetry(m.modelId);
+                          }}
                         >
                           重试
                         </button>
@@ -695,7 +763,9 @@ export default function ModelCallExecutor(props: Props) {
                     <Show when={model().status === "failed"}>
                       <div class="bg-red-50 border border-red-200 rounded-lg p-3 flex items-center justify-between">
                         <span class="text-sm text-red-600">
-                          {model().errorMessage ? localizeError(model().errorMessage ?? "") : "生成失败"}
+                          {model().errorMessage
+                            ? localizeError(model().errorMessage ?? "")
+                            : "生成失败"}
                         </span>
                         <button
                           type="button"
@@ -755,9 +825,7 @@ export default function ModelCallExecutor(props: Props) {
                       <span class="text-sm font-medium text-gray-800">
                         {model.modelDisplayName}
                       </span>
-                      <span class="ml-2 text-xs text-gray-400">
-                        {model.content.length} 字符
-                      </span>
+                      <span class="ml-2 text-xs text-gray-400">{model.content.length} 字符</span>
                     </div>
                     <Show when={selectedModelId() === model.modelId}>
                       <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium">

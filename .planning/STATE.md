@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-21T06:53:32.076Z"
+last_updated: "2026-03-21T07:01:43.629Z"
 progress:
   total_phases: 13
   completed_phases: 12
   total_plans: 45
-  completed_plans: 39
+  completed_plans: 42
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 13 of 13 (Document Runtime Refactor — Align Phase 12)
-Plan: 3 of 8 in current phase (13-02 complete)
+Plan: 6 of 8 in current phase (13-05 complete)
 Status: In Progress
-Last activity: 2026-03-21 — Completed 13-02 (Workspace Shell Config Wiring & Chinese Localization)
+Last activity: 2026-03-21 — Completed 13-05 (Restore & Export Executor Redesign)
 
-Progress: [████████░░] 87% (39/45 plans)
+Progress: [█████████░] 93% (42/45 plans)
 
 ## Performance Metrics
 
@@ -87,6 +87,8 @@ Progress: [████████░░] 87% (39/45 plans)
 | Phase 12 P05 | 7min | 2 tasks | 8 files |
 | Phase 12 P06 | 15min | 3 tasks | 12 files |
 | Phase 13 P01 | 6min | 2 tasks | 7 files |
+| Phase 13 P05 | 5min | 2 tasks | 2 files |
+| Phase 13 P03 | 5min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -194,6 +196,9 @@ Recent decisions affecting current work:
 - [13-01] rollbackToNode creates new versioned rows (isCurrent=true, executionRound=MAX+1) instead of mutating existing rows
 - [13-01] buildRuntimeState filters by isCurrent=true and includes workflowNodes from workflow JOIN
 - [Phase 13]: getNodeConfig helper lookups config from workflowNodes by nodeId; renderExecutor replaces inline Switch/Match
+- [13-05] ExportConfig.format is singular string; PPT hidden via static availableFormats array rather than filtering config property
+- [13-05] Executor null guards: if (!props.config) return Chinese loading message
+- [Phase 13]: Label wrapping pattern for a11y in dynamic SolidJS form fields
 
 ### Roadmap Evolution
 
@@ -210,5 +215,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-21
-Stopped at: Completed 13-02-PLAN.md
-Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-02-SUMMARY.md
+Stopped at: Completed 13-05-PLAN.md
+Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-05-SUMMARY.md

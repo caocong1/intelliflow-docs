@@ -319,6 +319,8 @@ export interface NodeExecution {
   nodeType: WorkflowNodeType;
   status: NodeExecutionStatus;
   stepOrder: number;
+  executionRound: number;
+  isCurrent: boolean;
   inputData: Record<string, unknown> | null;
   outputData: Record<string, unknown> | null;
   selectedOutputKey: string | null;
@@ -367,10 +369,31 @@ export interface SSEEvent {
   timestamp: string;
 }
 
+/** Model call log entry */
+export interface ModelCallLog {
+  id: string;
+  documentId: string;
+  nodeExecutionId: string;
+  modelId: string;
+  modelName: string;
+  promptTemplate: string;
+  resolvedPrompt: string;
+  variableMapping: Record<string, string>;
+  temperature: number | null;
+  maxTokens: number | null;
+  responseStatus: "completed" | "failed";
+  contentLength: number | null;
+  tokenUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null;
+  duration: number | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 /** Document runtime state (full workspace state for frontend) */
 export interface DocumentRuntimeState {
   documentId: string;
   workflowName: string;
   currentNodeIndex: number;
   nodes: NodeExecution[];
+  workflowNodes: WorkflowNodeDef[];
 }

@@ -15,6 +15,8 @@ function toNodeExecution(row: typeof nodeExecutions.$inferSelect): NodeExecution
     nodeType: row.nodeType as NodeExecution["nodeType"],
     status: row.status,
     stepOrder: row.stepOrder,
+    executionRound: row.executionRound,
+    isCurrent: row.isCurrent,
     inputData: row.inputData as Record<string, unknown> | null,
     outputData: row.outputData as Record<string, unknown> | null,
     selectedOutputKey: row.selectedOutputKey,
@@ -380,20 +382,24 @@ async function buildRuntimeState(
   documentId: string,
   executions: (typeof nodeExecutions.$inferSelect)[],
 ): Promise<DocumentRuntimeState> {
-  // Get workflow name
+  // Get workflow name and nodes
   const docRows = await db
-    .select({ workflowName: workflows.name })
+    .select({ workflowName: workflows.name, nodes: workflows.nodes })
     .from(documents)
     .innerJoin(workflows, eq(documents.workflowId, workflows.id))
     .where(eq(documents.id, documentId))
     .limit(1);
 
   const workflowName = docRows[0]?.workflowName ?? "Unknown";
+  const workflowNodes = (docRows[0]?.nodes as WorkflowNodeDef[]) ?? [];
+
+  // Filter to only current executions
+  const currentExecutions = executions.filter((e) => e.isCurrent);
 
   // Compute currentNodeIndex
-  let currentNodeIndex = executions.length - 1;
-  for (let i = 0; i < executions.length; i++) {
-    if (executions[i].status === "in_progress") {
+  let currentNodeIndex = currentExecutions.length - 1;
+  for (let i = 0; i < currentExecutions.length; i++) {
+    if (currentExecutions[i].status === "in_progress") {
       currentNodeIndex = i;
       break;
     }
@@ -403,6 +409,7 @@ async function buildRuntimeState(
     documentId,
     workflowName,
     currentNodeIndex,
-    nodes: executions.map(toNodeExecution),
+    nodes: currentExecutions.map(toNodeExecution),
+    workflowNodes,
   };
 }

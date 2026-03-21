@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgEnum, pgTable, real, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import type { WorkflowEdgeDef, WorkflowNodeDef } from "@intelliflow/shared";
 
 export const providerTypeEnum = pgEnum("provider_type", ["openai_compatible", "opencode"]);
@@ -183,6 +183,8 @@ export const nodeExecutions = pgTable("node_executions", {
   nodeType: varchar("node_type", { length: 50 }).notNull(),
   status: nodeExecutionStatusEnum("status").default("pending").notNull(),
   stepOrder: integer("step_order").notNull(),
+  executionRound: integer("execution_round").default(1).notNull(),
+  isCurrent: boolean("is_current").default(true).notNull(),
   inputData: jsonb("input_data"),
   outputData: jsonb("output_data"),
   selectedOutputKey: varchar("selected_output_key", { length: 200 }),
@@ -204,6 +206,29 @@ export const desensitizeMappings = pgTable("desensitize_mappings", {
   placeholder: varchar("placeholder", { length: 200 }).notNull(),
   originalValue: varchar("original_value", { length: 2000 }).notNull(),
   sensitiveType: varchar("sensitive_type", { length: 100 }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const modelCallLogs = pgTable("model_call_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  documentId: uuid("document_id")
+    .notNull()
+    .references(() => documents.id),
+  nodeExecutionId: uuid("node_execution_id")
+    .notNull()
+    .references(() => nodeExecutions.id),
+  modelId: uuid("model_id").references(() => models.id),
+  modelName: varchar("model_name", { length: 200 }),
+  promptTemplate: text("prompt_template"),
+  resolvedPrompt: text("resolved_prompt"),
+  variableMapping: jsonb("variable_mapping"),
+  temperature: real("temperature"),
+  maxTokens: integer("max_tokens"),
+  responseStatus: varchar("response_status", { length: 20 }),
+  contentLength: integer("content_length"),
+  tokenUsage: jsonb("token_usage"),
+  duration: integer("duration"),
+  errorMessage: varchar("error_message", { length: 2000 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

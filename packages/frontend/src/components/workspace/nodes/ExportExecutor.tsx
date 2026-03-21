@@ -40,17 +40,15 @@ export default function ExportExecutor(props: Props) {
     );
   }
 
-  // Filter out PPT from available formats
-  const availableFormats = () =>
-    ((props.config?.formats ?? ["word", "pdf", "markdown"]) as string[])
-      .filter((f) => f !== "ppt") as ExportFormat[];
+  // All supported formats (PPT hidden)
+  const availableFormats: ExportFormat[] = ["word", "pdf", "markdown"];
 
-  const defaultFormat = () => {
-    const configured = props.config?.defaultFormat;
-    if (configured && configured !== "ppt" && availableFormats().includes(configured as ExportFormat)) {
+  const defaultFormat = (): ExportFormat => {
+    const configured = props.config?.format;
+    if (configured && configured !== "ppt" && availableFormats.includes(configured as ExportFormat)) {
       return configured as ExportFormat;
     }
-    return availableFormats()[0] ?? "markdown";
+    return "markdown";
   };
 
   const [format, setFormat] = createSignal<ExportFormat>(defaultFormat());
@@ -226,7 +224,7 @@ export default function ExportExecutor(props: Props) {
         <div>
           <span class="block text-xs font-medium text-gray-500 mb-2">导出格式</span>
           <div class="flex gap-2">
-            <For each={availableFormats()}>
+            <For each={availableFormats}>
               {(fmt) => (
                 <button
                   type="button"

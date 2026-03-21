@@ -73,21 +73,22 @@ export default function DesensitizeExecutor(props: Props) {
     setError(null);
 
     try {
-      const res = await (
-        api.api.runtime as unknown as Record<
-          string,
-          Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>
-        >
-      )[props.documentId].desensitize[props.nodeExecution.id].detect.post({ text });
+      const runtimeApi = api.api.runtime as unknown as Record<
+        string,
+        Record<string, Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>>
+      >;
+      const res = await runtimeApi[props.documentId].desensitize[props.nodeExecution.id].detect.post({ text });
 
-      if (res.data && !("error" in res.data)) {
-        const detected = (res.data as { items: DetectedItem[] }).items.map(
+      const data = res.data as Record<string, unknown> | null;
+      if (data && !("error" in data)) {
+        const detected = (data as unknown as { items: DetectedItem[] }).items.map(
           (item: DetectedItem) => ({ ...item, checked: true }),
         );
         setItems(detected);
         setPhase("review");
       } else {
-        setError((res.data as Record<string, unknown> | undefined)?.error ?? "检测失败，请重试");
+        const errMsg = data?.error;
+        setError(typeof errMsg === "string" ? errMsg : "检测失败，请重试");
       }
     } catch {
       setError("检测失败，请重试");
@@ -156,12 +157,11 @@ export default function DesensitizeExecutor(props: Props) {
     setError(null);
 
     try {
-      const res = await (
-        api.api.runtime as unknown as Record<
-          string,
-          Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>
-        >
-      )[props.documentId].desensitize[props.nodeExecution.id].confirm.post({
+      const runtimeApi = api.api.runtime as unknown as Record<
+        string,
+        Record<string, Record<string, Record<string, { post: (body: unknown) => Promise<{ data: unknown }> }>>>
+      >;
+      const res = await runtimeApi[props.documentId].desensitize[props.nodeExecution.id].confirm.post({
         items: confirmed.map((it) => ({
           original: it.original,
           placeholder: it.placeholder,
@@ -170,11 +170,13 @@ export default function DesensitizeExecutor(props: Props) {
         sanitizedText,
       });
 
-      if (res.data && !("error" in res.data)) {
+      const data = res.data as Record<string, unknown> | null;
+      if (data && !("error" in data)) {
         setPhase("confirmed");
         props.onDraftSave({ text: sanitizedText, mappingCount: confirmed.length });
       } else {
-        setError((res.data as Record<string, unknown> | undefined)?.error ?? "确认失败，请重试");
+        const errMsg = data?.error;
+        setError(typeof errMsg === "string" ? errMsg : "确认失败，请重试");
       }
     } catch {
       setError("确认失败，请重试");

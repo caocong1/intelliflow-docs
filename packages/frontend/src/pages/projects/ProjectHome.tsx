@@ -33,6 +33,10 @@ type DocumentItem = {
   createdBy: string;
   creatorName: string;
   createdAt: string;
+  /** Progress fields for in_progress documents */
+  progressStep?: number;
+  totalSteps?: number;
+  currentNodeLabel?: string;
 };
 
 type DocumentTypeItem = {
@@ -510,7 +514,25 @@ export default function ProjectHome() {
                             class="transition-colors hover:bg-indigo-50/50 cursor-pointer"
                             onClick={() => navigate(`/documents/${doc.id}`)}
                           >
-                            <td class="px-5 py-3 text-sm text-slate-900 font-medium max-w-xs truncate">{doc.title}</td>
+                            <td class="px-5 py-3 text-sm max-w-xs">
+                              <div class="font-medium text-slate-900 truncate">{doc.title}</div>
+                              <Show when={doc.status === "in_progress" && doc.totalSteps && doc.totalSteps > 0}>
+                                <div class="mt-1.5 space-y-1">
+                                  <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                    <div
+                                      class="h-full bg-indigo-500 rounded-full transition-all"
+                                      style={{ width: `${Math.round(((doc.progressStep ?? 0) / (doc.totalSteps ?? 1)) * 100)}%` }}
+                                    />
+                                  </div>
+                                  <p class="text-xs text-slate-400">
+                                    进度: {doc.progressStep ?? 0}/{doc.totalSteps}
+                                    <Show when={doc.currentNodeLabel}>
+                                      {" "}&middot; {doc.currentNodeLabel}
+                                    </Show>
+                                  </p>
+                                </div>
+                              </Show>
+                            </td>
                             <td class="px-5 py-3 text-sm">
                               <Badge label={st().label} variant={st().variant} />
                             </td>

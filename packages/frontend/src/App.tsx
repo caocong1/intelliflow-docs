@@ -1,4 +1,4 @@
-import { Navigate, Route, Router } from "@solidjs/router";
+import { Navigate, Route, Router, useParams } from "@solidjs/router";
 import type { Component, ParentComponent } from "solid-js";
 import { Show } from "solid-js";
 import ToastContainer from "./components/ui/Toast";
@@ -17,7 +17,6 @@ import ModelCallLogs from "./pages/admin/ModelCallLogs";
 import ProjectList from "./pages/projects/ProjectList";
 import ProjectHome from "./pages/projects/ProjectHome";
 import ProjectSettings from "./pages/projects/ProjectSettings";
-import DocumentDetail from "./pages/documents/DocumentDetail";
 import VersionHistory from "./pages/documents/VersionHistory";
 import DocumentWorkspace from "./pages/workspace/DocumentWorkspace";
 
@@ -48,29 +47,19 @@ const App: Component = () => {
           </AuthLayout>
         )}
       />
-      {/* Workspace: full-screen without sidebar */}
-      <Route
-        path="/workspace/:documentId"
-        component={() => {
-          const auth = useAuth();
-          return (
-            <Show when={!auth.loading()}>
-              <Show when={auth.user()} fallback={<Navigate href="/login" />}>
-                <div class="min-h-screen bg-[#f7f9fb]">
-                  <DocumentWorkspace />
-                </div>
-              </Show>
-            </Show>
-          );
-        }}
-      />
       <Route path="/" component={AppLayout}>
         <Route path="/" component={Dashboard} />
         <Route path="/projects" component={ProjectList} />
         <Route path="/projects/:id" component={ProjectHome} />
         <Route path="/projects/:id/settings" component={ProjectSettings} />
-        <Route path="/documents/:id" component={DocumentDetail} />
-        <Route path="/documents/:id/versions" component={VersionHistory} />
+        {/* Documents: merged detail + workspace */}
+        <Route path="/documents/:documentId" component={DocumentWorkspace} />
+        <Route path="/documents/:documentId/versions" component={VersionHistory} />
+        {/* Redirect old workspace URL */}
+        <Route path="/workspace/:documentId" component={() => {
+          const p = useParams<{ documentId: string }>();
+          return <Navigate href={`/documents/${p.documentId}`} />;
+        }} />
         <Route
           path="/admin/users"
           component={() => (

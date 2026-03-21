@@ -374,71 +374,9 @@ export default function DocumentWorkspace() {
   };
 
   return (
-    <div class="flex flex-col min-h-screen" style={{ background: "#f7f9fb" }}>
+    <div class="flex flex-col h-full min-h-0">
       {/* Network status banner */}
       <NetworkBanner />
-
-      {/* Top navigation bar */}
-      <header
-        class="fixed top-0 left-0 right-0 z-30 flex items-center justify-between px-6"
-        style={{
-          height: "3.5rem",
-          background: "#ffffff",
-          "box-shadow": "0 1px 0 rgba(199,196,216,0.3), 0 4px 16px rgba(25,28,30,0.04)",
-        }}
-      >
-        {/* Left: back button */}
-        <A
-          href={backHref()}
-          class="flex items-center gap-1.5 text-sm font-medium transition-colors no-underline"
-          style={{ color: "#464555" }}
-        >
-          <svg
-            class="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 19l-7-7 7-7"
-            />
-          </svg>
-          返回项目
-        </A>
-
-        {/* Center: document title */}
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-semibold" style={{ color: "#191c1e" }}>
-            {state()?.workflowName ?? "文档工作台"}
-          </span>
-          <Show when={state()}>
-            <span
-              class="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{
-                background: "rgba(53,37,205,0.08)",
-                color: "#3525cd",
-              }}
-            >
-              工作台
-            </span>
-          </Show>
-        </div>
-
-        {/* Right: autosave + label */}
-        <div class="flex items-center gap-3">
-          <AutoSaveIndicator status={saveStatus()} />
-          <span class="text-xs" style={{ color: "#464555" }}>
-            {state()?.workflowName ?? ""}
-          </span>
-        </div>
-      </header>
-
-      {/* Spacer for fixed header */}
-      <div style={{ height: "3.5rem" }} />
 
       {/* Loading skeleton */}
       <Show when={loading()}>
@@ -480,16 +418,49 @@ export default function DocumentWorkspace() {
       <Show when={!loading() && !error() && state()}>
         {(s) => (
           <>
-            {/* Stepper bar */}
+            {/* Breadcrumb + Document info + Stepper */}
             <div
-              class="sticky z-20 px-6 py-4"
+              class="sticky top-0 z-20 px-6 pt-4 pb-3"
               style={{
-                top: "3.5rem",
-                background: "#ffffff",
+                background: "#f7f9fb",
                 "box-shadow": "0 1px 0 rgba(199,196,216,0.2)",
               }}
             >
-              <div class="max-w-[960px] mx-auto">
+              <div class="max-w-[960px] mx-auto space-y-3">
+                {/* Breadcrumb + auto-save */}
+                <div class="flex items-center justify-between">
+                  <A
+                    href={backHref()}
+                    class="flex items-center gap-1.5 text-sm font-medium transition-colors no-underline hover:opacity-80"
+                    style={{ color: "#464555" }}
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                    返回项目
+                  </A>
+                  <AutoSaveIndicator status={saveStatus()} />
+                </div>
+
+                {/* Document title + metadata */}
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <h1 class="text-lg font-bold" style={{ color: "#191c1e" }}>
+                      {s().workflowName ?? "文档工作台"}
+                    </h1>
+                    <span
+                      class="text-xs px-2.5 py-0.5 rounded-full font-medium"
+                      style={{ background: "rgba(53,37,205,0.08)", color: "#3525cd" }}
+                    >
+                      {readOnly() ? "已完成" : "进行中"}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-4 text-xs" style={{ color: "#464555" }}>
+                    <span>步骤 {s().currentNodeIndex + 1}/{s().nodes.length}</span>
+                  </div>
+                </div>
+
+                {/* Stepper */}
                 <StepperBar
                   nodes={s().nodes}
                   currentIndex={viewMode() === "current" ? s().currentNodeIndex : viewIndex()}

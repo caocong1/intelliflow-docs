@@ -1,9 +1,12 @@
 import { useParams } from "@solidjs/router";
-import { createSignal, For, Match, onMount, Show, Switch, createMemo } from "solid-js";
+import { createSignal, For, Match, onCleanup, onMount, Show, Switch, createMemo } from "solid-js";
 import { api } from "../../api/client";
 import StepperBar from "../../components/workspace/StepperBar";
 import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
 import InlineEditor from "../../components/workspace/InlineEditor";
+import NetworkBanner from "../../components/workspace/NetworkBanner";
+import AutoSaveIndicator from "../../components/workspace/AutoSaveIndicator";
+import type { SaveStatus } from "../../components/workspace/AutoSaveIndicator";
 import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExecutor";
 import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
 import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
@@ -36,12 +39,56 @@ export default function DocumentWorkspace() {
   const [showReexecDialog, setShowReexecDialog] = createSignal<number | null>(null);
   const [showInlineEditor, setShowInlineEditor] = createSignal(false);
   const [savedIndicator, setSavedIndicator] = createSignal(false);
+  const [saveStatus, setSaveStatus] = createSignal<SaveStatus>("idle");
+
+  /** Unified 1.5s debounced auto-save for all editable nodes */
+  let saveTimeout: ReturnType<typeof setTimeout>;
+  const debouncedDraftSave = (data: Record<string, unknown>) => {
+    setSaveStatus("idle");
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(async () => {
+      const node = currentNode();
+      if (!node) return;
+      setSaveStatus("saving");
+      try {
+        const token = localStorage.getItem("auth_token");
+        await fetch(
+          `/api/runtime/${params.documentId}/nodes/${node.id}/draft`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(data),
+          },
+        );
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      } catch {
+        setSaveStatus("idle");
+      }
+    }, 1500);
+  };
+
+  onCleanup(() => clearTimeout(saveTimeout));
 
   onMount(async () => {
     try {
       const res = await (api.api.runtime as any)[params.documentId].init.post();
       if (res.data && !("error" in res.data)) {
-        setState(res.data as unknown as DocumentRuntimeState);
+        const runtimeState = res.data as unknown as DocumentRuntimeState;
+        setState(runtimeState);
+
+        // State recovery on refresh: set currentNodeIndex to first non-completed node
+        const firstPendingIdx = runtimeState.nodes.findIndex(
+          (n) => n.status !== "completed" && n.status !== "skipped",
+        );
+        if (firstPendingIdx >= 0 && firstPendingIdx !== runtimeState.currentNodeIndex) {
+          setState((prev) =>
+            prev ? { ...prev, currentNodeIndex: firstPendingIdx } : prev,
+          );
+        }
       } else {
         setError((res.data as any)?.error ?? "加载工作台失败");
       }
@@ -236,7 +283,9 @@ export default function DocumentWorkspace() {
 
     const isReadOnly = readOnly();
     const docId = params.documentId;
-    const draftSave = (_data: unknown) => { /* draft saved via executor */ };
+    const draftSave = (data: unknown) => {
+      debouncedDraftSave(data as Record<string, unknown>);
+    };
 
     switch (node.nodeType) {
       case "input_transform":
@@ -304,6 +353,9 @@ export default function DocumentWorkspace() {
 
   return (
     <div class="flex flex-col h-full min-h-0">
+      {/* Network status banner */}
+      <NetworkBanner />
+
       {/* Loading skeleton */}
       <Show when={loading()}>
         <div class="space-y-4 p-6">
@@ -335,7 +387,10 @@ export default function DocumentWorkspace() {
             <div class="px-6 pt-4 pb-2">
               <div class="flex items-center justify-between">
                 <h1 class="text-lg font-bold text-gray-900">{s().workflowName}</h1>
-                <span class="text-xs text-gray-400">文档工作台</span>
+                <div class="flex items-center gap-3">
+                  <AutoSaveIndicator status={saveStatus()} />
+                  <span class="text-xs text-gray-400">文档工作台</span>
+                </div>
               </div>
             </div>
 

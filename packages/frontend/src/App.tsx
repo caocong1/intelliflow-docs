@@ -13,6 +13,7 @@ import ModelConfiguration from "./pages/admin/ModelConfiguration";
 import UserManagement from "./pages/admin/UserManagement";
 import WorkflowManagement from "./pages/admin/WorkflowManagement";
 import WorkflowEditor from "./pages/admin/WorkflowEditor";
+import ModelCallLogs from "./pages/admin/ModelCallLogs";
 import ProjectList from "./pages/projects/ProjectList";
 import ProjectHome from "./pages/projects/ProjectHome";
 import ProjectSettings from "./pages/projects/ProjectSettings";
@@ -76,6 +77,14 @@ const App: Component = () => {
           component={() => (
             <AdminRoute>
               <ModelConfiguration />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/model-call-logs"
+          component={() => (
+            <AdminRoute>
+              <ModelCallLogs />
             </AdminRoute>
           )}
         />

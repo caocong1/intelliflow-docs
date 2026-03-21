@@ -35,7 +35,7 @@ export default function InputTransformExecutor(props: Props) {
   } | null;
 
   const initialFields: Record<string, string> = {};
-  for (const field of props.config.formFields ?? []) {
+  for (const field of props.config?.formFields ?? []) {
     initialFields[field.id] = existingOutput?.fields?.[field.id] ?? "";
   }
 
@@ -76,8 +76,8 @@ export default function InputTransformExecutor(props: Props) {
     }, 1000);
   }
 
-  function handleFieldChange(fieldName: string, value: string) {
-    setFormData((prev) => ({ ...prev, [fieldName]: value }));
+  function handleFieldChange(fieldId: string, value: string) {
+    setFormData((prev) => ({ ...prev, [fieldId]: value }));
     scheduleDraftSave();
   }
 
@@ -147,11 +147,11 @@ export default function InputTransformExecutor(props: Props) {
             });
           } else {
             const err = JSON.parse(xhr.responseText);
-            reject(new Error(err.error ?? "Upload failed"));
+            reject(new Error(err.error ?? "上传失败"));
           }
         };
 
-        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.onerror = () => reject(new Error("网络错误"));
 
         const fd = new FormData();
         fd.append("file", file);
@@ -162,7 +162,7 @@ export default function InputTransformExecutor(props: Props) {
       setFiles((prev) => prev.map((f) => (f.fileId === tempId ? result : f)));
       scheduleDraftSave();
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Upload failed";
+      const message = err instanceof Error ? err.message : "上传失败";
       setFiles((prev) =>
         prev.map((f) =>
           f.fileId === tempId ? { ...f, uploading: false, error: message } : f,
@@ -199,9 +199,9 @@ export default function InputTransformExecutor(props: Props) {
   async function handleConfirm() {
     // Validate required fields
     const data = formData();
-    for (const field of props.config.formFields ?? []) {
+    for (const field of props.config?.formFields ?? []) {
       if (field.required && !data[field.id]?.trim()) {
-        setConfirmError(`"${field.label}" is required`);
+        setConfirmError(`"${field.label}" 为必填项`);
         return;
       }
     }
@@ -231,25 +231,25 @@ export default function InputTransformExecutor(props: Props) {
 
       if (!res.ok) {
         const err = await res.json();
-        setConfirmError(err.error ?? "Confirm failed");
+        setConfirmError(err.error ?? "确认失败");
         return;
       }
 
       // Trigger page-level advance after confirm succeeds
       // The parent DocumentWorkspace handles advancing via its own handleAdvance
     } catch {
-      setConfirmError("Network error");
+      setConfirmError("网络错误，请重试");
     }
   }
 
   const acceptedTypes = () =>
-    (props.config.acceptedFileTypes ?? [".docx", ".pdf", ".txt", ".png", ".jpg", ".mp3", ".mp4"]).join(",");
+    (props.config?.acceptedFileTypes ?? [".docx", ".pdf", ".txt", ".png", ".jpg", ".mp3", ".mp4"]).join(",");
 
   // Render form field based on type
   function renderField(field: FormFieldDef) {
     if (field.type === "text") {
       return (
-        <div class="space-y-1">
+        <div class="space-y-1.5">
           <label class="block text-sm font-medium text-gray-700">
             {field.label}
             <Show when={field.required}>
@@ -261,8 +261,8 @@ export default function InputTransformExecutor(props: Props) {
             value={formData()[field.id] ?? ""}
             onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
             disabled={props.readOnly}
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500"
-            placeholder={field.label}
+            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 transition-colors"
+            placeholder={`请输入${field.label}`}
           />
         </div>
       );
@@ -270,7 +270,7 @@ export default function InputTransformExecutor(props: Props) {
 
     if (field.type === "textarea") {
       return (
-        <div class="space-y-1">
+        <div class="space-y-1.5">
           <label class="block text-sm font-medium text-gray-700">
             {field.label}
             <Show when={field.required}>
@@ -282,8 +282,8 @@ export default function InputTransformExecutor(props: Props) {
             onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
             disabled={props.readOnly}
             rows={4}
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 resize-y"
-            placeholder={field.label}
+            class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 resize-y transition-colors"
+            placeholder={`请输入${field.label}`}
           />
         </div>
       );
@@ -294,187 +294,219 @@ export default function InputTransformExecutor(props: Props) {
   }
 
   const hasFileFields = () =>
-    props.config.allowFileUpload || (props.config.formFields ?? []).some((f) => f.type === "file");
+    props.config?.allowFileUpload || (props.config?.formFields ?? []).some((f) => f.type === "file");
 
   return (
-    <div class="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
+    <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       {/* Header */}
-      <div>
-        <h2 class="text-lg font-semibold text-gray-800">{props.nodeExecution.nodeLabel}</h2>
-        <p class="text-sm text-gray-500 mt-1">Fill in the form fields and upload any required files.</p>
+      <div class="px-6 py-4 bg-gradient-to-r from-indigo-50 to-white border-b border-gray-100">
+        <h2 class="text-lg font-semibold text-gray-800">
+          {props.nodeExecution.nodeLabel || "输入转换"}
+        </h2>
+        <p class="text-sm text-gray-500 mt-0.5">填写表单信息并上传所需文件</p>
       </div>
 
-      {/* Form fields */}
-      <Show when={(props.config.formFields ?? []).length > 0}>
-        <div class="space-y-4">
-          <For each={props.config.formFields?.filter((f) => f.type !== "file") ?? []}>
-            {(field) => renderField(field)}
-          </For>
-        </div>
-      </Show>
-
-      {/* File upload area */}
-      <Show when={hasFileFields() && !props.readOnly}>
-        <div class="space-y-3">
-          <label class="block text-sm font-medium text-gray-700">File Upload</label>
-
-          {/* Drop zone */}
-          <div
-            class={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-              dragOver()
-                ? "border-indigo-400 bg-indigo-50"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={handleFileDrop}
-            onClick={() => {
-              const input = document.getElementById("file-input-transform") as HTMLInputElement;
-              input?.click();
-            }}
-          >
-            <div class="text-gray-400 text-sm">
-              <p class="font-medium">Drag & drop files here, or click to select</p>
-              <p class="mt-1 text-xs text-gray-400">
-                Supported: {acceptedTypes()}
-              </p>
-            </div>
-            <input
-              id="file-input-transform"
-              type="file"
-              multiple
-              accept={acceptedTypes()}
-              class="hidden"
-              onChange={handleFileSelect}
-            />
+      <div class="p-6 space-y-6">
+        {/* Null guard: no form fields configured */}
+        <Show when={!props.config?.formFields || props.config.formFields.length === 0}>
+          <div class="text-center py-8 text-gray-400">
+            <div class="text-4xl mb-3">-</div>
+            <p class="text-sm">未配置表单字段</p>
+            <p class="text-xs mt-1 text-gray-300">请在工作流编辑器中添加表单字段配置</p>
           </div>
-        </div>
-      </Show>
+        </Show>
 
-      {/* Uploaded files list */}
-      <Show when={files().length > 0}>
-        <div class="space-y-3">
-          <h3 class="text-sm font-medium text-gray-700">
-            Uploaded Files ({files().length})
-          </h3>
-          <For each={files()}>
-            {(file) => (
-              <div class="border border-gray-200 rounded-lg p-4 space-y-2">
-                {/* File header */}
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3 min-w-0">
-                    <div class="flex-shrink-0 w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-500 font-medium">
-                      {file.originalName.split(".").pop()?.toUpperCase()?.slice(0, 3) ?? "?"}
-                    </div>
-                    <div class="min-w-0">
-                      <p class="text-sm font-medium text-gray-800 truncate">{file.originalName}</p>
-                      <Show when={file.fileSize > 0}>
-                        <p class="text-xs text-gray-400">{formatFileSize(file.fileSize)}</p>
-                      </Show>
-                    </div>
-                  </div>
+        {/* Form fields section */}
+        <Show when={(props.config?.formFields ?? []).length > 0}>
+          <div class="space-y-1.5">
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span class="w-1 h-4 bg-indigo-500 rounded-full" />
+              表单填写
+            </h3>
+            <div class="space-y-4 pl-3">
+              <For each={props.config.formFields?.filter((f) => f.type !== "file") ?? []}>
+                {(field) => renderField(field)}
+              </For>
+            </div>
+          </div>
+        </Show>
 
-                  <div class="flex items-center gap-2 flex-shrink-0">
-                    {/* Status badge */}
-                    <Show when={file.uploading}>
-                      <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs">
-                        Uploading {file.progress}%
-                      </span>
-                    </Show>
-                    <Show when={!file.uploading && !file.error}>
-                      <span class="inline-flex px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-xs">
-                        Done
-                      </span>
-                    </Show>
-                    <Show when={file.error}>
-                      <span class="inline-flex px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-xs">
-                        Error
-                      </span>
-                    </Show>
+        {/* File upload area */}
+        <Show when={hasFileFields() && !props.readOnly}>
+          <div class="space-y-3">
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span class="w-1 h-4 bg-indigo-500 rounded-full" />
+              文件上传
+            </h3>
 
-                    {/* View parsed button */}
-                    <Show when={!file.uploading && !file.error}>
-                      <button
-                        type="button"
-                        class="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                        onClick={() => toggleParsedView(file.fileId)}
-                      >
-                        {file.showParsed ? "Hide" : "View parsed"}
-                      </button>
-                    </Show>
-
-                    {/* Remove button */}
-                    <Show when={!props.readOnly}>
-                      <button
-                        type="button"
-                        class="text-xs text-red-500 hover:text-red-600"
-                        onClick={() => removeFile(file.fileId)}
-                      >
-                        Remove
-                      </button>
-                    </Show>
-                  </div>
-                </div>
-
-                {/* Upload progress bar */}
-                <Show when={file.uploading}>
-                  <div class="w-full bg-gray-200 rounded-full h-1.5">
-                    <div
-                      class="bg-indigo-500 h-1.5 rounded-full transition-all"
-                      style={{ width: `${file.progress}%` }}
-                    />
-                  </div>
-                </Show>
-
-                {/* Error message */}
-                <Show when={file.error}>
-                  <p class="text-xs text-red-500">{file.error}</p>
-                </Show>
-
-                {/* Parsed text preview / edit */}
-                <Show when={file.showParsed && !file.uploading}>
-                  <div class="mt-2">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">
-                      Parsed content (editable)
-                    </label>
-                    <textarea
-                      value={file.parsedText}
-                      onInput={(e) =>
-                        handleParsedTextEdit(file.fileId, e.currentTarget.value)
-                      }
-                      disabled={props.readOnly}
-                      rows={6}
-                      class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 resize-y"
-                    />
-                  </div>
-                </Show>
+            {/* Drop zone */}
+            <button
+              type="button"
+              class={`w-full border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+                dragOver()
+                  ? "border-indigo-400 bg-indigo-50 scale-[1.01]"
+                  : "border-gray-300 hover:border-indigo-300 hover:bg-gray-50"
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleFileDrop}
+              onClick={() => {
+                const input = document.getElementById("file-input-transform") as HTMLInputElement;
+                input?.click();
+              }}
+            >
+              <div class="text-gray-400">
+                <p class="text-sm font-medium text-gray-500">
+                  拖拽文件到此处，或点击选择文件
+                </p>
+                <p class="mt-1.5 text-xs text-gray-400">
+                  支持格式：{acceptedTypes()}
+                </p>
               </div>
-            )}
-          </For>
-        </div>
-      </Show>
+              <input
+                id="file-input-transform"
+                type="file"
+                multiple
+                accept={acceptedTypes()}
+                class="hidden"
+                onChange={handleFileSelect}
+              />
+            </button>
+          </div>
+        </Show>
 
-      {/* Confirm error */}
-      <Show when={confirmError()}>
-        <div class="bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm">{confirmError()}</div>
-      </Show>
+        {/* Uploaded files list */}
+        <Show when={files().length > 0}>
+          <div class="space-y-3">
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+              <span class="w-1 h-4 bg-indigo-500 rounded-full" />
+              已上传文件
+              <span class="text-xs text-gray-400 font-normal">({files().length})</span>
+            </h3>
+            <div class="space-y-2">
+              <For each={files()}>
+                {(file) => (
+                  <div class="border border-gray-200 rounded-lg p-4 space-y-2 hover:border-gray-300 transition-colors">
+                    {/* File header */}
+                    <div class="flex items-center justify-between">
+                      <div class="flex items-center gap-3 min-w-0">
+                        <div class="flex-shrink-0 w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center text-xs text-indigo-600 font-semibold">
+                          {file.originalName.split(".").pop()?.toUpperCase()?.slice(0, 3) ?? "?"}
+                        </div>
+                        <div class="min-w-0">
+                          <p class="text-sm font-medium text-gray-800 truncate">{file.originalName}</p>
+                          <Show when={file.fileSize > 0}>
+                            <p class="text-xs text-gray-400">{formatFileSize(file.fileSize)}</p>
+                          </Show>
+                        </div>
+                      </div>
 
-      {/* Confirm button (only in active mode, not readOnly) */}
-      <Show when={!props.readOnly}>
-        <div class="flex justify-end">
-          <button
-            type="button"
-            class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
-            disabled={files().some((f) => f.uploading)}
-            onClick={handleConfirm}
-          >
-            Confirm Input
-          </button>
-        </div>
-      </Show>
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        {/* Status badge */}
+                        <Show when={file.uploading}>
+                          <span class="inline-flex px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs">
+                            上传中 {file.progress}%
+                          </span>
+                        </Show>
+                        <Show when={!file.uploading && !file.error}>
+                          <span class="inline-flex px-2 py-0.5 rounded-full bg-green-50 text-green-600 text-xs">
+                            解析完成
+                          </span>
+                        </Show>
+                        <Show when={file.error}>
+                          <span class="inline-flex px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-xs">
+                            上传失败
+                          </span>
+                        </Show>
+
+                        {/* View parsed button */}
+                        <Show when={!file.uploading && !file.error}>
+                          <button
+                            type="button"
+                            class="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                            onClick={() => toggleParsedView(file.fileId)}
+                          >
+                            {file.showParsed ? "收起" : "查看解析结果"}
+                          </button>
+                        </Show>
+
+                        {/* Remove button */}
+                        <Show when={!props.readOnly}>
+                          <button
+                            type="button"
+                            class="text-xs text-red-500 hover:text-red-600"
+                            onClick={() => removeFile(file.fileId)}
+                          >
+                            移除
+                          </button>
+                        </Show>
+                      </div>
+                    </div>
+
+                    {/* Upload progress bar */}
+                    <Show when={file.uploading}>
+                      <div class="w-full bg-gray-200 rounded-full h-1.5">
+                        <div
+                          class="bg-indigo-500 h-1.5 rounded-full transition-all"
+                          style={{ width: `${file.progress}%` }}
+                        />
+                      </div>
+                    </Show>
+
+                    {/* Error message */}
+                    <Show when={file.error}>
+                      <p class="text-xs text-red-500">{file.error}</p>
+                    </Show>
+
+                    {/* Parsed text preview / edit */}
+                    <Show when={file.showParsed && !file.uploading}>
+                      <div class="mt-2">
+                        <p class="block text-xs font-medium text-gray-600 mb-1">
+                          解析内容（可编辑）
+                        </p>
+                        <textarea
+                          value={file.parsedText}
+                          onInput={(e) =>
+                            handleParsedTextEdit(file.fileId, e.currentTarget.value)
+                          }
+                          disabled={props.readOnly}
+                          rows={6}
+                          aria-label={`${file.originalName} 解析内容`}
+                          class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 disabled:bg-gray-100 disabled:text-gray-500 resize-y"
+                        />
+                      </div>
+                    </Show>
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        </Show>
+
+        {/* Confirm error */}
+        <Show when={confirmError()}>
+          <div class="bg-red-50 text-red-600 px-4 py-3 rounded-lg text-sm border border-red-100">
+            {confirmError()}
+          </div>
+        </Show>
+
+        {/* Confirm button (only in active mode, not readOnly) */}
+        <Show when={!props.readOnly}>
+          <div class="flex justify-end pt-2">
+            <button
+              type="button"
+              class="px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors disabled:opacity-50 shadow-sm"
+              disabled={files().some((f) => f.uploading)}
+              onClick={handleConfirm}
+            >
+              确认并继续
+            </button>
+          </div>
+        </Show>
+      </div>
     </div>
   );
 }

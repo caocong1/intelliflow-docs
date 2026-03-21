@@ -7,6 +7,8 @@ import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
 import VisibilityBadge from "../../components/documents/VisibilityBadge";
 import MemberSelectModal from "../../components/documents/MemberSelectModal";
+import WorkflowPreview from "../../components/workspace/WorkflowPreview";
+import type { WorkflowNodeDef } from "@intelliflow/shared";
 
 type ProjectDetail = {
   id: string;
@@ -79,6 +81,9 @@ export default function ProjectHome() {
   const [docTypes, setDocTypes] = createSignal<DocumentTypeItem[]>([]);
   const [workflows, setWorkflows] = createSignal<WorkflowItem[]>([]);
   const [creating, setCreating] = createSignal(false);
+  const [previewNodes, setPreviewNodes] = createSignal<WorkflowNodeDef[]>([]);
+  const [previewDescription, setPreviewDescription] = createSignal<string | undefined>();
+  const [previewLoading, setPreviewLoading] = createSignal(false);
 
   // Visibility modal
   const [showVisModal, setShowVisModal] = createSignal(false);
@@ -155,6 +160,21 @@ export default function ProjectHome() {
     }
   }
 
+  async function fetchWorkflowDetail(workflowId: string) {
+    setPreviewLoading(true);
+    try {
+      const { data, error } = await api.api.workflows({ id: workflowId }).get();
+      if (error) return;
+      const wf = data as unknown as { nodes: WorkflowNodeDef[]; description: string | null };
+      setPreviewNodes(wf.nodes ?? []);
+      setPreviewDescription(wf.description ?? undefined);
+    } catch {
+      // ignore
+    } finally {
+      setPreviewLoading(false);
+    }
+  }
+
   onMount(async () => {
     await fetchProject();
     if (!notFound()) {
@@ -187,6 +207,8 @@ export default function ProjectHome() {
     setNewDocTypeId("");
     setNewWorkflowId("");
     setWorkflows([]);
+    setPreviewNodes([]);
+    setPreviewDescription(undefined);
     fetchDocTypes();
     setShowCreateModal(true);
   }
@@ -194,10 +216,22 @@ export default function ProjectHome() {
   function handleDocTypeChange(docTypeId: string) {
     setNewDocTypeId(docTypeId);
     setNewWorkflowId("");
+    setPreviewNodes([]);
+    setPreviewDescription(undefined);
     if (docTypeId) {
       fetchWorkflows(docTypeId);
     } else {
       setWorkflows([]);
+    }
+  }
+
+  function handleWorkflowChange(workflowId: string) {
+    setNewWorkflowId(workflowId);
+    if (workflowId) {
+      fetchWorkflowDetail(workflowId);
+    } else {
+      setPreviewNodes([]);
+      setPreviewDescription(undefined);
     }
   }
 
@@ -613,7 +647,7 @@ export default function ProjectHome() {
             <select
               id="doc-workflow"
               value={newWorkflowId()}
-              onChange={(e) => setNewWorkflowId(e.currentTarget.value)}
+              onChange={(e) => handleWorkflowChange(e.currentTarget.value)}
               class={`${inputClass} cursor-pointer bg-white`}
               disabled={!newDocTypeId()}
               required
@@ -624,6 +658,19 @@ export default function ProjectHome() {
               </For>
             </select>
           </div>
+
+          {/* Workflow preview */}
+          <Show when={previewLoading()}>
+            <div class="flex items-center justify-center py-4">
+              <div class="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+            </div>
+          </Show>
+          <Show when={!previewLoading() && previewNodes().length > 0}>
+            <WorkflowPreview nodes={previewNodes()} description={previewDescription()} />
+          </Show>
+          <Show when={!previewLoading() && newDocTypeId() && !newWorkflowId()}>
+            <p class="text-xs text-slate-400 text-center py-3">请选择工作流以查看流程预览</p>
+          </Show>
           <div class="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setShowCreateModal(false)} class={cancelBtnClass}>
               取消

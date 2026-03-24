@@ -19,7 +19,7 @@ import { restoreRoutes } from "./modules/runtime/restore.routes";
 import { modelCallLogRoutes } from "./modules/runtime/model-call-log.routes";
 import { promptOptimizeRoutes } from "./modules/prompts";
 import { versionRoutes } from "./modules/versions/versions.routes";
-import { wecomAuthRoutes, wecomAdminRoutes } from "./modules/wecom/wecom.routes";
+import { wecomAuthRoutes, wecomAdminRoutes, invitationRoutes } from "./modules/wecom/wecom.routes";
 import { workflowAdminRoutes, workflowReadRoutes } from "./modules/workflows/workflows.routes";
 
 const app = new Elysia({ prefix: "/api" })
@@ -30,6 +30,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(authRoutes)
   .use(wecomAuthRoutes)
   .use(wecomAdminRoutes)
+  .use(invitationRoutes)
   .use(userReadRoutes)
   .use(userAdminRoutes)
   .use(documentTypeReadRoutes)

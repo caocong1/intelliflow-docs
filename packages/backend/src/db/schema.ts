@@ -115,6 +115,25 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const invitationStatusEnum = pgEnum("invitation_status", ["pending", "accepted", "rejected", "expired"]);
+
+export const projectInvitations = pgTable("project_invitations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  projectId: uuid("project_id")
+    .notNull()
+    .references(() => projects.id),
+  inviterId: uuid("inviter_id")
+    .notNull()
+    .references(() => users.id),
+  wecomUserId: varchar("wecom_userid", { length: 64 }).notNull(),
+  wecomName: varchar("wecom_name", { length: 100 }),
+  status: invitationStatusEnum("status").default("pending").notNull(),
+  token: varchar("token", { length: 255 }).notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+});
+
 export const projectMembers = pgTable("project_members", {
   id: uuid("id").defaultRandom().primaryKey(),
   projectId: uuid("project_id")

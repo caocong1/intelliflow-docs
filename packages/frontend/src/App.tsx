@@ -18,6 +18,7 @@ import ProjectList from "./pages/projects/ProjectList";
 import ProjectHome from "./pages/projects/ProjectHome";
 import ProjectSettings from "./pages/projects/ProjectSettings";
 import VersionHistory from "./pages/documents/VersionHistory";
+import Invitation from "./pages/Invitation";
 import DocumentWorkspace from "./pages/workspace/DocumentWorkspace";
 
 const AdminRoute: ParentComponent = (props) => {
@@ -47,6 +48,7 @@ const App: Component = () => {
           </AuthLayout>
         )}
       />
+      <Route path="/invitation/:token" component={Invitation} />
       <Route path="/" component={AppLayout}>
         <Route path="/" component={Dashboard} />
         <Route path="/projects" component={ProjectList} />

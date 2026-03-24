@@ -3,6 +3,7 @@ import { createSignal, For, onMount, Show } from "solid-js";
 import { api } from "../../api/client";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
+import WecomMemberPicker from "../../components/project/WecomMemberPicker";
 import { useAuth } from "../../contexts/auth";
 import { showToast } from "../../components/ui/Toast";
 
@@ -45,7 +46,6 @@ export default function ProjectSettings() {
 
   // Invite modal
   const [showInviteModal, setShowInviteModal] = createSignal(false);
-  const [inviteUsername, setInviteUsername] = createSignal("");
   const [inviting, setInviting] = createSignal(false);
 
   // Confirm delete
@@ -177,44 +177,27 @@ export default function ProjectSettings() {
     }
   }
 
-  async function handleInvite() {
-    if (!inviteUsername().trim()) {
-      showToast("请输入用户名", "error");
-      return;
-    }
+  async function handleInvite(selectedMembers: { userid: string; name: string }[]) {
+    if (selectedMembers.length === 0) return;
     setInviting(true);
     try {
-      // First find user by username - use the users list endpoint to search
-      // Since we don't have a search-by-username endpoint, we pass the username
-      // and let the backend handle it. For v1, the addMember API takes userId,
-      // so we need to look up the user first.
-      // We'll use a simple approach: call the users list and find by username.
-      const { data: usersData, error: usersError } = await api.api.users.get({
-        query: { page: "1", pageSize: "1000" },
+      const res = await fetch(`/api/projects/${params.id}/invite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
+        body: JSON.stringify({ wecomUserIds: selectedMembers.map((m) => m.userid) }),
       });
-      if (usersError) {
-        showToast("无法获取用户列表", "error");
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error ?? "邀请失败", "error");
         return;
       }
-      const usersList = (usersData as unknown as { data: { id: string; username: string; displayName: string }[] }).data;
-      const foundUser = usersList.find((u) => u.username === inviteUsername().trim());
-      if (!foundUser) {
-        showToast("未找到该用户名", "error");
-        return;
-      }
-
-      const { error } = await api.api.projects({ id: params.id }).members.post({
-        userId: foundUser.id,
-      });
-      if (error) {
-        const errData = error.value as { error?: string } | undefined;
-        showToast(errData?.error ?? "邀请失败", "error");
-        return;
-      }
-      showToast(`已邀请 ${foundUser.displayName} 加入项目`, "success");
+      const results = data.results as { wecomName: string; success: boolean }[];
+      const successCount = results.filter((r) => r.success).length;
+      showToast(`已向 ${successCount} 人发送邀请`, "success");
       setShowInviteModal(false);
-      setInviteUsername("");
-      await fetchMembers();
     } catch {
       showToast("网络错误", "error");
     } finally {
@@ -519,37 +502,13 @@ export default function ProjectSettings() {
         </div>
       </Show>
 
-      {/* Invite Modal */}
-      <Modal isOpen={showInviteModal()} onClose={() => setShowInviteModal(false)} title="邀请成员">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleInvite();
-          }}
-          class="space-y-4"
-        >
-          <div>
-            <label for="invite-username" class={labelClass}>用户名</label>
-            <input
-              id="invite-username"
-              type="text"
-              value={inviteUsername()}
-              onInput={(e) => setInviteUsername(e.currentTarget.value)}
-              class={inputClass}
-              placeholder="请输入要邀请的用户名"
-              required
-            />
-          </div>
-          <div class="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setShowInviteModal(false)} class={cancelBtnClass}>
-              取消
-            </button>
-            <button type="submit" disabled={inviting()} class={primaryBtnClass}>
-              {inviting() ? "邀请中..." : "邀请"}
-            </button>
-          </div>
-        </form>
-      </Modal>
+      {/* Invite Modal - WeChat Work Member Picker */}
+      <WecomMemberPicker
+        isOpen={showInviteModal()}
+        onClose={() => setShowInviteModal(false)}
+        onConfirm={handleInvite}
+        submitting={inviting()}
+      />
 
       {/* Delete Confirm Modal */}
       <Modal isOpen={showDeleteConfirm()} onClose={() => setShowDeleteConfirm(false)} title="确认删除项目">

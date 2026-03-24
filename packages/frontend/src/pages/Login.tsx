@@ -25,9 +25,19 @@ const Login: Component = () => {
   const [username, setUsername] = createSignal("");
   const [password, setPassword] = createSignal("");
 
+  function navigateAfterLogin() {
+    const pendingToken = localStorage.getItem("pending_invitation");
+    if (pendingToken) {
+      localStorage.removeItem("pending_invitation");
+      navigate(`/invitation/${pendingToken}`, { replace: true });
+    } else {
+      navigateAfterLogin();
+    }
+  }
+
   // If already logged in, redirect
   if (auth.user()) {
-    navigate("/", { replace: true });
+    navigateAfterLogin();
   }
 
   let wwLoginInstance: { unmount: () => void } | null = null;
@@ -101,7 +111,7 @@ const Login: Component = () => {
     const result = await auth.wecomLogin(code);
 
     if (result.success) {
-      navigate("/", { replace: true });
+      navigateAfterLogin();
     } else {
       setError(result.error ?? "企业微信登录失败");
     }
@@ -117,7 +127,7 @@ const Login: Component = () => {
     const result = await auth.login(username(), password());
 
     if (result.success) {
-      navigate("/", { replace: true });
+      navigateAfterLogin();
     } else {
       setError(result.error ?? "登录失败");
     }

@@ -221,3 +221,37 @@ export async function getDepartmentMembers(departmentId: number): Promise<WecomM
 
   return data.userlist ?? [];
 }
+
+/**
+ * 发送 textcard 应用消息
+ * @param toUserIds 接收人企业微信 userid 数组
+ */
+export async function sendTextCardMessage(
+  toUserIds: string[],
+  card: { title: string; description: string; url: string; btntxt?: string },
+): Promise<void> {
+  const accessToken = await getAccessToken();
+  const { agentId } = getWecomConfig();
+  const url = `${WECOM_API_BASE}/message/send?access_token=${accessToken}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      touser: toUserIds.join("|"),
+      agentid: Number(agentId),
+      msgtype: "textcard",
+      textcard: {
+        title: card.title,
+        description: card.description,
+        url: card.url,
+        btntxt: card.btntxt ?? "查看详情",
+      },
+    }),
+  });
+
+  const data = (await res.json()) as { errcode: number; errmsg: string };
+  if (data.errcode !== 0) {
+    throw new Error(`Failed to send message: ${data.errmsg} (errcode: ${data.errcode})`);
+  }
+}

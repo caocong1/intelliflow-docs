@@ -19,7 +19,7 @@ export const versionRoutes = new Elysia({ prefix: "/versions" })
       const isMember = await isDocumentProjectMember(body.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can create version snapshots" };
+        return { error: "仅项目成员可创建版本快照" };
       }
 
       try {
@@ -36,7 +36,7 @@ export const versionRoutes = new Elysia({ prefix: "/versions" })
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes("23503") || message.includes("foreign key")) {
           set.status = 400;
-          return { error: "Invalid documentId" };
+          return { error: "无效的文档ID" };
         }
         throw err;
       }
@@ -59,13 +59,13 @@ export const versionRoutes = new Elysia({ prefix: "/versions" })
       const documentId = query.documentId;
       if (!documentId) {
         set.status = 400;
-        return { error: "documentId is required" };
+        return { error: "缺少文档ID" };
       }
 
       const isMember = await isDocumentProjectMember(documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can view versions" };
+        return { error: "仅项目成员可查看版本" };
       }
 
       const versions = await listVersions(documentId);
@@ -86,13 +86,13 @@ export const versionRoutes = new Elysia({ prefix: "/versions" })
       const version = await getVersion(params.id);
       if (!version) {
         set.status = 404;
-        return { error: "Version not found" };
+        return { error: "版本不存在" };
       }
 
       const isMember = await isDocumentProjectMember(version.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can view versions" };
+        return { error: "仅项目成员可查看版本" };
       }
 
       return version;
@@ -111,19 +111,19 @@ export const versionRoutes = new Elysia({ prefix: "/versions" })
       const versionA = await getVersion(params.id);
       if (!versionA) {
         set.status = 404;
-        return { error: "Version A not found" };
+        return { error: "版本A不存在" };
       }
 
       const isMember = await isDocumentProjectMember(versionA.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can view version diffs" };
+        return { error: "仅项目成员可查看版本差异" };
       }
 
       const diffResult = await getVersionDiff(params.id, params.idB);
       if (!diffResult) {
         set.status = 404;
-        return { error: "One or both versions not found" };
+        return { error: "一个或两个版本不存在" };
       }
 
       return diffResult;

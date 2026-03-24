@@ -33,7 +33,7 @@ const Sidebar: Component = () => {
   };
 
   return (
-    <aside class="w-60 flex-shrink-0 bg-indigo-950 min-h-screen flex flex-col">
+    <aside class="w-60 flex-shrink-0 bg-indigo-950 h-full overflow-y-auto flex flex-col">
       {/* Logo area */}
       <div class="px-4 py-5 border-b border-indigo-900">
         <div class="flex items-center gap-2.5">
@@ -204,9 +204,17 @@ const Sidebar: Component = () => {
       {/* User section */}
       <div class="px-3 py-4 border-t border-indigo-900">
         <div class="flex items-center gap-2.5 mb-3 px-1">
-          <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">
-            {initials()}
-          </div>
+          {auth.user()?.avatar ? (
+            <img
+              src={auth.user()?.avatar ?? ""}
+              alt={auth.user()?.displayName ?? ""}
+              class="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+            />
+          ) : (
+            <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">
+              {initials()}
+            </div>
+          )}
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium text-white truncate">{auth.user()?.displayName}</p>
             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-800 text-indigo-200">

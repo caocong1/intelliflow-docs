@@ -26,7 +26,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {
@@ -34,7 +34,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         const config = await getModelCallConfig(params.nodeExecutionId);
         if (!config || config.type !== "model_call") {
           set.status = 404;
-          return { error: "Model call node config not found" };
+          return { error: "未找到模型调用节点配置" };
         }
 
         const mcConfig = config as ModelCallConfig;
@@ -44,7 +44,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
 
         if (modelIds.length === 0) {
           set.status = 400;
-          return { error: "No models configured for this node" };
+          return { error: "该节点未配置模型" };
         }
 
         // Resolve prompt
@@ -69,6 +69,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           resolvedPrompt,
           mcConfig.promptTemplate,
           variableMapping,
+          user!.id,
         );
 
         return new Response(stream, {
@@ -97,7 +98,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {
@@ -105,7 +106,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         const config = await getModelCallConfig(params.nodeExecutionId);
         if (!config || config.type !== "model_call") {
           set.status = 404;
-          return { error: "Model call node config not found" };
+          return { error: "未找到模型调用节点配置" };
         }
 
         const mcConfig = config as ModelCallConfig;
@@ -129,6 +130,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           resolvedPrompt,
           mcConfig.promptTemplate,
           variableMapping,
+          user!.id,
         );
 
         return new Response(stream, {
@@ -157,7 +159,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {
@@ -187,7 +189,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       const [exec] = await db
@@ -198,7 +200,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
 
       if (!exec) {
         set.status = 404;
-        return { error: "Node execution not found" };
+        return { error: "未找到节点执行记录" };
       }
 
       const outputData = (exec.outputData as Record<string, unknown>) ?? {};

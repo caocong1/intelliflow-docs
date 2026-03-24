@@ -25,13 +25,13 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const projectId = query.projectId;
       if (!projectId) {
         set.status = 400;
-        return { error: "projectId is required" };
+        return { error: "缺少项目ID" };
       }
 
       const member = await isProjectMember(projectId, user!.id);
       if (!member) {
         set.status = 403;
-        return { error: "Only project members can view documents" };
+        return { error: "仅项目成员可查看文档" };
       }
 
       const owner = await isProjectOwner(projectId, user!.id);
@@ -68,13 +68,13 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const projectId = query.projectId;
       if (!projectId) {
         set.status = 400;
-        return { error: "projectId is required" };
+        return { error: "缺少项目ID" };
       }
 
       const owner = await isProjectOwner(projectId, user!.id);
       if (!owner) {
         set.status = 403;
-        return { error: "Only project owner can view recycle bin" };
+        return { error: "仅项目负责人可查看回收站" };
       }
 
       const page = Number(query.page) || 1;
@@ -100,7 +100,7 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const member = await isProjectMember(body.projectId, user!.id);
       if (!member) {
         set.status = 403;
-        return { error: "Only project members can create documents" };
+        return { error: "仅项目成员可创建文档" };
       }
 
       try {
@@ -111,7 +111,7 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes("23503") || message.includes("foreign key")) {
           set.status = 400;
-          return { error: "Invalid projectId or workflowId" };
+          return { error: "无效的项目ID或工作流ID" };
         }
         throw err;
       }
@@ -138,13 +138,13 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
         // Try again as owner check for each project the user belongs to
         // Simplified: just check if doc exists at all first
         set.status = 404;
-        return { error: "Document not found" };
+        return { error: "文档不存在" };
       }
 
       const member = await isProjectMember(doc.projectId, user!.id);
       if (!member) {
         set.status = 403;
-        return { error: "Only project members can view documents" };
+        return { error: "仅项目成员可查看文档" };
       }
 
       const owner = await isProjectOwner(doc.projectId, user!.id);
@@ -152,7 +152,7 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const result = await getDocument(params.id, user!.id, owner);
       if (!result) {
         set.status = 403;
-        return { error: "You do not have visibility access to this document" };
+        return { error: "你没有该文档的查看权限" };
       }
 
       return result;
@@ -171,11 +171,11 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const doc = await getDocument(params.id, user!.id, true);
       if (!doc) {
         set.status = 404;
-        return { error: "Document not found" };
+        return { error: "文档不存在" };
       }
       if (doc.createdBy !== user!.id) {
         set.status = 403;
-        return { error: "Only document creator can update" };
+        return { error: "仅文档创建者可更新" };
       }
 
       const updated = await updateDocument(params.id, body);
@@ -198,14 +198,14 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const doc = await getDocument(params.id, user!.id, true);
       if (!doc) {
         set.status = 404;
-        return { error: "Document not found" };
+        return { error: "文档不存在" };
       }
 
       // Creator or project owner can delete
       const owner = await isProjectOwner(doc.projectId, user!.id);
       if (doc.createdBy !== user!.id && !owner) {
         set.status = 403;
-        return { error: "Only document creator or project owner can delete" };
+        return { error: "仅文档创建者或项目负责人可删除" };
       }
 
       await deleteDocument(params.id);
@@ -225,13 +225,13 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const doc = await getDocumentRaw(params.id);
       if (!doc) {
         set.status = 404;
-        return { error: "Document not found" };
+        return { error: "文档不存在" };
       }
 
       const owner = await isProjectOwner(doc.projectId, user!.id);
       if (!owner) {
         set.status = 403;
-        return { error: "Only project owner can restore documents" };
+        return { error: "仅项目负责人可恢复文档" };
       }
 
       const restored = await restoreDocument(params.id);
@@ -250,13 +250,13 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const doc = await getDocumentRaw(params.id);
       if (!doc) {
         set.status = 404;
-        return { error: "Document not found" };
+        return { error: "文档不存在" };
       }
 
       const owner = await isProjectOwner(doc.projectId, user!.id);
       if (!owner) {
         set.status = 403;
-        return { error: "Only project owner can permanently delete documents" };
+        return { error: "仅项目负责人可永久删除文档" };
       }
 
       await permanentDeleteDocument(params.id);
@@ -275,11 +275,11 @@ export const documentMgmtRoutes = new Elysia({ prefix: "/documents" })
       const doc = await getDocument(params.id, user!.id, true);
       if (!doc) {
         set.status = 404;
-        return { error: "Document not found" };
+        return { error: "文档不存在" };
       }
       if (doc.createdBy !== user!.id) {
         set.status = 403;
-        return { error: "Only document creator can change visibility" };
+        return { error: "仅文档创建者可更改可见范围" };
       }
 
       const updated = await updateVisibility(

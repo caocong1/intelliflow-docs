@@ -47,7 +47,7 @@ export const documentTypeAdminRoutes = new Elysia({ prefix: "/document-types" })
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes("23505") || message.includes("unique")) {
           set.status = 409;
-          return { error: "Document type code already exists" };
+          return { error: "文档类型编码已存在" };
         }
         throw err;
       }
@@ -74,11 +74,11 @@ export const documentTypeAdminRoutes = new Elysia({ prefix: "/document-types" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "DOCUMENT_TYPE_NOT_FOUND") {
           set.status = 404;
-          return { error: "Document type not found" };
+          return { error: "文档类型不存在" };
         }
         if (message.includes("23505") || message.includes("unique")) {
           set.status = 409;
-          return { error: "Document type code already exists" };
+          return { error: "文档类型编码已存在" };
         }
         throw err;
       }
@@ -108,7 +108,7 @@ export const documentTypeAdminRoutes = new Elysia({ prefix: "/document-types" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "DOCUMENT_TYPE_NOT_FOUND") {
           set.status = 404;
-          return { error: "Document type not found" };
+          return { error: "文档类型不存在" };
         }
         throw err;
       }
@@ -136,15 +136,15 @@ export const documentTypeAdminRoutes = new Elysia({ prefix: "/document-types" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "DOCUMENT_TYPE_NOT_FOUND") {
           set.status = 404;
-          return { error: "Document type not found" };
+          return { error: "文档类型不存在" };
         }
         if (message === "HAS_ASSOCIATED_WORKFLOWS") {
           set.status = 409;
-          return { error: "Cannot delete: associated workflows exist", workflows: [] as { id: string; name: string }[] };
+          return { error: "无法删除：存在关联的工作流", workflows: [] as { id: string; name: string }[] };
         }
         if (message === "HAS_ASSOCIATED_DOCUMENTS") {
           set.status = 409;
-          return { error: "Cannot delete document type with associated documents" };
+          return { error: "无法删除已关联文档的文档类型" };
         }
         throw err;
       }

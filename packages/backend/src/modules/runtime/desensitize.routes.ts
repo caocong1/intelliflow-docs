@@ -51,14 +51,14 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {
         const config = await getDesensitizeConfig(params.nodeExecutionId);
         if (!config) {
           set.status = 404;
-          return { error: "Desensitize node config not found" };
+          return { error: "未找到脱敏节点配置" };
         }
 
         const items = await detectSensitiveInfo(
@@ -88,7 +88,7 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {
@@ -130,7 +130,7 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {

@@ -11,6 +11,7 @@
     "db:seed": "bun --env-file=../../.env src/db/seed.ts"
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.81",
     "docx": "^9.6.1",
     "drizzle-orm": "^0.39.3",
     "elysia": "^1.2.25",

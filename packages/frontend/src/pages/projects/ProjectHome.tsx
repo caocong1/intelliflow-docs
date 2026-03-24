@@ -169,14 +169,57 @@ export default function ProjectHome() {
     try {
       const { data, error } = await api.api.workflows({ id: workflowId }).get();
       if (error) return;
-      const wf = data as unknown as { nodes: WorkflowNodeDef[]; description: string | null };
-      setPreviewNodes(wf.nodes ?? []);
+      const wf = data as unknown as {
+        nodes: WorkflowNodeDef[];
+        edges: { source: string; target: string }[];
+        description: string | null;
+      };
+      setPreviewNodes(topoSortNodes(wf.nodes ?? [], wf.edges ?? []));
       setPreviewDescription(wf.description ?? undefined);
     } catch {
       // ignore
     } finally {
       setPreviewLoading(false);
     }
+  }
+
+  /** Topologically sort nodes by edges so preview shows execution order */
+  function topoSortNodes(
+    nodes: WorkflowNodeDef[],
+    edges: { source: string; target: string }[],
+  ): WorkflowNodeDef[] {
+    if (nodes.length === 0) return nodes;
+    const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+    const inDegree = new Map<string, number>();
+    const adj = new Map<string, string[]>();
+    for (const n of nodes) {
+      inDegree.set(n.id, 0);
+      adj.set(n.id, []);
+    }
+    for (const e of edges) {
+      adj.get(e.source)?.push(e.target);
+      inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
+    }
+    const queue = nodes.filter((n) => (inDegree.get(n.id) ?? 0) === 0).map((n) => n.id);
+    const sorted: WorkflowNodeDef[] = [];
+    while (queue.length > 0) {
+      const id = queue.shift() as string;
+      const node = nodeMap.get(id);
+      if (node) sorted.push(node);
+      for (const next of adj.get(id) ?? []) {
+        const deg = (inDegree.get(next) ?? 1) - 1;
+        inDegree.set(next, deg);
+        if (deg === 0) queue.push(next);
+      }
+    }
+    // Append any remaining nodes not in edges
+    if (sorted.length < nodes.length) {
+      const sortedIds = new Set(sorted.map((n) => n.id));
+      for (const n of nodes) {
+        if (!sortedIds.has(n.id)) sorted.push(n);
+      }
+    }
+    return sorted;
   }
 
   onMount(async () => {

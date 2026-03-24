@@ -21,7 +21,7 @@ export function showToast(message: string, type: "success" | "error") {
 
 export default function ToastContainer() {
   return (
-    <div class="fixed top-4 right-4 z-50 flex flex-col gap-2">
+    <div class="fixed top-4 right-4 z-[100] flex flex-col gap-2">
       <For each={toasts()}>
         {(toast) => (
           <div

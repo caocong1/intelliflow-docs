@@ -14,7 +14,7 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access export" };
+        return { error: "仅项目成员可访问导出" };
       }
 
       try {
@@ -39,7 +39,7 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can generate exports" };
+        return { error: "仅项目成员可生成导出" };
       }
 
       try {
@@ -74,14 +74,14 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can download exports" };
+        return { error: "仅项目成员可下载导出" };
       }
 
       try {
         const result = await downloadExport(params.documentId, params.nodeExecutionId);
         if (!result) {
           set.status = 404;
-          return { error: "Export file not found. Generate the export first." };
+          return { error: "导出文件不存在，请先生成导出" };
         }
 
         set.headers["content-type"] = result.mimeType;

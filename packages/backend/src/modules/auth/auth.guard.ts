@@ -23,7 +23,7 @@ export const requireAuth = new Elysia({ name: "requireAuth" })
   .onBeforeHandle({ as: "scoped" }, ({ user, set }) => {
     if (!user) {
       set.status = 401;
-      return { error: "Unauthorized" };
+      return { error: "未授权" };
     }
   });
 
@@ -32,10 +32,10 @@ export const requireAdmin = new Elysia({ name: "requireAdmin" })
   .onBeforeHandle({ as: "scoped" }, ({ user, set }) => {
     if (!user) {
       set.status = 401;
-      return { error: "Unauthorized" };
+      return { error: "未授权" };
     }
     if (user.role !== "admin") {
       set.status = 403;
-      return { error: "Forbidden" };
+      return { error: "无权限" };
     }
   });

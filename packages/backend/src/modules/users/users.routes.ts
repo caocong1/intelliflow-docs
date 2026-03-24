@@ -39,7 +39,7 @@ export const userAdminRoutes = new Elysia({ prefix: "/users" })
         // PostgreSQL unique violation code is 23505
         if (message.includes("23505") || message.includes("unique")) {
           set.status = 409;
-          return { error: "Username already exists" };
+          return { error: "用户名已存在" };
         }
         throw err;
       }
@@ -63,7 +63,7 @@ export const userAdminRoutes = new Elysia({ prefix: "/users" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "USER_NOT_FOUND") {
           set.status = 404;
-          return { error: "User not found" };
+          return { error: "用户不存在" };
         }
         throw err;
       }
@@ -86,11 +86,11 @@ export const userAdminRoutes = new Elysia({ prefix: "/users" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "USER_NOT_FOUND") {
           set.status = 404;
-          return { error: "User not found" };
+          return { error: "用户不存在" };
         }
         if (message === "LAST_ACTIVE_ADMIN") {
           set.status = 409;
-          return { error: "Cannot deactivate the last active admin" };
+          return { error: "不能停用最后一个管理员" };
         }
         throw err;
       }

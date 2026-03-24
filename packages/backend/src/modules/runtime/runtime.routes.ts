@@ -21,7 +21,7 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {
@@ -46,13 +46,13 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       const state = await getDocumentRuntimeState(params.documentId);
       if (!state) {
         set.status = 404;
-        return { error: "No runtime state found. Initialize first." };
+        return { error: "未找到运行状态，请先初始化" };
       }
 
       return state;
@@ -70,7 +70,7 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can advance nodes" };
+        return { error: "仅项目成员可推进节点" };
       }
 
       try {
@@ -95,7 +95,7 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can rollback nodes" };
+        return { error: "仅项目成员可回退节点" };
       }
 
       try {
@@ -121,7 +121,7 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can save drafts" };
+        return { error: "仅项目成员可保存草稿" };
       }
 
       try {
@@ -147,7 +147,7 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can skip nodes" };
+        return { error: "仅项目成员可跳过节点" };
       }
 
       try {

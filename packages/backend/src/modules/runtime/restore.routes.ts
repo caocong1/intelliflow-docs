@@ -51,14 +51,14 @@ export const restoreRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {
         const config = await getRestoreConfig(params.nodeExecutionId);
         if (!config) {
           set.status = 404;
-          return { error: "Restore node config not found" };
+          return { error: "未找到恢复节点配置" };
         }
 
         const result = await executeRestore(
@@ -87,7 +87,7 @@ export const restoreRoutes = new Elysia({ prefix: "/runtime" })
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can access runtime" };
+        return { error: "仅项目成员可访问运行时" };
       }
 
       try {

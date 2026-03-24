@@ -1,7 +1,7 @@
 import { boolean, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 import type { WorkflowEdgeDef, WorkflowNodeDef } from "@intelliflow/shared";
 
-export const providerTypeEnum = pgEnum("provider_type", ["openai_compatible", "opencode"]);
+export const providerTypeEnum = pgEnum("provider_type", ["openai_compatible", "opencode", "claude_agent_sdk", "ollama"]);
 export const deploymentTypeEnum = pgEnum("deployment_type", ["cloud", "local"]);
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"]);
@@ -9,10 +9,14 @@ export const userRoleEnum = pgEnum("user_role", ["admin", "user"]);
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   username: varchar("username", { length: 50 }).notNull().unique(),
-  passwordHash: varchar("password_hash", { length: 255 }).notNull(),
+  passwordHash: varchar("password_hash", { length: 255 }),
   displayName: varchar("display_name", { length: 100 }).notNull(),
   role: userRoleEnum("role").default("user").notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  wecomUserId: varchar("wecom_userid", { length: 64 }).unique(),
+  mobile: varchar("mobile", { length: 20 }),
+  avatar: varchar("avatar", { length: 500 }),
+  email: varchar("email", { length: 200 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -50,6 +54,8 @@ export const providers = pgTable("providers", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const agentModeEnum = pgEnum("agent_mode", ["simple_chat", "autonomous_agent"]);
+
 export const models = pgTable("models", {
   id: uuid("id").defaultRandom().primaryKey(),
   providerId: uuid("provider_id")
@@ -62,6 +68,11 @@ export const models = pgTable("models", {
   temperature: real("temperature"),
   maxTokens: integer("max_tokens"),
   topP: real("top_p"),
+  // Agent SDK specific fields
+  agentMode: agentModeEnum("agent_mode").default("simple_chat"),
+  agentMaxTurns: integer("agent_max_turns").default(15),
+  agentMaxBudgetUsd: varchar("agent_max_budget_usd", { length: 20 }).default("2.00"),
+  agentAllowedTools: jsonb("agent_allowed_tools").$type<string[]>().default([]),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -209,26 +220,45 @@ export const desensitizeMappings = pgTable("desensitize_mappings", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const callSourceEnum = pgEnum("call_source", [
+  "runtime",
+  "model_test",
+  "provider_test",
+  "prompt_optimize",
+]);
+
 export const modelCallLogs = pgTable("model_call_logs", {
   id: uuid("id").defaultRandom().primaryKey(),
-  documentId: uuid("document_id")
-    .notNull()
-    .references(() => documents.id),
-  nodeExecutionId: uuid("node_execution_id")
-    .notNull()
-    .references(() => nodeExecutions.id),
+  // Nullable: test/optimize calls don't have a document context
+  documentId: uuid("document_id").references(() => documents.id),
+  nodeExecutionId: uuid("node_execution_id").references(() => nodeExecutions.id),
+  // Who triggered this call
+  userId: uuid("user_id").references(() => users.id),
+  // Provider info
+  providerId: uuid("provider_id").references(() => providers.id),
+  providerName: varchar("provider_name", { length: 100 }),
+  // Model info
   modelId: uuid("model_id").references(() => models.id),
   modelName: varchar("model_name", { length: 200 }),
+  // Call source
+  callSource: callSourceEnum("call_source").default("runtime").notNull(),
+  // Prompt
   promptTemplate: text("prompt_template"),
   resolvedPrompt: text("resolved_prompt"),
   variableMapping: jsonb("variable_mapping"),
   temperature: real("temperature"),
   maxTokens: integer("max_tokens"),
+  // Response
   responseStatus: varchar("response_status", { length: 20 }),
+  responseContent: text("response_content"),
   contentLength: integer("content_length"),
   tokenUsage: jsonb("token_usage"),
   duration: integer("duration"),
   errorMessage: varchar("error_message", { length: 2000 }),
+  // Agent SDK specific log fields
+  agentTurnsUsed: integer("agent_turns_used"),
+  agentToolsCalled: jsonb("agent_tools_called").$type<string[]>(),
+  budgetUsedUsd: varchar("budget_used_usd", { length: 20 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

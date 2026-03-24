@@ -16,7 +16,7 @@ export const inputTransformRoutes = new Elysia({
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can upload files" };
+        return { error: "仅项目成员可上传文件" };
       }
 
       try {
@@ -52,7 +52,7 @@ export const inputTransformRoutes = new Elysia({
       const isMember = await isDocumentProjectMember(params.documentId, user!.id);
       if (!isMember) {
         set.status = 403;
-        return { error: "Only project members can confirm input transform" };
+        return { error: "仅项目成员可确认输入转换" };
       }
 
       try {

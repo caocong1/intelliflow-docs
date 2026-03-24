@@ -6,12 +6,14 @@ export type User = {
   username: string;
   displayName: string;
   role: "admin" | "user";
+  avatar: string | null;
 };
 
 type AuthContextValue = {
   user: () => User | null;
   loading: () => boolean;
   login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  wecomLogin: (code: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   isAdmin: () => boolean;
 };
@@ -61,6 +63,24 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
+  const wecomLogin = async (code: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data, error } = await api.api.auth["wecom-login"].post({ code });
+
+      if (error || !data) {
+        const errData = error?.value as { error?: string } | undefined;
+        return { success: false, error: errData?.error ?? "企业微信登录失败" };
+      }
+
+      const result = data as { token: string; user: User };
+      localStorage.setItem("auth_token", result.token);
+      setUser(result.user);
+      return { success: true };
+    } catch {
+      return { success: false, error: "网络错误" };
+    }
+  };
+
   const logout = async () => {
     try {
       await api.api.auth.logout.post();
@@ -74,7 +94,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const isAdmin = () => user()?.role === "admin";
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, wecomLogin, logout, isAdmin }}>
       {props.children}
     </AuthContext.Provider>
   );

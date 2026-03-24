@@ -7,6 +7,7 @@ export type SessionUser = {
   username: string;
   displayName: string;
   role: "admin" | "user";
+  avatar: string | null;
 };
 
 export async function validateCredentials(
@@ -21,13 +22,14 @@ export async function validateCredentials(
       role: users.role,
       passwordHash: users.passwordHash,
       isActive: users.isActive,
+      avatar: users.avatar,
     })
     .from(users)
     .where(eq(users.username, username))
     .limit(1);
 
   const user = result[0];
-  if (!user || !user.isActive) return null;
+  if (!user || !user.isActive || !user.passwordHash) return null;
 
   const valid = await Bun.password.verify(password, user.passwordHash);
   if (!valid) return null;
@@ -37,6 +39,7 @@ export async function validateCredentials(
     username: user.username,
     displayName: user.displayName,
     role: user.role,
+    avatar: user.avatar ?? null,
   };
 }
 
@@ -62,6 +65,7 @@ export async function getSessionUser(token: string): Promise<SessionUser | null>
       username: users.username,
       displayName: users.displayName,
       role: users.role,
+      avatar: users.avatar,
     })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))

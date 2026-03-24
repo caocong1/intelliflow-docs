@@ -10,7 +10,7 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
 
       if (!user) {
         set.status = 401;
-        return { error: "Invalid credentials" };
+        return { error: "用户名或密码错误" };
       }
 
       const token = await createSession(user.id);
@@ -28,14 +28,14 @@ export const authRoutes = new Elysia({ prefix: "/auth" })
   .get("/me", ({ user, set }) => {
     if (!user) {
       set.status = 401;
-      return { error: "Unauthorized" };
+      return { error: "未授权" };
     }
     return { user };
   })
   .post("/logout", async ({ sessionToken, set }) => {
     if (!sessionToken) {
       set.status = 401;
-      return { error: "Unauthorized" };
+      return { error: "未授权" };
     }
     await deleteSession(sessionToken);
     return { success: true };

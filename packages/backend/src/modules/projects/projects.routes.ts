@@ -51,7 +51,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         const message = err instanceof Error ? err.message : String(err);
         if (message.includes("23505") || message.includes("unique")) {
           set.status = 409;
-          return { error: "Project name conflict" };
+          return { error: "项目名称冲突" };
         }
         throw err;
       }
@@ -71,7 +71,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       const project = await getProject(params.id, user!.id);
       if (!project) {
         set.status = 404;
-        return { error: "Project not found" };
+        return { error: "项目不存在" };
       }
       return project;
     },
@@ -86,12 +86,12 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       const owner = await isProjectOwner(params.id, user!.id);
       if (!owner) {
         set.status = 403;
-        return { error: "Only project owner can update project" };
+        return { error: "仅项目负责人可更新项目" };
       }
       const updated = await updateProject(params.id, body);
       if (!updated) {
         set.status = 404;
-        return { error: "Project not found" };
+        return { error: "项目不存在" };
       }
       return updated;
     },
@@ -111,12 +111,12 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       const owner = await isProjectOwner(params.id, user!.id);
       if (!owner) {
         set.status = 403;
-        return { error: "Only project owner can delete project" };
+        return { error: "仅项目负责人可删除项目" };
       }
       const deleted = await deleteProject(params.id);
       if (!deleted) {
         set.status = 404;
-        return { error: "Project not found" };
+        return { error: "项目不存在" };
       }
       return { success: true };
     },
@@ -133,7 +133,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       const member = await isProjectMember(params.id, user!.id);
       if (!member) {
         set.status = 403;
-        return { error: "Only project members can view member list" };
+        return { error: "仅项目成员可查看成员列表" };
       }
       return await listMembers(params.id);
     },
@@ -148,7 +148,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       const owner = await isProjectOwner(params.id, user!.id);
       if (!owner) {
         set.status = 403;
-        return { error: "Only project owner can add members" };
+        return { error: "仅项目负责人可添加成员" };
       }
       try {
         const member = await addMember(params.id, body.userId, body.role as "owner" | "participant" | undefined);
@@ -158,7 +158,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "ALREADY_MEMBER") {
           set.status = 409;
-          return { error: "User is already a member" };
+          return { error: "该用户已是项目成员" };
         }
         throw err;
       }
@@ -178,7 +178,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       const owner = await isProjectOwner(params.id, user!.id);
       if (!owner) {
         set.status = 403;
-        return { error: "Only project owner can remove members" };
+        return { error: "仅项目负责人可移除成员" };
       }
       try {
         await removeMember(params.id, params.userId);
@@ -187,11 +187,11 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "NOT_A_MEMBER") {
           set.status = 404;
-          return { error: "User is not a member" };
+          return { error: "该用户不是项目成员" };
         }
         if (message === "SOLE_OWNER") {
           set.status = 409;
-          return { error: "Cannot remove sole owner" };
+          return { error: "不能移除唯一负责人" };
         }
         throw err;
       }
@@ -211,11 +211,11 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "NOT_A_MEMBER") {
           set.status = 404;
-          return { error: "You are not a member of this project" };
+          return { error: "你不是该项目的成员" };
         }
         if (message === "SOLE_OWNER") {
           set.status = 409;
-          return { error: "Cannot leave as sole owner — transfer ownership first" };
+          return { error: "唯一负责人无法退出，请先转让负责人" };
         }
         throw err;
       }
@@ -231,7 +231,7 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
       const owner = await isProjectOwner(params.id, user!.id);
       if (!owner) {
         set.status = 403;
-        return { error: "Only project owner can change member roles" };
+        return { error: "仅项目负责人可更改成员角色" };
       }
       try {
         const updated = await updateMemberRole(params.id, params.userId, body.role);
@@ -240,11 +240,11 @@ export const projectRoutes = new Elysia({ prefix: "/projects" })
         const message = err instanceof Error ? err.message : String(err);
         if (message === "NOT_A_MEMBER") {
           set.status = 404;
-          return { error: "User is not a member" };
+          return { error: "该用户不是项目成员" };
         }
         if (message === "SOLE_OWNER") {
           set.status = 409;
-          return { error: "Cannot demote sole owner" };
+          return { error: "不能降级唯一负责人" };
         }
         throw err;
       }

@@ -4,7 +4,7 @@ import { and, asc, eq, gt, max, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { createVersionSnapshot } from "../versions/versions.service";
-import type { DocumentRuntimeState, NodeExecution, WorkflowEdgeDef, WorkflowNodeDef } from "@intelliflow/shared";
+import type { DocumentRuntimeState, InputSource, NodeExecution, WorkflowEdgeDef, WorkflowNodeDef } from "@intelliflow/shared";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -207,13 +207,59 @@ export async function advanceNode(
 
   if (nextNodes.length > 0) {
     const nextNode = nextNodes[0];
+
+    // Build inputData for the next node based on upstream outputData
+    let nextInputData: Record<string, unknown> | null = null;
+    const wfData = await getWorkflowForDocument(documentId);
+    if (wfData && completedNode) {
+      const nextNodeDef = wfData.nodes.find((n: WorkflowNodeDef) => n.id === nextNode.nodeId);
+      const nextConfig = nextNodeDef?.config as { type: string; inputSources?: InputSource[] } | undefined;
+      const inputSources = nextConfig?.inputSources;
+
+      if (
+        (nextConfig?.type === "desensitize" || nextConfig?.type === "restore") &&
+        inputSources &&
+        inputSources.length > 0
+      ) {
+        // Build multi-source inputData from upstream node's outputData
+        const upstreamOutput = completedNode.outputData as Record<string, unknown> | null;
+        const sources: Record<string, { displayName: string; text: string }> = {};
+
+        for (const src of inputSources) {
+          // Try to find the text content from upstream outputData
+          let text = "";
+          if (upstreamOutput) {
+            // Check if upstream has sources structure (another desensitize/restore)
+            const upstreamSources = upstreamOutput.sources as Record<string, { text?: string; desensitizedText?: string; restoredText?: string }> | undefined;
+            if (upstreamSources?.[src.outputId]) {
+              const s = upstreamSources[src.outputId];
+              text = s.restoredText ?? s.desensitizedText ?? s.text ?? "";
+            } else {
+              // Try direct text field or model output content
+              text = (upstreamOutput.text as string) ?? (upstreamOutput.content as string) ?? "";
+            }
+          }
+          sources[src.outputId] = { displayName: src.displayName, text };
+        }
+
+        nextInputData = { sources };
+      } else if (completedNode.outputData) {
+        // Legacy single-input: pass text directly
+        nextInputData = completedNode.outputData as Record<string, unknown>;
+      }
+    }
+
     await db
       .update(nodeExecutions)
-      .set({ status: "in_progress", startedAt: now, updatedAt: now })
+      .set({
+        status: "in_progress",
+        startedAt: now,
+        updatedAt: now,
+        ...(nextInputData ? { inputData: nextInputData } : {}),
+      })
       .where(eq(nodeExecutions.id, nextNode.id));
 
     // Check if next node has autoAdvance and is a restore node
-    const wfData = await getWorkflowForDocument(documentId);
     if (wfData) {
       const nodeDef = wfData.nodes.find((n: WorkflowNodeDef) => n.id === nextNode.nodeId);
       if (nodeDef?.config?.autoAdvance && nodeDef.type === "restore") {

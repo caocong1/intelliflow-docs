@@ -1,4 +1,4 @@
-import type { DesensitizeConfig, NodeExecution } from "@intelliflow/shared";
+import type { DesensitizeConfig, InputSource, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { api } from "../../../api/client";
 
@@ -37,13 +37,31 @@ function groupByType(items: DetectedItem[]): Record<string, DetectedItem[]> {
   return groups;
 }
 
+/** Check if inputData uses multi-source format */
+function isMultiSource(inputData: Record<string, unknown> | null): inputData is { sources: Record<string, { displayName: string; text: string }> } {
+  return !!inputData && typeof inputData === "object" && "sources" in inputData && typeof inputData.sources === "object";
+}
+
 export default function DesensitizeExecutor(props: Props) {
+  // Multi-source support
+  const multiSource = () => isMultiSource(props.nodeExecution.inputData as Record<string, unknown> | null);
+  const sourceEntries = () => {
+    const input = props.nodeExecution.inputData as Record<string, unknown> | null;
+    if (isMultiSource(input)) {
+      return Object.entries(input.sources).map(([outputId, data]) => ({
+        outputId,
+        displayName: data.displayName,
+        text: data.text,
+      }));
+    }
+    return [];
+  };
+  const [activeSourceIndex, setActiveSourceIndex] = createSignal(0);
+
   // Determine initial phase from existing outputData
   const initialPhase = (): Phase => {
-    if (
-      props.nodeExecution.outputData &&
-      (props.nodeExecution.outputData as Record<string, unknown>).text
-    ) {
+    const output = props.nodeExecution.outputData as Record<string, unknown> | null;
+    if (output && (output.text || output.sources)) {
       return "confirmed";
     }
     return "detect";
@@ -51,7 +69,9 @@ export default function DesensitizeExecutor(props: Props) {
 
   const [phase, setPhase] = createSignal<Phase>(initialPhase());
   const [inputText, setInputText] = createSignal(
-    ((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? "",
+    multiSource()
+      ? (sourceEntries()[0]?.text ?? "")
+      : (((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? ""),
   );
   const [items, setItems] = createSignal<DetectedItem[]>([]);
   const [loading, setLoading] = createSignal(false);
@@ -310,10 +330,11 @@ export default function DesensitizeExecutor(props: Props) {
   // ─── Read-only / confirmed mode ────────────────────────────────────────────
 
   if (props.readOnly || phase() === "confirmed") {
-    const outputText =
-      ((props.nodeExecution.outputData as Record<string, unknown>)?.text as string) ?? "";
-    const mappingCount =
-      ((props.nodeExecution.outputData as Record<string, unknown>)?.mappingCount as number) ?? 0;
+    const outputData = props.nodeExecution.outputData as Record<string, unknown> | null;
+    const outputText = (outputData?.text as string) ?? "";
+    const mappingCount = (outputData?.mappingCount as number) ?? 0;
+    const outputSources = outputData?.sources as Record<string, { displayName: string; desensitizedText: string }> | undefined;
+    const hasMultiOutput = !!outputSources && Object.keys(outputSources).length > 0;
 
     return (
       <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
@@ -346,9 +367,26 @@ export default function DesensitizeExecutor(props: Props) {
           </div>
         </div>
         <div class="p-6">
-          <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed">
-            {outputText}
-          </div>
+          <Show when={hasMultiOutput} fallback={
+            <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed">
+              {outputText}
+            </div>
+          }>
+            <div class="space-y-3">
+              <For each={Object.entries(outputSources ?? {})}>
+                {([_outputId, src]) => (
+                  <div class="rounded-xl border border-[rgba(199,196,216,0.25)] overflow-hidden">
+                    <div class="px-4 py-2 bg-[#f7f9fb] border-b border-[rgba(199,196,216,0.15)]">
+                      <span class="text-xs font-medium text-[#464555]">{src.displayName}</span>
+                    </div>
+                    <div class="p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed">
+                      {src.desensitizedText}
+                    </div>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
         </div>
       </div>
     );
@@ -425,6 +463,35 @@ export default function DesensitizeExecutor(props: Props) {
               )}
             </For>
           </div>
+
+          {/* Multi-source tab bar */}
+          <Show when={multiSource() && sourceEntries().length > 1}>
+            <div class="flex gap-1 bg-[#f7f9fb] rounded-xl p-1">
+              <For each={sourceEntries()}>
+                {(src, index) => (
+                  <button
+                    type="button"
+                    class={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      activeSourceIndex() === index()
+                        ? "bg-white text-[#191c1e] shadow-sm"
+                        : "text-[#9fa0a8] hover:text-[#464555]"
+                    }`}
+                    onClick={() => {
+                      setActiveSourceIndex(index());
+                      setInputText(src.text);
+                      // Reset to detect phase for this source
+                      if (phase() !== "confirmed") {
+                        setPhase("detect");
+                        setItems([]);
+                      }
+                    }}
+                  >
+                    {src.displayName}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
 
           {/* Error display */}
           <Show when={error()}>

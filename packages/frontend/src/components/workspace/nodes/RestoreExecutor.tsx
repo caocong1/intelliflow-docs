@@ -13,6 +13,8 @@ interface RestoreOutputData {
   originalText: string;
   restoredText: string;
   restorations: RestorationItem[];
+  /** Multi-source output structure */
+  sources?: Record<string, { displayName: string; originalText: string; restoredText: string }>;
 }
 
 interface Props {
@@ -229,7 +231,10 @@ export default function RestoreExecutor(props: Props) {
   // ─── Read-only mode ───────────────────────────────────────────────────────
 
   if (props.readOnly && outputData()) {
-    const data = outputData()!;
+    const data = outputData();
+    if (!data) return null;
+    const hasMultiSource = !!data.sources && Object.keys(data.sources).length > 0;
+
     return (
       <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] p-6 space-y-4">
         <div class="flex items-center justify-between">
@@ -241,9 +246,26 @@ export default function RestoreExecutor(props: Props) {
             已恢复 {restoredCount()} 处
           </div>
         </div>
-        <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm whitespace-pre-wrap leading-relaxed text-[#191c1e]">
-          {renderHighlightedText(data.restoredText, data.restorations, "right")}
-        </div>
+        <Show when={hasMultiSource} fallback={
+          <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm whitespace-pre-wrap leading-relaxed text-[#191c1e]">
+            {renderHighlightedText(data.restoredText, data.restorations, "right")}
+          </div>
+        }>
+          <div class="space-y-3">
+            <For each={Object.entries(data.sources ?? {})}>
+              {([_outputId, src]) => (
+                <div class="rounded-xl border border-[rgba(199,196,216,0.25)] overflow-hidden">
+                  <div class="px-4 py-2 bg-[#f0fdf4] border-b border-[rgba(199,196,216,0.15)]">
+                    <span class="text-xs font-medium text-[#464555]">{src.displayName}</span>
+                  </div>
+                  <div class="p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed">
+                    {src.restoredText}
+                  </div>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
     );
   }

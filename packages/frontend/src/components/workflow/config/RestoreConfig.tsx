@@ -1,4 +1,4 @@
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 import type { RestoreConfig } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
 
@@ -17,8 +17,36 @@ export default function RestoreConfigPanel(props: RestoreConfigProps) {
 
   const isPaired = () => !!pairedNode();
 
+  const inputSources = () => props.config.inputSources ?? [];
+
   return (
     <div class="space-y-4">
+      {/* Input Sources (auto-populated, read-only) */}
+      <div>
+        <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+          输入来源 (自动关联)
+        </h4>
+        <Show
+          when={inputSources().length > 0}
+          fallback={
+            <p class="text-xs text-amber-600 italic text-center py-2">
+              请先连接上游节点
+            </p>
+          }
+        >
+          <div class="space-y-1">
+            <For each={inputSources()}>
+              {(src) => (
+                <div class="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 rounded-md border border-slate-200">
+                  <div class="w-1.5 h-1.5 rounded-full bg-green-400 flex-shrink-0" />
+                  <span class="text-xs text-slate-700 truncate">{src.displayName}</span>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+
       {/* Description */}
       <div class="bg-slate-50 rounded-md p-2.5 border border-slate-100">
         <p class="text-xs text-slate-500">

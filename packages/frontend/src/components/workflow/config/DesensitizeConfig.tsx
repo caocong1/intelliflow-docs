@@ -1,5 +1,5 @@
 import type { DesensitizeConfig } from "@intelliflow/shared";
-import { For, createResource } from "solid-js";
+import { Index, For, Show, createResource, createEffect } from "solid-js";
 import { api } from "../../../api/client";
 
 type LocalModel = {
@@ -33,7 +33,7 @@ async function fetchLocalModels(): Promise<LocalModel[]> {
       }>;
     };
     // Filter to local deployment models only
-    return data.data.filter((m) => m.isActive && !m.isProviderDisabled);
+    return data.data.filter((m) => m.isActive && !m.isProviderDisabled && m.deploymentType === "local");
   } catch {
     return [];
   }
@@ -46,6 +46,15 @@ interface DesensitizeConfigProps {
 
 export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
   const [localModels] = createResource(fetchLocalModels);
+  let selectRef!: HTMLSelectElement;
+
+  // Re-apply select value after async options load
+  createEffect(() => {
+    const _ = localModels();
+    if (selectRef) {
+      selectRef.value = props.config.localModelId ?? "";
+    }
+  });
 
   function addCategory() {
     const current = props.config.categories ?? [];
@@ -75,8 +84,36 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
     props.onChange({ ...props.config, categories: current });
   }
 
+  const inputSources = () => props.config.inputSources ?? [];
+
   return (
     <div class="space-y-4">
+      {/* Input Sources (auto-populated, read-only) */}
+      <div>
+        <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">
+          输入来源 (自动关联)
+        </h4>
+        <Show
+          when={inputSources().length > 0}
+          fallback={
+            <p class="text-xs text-amber-600 italic text-center py-2">
+              请先连接上游节点
+            </p>
+          }
+        >
+          <div class="space-y-1">
+            <For each={inputSources()}>
+              {(src) => (
+                <div class="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 rounded-md border border-slate-200">
+                  <div class="w-1.5 h-1.5 rounded-full bg-indigo-400 flex-shrink-0" />
+                  <span class="text-xs text-slate-700 truncate">{src.displayName}</span>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+      </div>
+
       {/* Categories */}
       <div>
         <div class="flex items-center justify-between mb-2">
@@ -106,7 +143,7 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
         </div>
 
         <div class="space-y-2">
-          <For
+          <Index
             each={props.config.categories ?? []}
             fallback={
               <p class="text-xs text-slate-400 italic text-center py-2">
@@ -122,8 +159,8 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
                   <div class="flex flex-col gap-0.5 flex-shrink-0">
                     <button
                       type="button"
-                      onClick={() => moveCategory(index(), -1)}
-                      disabled={index() === 0}
+                      onClick={() => moveCategory(index, -1)}
+                      disabled={index === 0}
                       class="p-0.5 text-slate-300 hover:text-slate-500 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
                       title="上移"
                     >
@@ -145,8 +182,8 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
                     </button>
                     <button
                       type="button"
-                      onClick={() => moveCategory(index(), 1)}
-                      disabled={index() === (props.config.categories ?? []).length - 1}
+                      onClick={() => moveCategory(index, 1)}
+                      disabled={index === (props.config.categories ?? []).length - 1}
                       class="p-0.5 text-slate-300 hover:text-slate-500 disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed focus:outline-none"
                       title="下移"
                     >
@@ -171,8 +208,8 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
                   {/* Category name input */}
                   <input
                     type="text"
-                    value={cat.name}
-                    onInput={(e) => updateCategory(index(), { name: e.currentTarget.value })}
+                    value={cat().name}
+                    onInput={(e) => updateCategory(index, { name: e.currentTarget.value })}
                     placeholder="类别名称（如：公司名称）"
                     class="flex-1 min-w-0 text-xs px-2 py-1.5 border border-gray-300 rounded-md bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400 focus:border-orange-400"
                   />
@@ -180,7 +217,7 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
                   {/* Delete button — top-right corner of card */}
                   <button
                     type="button"
-                    onClick={() => removeCategory(index())}
+                    onClick={() => removeCategory(index)}
                     class="flex-shrink-0 p-1 text-slate-300 hover:text-red-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-400 rounded"
                     title="删除类别"
                   >
@@ -205,8 +242,8 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
                 {/* Description textarea */}
                 <div class="mt-2 pl-7">
                   <textarea
-                    value={cat.description}
-                    onInput={(e) => updateCategory(index(), { description: e.currentTarget.value })}
+                    value={cat().description}
+                    onInput={(e) => updateCategory(index, { description: e.currentTarget.value })}
                     placeholder="描述（如：识别并脱敏所有公司和组织名称）"
                     rows={2}
                     class="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-md bg-white text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-orange-400 focus:border-orange-400 resize-none"
@@ -214,7 +251,7 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
                 </div>
               </div>
             )}
-          </For>
+          </Index>
         </div>
 
         {(props.config.categories ?? []).length === 0 && (
@@ -237,6 +274,7 @@ export default function DesensitizeConfigPanel(props: DesensitizeConfigProps) {
           本地模型（用于脱敏处理）
         </label>
         <select
+          ref={selectRef}
           id="desensitize-local-model"
           value={props.config.localModelId ?? ""}
           onChange={(e) =>

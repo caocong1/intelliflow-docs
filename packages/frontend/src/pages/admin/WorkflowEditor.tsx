@@ -1,6 +1,6 @@
 import { Show, createSignal, createEffect, onMount, onCleanup } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
-import type { WorkflowNodeType, OutputDef, NodeConfig } from "@intelliflow/shared";
+import type { WorkflowNodeType, OutputDef, NodeConfig, InputSource } from "@intelliflow/shared";
 import { api } from "../../api/client";
 import { showToast } from "../../components/ui/Toast";
 import FlowCanvas from "../../components/workflow/canvas/FlowCanvas";
@@ -222,6 +222,8 @@ export default function WorkflowEditor() {
         outputs,
       },
     });
+    // Propagate output changes to downstream desensitize/restore inputSources
+    syncInputSources();
     pushStateChange();
   }
 
@@ -277,9 +279,63 @@ export default function WorkflowEditor() {
       }
     }
 
+    // Sync inputSources after auto-connect
+    syncInputSources();
+
     // Select the newly dropped node
     selection.selectNode(id, false);
     pushStateChange();
+  }
+
+  /**
+   * Auto-populate inputSources on desensitize/restore nodes based on incoming edges.
+   * Called after any edge add/remove or upstream config change.
+   */
+  function syncInputSources() {
+    for (const node of store.nodes) {
+      const config = node.data.config as unknown as Record<string, unknown>;
+      if (config.type !== "desensitize" && config.type !== "restore") continue;
+
+      // Find the incoming edge to this node
+      const incomingEdge = store.edges.find((e) => e.target === node.id);
+      if (!incomingEdge) {
+        // No incoming edge — clear inputSources
+        if ((config as { inputSources?: unknown[] }).inputSources?.length) {
+          const updatedConfig = { ...config, inputSources: [] } as unknown as NodeConfig;
+          const outputs = deriveOutputs(node.id, updatedConfig);
+          store.updateNode(node.id, {
+            data: { ...node.data, config: updatedConfig, outputs },
+          });
+        }
+        continue;
+      }
+
+      // Find the source node
+      const sourceNode = store.nodes.find((n) => n.id === incomingEdge.source);
+      if (!sourceNode) continue;
+
+      // Map source node's outputs to InputSource[]
+      const sourceOutputs = (sourceNode.data.outputs ?? []) as OutputDef[];
+      const newInputSources: InputSource[] = sourceOutputs.map((out) => ({
+        sourceNodeId: sourceNode.id,
+        outputId: out.id,
+        displayName: out.name,
+      }));
+
+      // Only update if changed (avoid infinite loops)
+      const existing = (config as { inputSources?: InputSource[] }).inputSources ?? [];
+      const changed =
+        existing.length !== newInputSources.length ||
+        existing.some((s, i) => s.outputId !== newInputSources[i]?.outputId || s.displayName !== newInputSources[i]?.displayName);
+
+      if (changed) {
+        const updatedConfig = { ...config, inputSources: newInputSources } as unknown as NodeConfig;
+        const outputs = deriveOutputs(node.id, updatedConfig);
+        store.updateNode(node.id, {
+          data: { ...node.data, config: updatedConfig, outputs },
+        });
+      }
+    }
   }
 
   function handleConnectionComplete(sourceId: string, targetId: string) {
@@ -289,6 +345,7 @@ export default function WorkflowEditor() {
       target: targetId,
       type: "bezier",
     });
+    syncInputSources();
     pushStateChange();
   }
 
@@ -313,6 +370,7 @@ export default function WorkflowEditor() {
     if (edgeIds.size > 0) {
       store.removeEdges(edgeIds);
     }
+    syncInputSources();
     selection.clearSelection();
     pushStateChange();
   }

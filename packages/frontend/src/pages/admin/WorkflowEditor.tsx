@@ -1,4 +1,4 @@
-import { Show, createSignal, onMount, onCleanup } from "solid-js";
+import { Show, createSignal, createEffect, onMount, onCleanup } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
 import type { WorkflowNodeType, OutputDef, NodeConfig } from "@intelliflow/shared";
 import { api } from "../../api/client";
@@ -47,7 +47,7 @@ const DEFAULT_LABELS: Record<WorkflowNodeType, string> = {
 function buildDefaultConfig(nodeType: WorkflowNodeType): NodeConfig {
   switch (nodeType) {
     case "input_transform":
-      return { type: "input_transform", formFields: [], allowFileUpload: false };
+      return { type: "input_transform", formFields: [] };
     case "desensitize":
       return { type: "desensitize", categories: [], localModelId: null };
     case "model_call":
@@ -55,7 +55,7 @@ function buildDefaultConfig(nodeType: WorkflowNodeType): NodeConfig {
     case "restore":
       return { type: "restore", pairedDesensitizeNodeId: null };
     case "export":
-      return { type: "export", format: "word", templateId: null, contentMapping: [] };
+      return { type: "export", formats: ["word", "pdf", "markdown"], templateId: null, contentMapping: [] };
   }
 }
 
@@ -355,6 +355,59 @@ export default function WorkflowEditor() {
     const firstId = ids.values().next().value;
     return store.nodes.find((n) => n.id === firstId) ?? null;
   };
+
+  // Deferred repair: when a node is selected, fix any broken upstream variable
+  // references in its promptTemplate using the final state of upstream outputs.
+  createEffect(() => {
+    const node = selectedNodeForConfig();
+    if (!node) return;
+    const cfg = node.data.config as unknown as Record<string, unknown>;
+    if (cfg.type !== "model_call" || typeof cfg.promptTemplate !== "string") return;
+
+    const tpl = cfg.promptTemplate as string;
+    const refRegex = /\{\{([^}]+)\}\}/g;
+    let match: RegExpExecArray | null;
+    let repaired = tpl;
+    let changed = false;
+
+    match = refRegex.exec(tpl);
+    while (match !== null) {
+      const varKey = match[1].trim();
+      const dotIdx = varKey.indexOf(".");
+      if (dotIdx > 0) {
+        const refNodeId = varKey.slice(0, dotIdx);
+        const refOutputId = varKey.slice(dotIdx + 1);
+        const refNode = store.nodes.find((n) => n.id === refNodeId);
+        if (refNode) {
+          const outputs = (refNode.data.outputs ?? []) as OutputDef[];
+          const found = outputs.find((o) => o.id === refOutputId);
+          if (!found) {
+            // Output ID is stale — try to remap by type prefix (e.g. nodeId-model-*)
+            const prefix = `${refNodeId}-model-`;
+            if (refOutputId.startsWith(prefix)) {
+              const modelOutputs = outputs.filter((o) => o.id.startsWith(prefix));
+              if (modelOutputs.length === 1) {
+                // Single model output available — remap to it
+                repaired = repaired.replace(
+                  `{{${varKey}}}`,
+                  `{{${refNodeId}.${modelOutputs[0].id}}}`,
+                );
+                changed = true;
+              }
+            }
+          }
+        }
+      }
+      match = refRegex.exec(tpl);
+    }
+
+    if (changed) {
+      store.updateNode(node.id, {
+        data: { ...node.data, config: { ...cfg, promptTemplate: repaired } as unknown as NodeConfig },
+      });
+      pushStateChange();
+    }
+  });
 
   return (
     <div class="flex flex-col h-screen bg-slate-50">

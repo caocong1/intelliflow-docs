@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-21T07:07:19.827Z"
+last_updated: "2026-03-24T02:37:36Z"
 progress:
   total_phases: 13
-  completed_phases: 12
-  total_plans: 45
-  completed_plans: 44
+  completed_phases: 13
+  total_plans: 46
+  completed_plans: 46
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 13 of 13 (Document Runtime Refactor — Align Phase 12)
-Plan: 8 of 8 in current phase (13-07 complete)
-Status: In Progress
-Last activity: 2026-03-21 — Completed 13-07 (State Persistence & Model Call Logs)
+Plan: 9 of 9 in current phase (13-09 complete)
+Status: Complete
+Last activity: 2026-03-24 — Completed 13-09 (Multi-Input Desensitize/Restore)
 
-Progress: [█████████░] 98% (44/45 plans)
+Progress: [██████████] 100% (46/46 plans)
 
 ## Performance Metrics
 
@@ -91,6 +91,7 @@ Progress: [█████████░] 98% (44/45 plans)
 | Phase 13 P03 | 5min | 2 tasks | 2 files |
 | Phase 13 P07 | 4min | 2 tasks | 8 files |
 | Phase 13 P06 | 3min | 2 tasks | 2 files |
+| Phase 13 P09 | 6min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -205,6 +206,11 @@ Recent decisions affecting current work:
 - [13-05] Executor null guards: if (!props.config) return Chinese loading message
 - [Phase 13]: Label wrapping pattern for a11y in dynamic SolidJS form fields
 - [Phase 13]: [13-06] WorkflowPreview uses CSS borders for connecting lines; progress fields optional on DocumentItem for backward compat
+- [13-09] InputSource type with auto-population from upstream outputs via syncInputSources()
+- [13-09] derive-outputs generates per-inputSource outputs: {displayName}.脱敏 / {displayName}.恢复
+- [13-09] Validation Rule 9: max 1 desensitize node per workflow; Rule 10: valid inputSource references
+- [13-09] Multi-source inputData format: { sources: { [outputId]: { displayName, text } } }
+- [13-09] Single shared desensitize mapping table across all input sources; legacy fallback preserved
 
 ### Roadmap Evolution
 
@@ -220,6 +226,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-21
-Stopped at: Completed 13-07-PLAN.md
-Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-07-SUMMARY.md
+Last session: 2026-03-24
+Stopped at: Completed 13-09-PLAN.md
+Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-09-SUMMARY.md

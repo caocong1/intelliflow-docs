@@ -31,7 +31,10 @@ export interface HealthResponse {
 }
 
 /** AI provider types */
-export type ProviderType = "openai_compatible" | "opencode";
+export type ProviderType = "openai_compatible" | "opencode" | "claude_agent_sdk" | "ollama";
+
+/** Agent SDK running mode */
+export type AgentMode = "simple_chat" | "autonomous_agent";
 
 /** Model deployment types */
 export type DeploymentType = "cloud" | "local";
@@ -58,6 +61,11 @@ export interface Model extends BaseEntity {
   maxTokens?: number | null;
   topP?: number | null;
   providerName?: string;
+  /** Agent SDK specific fields */
+  agentMode?: AgentMode | null;
+  agentMaxTurns?: number | null;
+  agentMaxBudgetUsd?: string | null;
+  agentAllowedTools?: string[] | null;
 }
 
 /** Provider with its models */
@@ -87,6 +95,13 @@ export interface OutputDef {
   description?: string;
 }
 
+/** Explicit input source reference for desensitize/restore nodes */
+export interface InputSource {
+  sourceNodeId: string;
+  outputId: string;
+  displayName: string; // auto-filled from upstream output name
+}
+
 /** Variable reference in prompt templates */
 export interface VariableRef {
   nodeId: string;
@@ -100,14 +115,16 @@ export interface FormFieldDef {
   label: string;
   type: "text" | "textarea" | "file";
   required: boolean;
+  /** File upload: how many files allowed */
+  fileCountMode?: "single" | "unlimited";
+  /** When set, restrict to these file extensions (e.g. [".pdf", ".doc,.docx"]) */
+  acceptedFileTypes?: string[];
 }
 
 /** Node config discriminated union */
 export interface InputTransformConfig {
   type: "input_transform";
   formFields: FormFieldDef[];
-  allowFileUpload: boolean;
-  acceptedFileTypes?: string[];
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
@@ -117,6 +134,7 @@ export interface DesensitizeConfig {
   type: "desensitize";
   categories: Array<{ name: string; description: string }>;
   localModelId: string | null;
+  inputSources?: InputSource[];
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
@@ -126,6 +144,8 @@ export interface ModelCallConfig {
   type: "model_call";
   displayName: string;
   modelIds: string[];
+  /** Model ID → display name mapping for readable output names */
+  modelNames?: Record<string, string>;
   /** @deprecated Use modelIds instead. Kept for backward compatibility. */
   modelId?: string | null;
   promptTemplate: string;
@@ -138,6 +158,7 @@ export interface ModelCallConfig {
 export interface RestoreConfig {
   type: "restore";
   pairedDesensitizeNodeId: string | null;
+  inputSources?: InputSource[];
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
@@ -145,7 +166,10 @@ export interface RestoreConfig {
 
 export interface ExportConfig {
   type: "export";
-  format: "word" | "pdf" | "markdown" | "ppt";
+  /** Allowed export formats (multi-select in config, user picks one at runtime) */
+  formats: Array<"word" | "pdf" | "markdown" | "ppt">;
+  /** @deprecated Use formats instead */
+  format?: "word" | "pdf" | "markdown" | "ppt";
   templateId: string | null;
   contentMapping: VariableRef[];
   autoAdvance?: boolean;

@@ -17,7 +17,8 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
           });
         }
       }
-      if (config.allowFileUpload) {
+      const hasFileField = config.formFields.some((f) => f.type === "file");
+      if (hasFileField) {
         outputs.push({
           id: `${nodeId}-file-upload`,
           name: "文件输出 (动态)",
@@ -30,17 +31,32 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
     case "model_call":
       return config.modelIds.map((modelId) => ({
         id: `${nodeId}-model-${modelId}`,
-        name: modelId,
+        name: config.modelNames?.[modelId] ?? modelId,
         description: "模型生成输出",
       }));
 
     case "desensitize":
+      if (config.inputSources && config.inputSources.length > 0) {
+        return config.inputSources.map((src) => ({
+          id: `${nodeId}-desensitized-${src.outputId}`,
+          name: `${src.displayName}.脱敏`,
+          description: `脱敏后文本: ${src.displayName}`,
+        }));
+      }
+      // Fallback for legacy configs without inputSources
       return [{ id: `${nodeId}-desensitized`, name: "脱敏后文本" }];
 
     case "restore":
+      if (config.inputSources && config.inputSources.length > 0) {
+        return config.inputSources.map((src) => ({
+          id: `${nodeId}-restored-${src.outputId}`,
+          name: `${src.displayName}.恢复`,
+          description: `恢复后文本: ${src.displayName}`,
+        }));
+      }
       return [{ id: `${nodeId}-restored`, name: "恢复后文本" }];
 
     case "export":
-      return [{ id: `${nodeId}-exported`, name: "导出文件" }];
+      return [];
   }
 }

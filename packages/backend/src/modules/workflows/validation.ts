@@ -91,6 +91,15 @@ export function validateWorkflow(
     });
   }
 
+  // ── Rule 9: Max 1 desensitize node per workflow ────────────────────────────
+  const desensitizeNodeCount = nodes.filter((n) => n.type === "desensitize").length;
+  if (desensitizeNodeCount > 1) {
+    errors.push({
+      message: "工作流最多只能包含一个【信息脱敏】节点",
+      severity: "error",
+    });
+  }
+
   // ── Rule 5: desensitize/restore pairing ────────────────────────────────────
   // Build reachability map (BFS/DFS downstream from each node)
   function getDownstreamIds(startId: string): Set<string> {
@@ -227,10 +236,10 @@ export function validateWorkflow(
     }
 
     if (node.config.type === "export") {
-      if (!node.config.format) {
+      if (!node.config.formats || node.config.formats.length === 0) {
         errors.push({
           nodeId: node.id,
-          field: "format",
+          field: "formats",
           message: `【文件导出】节点 "${node.label}" 未指定导出格式`,
           severity: "error",
         });
@@ -238,7 +247,69 @@ export function validateWorkflow(
     }
   }
 
-  // ── Rule 7: Linear flow constraint (max 1 input + 1 output per node) ────
+  // ── Rule 7: Broken variable references (nodeId or outputId no longer exists) ─
+  const outputIdSet = new Set<string>();
+  for (const n of nodes) {
+    for (const o of n.outputs) {
+      outputIdSet.add(`${n.id}.${o.id}`);
+    }
+  }
+
+  for (const node of nodes) {
+    if (node.config.type === "model_call") {
+      const template = node.config.promptTemplate ?? "";
+      const regex = /\{\{([^}]+)\}\}/g;
+      let m: RegExpExecArray | null;
+      m = regex.exec(template);
+      while (m !== null) {
+        const varKey = m[1].trim();
+        // Skip system variables
+        if (!varKey.includes(".")) { m = regex.exec(template); continue; }
+        const dotIdx = varKey.indexOf(".");
+        const refNodeId = varKey.slice(0, dotIdx);
+        const refNode = nodeMap.get(refNodeId);
+        if (!refNode) {
+          errors.push({
+            nodeId: node.id,
+            field: "promptTemplate",
+            message: `【模型调用】节点 "${node.label}" 的提示词引用了已删除的节点`,
+            severity: "error",
+          });
+        } else if (!outputIdSet.has(varKey)) {
+          errors.push({
+            nodeId: node.id,
+            field: "promptTemplate",
+            message: `【模型调用】节点 "${node.label}" 的提示词引用了节点 "${refNode.label}" 中不存在的输出`,
+            severity: "error",
+          });
+        }
+        m = regex.exec(template);
+      }
+    }
+
+    if (node.config.type === "export") {
+      for (const ref of node.config.contentMapping ?? []) {
+        const refNode = nodeMap.get(ref.nodeId);
+        if (!refNode) {
+          errors.push({
+            nodeId: node.id,
+            field: "contentMapping",
+            message: `【文件导出】节点 "${node.label}" 引用了已删除的节点`,
+            severity: "error",
+          });
+        } else if (!outputIdSet.has(`${ref.nodeId}.${ref.outputId}`)) {
+          errors.push({
+            nodeId: node.id,
+            field: "contentMapping",
+            message: `【文件导出】节点 "${node.label}" 引用了节点 "${refNode.label}" 中不存在的输出`,
+            severity: "error",
+          });
+        }
+      }
+    }
+  }
+
+  // ── Rule 8: Linear flow constraint (max 1 input + 1 output per node) ────
   const incomingCount = new Map<string, number>();
   const outgoingCount = new Map<string, number>();
   for (const edge of edges) {
@@ -261,6 +332,65 @@ export function validateWorkflow(
         message: `节点 "${node.label}" 有多条输出连接，流程必须为线性`,
         severity: "error",
       });
+    }
+  }
+
+  // ── Rule 10: Validate inputSources on desensitize/restore nodes ────────────
+  // Build upstream reachability for each node via BFS
+  function getUpstreamIds(startId: string): Set<string> {
+    const visited = new Set<string>();
+    const stack = [startId];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (current === undefined) break;
+      for (const edge of edges) {
+        if (edge.target === current && !visited.has(edge.source)) {
+          visited.add(edge.source);
+          stack.push(edge.source);
+        }
+      }
+    }
+    return visited;
+  }
+
+  for (const node of nodes) {
+    if (node.config.type !== "desensitize" && node.config.type !== "restore") continue;
+    const inputSources = node.config.inputSources;
+    if (!inputSources || inputSources.length === 0) continue;
+
+    const upstreamIds = getUpstreamIds(node.id);
+
+    for (const src of inputSources) {
+      const srcNode = nodeMap.get(src.sourceNodeId);
+      if (!srcNode) {
+        errors.push({
+          nodeId: node.id,
+          field: "inputSources",
+          message: `节点 "${node.label}" 的输入来源引用了不存在的节点`,
+          severity: "error",
+        });
+        continue;
+      }
+
+      if (!upstreamIds.has(src.sourceNodeId)) {
+        errors.push({
+          nodeId: node.id,
+          field: "inputSources",
+          message: `节点 "${node.label}" 的输入来源 "${src.displayName}" 不在上游路径中`,
+          severity: "error",
+        });
+        continue;
+      }
+
+      const srcOutputExists = srcNode.outputs.some((o) => o.id === src.outputId);
+      if (!srcOutputExists) {
+        errors.push({
+          nodeId: node.id,
+          field: "inputSources",
+          message: `节点 "${node.label}" 的输入来源 "${src.displayName}" 引用了不存在的输出`,
+          severity: "error",
+        });
+      }
     }
   }
 

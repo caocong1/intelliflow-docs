@@ -259,7 +259,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DOC-02 | Phase 5 | Complete |
 | DOC-03 | Phase 5 | Complete |
 | DOC-04 | Phase 5 | Complete |
-| DOC-05 | Phase 5 | Complete |
+| DOC-05 | Phase 5, Phase 15 | Complete |
 | NODE-01 | Phase 5 | Complete |
 | NODE-02 | Phase 5 | Complete |
 | NODE-03 | Phase 5 | Complete |
@@ -279,7 +279,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NODE-17 | Phase 5 | Complete |
 | NODE-18 | Phase 5 | Complete |
 | NODE-19 | Phase 5 | Complete |
-| NODE-20 | Phase 5 | Complete |
+| NODE-20 | Phase 5, Phase 15 | Complete |
 | NODE-21 | Phase 5 | Complete |
 | NODE-22 | Phase 5 | Complete |
 | NOPS-01 | Phase 5 | Complete |

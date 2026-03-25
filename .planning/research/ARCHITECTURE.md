@@ -1,656 +1,889 @@
-# Architecture Research
+# Architecture: v1.1 Integration Design
 
-**Domain:** Enterprise AI document generation platform with workflow orchestration
-**Researched:** 2026-03-19
+**Domain:** v1.1 feature integration into existing AI document generation platform
+**Researched:** 2026-03-25
 **Confidence:** HIGH
 
-## Standard Architecture
+## Existing Architecture Summary
 
-### System Overview
+The v1.0 codebase is a Bun monorepo with:
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Presentation Layer                           │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌──────────────────┐  │
-│  │ Admin    │  │ Document │  │ Workflow  │  │ Project &       │  │
-│  │ Console  │  │ Workbench│  │ Designer  │  │ Doc Management  │  │
-│  └────┬─────┘  └────┬─────┘  └─────┬─────┘  └───────┬──────────┘  │
-├───────┴──────────────┴──────────────┴────────────────┴──────────────┤
-│                        API Layer (NestJS + Fastify)                  │
-│  Authentication / Authorization / Rate Limiting / SSE Streaming     │
-├─────────────────────────────────────────────────────────────────────┤
-│                        Application Services                         │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌──────────────────┐  │
-│  │ Auth &   │  │ Workflow │  │ Model     │  │ Document &      │  │
-│  │ User Svc │  │ Engine   │  │ Invocation│  │ Project Svc     │  │
-│  └──────────┘  └──────────┘  │ Layer     │  └──────────────────┘  │
-│  ┌──────────┐  ┌──────────┐  └───────────┘  ┌──────────────────┐  │
-│  │ Desensi- │  │ Export   │  ┌───────────┐  │ Material &      │  │
-│  │ tization │  │ Service  │  │ Workspace │  │ Context Svc     │  │
-│  │ Service  │  └──────────┘  │ Manager   │  │ (M4+ scope)     │  │
-│  └──────────┘                └───────────┘  └──────────────────┘  │
-├─────────────────────────────────────────────────────────────────────┤
-│                        Infrastructure Layer                         │
-│  ┌──────────┐  ┌──────────┐  ┌───────────┐  ┌──────────────────┐  │
-│  │PostgreSQL│  │ File     │  │ BullMQ    │  │ Redis            │  │
-│  │ (Prisma) │  │ System   │  │ Task Queue│  │ (Cache/Pub-Sub)  │  │
-│  └──────────┘  └──────────┘  └───────────┘  └──────────────────┘  │
-└─────────────────────────────────────────────────────────────────────┘
-```
+- **Backend:** ElysiaJS + Drizzle ORM + PostgreSQL 18, modular route/service pattern
+- **Frontend:** SolidJS + Tailwind CSS v4, Eden Treaty for type-safe API calls
+- **Runtime:** Sequential node execution with SSE streaming via `ReadableStream<Uint8Array>`
+- **Auth:** Bearer Token + `sessions` table, `authPlugin` (resolve) + `requireAuth`/`requireAdmin` (scoped guards)
+- **WeChat Work:** Service layer with access token caching, `sendTextCardMessage()` already implemented
+- **Model calls:** OpenAI-compatible API with SSE, strategy pattern (`base.strategy.ts` -> `openai-compatible.strategy.ts`, `claude-agent-sdk.strategy.ts`)
+- **Schema:** 14 tables via Drizzle (`users`, `sessions`, `providers`, `models`, `documentTypes`, `workflows`, `projects`, `projectMembers`, `projectInvitations`, `documents`, `documentVersions`, `nodeExecutions`, `desensitizeMappings`, `modelCallLogs`, `documentFiles`, `documentVisibilityMembers`)
 
-### Recommended Approach: Modular Monolith
+Key insight: The current runtime is **synchronous-blocking from the user's perspective** -- the user stays on the DocumentWorkspace page while SSE streams model output. v1.1 must add an asynchronous path where the user leaves and gets notified on completion.
 
-For a 50-user internal enterprise tool, a **modular monolith** (NestJS) is the correct starting architecture. Microservices would add deployment and operational complexity with zero benefit at this scale.
+---
 
-**Why modular monolith:**
-- 50 concurrent users does not justify distributed system overhead
-- Single team developing the product -- no organizational need for service boundaries
-- Shared PostgreSQL transactions simplify consistency (workflow state + file index + execution log in one transaction)
-- NestJS module system enforces boundaries at the code level without network overhead
-- Can extract modules into services later if needed (module boundaries are the extraction seam)
+## Feature 1: Background AI Generation + WeChat Work Notification
 
-**Why not a tangled monolith:**
-- The workflow engine, model invocation layer, and desensitization service have fundamentally different concerns and security boundaries
-- Clean internal boundaries prevent a costly rewrite when extracting the model invocation layer for v2 API mode
+### Decision: In-Process Task Queue (No External Dependencies)
 
-### Component Responsibilities
+**Use in-process queue with PostgreSQL persistence, not Redis/BullMQ.**
 
-| Component | Responsibility | Communicates With |
-|-----------|----------------|-------------------|
-| **Admin Console** | Model provider/model config, doc type management, workflow design, usage stats, user management | API Layer |
-| **Document Workbench** | Step-by-step node execution UI, streaming output display, multi-model comparison, inline editing | API Layer (HTTP + SSE) |
-| **Workflow Designer** | Visual drag-and-drop node arrangement (React Flow), node config editing, variable system, flow validation preview | API Layer |
-| **Project & Doc Management** | Project CRUD, member management, document listing/filtering/versioning, visibility controls | API Layer |
-| **Auth & User Module** | User authentication (v1 password, v2 WeChat OAuth), JWT, RBAC via NestJS guards | PostgreSQL, all modules via guards |
-| **Workflow Engine** | Flow definition storage, node state machine, step sequencing, parallel branch orchestration, rollback/skip logic, flow snapshot on document creation | PostgreSQL, BullMQ, Model Invocation Layer, Workspace Manager |
-| **Model Invocation Layer** | Unified abstraction over CLI/API model calls, prompt assembly with variable substitution, streaming output relay, call result normalization | Workspace Manager, PostgreSQL, BullMQ |
-| **Desensitization Service** | Sensitive info detection (local model only), mapping table management (pgcrypto encrypted), prompt rule injection for downstream nodes, restoration (local text replacement) | PostgreSQL, Workspace Manager, local private models only |
-| **Export Service** | Markdown-to-DOCX/PDF/XLSX conversion, template-based formatting, batch export | Workspace Manager, PostgreSQL, BullMQ |
-| **Workspace Manager** | Temporary directory lifecycle (create/materialize/collect/cleanup), file indexing in DB, binary file storage path management | PostgreSQL, File System |
-| **Document & Project Service** | Project CRUD, membership, document metadata, version snapshots, visibility/permission enforcement | PostgreSQL, Workspace Manager |
-| **Material & Context Service** | File upload and async parsing (BullMQ), text extraction and storage, token budget calculation, prompt context assembly, prompt cache adapter (M4+ scope) | PostgreSQL, File System, BullMQ, Redis |
-| **SSE Gateway** | Server-Sent Events for streaming AI output, multiplexes multi-model streams per task | Frontend, CLI/API Executors, Redis (for multi-instance) |
-| **Stats Module** | Usage statistics, audit logs, multi-dimension reporting | PostgreSQL (read-only aggregations) |
+Rationale:
+- Target is 50 concurrent users on a single server -- no need for distributed queue
+- PostgreSQL is already the source of truth for `nodeExecutions` and `modelCallLogs`
+- Adding Redis would double infrastructure complexity for zero benefit at this scale
+- Bun Workers API can run CPU-bound tasks on separate threads if needed later
+- The existing `executeModelCall()` already runs models in parallel via `Promise.allSettled` -- it just needs to be decoupled from the HTTP request lifecycle
 
-## Recommended Project Structure
+### Architecture
 
 ```
-server/
-├── src/
-│   ├── modules/
-│   │   ├── auth/                  # Authentication & user management
-│   │   │   ├── auth.controller.ts
-│   │   │   ├── auth.service.ts
-│   │   │   ├── auth.module.ts
-│   │   │   ├── guards/
-│   │   │   │   ├── jwt-auth.guard.ts
-│   │   │   │   └── roles.guard.ts
-│   │   │   └── entities/
-│   │   ├── admin/                 # Doc types, provider/model config
-│   │   │   ├── doc-type/
-│   │   │   │   ├── doc-type.controller.ts
-│   │   │   │   ├── doc-type.service.ts
-│   │   │   │   └── entities/
-│   │   │   ├── provider/
-│   │   │   └── model/
-│   │   ├── project/               # Project CRUD, membership, roles
-│   │   │   ├── project.controller.ts
-│   │   │   ├── project.service.ts
-│   │   │   ├── member.service.ts
-│   │   │   └── entities/
-│   │   ├── document/              # Document CRUD, versioning, visibility
-│   │   │   ├── document.controller.ts
-│   │   │   ├── document.service.ts
-│   │   │   ├── version.service.ts
-│   │   │   └── entities/
-│   │   ├── workflow/              # Flow definition + runtime execution
-│   │   │   ├── definition/        # Flow & node config CRUD
-│   │   │   │   ├── workflow.controller.ts
-│   │   │   │   ├── workflow.service.ts
-│   │   │   │   └── validation.service.ts
-│   │   │   ├── engine/            # Runtime execution state machine
-│   │   │   │   ├── engine.service.ts
-│   │   │   │   ├── state-machine.ts
-│   │   │   │   └── node-executors/  # Strategy pattern: one per node type
-│   │   │   │       ├── executor.interface.ts
-│   │   │   │       ├── input-transform.executor.ts
-│   │   │   │       ├── desensitize.executor.ts
-│   │   │   │       ├── model-call.executor.ts
-│   │   │   │       ├── restore.executor.ts
-│   │   │   │       └── export.executor.ts
-│   │   │   └── entities/
-│   │   ├── model-invocation/      # Unified model call abstraction
-│   │   │   ├── invocation.service.ts
-│   │   │   ├── prompt-assembler.ts      # Variable substitution, rule injection
-│   │   │   ├── adapters/
-│   │   │   │   ├── adapter.interface.ts
-│   │   │   │   ├── cli.adapter.ts       # v1: CLI subprocess execution
-│   │   │   │   └── api.adapter.ts       # v2: HTTP API calls
-│   │   │   └── streaming/               # SSE relay
-│   │   │       └── sse.gateway.ts
-│   │   ├── desensitization/       # Mapping management, rule injection, recovery
-│   │   │   ├── desensitize.service.ts
-│   │   │   ├── restore.service.ts
-│   │   │   └── entities/
-│   │   ├── workspace/             # File system workspace lifecycle
-│   │   │   ├── workspace.service.ts
-│   │   │   ├── file-index.service.ts
-│   │   │   └── entities/
-│   │   ├── export/                # Format conversion, template rendering
-│   │   │   ├── export.service.ts
-│   │   │   └── renderers/
-│   │   │       ├── docx.renderer.ts
-│   │   │       ├── pdf.renderer.ts
-│   │   │       └── xlsx.renderer.ts
-│   │   ├── material/              # Project material library (M4+ scope)
-│   │   │   ├── upload/
-│   │   │   ├── parsing/
-│   │   │   ├── context-assembly/
-│   │   │   └── entities/
-│   │   └── stats/                 # Usage statistics, audit
-│   │       ├── stats.controller.ts
-│   │       └── stats.service.ts
-│   ├── common/                    # Shared utilities
-│   │   ├── decorators/
-│   │   ├── guards/
-│   │   ├── interceptors/
-│   │   ├── filters/
-│   │   └── utils/
-│   ├── config/                    # Environment & app configuration
-│   ├── database/                  # Prisma schema, migrations, seeds
-│   │   ├── schema.prisma
-│   │   ├── migrations/
-│   │   └── seeds/
-│   └── main.ts
-client/
-├── src/
-│   ├── pages/
-│   │   ├── admin/                 # Admin console pages
-│   │   ├── project/               # Project management pages
-│   │   ├── document/              # Document list, detail pages
-│   │   ├── workbench/             # Document generation workbench
-│   │   └── workflow-designer/     # Visual flow editor
-│   ├── components/
-│   │   ├── workflow/              # Flow editor components (React Flow)
-│   │   ├── workbench/             # Node execution UI components
-│   │   │   ├── InputTransformStep.tsx
-│   │   │   ├── DesensitizeStep.tsx
-│   │   │   ├── ModelCallStep.tsx
-│   │   │   ├── RestoreStep.tsx
-│   │   │   └── ExportStep.tsx
-│   │   └── common/
-│   ├── hooks/
-│   │   ├── useSSE.ts              # SSE streaming hook
-│   │   └── useWorkbench.ts        # Workbench state management
-│   ├── services/                  # API client functions
-│   └── store/                     # Zustand state management
+Current (v1.0 - foreground):
+  Browser SSE connection <---> model-call.routes.ts <---> model-call.service.ts
+  (user must stay on page)
+
+New (v1.1 - background option):
+  POST /runtime/:docId/background-start
+    -> Create background_tasks DB row (status: running)
+    -> Fire-and-forget: run entire remaining workflow
+    -> Return { taskId } immediately
+
+  Background execution loop (in-process):
+    -> For each remaining node: execute sequentially
+    -> On model_call nodes: call executeModelCall() (no SSE stream needed)
+    -> Store all outputs in nodeExecutions.outputData (same as foreground)
+    -> On completion/failure: update background_tasks row
+    -> Send WeChat Work notification via sendTextCardMessage()
+
+  GET /runtime/:docId/background-status
+    -> Poll task status (for re-entering users)
 ```
 
-### Structure Rationale
+### New Components
 
-- **modules/workflow/engine/node-executors/:** Each of the 5 node types has distinct execution logic. The Strategy pattern (one executor per node type) keeps the engine generic while each executor handles its specific behavior. New node types (outline confirmation, human review, material selection) plug in by adding new executor files with zero changes to the engine.
-- **modules/model-invocation/adapters/:** The CLI vs API distinction is an implementation detail hidden behind a unified interface. v1 ships with CLI only; API adapter plugs in for v2 without changing any upstream code.
-- **modules/desensitization/:** Isolated because it has unique security constraints (local models only, pgcrypto encrypted storage, no data leaves server). Coupling this with general model invocation would create security boundary violations.
-- **modules/workspace/:** Separated from document module because workspace lifecycle (materialize/collect/cleanup) is infrastructure-level logic, not business logic. Multiple modules (executors, export, material parsing) all depend on workspace services.
-- **modules/material/:** Entirely separate for M4+ scope. Can be developed independently without touching workflow or document modules.
+| Component | Type | Location |
+|-----------|------|----------|
+| `background_tasks` table | New DB table | `packages/backend/src/db/schema.ts` |
+| `background.service.ts` | New service | `packages/backend/src/modules/runtime/` |
+| `background.routes.ts` | New routes | `packages/backend/src/modules/runtime/` |
+| `notification.service.ts` | New service | `packages/backend/src/modules/notification/` |
 
-## Architectural Patterns
+### Modified Components
 
-### Pattern 1: Node Execution State Machine
+| Component | Change |
+|-----------|--------|
+| `wecom.service.ts` | Already has `sendTextCardMessage()` -- no change needed |
+| `runtime.service.ts` | Extract `advanceNode` logic into reusable function callable without HTTP context |
+| `model-call.service.ts` | Add non-streaming variant of `executeModelCall()` that writes directly to DB without SSE |
+| `DocumentWorkspace.tsx` | Add "Background Generation" button, show background task status |
 
-**What:** Each document generation session is a finite state machine. The workflow engine tracks which node is current, manages transitions (next/skip/rollback), and enforces flow rules.
-
-**When to use:** All workflow execution -- this is the core runtime model.
-
-**Trade-offs:** State machines are explicit and debuggable, but can become complex with many transition rules. For this project, the linear-with-parallel-branches nature of flows (not arbitrary DAGs) keeps complexity manageable.
-
-```
-Node States:
-  PENDING -> ACTIVE -> COMPLETED -> (rollback) -> ACTIVE
-                    -> SKIPPED   -> (rollback) -> ACTIVE
-                    -> FAILED    -> (retry)    -> ACTIVE
-
-Document States:
-  DRAFT -> EXECUTING -> COMPLETED
-```
-
-**Implementation:**
+### New Table: `background_tasks`
 
 ```typescript
-enum NodeStatus {
-  PENDING = 'pending',
-  ACTIVE = 'active',
-  COMPLETED = 'completed',
-  SKIPPED = 'skipped',
-  FAILED = 'failed',
-}
+export const backgroundTaskStatusEnum = pgEnum("background_task_status", [
+  "running",
+  "completed",
+  "failed",
+]);
 
-// State transitions are atomic DB operations
-class WorkflowStateMachine {
-  async advance(taskId: string, action: 'next' | 'skip' | 'rollback', targetStep?: number) {
-    return this.prisma.$transaction(async (tx) => {
-      const task = await tx.task.findUniqueOrThrow({ where: { id: taskId } });
-      const nextState = this.computeTransition(task, action, targetStep);
-      // On rollback: archive outputs of steps N+1..current, reset to PENDING
-      // On skip: mark optional nodes as SKIPPED, advance to next required
-      await tx.task.update({ where: { id: taskId }, data: nextState });
-      await this.createVersionSnapshot(tx, taskId, task.currentStep);
-      return nextState;
-    });
-  }
-}
+export const backgroundTasks = pgTable("background_tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  documentId: uuid("document_id").notNull().references(() => documents.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  status: backgroundTaskStatusEnum("status").default("running").notNull(),
+  currentNodeId: varchar("current_node_id", { length: 100 }),
+  errorMessage: varchar("error_message", { length: 2000 }),
+  notifiedAt: timestamp("notified_at", { withTimezone: true }),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+});
 ```
 
-### Pattern 2: Workspace Materialization / Collection Cycle
-
-**What:** For CLI model calls, the system materializes data from PostgreSQL into temporary filesystem directories before execution, then collects results back afterward. DB is the single source of truth; filesystem is transient.
-
-**When to use:** Every CLI model invocation.
-
-**Trade-offs:** Adds I/O overhead (DB -> file -> DB round-trip), but this is negligible compared to AI generation time (seconds to minutes). API mode (v2) bypasses this entirely -- reads from DB, writes to DB.
-
-```
-Materialize:  DB text content ──write──> /tmp/workspace/{taskId}/s1/input.md
-              DB binary files ──copy───> /tmp/workspace/{taskId}/s1/_raw/
-Execute:      CLI agent reads input files, writes output files
-Collect:      /tmp/workspace/{taskId}/s2/output.md ──read──> DB node_outputs.text_content
-              Output metadata ──record──> DB file indexes
-Cleanup:      rm -rf /tmp/workspace/{taskId}/  (or archive for debugging)
-```
-
-**Implementation:**
+### Background Execution Pattern
 
 ```typescript
-@Injectable()
-class WorkspaceManager {
-  async materialize(taskId: string, stepNumber: number): Promise<string> {
-    // 1. Create temp directory: /tmp/workspace/{taskId}/
-    // 2. Query node_outputs from DB for upstream steps
-    // 3. Write text content to files in step subdirectories
-    // 4. Copy binary files from permanent storage
-    // 5. If desensitization active, write mapping.json (encrypted read from DB)
-    // 6. Return workspace root path
-  }
+// background.service.ts
+export async function startBackgroundExecution(
+  documentId: string,
+  userId: string,
+): Promise<string> {
+  // 1. Create background_tasks row
+  const [task] = await db.insert(backgroundTasks).values({
+    documentId, userId, status: "running", startedAt: new Date(),
+  }).returning();
 
-  async collect(taskId: string, stepNumber: number, workspacePath: string): Promise<void> {
-    // 1. Scan output directory for new/changed files
-    // 2. Read text files -> store in node_outputs table
-    // 3. Move binary files to permanent storage
-    // 4. Update file_index records in DB
-    // 5. Clean up temp workspace
-  }
-}
-```
+  // 2. Fire-and-forget the execution loop (runs after response is sent)
+  // Using queueMicrotask or setTimeout(fn, 0) to detach from request
+  setTimeout(() => {
+    executeInBackground(task.id, documentId, userId).catch(console.error);
+  }, 0);
 
-### Pattern 3: Unified Model Executor (Adapter Pattern)
-
-**What:** Abstract CLI and API model invocation behind a common interface. The workflow engine does not know or care which invocation method is used. Selection is driven by the model's `invoke_type` config field.
-
-**When to use:** Every model call node execution.
-
-**Trade-offs:** Adds an abstraction layer, but the abstraction is strongly justified -- the two methods have fundamentally different I/O patterns (file-based vs. in-memory) and both must produce identical event streams.
-
-```typescript
-interface ModelInvocationAdapter {
-  invoke(params: InvocationParams): Observable<ExecutionEvent>;
-  cancel(invocationId: string): Promise<void>;
+  return task.id;
 }
 
-// CLI Adapter (v1): materializes files, spawns subprocess, reads stdout
-@Injectable()
-class CliAdapter implements ModelInvocationAdapter {
-  invoke(params: InvocationParams): Observable<ExecutionEvent> {
-    return new Observable(subscriber => {
-      // 1. Materialize workspace
-      // 2. Assemble CLI command from model's command template
-      // 3. spawn() child process
-      // 4. Stream stdout as token events
-      // 5. On exit: collect results from workspace back to DB
-      // 6. Emit model_start, token, model_done/model_error
-    });
-  }
-}
+async function executeInBackground(
+  taskId: string,
+  documentId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    let state = await getDocumentRuntimeState(documentId);
+    while (state && hasInProgressOrPendingNodes(state)) {
+      const currentNode = getCurrentNode(state);
 
-// API Adapter (v2): reads from DB, calls HTTP API, writes to DB
-@Injectable()
-class ApiAdapter implements ModelInvocationAdapter {
-  invoke(params: InvocationParams): Observable<ExecutionEvent> {
-    return new Observable(subscriber => {
-      // 1. Read input content from DB (no filesystem needed)
-      // 2. HTTP streaming request to model API
-      // 3. Parse SSE/streaming response
-      // 4. Write result to DB
-      // 5. Emit same event types as CLI adapter
-    });
-  }
-}
-```
+      // Update progress
+      await db.update(backgroundTasks)
+        .set({ currentNodeId: currentNode.nodeId })
+        .where(eq(backgroundTasks.id, taskId));
 
-### Pattern 4: Prompt Assembly Pipeline
+      // Execute current node (type-specific)
+      await executeNodeInBackground(documentId, currentNode, userId);
 
-**What:** Centralized prompt construction that resolves variables, injects desensitization rules, and substitutes file paths. All model invocations go through this single assembly point.
-
-**When to use:** Every model call node, before execution.
-
-**Trade-offs:** Centralization adds a single point of complexity, but prevents the far worse problem of scattered string concatenation across multiple services. Makes prompt debugging and auditing possible.
-
-```typescript
-@Injectable()
-class PromptAssembler {
-  assemble(nodeConfig: NodeConfig, context: ExecutionContext): AssembledPrompt {
-    let prompt = nodeConfig.promptTemplate;
-
-    // 1. Replace system variables
-    prompt = this.replaceSystemVars(prompt, context);
-    // {{workDir}}, {{inputDir}}, {{outputDir}}, {{outputFileName}}
-
-    // 2. Inject desensitization rules (if in desensitized segment)
-    if (context.hasDesensitization) {
-      // CRITICAL: getRulesForPrompt() returns ONLY type descriptions
-      // e.g., "<!-- 000001 --> represents a company name"
-      // NEVER real values -- those are only in getMappingForRestore()
-      const rules = this.desensitizationService.getRulesForPrompt(context.taskId);
-      prompt = prompt.replace('{{desensitizationRules}}', rules);
+      // Advance to next
+      state = await advanceNode(documentId, currentNode.id, userId);
     }
 
-    // 3. Replace user-defined variables
-    prompt = this.replaceUserVars(prompt, context.userInputs);
+    // Mark completed
+    await db.update(backgroundTasks)
+      .set({ status: "completed", completedAt: new Date() })
+      .where(eq(backgroundTasks.id, taskId));
 
-    // 4. Log assembled prompt (with sensitive values redacted) for debugging
-    this.auditLog.recordPrompt(context.taskId, context.stepNumber, prompt);
+    // Send WeChat Work notification
+    await notifyCompletion(documentId, userId, "completed");
+  } catch (err) {
+    await db.update(backgroundTasks)
+      .set({ status: "failed", errorMessage: String(err), completedAt: new Date() })
+      .where(eq(backgroundTasks.id, taskId));
 
-    return { systemPrompt: nodeConfig.systemPrompt, userPrompt: prompt };
+    await notifyCompletion(documentId, userId, "failed");
   }
 }
 ```
 
-### Pattern 5: SSE Event Multiplexing for Streaming
-
-**What:** Multi-model parallel generation streams results to the frontend via Server-Sent Events. Each model invocation emits events (`model_start`, `token`, `model_done`, `model_error`) multiplexed onto a single SSE connection per document task.
-
-**When to use:** Document workbench during model call node execution.
-
-**Trade-offs:** SSE is simpler than WebSocket for this use case (server-to-client unidirectional). Client sends cancel/select requests via regular HTTP POST. For multi-instance deployment, Redis pub/sub relays events across instances.
-
-```
-Browser (SSE client)
-    |
-    |  GET /api/tasks/{id}/stream  (SSE connection)
-    |
-    v
-SSE Gateway ──> Workflow Engine ──> Model Invocation Layer
-                                        |
-                        ┌───────────────┼───────────────┐
-                        v               v               v
-                   CLI Process 1   CLI Process 2   CLI Process 3
-                   (glm-5)         (kimi-k2.5)     (deepseek-v3.2)
-                        |               |               |
-                        └───────┬───────┘───────────────┘
-                                v
-                        SSE Multiplexer (tags each chunk with model ID)
-                                |
-                                v
-                        Browser renders in parallel output cards
-```
+### Notification Pattern
 
 ```typescript
-@Controller('tasks')
-class TaskController {
-  @Sse(':id/stream')
-  streamExecution(@Param('id') taskId: string): Observable<MessageEvent> {
-    return this.executionService.getEventStream(taskId).pipe(
-      map(event => ({
-        type: event.type,  // model_start | token | model_done | model_error | all_done
-        data: JSON.stringify(event.payload),
-      })),
+// notification.service.ts
+import { sendTextCardMessage } from "../wecom/wecom.service";
+
+export async function notifyCompletion(
+  documentId: string,
+  userId: string,
+  result: "completed" | "failed",
+): Promise<void> {
+  // Look up user's wecomUserId
+  const [user] = await db.select().from(users)
+    .where(eq(users.id, userId)).limit(1);
+
+  if (!user?.wecomUserId) return; // Can't notify without WeChat Work ID
+
+  const [doc] = await db.select().from(documents)
+    .where(eq(documents.id, documentId)).limit(1);
+
+  const title = result === "completed"
+    ? "AI 文档生成完成"
+    : "AI 文档生成失败";
+  const description = result === "completed"
+    ? `文档「${doc?.title}」已生成完毕，点击查看结果。`
+    : `文档「${doc?.title}」生成失败，请点击查看详情。`;
+
+  try {
+    await sendTextCardMessage(
+      [user.wecomUserId],
+      {
+        title,
+        description,
+        url: `${process.env.APP_URL}/documents/${documentId}`,
+        btntxt: "查看文档",
+      },
     );
+
+    // Record notification sent
+    await db.update(backgroundTasks)
+      .set({ notifiedAt: new Date() })
+      .where(eq(backgroundTasks.documentId, documentId));
+  } catch (err) {
+    console.error("[notification] Failed to send WeChat Work message:", err);
+    // Non-fatal: don't fail the task because notification failed
   }
 }
 ```
 
-### Pattern 6: Flow Snapshot on Document Creation
+### Key Design Decision: Why Not a Separate Worker Process
 
-**What:** When a user creates a document and selects a flow, the system deep-copies the entire flow definition (node sequence, configs, prompt templates, model selections) into the document record. Subsequent admin edits to the flow do not affect in-progress documents.
+A separate worker (BullMQ, bunqueue) adds operational complexity (process management, health checks, shared state). The current architecture runs all model calls in-process via `Promise.allSettled` already. Background execution simply means "don't tie the Promise chain to an HTTP response." Using `setTimeout(fn, 0)` to detach from the request handler is sufficient. If the server crashes mid-generation, the `background_tasks` row stays in `running` status -- a startup recovery sweep can detect and either retry or mark as failed.
 
-**When to use:** Every document creation. This directly enforces business rule #7.
+---
 
-**Trade-offs:** Duplicates flow definition data, but storage cost is trivial (JSON blob per document). The alternative -- runtime referencing of live flow config -- is a serious correctness bug waiting to happen.
+## Feature 2: Statistics & Audit Dashboard
 
-## Data Flow
+### Decision: Aggregate from Existing Tables + One New Materialized View
 
-### Core Document Generation Flow (Happy Path)
+**Do not create a separate analytics database.** The existing `modelCallLogs` table already captures all model call data (token usage, duration, costs, user, model, provider, call source). The `nodeExecutions` table tracks all execution activity. Statistics are read-heavy aggregation queries on existing data.
 
-```
-1. User creates document
-   -> API creates DB record + working directory path
-   -> Snapshot flow definition into document record
-   -> Initialize state machine at step 1
-
-2. Input Transform node (step 1)
-   -> User fills form, uploads files
-   -> Parse uploads (sync for small files, async BullMQ for large/media)
-   -> Write structured content to DB node_outputs
-   -> Update node state: COMPLETED
-
-3. Desensitization node (step 2, optional)
-   -> Local private model identifies sensitive info
-   -> User confirms/edits mapping table
-   -> pgcrypto encrypt mapping -> store in DB
-   -> Register rules for downstream prompt injection
-   -> Update node state: COMPLETED
-
-4. Model Call node(s) (step 3+, possibly parallel)
-   -> Prompt Assembler resolves template:
-      a. System variables (paths)
-      b. Desensitization rules (type descriptions only, never real values)
-      c. User-defined variables
-   -> For each selected model (parallel via BullMQ jobs):
-      CLI: materialize workspace -> spawn process -> stream stdout via SSE -> collect results
-      API: read DB content -> HTTP call -> stream response via SSE -> write to DB
-   -> User selects best output (multi-model mode)
-   -> Update node state: COMPLETED
-
-5. Information Recovery node (optional, paired with step 2)
-   -> Read encrypted mapping from DB
-   -> Replace <!-- 000001 --> placeholders with real values
-   -> Pure local operation, zero AI involvement
-   -> Show before/after comparison to user
-   -> Update node state: COMPLETED
-
-6. Export node (final step)
-   -> User selects format (DOCX/PDF/XLSX/MD) + template
-   -> Render via format-specific renderer
-   -> Store export file in filesystem + index in DB
-   -> Update document status: COMPLETED
-```
-
-### Rollback Flow
+### Architecture
 
 ```
-User clicks "Rollback to Step N"
-    |
-    v
-Workflow Engine (within DB transaction):
-  1. Verify rollback allowed (step N < current step)
-  2. Archive current outputs of steps N+1..current to version history
-  3. Reset states of steps N+1..current to PENDING
-  4. Set current step to N, state to ACTIVE
-  5. Create version snapshot for audit trail
-  6. Frontend navigates to step N executor UI
+Existing data sources (no schema changes):
+  modelCallLogs  -> token usage, duration, costs, model/provider/user dimensions
+  nodeExecutions -> node-level timing, status, execution rounds
+  documents      -> document count, status, creation date
+  workflows      -> workflow usage (JOIN with documents)
+  users          -> user activity dimension
+
+New:
+  stats.service.ts      -> Aggregation queries with time-range filters
+  stats.routes.ts       -> Admin-only API endpoints
+  admin/Statistics.tsx   -> Dashboard page with charts
 ```
 
-### File Parsing Flow (Async via BullMQ)
+### New Components
+
+| Component | Type | Location |
+|-----------|------|----------|
+| `stats.service.ts` | New service | `packages/backend/src/modules/stats/` |
+| `stats.routes.ts` | New routes | `packages/backend/src/modules/stats/` |
+| `admin/Statistics.tsx` | New page | `packages/frontend/src/pages/admin/` |
+
+### Aggregation Strategy
+
+Use Drizzle ORM's `sql` tagged template for aggregation queries. No materialized views needed at 50-user scale -- direct aggregation is fast enough.
+
+```typescript
+// stats.service.ts
+
+// Overview stats
+export async function getOverviewStats(from: Date, to: Date) {
+  return db.select({
+    totalCalls: sql<number>`count(*)`,
+    totalTokens: sql<number>`coalesce(sum((${modelCallLogs.tokenUsage}->>'total_tokens')::int), 0)`,
+    totalDuration: sql<number>`coalesce(sum(${modelCallLogs.duration}), 0)`,
+    uniqueUsers: sql<number>`count(distinct ${modelCallLogs.userId})`,
+    successRate: sql<number>`round(
+      count(*) filter (where ${modelCallLogs.responseStatus} = 'completed')::numeric
+      / nullif(count(*), 0) * 100, 1
+    )`,
+  }).from(modelCallLogs)
+    .where(and(
+      gte(modelCallLogs.createdAt, from),
+      lte(modelCallLogs.createdAt, to),
+    ));
+}
+
+// By-model breakdown
+export async function getStatsByModel(from: Date, to: Date) {
+  return db.select({
+    modelId: modelCallLogs.modelId,
+    modelName: modelCallLogs.modelName,
+    calls: sql<number>`count(*)`,
+    tokens: sql<number>`coalesce(sum((${modelCallLogs.tokenUsage}->>'total_tokens')::int), 0)`,
+    avgDuration: sql<number>`round(avg(${modelCallLogs.duration}))`,
+    successRate: sql<number>`round(
+      count(*) filter (where ${modelCallLogs.responseStatus} = 'completed')::numeric
+      / nullif(count(*), 0) * 100, 1
+    )`,
+  }).from(modelCallLogs)
+    .where(and(
+      gte(modelCallLogs.createdAt, from),
+      lte(modelCallLogs.createdAt, to),
+      eq(modelCallLogs.callSource, "runtime"),
+    ))
+    .groupBy(modelCallLogs.modelId, modelCallLogs.modelName);
+}
+```
+
+### Time Dimension
+
+Support week/month/year grouping via PostgreSQL `date_trunc`:
+
+```typescript
+export async function getTrend(
+  from: Date, to: Date,
+  granularity: "day" | "week" | "month",
+) {
+  return db.select({
+    period: sql<string>`date_trunc(${granularity}, ${modelCallLogs.createdAt})`,
+    calls: sql<number>`count(*)`,
+    tokens: sql<number>`coalesce(sum((${modelCallLogs.tokenUsage}->>'total_tokens')::int), 0)`,
+  }).from(modelCallLogs)
+    .where(and(
+      gte(modelCallLogs.createdAt, from),
+      lte(modelCallLogs.createdAt, to),
+    ))
+    .groupBy(sql`date_trunc(${granularity}, ${modelCallLogs.createdAt})`)
+    .orderBy(sql`date_trunc(${granularity}, ${modelCallLogs.createdAt})`);
+}
+```
+
+### Frontend: Lightweight Charting
+
+Use a lightweight chart library compatible with SolidJS. **Recommendation: Chart.js with `solid-chartjs` wrapper** or direct Canvas API. Avoid heavy libraries (recharts is React-only, echarts is 500KB+). Alternatively, use `@solid-primitives/canvas` for simple sparklines and server-rendered SVG for complex charts.
+
+### Modified Components
+
+| Component | Change |
+|-----------|--------|
+| `index.ts` (backend entry) | Register `statsRoutes` |
+| `Sidebar.tsx` | Add "Statistics" nav item under admin section |
+| `App.tsx` | Add route `/admin/statistics` |
+
+---
+
+## Feature 3: Quota & Usage Limits
+
+### Decision: Service Layer with Middleware Hook
+
+**Implement as a service called from a reusable Elysia plugin (not raw middleware), because ElysiaJS uses a plugin composition model, not Express-style middleware.**
+
+The quota check must run before model calls but after auth. Use an Elysia `onBeforeHandle` hook scoped to runtime routes.
+
+### Architecture
 
 ```
-1. User uploads file -> API stores in filesystem, creates DB record (status: uploading)
-2. API enqueues BullMQ job (status: parsing)
-3. Worker picks up job:
-   a. Word -> mammoth -> text + structure
-   b. PDF  -> pdf-parse -> text + page mapping
-   c. Excel -> exceljs -> text (markdown table format)
-   d. Image -> OCR API call -> text
-   e. Audio/Video -> speech-to-text API -> text
-4. Worker stores parsed text in DB (status: ready)
-5. On failure: status -> parse_failed, user can retry
+Request flow:
+  POST /runtime/:docId/model-call/:nodeId/execute
+    -> requireAuth (existing)
+    -> quotaCheck plugin (NEW - onBeforeHandle)
+       -> quotaService.checkQuota(userId, modelId)
+       -> If exceeded: return 429 with quota info
+    -> model-call handler (existing)
+    -> After success: quotaService.recordUsage() (already happens via modelCallLogs insert)
 ```
 
-### Multi-Model Parallel Execution Flow
+### New Components
+
+| Component | Type | Location |
+|-----------|------|----------|
+| `quotas` table | New DB table | `packages/backend/src/db/schema.ts` |
+| `quota.service.ts` | New service | `packages/backend/src/modules/quota/` |
+| `quota.guard.ts` | New Elysia plugin | `packages/backend/src/modules/quota/` |
+| `admin/QuotaManagement.tsx` | New page | `packages/frontend/src/pages/admin/` |
+
+### New Table: `quotas`
+
+```typescript
+export const quotaTypeEnum = pgEnum("quota_type", [
+  "user_daily",
+  "user_monthly",
+  "model_daily",
+  "project_monthly",
+]);
+
+export const quotas = pgTable("quotas", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  quotaType: quotaTypeEnum("quota_type").notNull(),
+  // Nullable: applies to specific entity or globally
+  userId: uuid("user_id").references(() => users.id),
+  modelId: uuid("model_id").references(() => models.id),
+  projectId: uuid("project_id").references(() => projects.id),
+  maxCalls: integer("max_calls"),          // null = unlimited
+  maxTokens: integer("max_tokens"),        // null = unlimited
+  warningThreshold: real("warning_threshold").default(0.8), // 80% triggers warning
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+```
+
+### Quota Check Pattern
+
+```typescript
+// quota.guard.ts
+export const quotaCheck = new Elysia({ name: "quotaCheck" })
+  .use(requireAuth)
+  .onBeforeHandle({ as: "scoped" }, async ({ user, params, set }) => {
+    if (!user) return; // requireAuth already handles this
+
+    const result = await checkUserQuota(user.id);
+    if (result.exceeded) {
+      set.status = 429;
+      return {
+        error: "已超出使用配额",
+        quota: result.details,
+      };
+    }
+    if (result.warning) {
+      // Set header to inform frontend of approaching limit
+      set.headers["X-Quota-Warning"] = JSON.stringify(result.details);
+    }
+  });
+
+// quota.service.ts
+export async function checkUserQuota(userId: string): Promise<QuotaCheckResult> {
+  // Count today's calls from modelCallLogs
+  const todayCalls = await db.select({
+    count: sql<number>`count(*)`,
+  }).from(modelCallLogs)
+    .where(and(
+      eq(modelCallLogs.userId, userId),
+      gte(modelCallLogs.createdAt, startOfDay()),
+      eq(modelCallLogs.callSource, "runtime"),
+    ));
+
+  // Look up applicable quotas
+  const userQuotas = await db.select().from(quotas)
+    .where(and(
+      eq(quotas.userId, userId),
+      eq(quotas.isActive, true),
+    ));
+
+  // Check each quota rule...
+  // Return { exceeded: boolean, warning: boolean, details: {...} }
+}
+```
+
+### Modified Components
+
+| Component | Change |
+|-----------|--------|
+| `model-call.routes.ts` | Add `.use(quotaCheck)` before execute/retry handlers |
+| `background.service.ts` | Check quota before each model call node in background loop |
+| `Sidebar.tsx` | Add "Quota Management" nav item |
+| `App.tsx` | Add route `/admin/quotas` |
+| `ModelCallExecutor.tsx` | Show quota warning/exceeded state in UI |
+
+---
+
+## Feature 4: Global Search, Recent Access, Favorites
+
+### Decision: PostgreSQL `ILIKE` + `pg_trgm` for Search, Not tsvector
+
+**Use `ILIKE` with `pg_trgm` GIN index, not `tsvector`.** Reasons:
+- Chinese text requires `zhparser` or `pg_bigm` extension for proper `tsvector` segmentation -- these need PostgreSQL extension installation (ops burden)
+- `pg_trgm` works for Chinese out of the box via trigram matching with no segmentation needed
+- At 50-user scale with thousands (not millions) of documents, `ILIKE` with trigram index is fast enough
+- Simpler implementation: no need to maintain tsvector columns or triggers
+
+### Architecture
 
 ```
-Workflow Engine reaches model call node configured for multi-model
-    |
-    v
-Model Invocation Layer:
-  - Read node config: models = [glm-5, kimi-k2.5, deepseek-v3.2]
-  - For each model, create BullMQ job with shared taskId
-    |
-    ├──> Job: glm-5      ──> CLI/API adapter ──> stream events
-    ├──> Job: kimi-k2.5  ──> CLI/API adapter ──> stream events
-    └──> Job: deepseek   ──> CLI/API adapter ──> stream events
-              |            |            |
-              v            v            v
-         SSE Multiplexer (tags chunks with model ID)
-              |
-              v
-         Single SSE connection to browser
-              |
-         All models done? -> node state: AWAITING_SELECTION
-         User picks best  -> node state: COMPLETED
+Search scope:
+  documents (title, description)
+  projects (name, description)
+  workflows (name, description)
+
+Approach:
+  1. Add pg_trgm extension (CREATE EXTENSION pg_trgm)
+  2. Create GIN trigram indexes on searchable columns
+  3. Use ILIKE with % wildcards -- pg_trgm GIN index accelerates this
+  4. Union results from multiple tables, rank by relevance
 ```
 
-## Scaling Considerations
+### New Components
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0-50 users (v1 target) | Single server monolith. PostgreSQL on same or adjacent server. Local filesystem. BullMQ with 2-4 workers for CLI processes. Redis for SSE + caching. This is sufficient and correct for v1. |
-| 50-200 users | Dedicated PostgreSQL server. More BullMQ workers (CLI processes are memory-heavy, 500MB+ each). PgBouncer for connection pooling. Monitor workspace disk I/O. |
-| 200+ users | File system upgrades to MinIO/S3 (already planned in storage design doc). Task queue workers on separate machines. PostgreSQL read replicas for stats queries. Redis pub/sub for multi-instance SSE relay. |
+| Component | Type | Location |
+|-----------|------|----------|
+| `user_favorites` table | New DB table | `packages/backend/src/db/schema.ts` |
+| `user_recent_access` table | New DB table | `packages/backend/src/db/schema.ts` |
+| `search.service.ts` | New service | `packages/backend/src/modules/search/` |
+| `search.routes.ts` | New routes | `packages/backend/src/modules/search/` |
+| `favorites.service.ts` | New service | `packages/backend/src/modules/search/` |
+| `favorites.routes.ts` | New routes | `packages/backend/src/modules/search/` |
+| `SearchResults.tsx` | New page | `packages/frontend/src/pages/` |
+| `SearchBar.tsx` | New component | `packages/frontend/src/components/nav/` |
 
-### Scaling Priorities
+### New Tables
 
-1. **First bottleneck: CLI process concurrency.** Each CLI model call spawns a subprocess consuming significant memory. With 50 users and multi-model mode, peak concurrent CLI processes could reach 50-200. Solution: BullMQ with configurable concurrency limits per worker, priority queues, and backpressure to the frontend ("queued, position N").
+```typescript
+export const favoriteTargetEnum = pgEnum("favorite_target", [
+  "document",
+  "project",
+  "workflow",
+]);
 
-2. **Second bottleneck: Workspace disk I/O.** Materializing and collecting files for CLI calls creates disk churn. Solution: Use tmpfs (RAM disk) for workspace directories if memory allows; otherwise SSD with adequate IOPS. Implement aggressive workspace cleanup after collection.
+export const userFavorites = pgTable("user_favorites", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  targetType: favoriteTargetEnum("target_type").notNull(),
+  targetId: uuid("target_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
-3. **Third bottleneck: SSE connection count.** Each active document generation holds an SSE connection. At 200+ concurrent users, this strains a single Node.js instance. Solution: Redis pub/sub to relay SSE events, allowing any backend instance to serve any client.
+export const userRecentAccess = pgTable("user_recent_access", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  targetType: favoriteTargetEnum("target_type").notNull(), // reuse enum
+  targetId: uuid("target_id").notNull(),
+  accessedAt: timestamp("accessed_at", { withTimezone: true }).defaultNow().notNull(),
+});
+```
 
-## Anti-Patterns
+### Search Pattern
 
-### Anti-Pattern 1: Treating File System as Source of Truth
+```typescript
+// search.service.ts
+export async function globalSearch(query: string, userId: string, limit = 20) {
+  const pattern = `%${query}%`;
 
-**What people do:** Use file existence or directory contents to determine workflow state (e.g., "if s3/ exists, step 3 is done").
-**Why it's wrong:** No ACID transactions, race conditions on concurrent access, partial writes from failed CLI processes, filesystem state diverges from DB state after any failure.
-**Do this instead:** PostgreSQL is the single source of truth for all execution state. File system is a transient workspace for CLI execution only (materialization/collection pattern).
+  // Search documents (respecting visibility)
+  const docs = await db.select({
+    id: documents.id,
+    type: sql<string>`'document'`,
+    title: documents.title,
+    description: documents.description,
+    updatedAt: documents.updatedAt,
+  }).from(documents)
+    .innerJoin(projectMembers, and(
+      eq(projectMembers.projectId, documents.projectId),
+      eq(projectMembers.userId, userId),
+    ))
+    .where(and(
+      eq(documents.isDeleted, false),
+      or(
+        sql`${documents.title} ILIKE ${pattern}`,
+        sql`${documents.description} ILIKE ${pattern}`,
+      ),
+    ))
+    .limit(limit);
 
-### Anti-Pattern 2: Synchronous CLI Execution in Request Handlers
+  // Search projects (user is member)
+  const projs = await db.select({
+    id: projects.id,
+    type: sql<string>`'project'`,
+    title: projects.name,
+    description: projects.description,
+    updatedAt: projects.updatedAt,
+  }).from(projects)
+    .innerJoin(projectMembers, and(
+      eq(projectMembers.projectId, projects.id),
+      eq(projectMembers.userId, userId),
+    ))
+    .where(and(
+      eq(projects.isDeleted, false),
+      or(
+        sql`${projects.name} ILIKE ${pattern}`,
+        sql`${projects.description} ILIKE ${pattern}`,
+      ),
+    ))
+    .limit(limit);
 
-**What people do:** The API endpoint that triggers model generation spawns the CLI process synchronously and waits for completion before responding.
-**Why it's wrong:** CLI calls take 30 seconds to 10+ minutes. HTTP connections time out. Server threads are blocked. No graceful cancellation. No progress feedback.
-**Do this instead:** Enqueue CLI execution as a BullMQ job. Return immediately with a task ID. Stream progress via SSE on a separate connection. The task queue handles retries, timeouts, and concurrency.
+  // Merge, sort by updatedAt, return top N
+  return [...docs, ...projs]
+    .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+    .slice(0, limit);
+}
+```
 
-### Anti-Pattern 3: Live Flow Config During Execution
+### Recent Access Tracking
 
-**What people do:** Workflow execution directly reads the flow definition from the admin config table at each step.
-**Why it's wrong:** If admin edits a flow mid-execution, the document's remaining steps change unexpectedly. Directly violates business rule #7.
-**Do this instead:** Snapshot the complete flow definition into the document record at creation time. The engine reads only from the snapshot.
+Record access on document/project view endpoints. Use upsert to avoid duplicates:
 
-### Anti-Pattern 4: Leaking Real Values in Desensitization
+```typescript
+// Called from documents.routes.ts and projects.routes.ts GET handlers
+export async function recordAccess(userId: string, targetType: string, targetId: string) {
+  await db.insert(userRecentAccess).values({
+    userId, targetType, targetId, accessedAt: new Date(),
+  }).onConflictDoUpdate({
+    target: [userRecentAccess.userId, userRecentAccess.targetType, userRecentAccess.targetId],
+    set: { accessedAt: new Date() },
+  });
+  // Keep only last 50 entries per user (async cleanup)
+}
+```
 
-**What people do:** Pass the full desensitization mapping (including `original` real values) through the model invocation layer or include it in prompts.
-**Why it's wrong:** Defeats the entire purpose of desensitization. Real values must never reach any online AI model.
-**Do this instead:** The `DesensitizationService` exposes two strictly separate methods: `getRulesForPrompt()` (returns only type descriptions, safe for any model) and `getMappingForRestore()` (returns real values, restricted to local-only restore executor). Enforce this separation at the architecture level.
+### Modified Components
 
-### Anti-Pattern 5: Monolithic Prompt String Building
+| Component | Change |
+|-----------|--------|
+| `AppLayout.tsx` | Add global search bar in header |
+| `Dashboard.tsx` | Show recent access list and favorites |
+| `documents.routes.ts` | Record access on GET document detail |
+| `projects.routes.ts` | Record access on GET project detail |
+| Migration | `CREATE EXTENSION IF NOT EXISTS pg_trgm` + GIN indexes |
 
-**What people do:** Build prompts by concatenating strings with inline variable replacement scattered across multiple services.
-**Why it's wrong:** Hard to test, debug, or audit. Injection vulnerabilities. Desensitization rule injection gets missed. No way to review what was actually sent to the model.
-**Do this instead:** Centralize all prompt assembly in the `PromptAssembler` service with discrete stages, each independently testable. Log assembled prompts (redacted) for debugging.
+### Database Migration
 
-## Integration Points
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
-### External Services
+CREATE INDEX idx_documents_title_trgm ON documents USING gin (title gin_trgm_ops);
+CREATE INDEX idx_documents_description_trgm ON documents USING gin (description gin_trgm_ops);
+CREATE INDEX idx_projects_name_trgm ON projects USING gin (name gin_trgm_ops);
 
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| AI Models (CLI, v1) | Subprocess spawn via `child_process` | Handle stdout/stderr streaming, process signals (SIGTERM for cancel), exit codes, timeout enforcement. Each model has its own command template. |
-| AI Models (API, v2) | HTTP client with SSE streaming | Provider-specific adapters (OpenAI-compatible, DashScope, custom HTTP). Handle rate limits, retries, partial failures. |
-| WeChat Work OAuth (future) | OAuth 2.0 redirect flow | v1 skips this. Auth module uses strategy pattern so WeChat adapter plugs in later without refactoring. |
-| File parsing libraries | In-process or BullMQ worker | mammoth (DOCX), pdf-parse (PDF), exceljs (XLSX). Run in task queue workers to avoid blocking main event loop for large files. |
+-- Unique constraint for recent access upsert
+CREATE UNIQUE INDEX idx_user_recent_access_unique
+  ON user_recent_access (user_id, target_type, target_id);
+```
 
-### Internal Module Boundaries
+---
 
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Workflow Engine <-> Node Executors | Strategy pattern (direct call) | Engine is generic, executors are specific. Register executors by node type enum. Adding new node types = adding new executor class. |
-| Workflow Engine <-> Model Invocation | Service interface (direct call) | Engine calls `invocationService.invoke()`, receives `Observable<ExecutionEvent>` |
-| Model Invocation <-> Workspace Manager | Service interface (direct call) | CLI adapter calls `workspaceManager.materialize()` and `.collect()`. API adapter skips workspace entirely. |
-| Prompt Assembler <-> Desensitization | Service interface | Assembler calls `desensitizeService.getRulesForPrompt(taskId)` -- returns safe text only, never real values |
-| Any Module <-> PostgreSQL | Repository layer (Prisma) | Each module owns its Prisma models. Cross-module data access goes through service interfaces, not direct table queries. |
-| Backend <-> Frontend (streaming) | SSE over HTTP | Single SSE endpoint per task. Events multiplexed with model ID. Client reconnects on drop with `Last-Event-ID`. |
+## Feature 5: AI Inline Editing
 
-## Build Order (Dependencies for Roadmap)
+### Decision: New Streaming Endpoint, Reuse Existing SSE Pattern
 
-The following build order reflects hard technical dependencies and maps directly to the milestone plan in PROJECT.md.
+The existing `InlineEditor.tsx` is a pure markdown editor (no AI). v1.1 adds an "AI assist" button that sends selected text + instruction to a model and streams back the edited result.
 
-### M1: Foundation -- build order within milestone
+### Architecture
 
-| Order | Component | Depends On | Rationale |
-|-------|-----------|------------|-----------|
-| 1 | Database schema + Prisma setup + migrations | Nothing | Everything depends on this |
-| 2 | Auth & User Module (JWT, guards, RBAC) | Database | Gates all API endpoints |
-| 3 | Workspace Manager (directory lifecycle, file indexing) | Database | Infrastructure for later modules |
-| 4 | Admin: Provider & Model config CRUD | Auth, Database | Required before any model can be referenced |
-| 5 | Admin: Document Type management CRUD | Auth, Database | Required before flows can be created |
+```
+User selects text in InlineEditor
+  -> Clicks "AI Edit" button
+  -> Sends: { selectedText, instruction, modelId, documentId, nodeExecutionId }
+  -> POST /runtime/:docId/inline-edit (returns SSE stream)
+  -> Backend: resolve model, send prompt, stream response
+  -> Frontend: shows streaming diff/replacement in editor
+  -> User accepts or rejects the edit
+```
 
-### M2: Workflow Orchestration -- build order within milestone
+### New Components
 
-| Order | Component | Depends On | Rationale |
-|-------|-----------|------------|-----------|
-| 1 | Flow definition CRUD (store/retrieve configs) | M1 complete, DocType | Foundation for flow editing |
-| 2 | Node type registry + validation rules | Flow definition | Enforce flow correctness at save time |
-| 3 | Variable system (template engine) | Node type registry | {{variable}} substitution used by all nodes |
-| 4 | Flow validation engine | Node types, variable system | Start/end rules, desensitize pairing, etc. |
-| 5 | Visual flow editor (React Flow frontend) | All backend flow APIs | Admin UX for designing flows |
+| Component | Type | Location |
+|-----------|------|----------|
+| `inline-edit.service.ts` | New service | `packages/backend/src/modules/runtime/` |
+| `inline-edit.routes.ts` | New routes | `packages/backend/src/modules/runtime/` |
+| `AIEditDialog.tsx` | New component | `packages/frontend/src/components/workspace/` |
 
-### M3: Document Generation Runtime -- build order within milestone (most complex)
+### Modified Components
 
-| Order | Component | Depends On | Rationale |
-|-------|-----------|------------|-----------|
-| 1 | Workflow state machine | M2 complete | Core execution loop (next/skip/rollback) |
-| 2 | Node executor: Input Transform | State machine, Workspace | Simplest executor, validates the pattern |
-| 3 | CLI Adapter (v1 model invocation) | Workspace Manager | The v1 execution engine |
-| 4 | Prompt Assembler | Variable system | Template rendering, path substitution |
-| 5 | Node executor: Model Call | CLI Adapter, Prompt Assembler | Most complex executor |
-| 6 | SSE streaming infrastructure | Model Call executor | Required for model call UI |
-| 7 | Node executor: Desensitize | Local model invocation | Depends on local model being callable |
-| 8 | Desensitization rule injection | Prompt Assembler, Desensitize | Extend assembler for rule injection |
-| 9 | Node executor: Restore | Desensitization Service | Local text replacement, relatively simple |
-| 10 | Node executor: Export | Workspace Manager | Format conversion, template rendering |
-| 11 | Document workbench UI | All executors, SSE | Step-by-step user interface |
-| 12 | Project management (CRUD, members) | Auth | Can be built in parallel with items 1-10 |
+| Component | Change |
+|-----------|--------|
+| `InlineEditor.tsx` | Add "AI Edit" toolbar button, selection-aware |
+| `model-call.service.ts` | Extract streaming logic into reusable helper |
+| `modelCallLogs` | Inline edits logged with `callSource: "inline_edit"` |
 
-### M4+: Enhancement -- minimal interdependencies, flexible order
+### Schema Change
 
-- Material & Context Service (file parsing, token budget, context assembly)
-- Statistics & Audit dashboards
-- Usage limits & quotas
-- WeChat OAuth integration
-- Workspace archival & cleanup automation
+Add `"inline_edit"` to `callSourceEnum`:
+
+```typescript
+export const callSourceEnum = pgEnum("call_source", [
+  "runtime",
+  "model_test",
+  "provider_test",
+  "prompt_optimize",
+  "inline_edit",    // NEW
+]);
+```
+
+### Endpoint Pattern
+
+```typescript
+// inline-edit.routes.ts
+export const inlineEditRoutes = new Elysia({ prefix: "/runtime" })
+  .use(requireAuth)
+  .get(
+    "/:documentId/inline-edit",
+    async ({ params, query, user, set }) => {
+      // query: { text, instruction, modelId }
+      const { text, instruction, modelId } = query;
+
+      // Security: check if model is local-only if document has been restored
+      // (post-restore editing must use local model per requirements)
+
+      const prompt = buildInlineEditPrompt(text, instruction);
+      const stream = await streamSingleModel(modelId, prompt, {
+        documentId: params.documentId,
+        userId: user!.id,
+        callSource: "inline_edit",
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    },
+    {
+      params: t.Object({ documentId: t.String() }),
+      query: t.Object({
+        text: t.String(),
+        instruction: t.String(),
+        modelId: t.String(),
+      }),
+    },
+  );
+```
+
+### Security Constraint: Local Model After Restore
+
+Per requirements: "AI assisted editing -- before information restore, can use online models; after restore, only local models." The inline edit service must check whether the document has passed a restore node:
+
+```typescript
+async function validateModelForInlineEdit(
+  documentId: string,
+  modelId: string,
+): Promise<void> {
+  // Check if any restore node has been completed
+  const restoreNodes = await db.select().from(nodeExecutions)
+    .where(and(
+      eq(nodeExecutions.documentId, documentId),
+      eq(nodeExecutions.nodeType, "restore"),
+      eq(nodeExecutions.status, "completed"),
+      eq(nodeExecutions.isCurrent, true),
+    ));
+
+  if (restoreNodes.length > 0) {
+    // Must use local/private model only
+    const [model] = await db.select({
+      deploymentType: providers.deploymentType,
+    }).from(models)
+      .innerJoin(providers, eq(models.providerId, providers.id))
+      .where(eq(models.id, modelId));
+
+    if (model?.deploymentType !== "local") {
+      throw new Error("信息恢复后仅可使用本地私有模型进行 AI 编辑");
+    }
+  }
+}
+```
+
+---
+
+## Feature 6: DTYPE-04 Document Association Guard (Tech Debt)
+
+### Decision: Add Check to Document Type Disable/Delete Endpoints
+
+Simple service-layer check -- if documents reference a document type (via workflow), prevent deletion. Allow disable (existing documents unaffected, no new documents can use it).
+
+### Modified Components
+
+| Component | Change |
+|-----------|--------|
+| `document-types.service.ts` | Add `hasAssociatedDocuments()` check before delete |
+| `document-types.routes.ts` | Return 409 Conflict if delete blocked |
+
+No new tables or services needed.
+
+---
+
+## Component Boundary Summary
+
+### New Modules
+
+```
+packages/backend/src/modules/
+  notification/              # WeChat Work notifications (thin wrapper)
+    notification.service.ts
+  stats/                     # Analytics aggregation
+    stats.service.ts
+    stats.routes.ts
+  quota/                     # Usage limits
+    quota.service.ts
+    quota.guard.ts
+    quota.routes.ts          # Admin CRUD for quota rules
+  search/                    # Global search + favorites + recent
+    search.service.ts
+    search.routes.ts
+    favorites.service.ts
+    favorites.routes.ts
+
+packages/backend/src/modules/runtime/
+  background.service.ts      # Background execution loop
+  background.routes.ts       # Start/status endpoints
+  inline-edit.service.ts     # AI inline editing
+  inline-edit.routes.ts      # SSE streaming endpoint
+
+packages/frontend/src/pages/admin/
+  Statistics.tsx              # Analytics dashboard
+  QuotaManagement.tsx         # Quota CRUD
+
+packages/frontend/src/pages/
+  SearchResults.tsx           # Global search results
+
+packages/frontend/src/components/
+  nav/SearchBar.tsx           # Global search input
+  workspace/AIEditDialog.tsx  # AI edit instruction dialog
+```
+
+### New Database Tables
+
+| Table | Purpose | Rows at Scale |
+|-------|---------|---------------|
+| `background_tasks` | Track background generation jobs | ~100s |
+| `quotas` | Quota rules per user/model/project | ~10s |
+| `user_favorites` | User bookmarks | ~100s |
+| `user_recent_access` | Recent access log | ~1000s (pruned) |
+
+### Database Indexes
+
+| Index | Purpose |
+|-------|---------|
+| `idx_documents_title_trgm` (GIN) | Accelerate ILIKE search on document titles |
+| `idx_documents_description_trgm` (GIN) | Accelerate ILIKE search on document descriptions |
+| `idx_projects_name_trgm` (GIN) | Accelerate ILIKE search on project names |
+| `idx_user_recent_access_unique` | Upsert support for recent access |
+| `idx_model_call_logs_user_date` | Fast quota checks (userId + createdAt) |
+| `idx_model_call_logs_created_at` | Fast time-range aggregations for stats |
+
+---
+
+## Suggested Build Order
+
+Dependencies determine the order:
+
+```
+Phase 1: Infrastructure (no feature dependencies)
+  1a. DB migration: new tables + pg_trgm extension + indexes
+  1b. DTYPE-04 guard (simple, closes tech debt)
+
+Phase 2: Background Execution + Notification (unlocks core feature)
+  2a. notification.service.ts (thin wrapper over existing wecom.service)
+  2b. background.service.ts + routes (depends on 2a)
+  2c. Frontend: background task button + status display
+
+Phase 3: Statistics & Audit (reads existing data, no write-side changes)
+  3a. stats.service.ts + routes
+  3b. Frontend: Statistics dashboard page
+
+Phase 4: Quota Management (must exist before heavy usage)
+  4a. quota.service.ts + guard
+  4b. quota.routes.ts (admin CRUD)
+  4c. Wire quota guard into model-call and background routes
+  4d. Frontend: Quota management page + warning indicators
+
+Phase 5: Search + Favorites + Recent (user-facing polish)
+  5a. search.service.ts + routes
+  5b. favorites + recent access services + routes
+  5c. Wire recent access recording into existing routes
+  5d. Frontend: search bar, results page, dashboard integration
+
+Phase 6: AI Inline Editing (highest complexity, depends on stable runtime)
+  6a. inline-edit.service.ts + routes
+  6b. Frontend: AIEditDialog + InlineEditor AI button
+  6c. Security: local model enforcement post-restore
+```
+
+### Rationale for Order
+
+- **Phase 1 first:** Schema migrations must land before any feature code. DTYPE-04 is a simple fix that closes tech debt with minimal risk.
+- **Phase 2 before 3:** Background execution creates the `background_tasks` data that statistics can later aggregate. Also, background execution is the highest-value user-facing feature.
+- **Phase 3 before 4:** Statistics gives admins visibility into actual usage before they configure quotas. Setting quotas without usage data is guesswork.
+- **Phase 5 is independent:** Search/favorites have no dependency on other v1.1 features. Placed here because it's user-facing polish.
+- **Phase 6 last:** AI inline editing is the most complex feature (streaming, security constraints, editor integration). It benefits from the stable runtime that earlier phases ensure.
+
+---
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern: External Queue for In-Process Workload
+
+Adding Redis + BullMQ for background tasks at 50-user scale. The operational cost (Redis deployment, monitoring, connection management) outweighs any benefit. In-process execution with PostgreSQL as the state store is simpler and equally reliable.
+
+### Anti-Pattern: Separate Analytics Database
+
+Creating a data warehouse or separate analytics store for 50 users. Direct SQL aggregation on the operational database is fast enough. Add read replicas or materialized views only when query latency becomes measurable (unlikely below 10K users).
+
+### Anti-Pattern: Elasticsearch for Search
+
+Deploying Elasticsearch for full-text search over thousands of documents. PostgreSQL `pg_trgm` with GIN indexes handles this volume trivially. Elasticsearch adds ops burden, data sync complexity, and is justified only at millions of documents.
+
+### Anti-Pattern: Quota Check in Middleware Only
+
+Checking quotas only at the HTTP layer misses background execution. Quota checks must also run inside `background.service.ts` before each model call node, or background jobs could exceed quotas silently.
+
+---
 
 ## Sources
 
-- [Windmill: Fastest self-hostable workflow engine](https://www.windmill.dev/blog/launch-week-1/fastest-workflow-engine) -- PostgreSQL-based state transitions as single transacted statements
-- [PGFlow: Postgres-centric workflow engine](https://github.com/pgflow-dev/pgflow) -- All workflow state in Postgres, queryable with SQL
-- [Absurd Workflows: Durable Execution With Just Postgres](https://lucumr.pocoo.org/2025/11/3/absurd-workflows/) -- Durable execution patterns using PostgreSQL
-- [State of Workflow Orchestration Ecosystem 2025](https://www.pracdata.io/p/state-of-workflow-orchestration-ecosystem-2025) -- Landscape overview
-- [Design Patterns for Gen AI Applications](https://code-b.dev/blog/gen-ai-architecture) -- AI application architecture patterns
-- [Azure: Generate Documents from Your Data](https://learn.microsoft.com/en-us/azure/architecture/ai-ml/idea/generate-documents-from-your-data) -- Document generation reference architecture
-- [Smarter PII Handling in LLMs](https://www.firstsource.com/insights/blogs/when-privacy-meets-performance-smarter-way-handle-pii-llms) -- Data masking patterns for AI pipelines
-- [AWS: What is Data Masking](https://aws.amazon.com/what-is/data-masking/) -- Tokenization and substitution masking approaches
-- Project requirements: `docs/requirements/v4-current.md`
-- Project storage architecture: `docs/design/storage-architecture.md`
-- Project material context design: `docs/design/material-context-design.md`
+- [BullMQ](https://bullmq.io/) -- Evaluated but rejected for v1.1 scale
+- [bunqueue](https://github.com/egeominotti/bunqueue) -- Bun-native alternative evaluated
+- [Bun Workers API](https://bun.com/docs/runtime/workers) -- For future CPU-bound isolation
+- [zhparser](https://github.com/amutu/zhparser) -- PostgreSQL Chinese FTS extension (evaluated, too complex for current needs)
+- [pg_cjk_parser](https://github.com/huangjimmy/pg_cjk_parser) -- CJK 2-gram tokenizer alternative
+- [PostgreSQL pg_trgm](https://www.postgresql.org/docs/current/pgtrgm.html) -- Trigram matching for ILIKE acceleration
+- WeChat Work message API: existing `wecom.service.ts` `sendTextCardMessage()`
+- Existing codebase: `packages/backend/src/db/schema.ts`, `packages/backend/src/modules/runtime/`
 
 ---
-*Architecture research for: IntelliFlow Docs -- Enterprise AI Document Generation Platform*
-*Researched: 2026-03-19*
+*Architecture research for: IntelliFlow Docs v1.1 -- Operations Enhancement & Smart Editing*
+*Researched: 2026-03-25*

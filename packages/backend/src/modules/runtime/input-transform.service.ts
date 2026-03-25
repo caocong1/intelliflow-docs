@@ -151,18 +151,7 @@ export interface ConfirmInputTransformParams {
 export async function confirmInputTransform(params: ConfirmInputTransformParams) {
   const { documentId, nodeExecutionId, formData, fileOutputs, userId } = params;
 
-  // Build output data structure
-  const outputData = {
-    fields: formData,
-    files: fileOutputs.map((f) => ({
-      fileId: f.fileId,
-      name: f.name,
-      parsedText: f.parsedText,
-    })),
-    confirmedAt: new Date().toISOString(),
-  };
-
-  // Build combined text for downstream nodes
+  // Build combined text for downstream nodes (must be computed before outputData)
   const textParts: string[] = [];
   for (const [key, value] of Object.entries(formData)) {
     if (value) textParts.push(`[${key}]\n${value}`);
@@ -171,6 +160,18 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
     if (file.parsedText) textParts.push(`[${file.name}]\n${file.parsedText}`);
   }
   const combinedText = textParts.join("\n\n---\n\n");
+
+  // Build output data structure
+  const outputData = {
+    fields: formData,
+    files: fileOutputs.map((f) => ({
+      fileId: f.fileId,
+      name: f.name,
+      parsedText: f.parsedText,
+    })),
+    text: combinedText,
+    confirmedAt: new Date().toISOString(),
+  };
 
   // Write combined output to step directory
   const outputDir = join(getUploadPath(documentId), nodeExecutionId);

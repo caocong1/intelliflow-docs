@@ -25,6 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 11: Pre-Phase 5 API Access Fixes** - Split user/model/workflow-detail routes to requireAuth for non-admin access, closing INT-NEW-02/INT-NEW-03 (completed 2026-03-20)
 - [x] **Phase 14: Milestone Tracking Housekeeping** - Fix RECV-03 tracking, Phase 5 stale metadata, Phase 13 verification discrepancy, Phase 5 VERIFICATION.md (completed 2026-03-25)
 - [x] **Phase 15: Integration Bug Fixes — Export URL, PPT Cleanup, Type Sync** - Fix ExportCompleted download URL, remove phantom PPT format, sync shared User type avatar field (completed 2026-03-25)
+- [ ] **Phase 16: Fix Version History & Dead Code Cleanup** - Fix VersionHistory.tsx route param mismatch (params.id → params.documentId), delete orphaned DocumentDetail.tsx, fix REQUIREMENTS.md coverage count
 
 ## Phase Details
 
@@ -234,6 +235,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 13. Document Runtime Refactor | 10/10 | Complete    | 2026-03-25 |
 | 14. Milestone Tracking Housekeeping | 1/1 | Complete    | 2026-03-25 |
 | 15. Integration Bug Fixes — Export URL, PPT Cleanup, Type Sync | 1/1 | Complete    | 2026-03-25 |
+| 16. Fix Version History & Dead Code Cleanup | 0/1 | Planned | — |
 
 ### Phase 12: Workflow Editor Fixes & Config Panel Alignment
 
@@ -306,3 +308,20 @@ Plans:
 
 Plans:
 - [ ] 15-01-PLAN.md — Fix ExportCompleted download URL, remove PPT from types/editor, add avatar to shared User type
+
+### Phase 16: Fix Version History & Dead Code Cleanup
+
+**Goal:** Fix the VersionHistory.tsx route param mismatch that makes version history completely non-functional, delete orphaned DocumentDetail.tsx dead code, and correct REQUIREMENTS.md coverage count
+**Depends on:** Phase 4
+**Requirements**: VER-02, VER-03
+**Gap Closure:** Closes requirement gaps (VER-02, VER-03), integration gap (route param mismatch), and flow gap (version history viewing/diff) from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. VersionHistory.tsx uses `useParams<{ documentId: string }>()` matching the route `:documentId`
+  2. Version history page loads and displays version timeline for a document
+  3. Version diff comparison works between two versions
+  4. DocumentDetail.tsx is deleted (orphaned dead code)
+  5. REQUIREMENTS.md coverage count corrected to 84 (not 85)
+**Plans**: TBD
+
+Plans:
+- [ ] 16-01-PLAN.md — Fix VersionHistory param mismatch, delete DocumentDetail.tsx, fix REQUIREMENTS.md coverage

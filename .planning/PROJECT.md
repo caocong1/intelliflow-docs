@@ -8,89 +8,105 @@
 
 用户能跑通完整的流程生成高质量文档——从输入到 AI 多模型并行生成、对比迭代、信息脱敏恢复、最终导出，一站式完成，替代逐个 AI 平台粘贴对比的低效方式。
 
+## Current State
+
+**Shipped:** v1.0 MVP (2026-03-25)
+**Codebase:** Bun monorepo, 146 TypeScript files, ~31,100 LOC
+**Tech stack:** Bun + ElysiaJS + Drizzle ORM + PostgreSQL 18 + SolidJS + Tailwind CSS v4
+
+v1.0 delivers the complete MVP: user auth, admin configuration (providers, models, document types), visual workflow editor with 5 node types, project/document management with version history, and full document creation runtime with SSE streaming, multi-model comparison, desensitize/restore, and export. 82/82 active requirements satisfied across 16 phases.
+
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+- **AUTH-01~04**: 用户认证（登录、会话、角色权限） — v1.0
+- **AIMC-01~07, AIMC-09**: AI Provider/模型管理（CRUD、连通性测试、参数配置） — v1.0
+- **DTYPE-01~05**: 文档类型管理 — v1.0
+- **FLOW-01~13**: 流程编排（5 种节点、变量系统、校验、管理） — v1.0
+- **PROJ-01~09**: 项目管理（CRUD、成员、角色） — v1.0
+- **DMGT-01~06**: 文档管理（列表、搜索、详情、可见性） — v1.0
+- **DOC-01~05**: 文档创建与工作台 — v1.0
+- **NODE-01~22**: 5 种节点执行器 — v1.0
+- **NOPS-01~04**: 节点通用操作 — v1.0
+- **VER-01~03**: 版本管理 — v1.0
+- **FSYS-01~04**: 文件系统与工作目录 — v1.0
+- **RECV-01~02**: 失败恢复（草稿保存、断点续作） — v1.0
 
 ### Active
 
-- [ ] 用户认证与管理（v1 简化为用户名密码登录，后续扩展企业微信 OAuth）
-- [ ] 角色权限体系（系统管理员 / 普通用户）
-- [ ] AI 模型提供商（Provider）管理（创建、编辑、测试连通性、启停）
-- [ ] AI 模型管理（模型配置、部署类型标识、CLI/API 调用方式、参数配置）
-- [ ] 文档类型管理（创建、编辑、启停、排序）
-- [ ] 流程编排配置（5 种基础节点的自由编排、节点配置、变量系统、流程校验）
-- [ ] 流程管理（创建、编辑、启停、复制、与文档类型绑定）
-- [ ] 项目管理（创建、编辑、删除、成员管理、项目角色）
-- [ ] 文档创建与工作台（从空白/导入/复制创建、流程进度导航、逐节点执行）
-- [ ] 5 种基础节点的用户交互界面（输入转换、信息脱敏、模型调用、信息恢复、文件导出）
-- [ ] 多模型并行调用与流式输出展示
-- [ ] 文件系统驱动的工作目录机制
-- [ ] 节点通用操作（确认下一步、编辑当前内容、跳过后续、回退）
-- [ ] 文档管理（列表、详情、版本管理、可见性设置）
-- [ ] 文档导出（Word / PDF / Excel / Markdown）
-- [ ] 统计与审计（总览面板、生成记录明细、多维度统计）
-- [ ] 用量与限制管理
-- [ ] 失败恢复与断点续作
-- [ ] 通知规则（后台生成完成通知）
+- [ ] RECV-03: 支持取消正在进行的 AI 生成任务（v1.0 deferred）
+- [ ] 企业微信 OAuth 集成（WCOM-01~04）
+- [ ] 统计与审计面板（STAT-01~04）
+- [ ] 用量与限制管理（QUOT-01~03）
+- [ ] 全局搜索、最近访问、收藏功能（ENHC-01~02）
+- [ ] 文档评论与行内批注（ENHC-03）
+- [ ] 从已有/历史文档导入/复制创建（ENHC-04~05）
+- [ ] 后台 AI 生成 + 企业微信通知（ENHC-06）
+- [ ] Excel 导出格式支持（ENHC-08）
+- [ ] AI 辅助内联编辑（ENHC-09）
+- [ ] 模型调用改为 API 直接调用（替代 CLI）
+- [ ] 脱敏映射加密存储（v1.0 tech debt）
+- [ ] DTYPE-04 文档关联守卫（v1.0 tech debt）
 
 ### Out of Scope
 
-- 企业微信 OAuth 集成 — v1 使用简单用户名密码，后续版本接入
-- 人工审核节点 — 后续版本支持
-- 大纲确认节点 — 后续版本支持
-- 选择资料节点（RAG 检索） — 后续版本支持
-- 文档评论与行内批注 — 后续版本支持
-- 全局搜索/最近访问/收藏/常用流程快捷创建 — 后续迭代
-- 审核中文档锁定 / 已完成文档再编辑触发复审 — 依赖人工审核节点
-- 移动端适配 — Web 优先
+- 实时多人协同编辑 — 高复杂度（CRDT/OT），业务规则已明确同一文档同一时间只允许一人编辑
+- 用户自定义节点类型 — 复杂度无上限，安全风险；通过 5 种固定节点灵活配置满足需求
+- 内置 AI 模型托管 — 超出范围，运维负担大；通过外部 Provider 集成
+- 移动端 App — Web 优先的内部工具，暂无移动端场景
+- 多租户 SaaS 架构 — 公司内部工具，单租户部署
+- 插件/扩展市场 — 过度工程化
+- 项目资料库（RAG） — 独立且复杂的子系统
+- AIMC-08: CLI 命令行调用模板 — 改用 OpenCode Coding Plan 转发
+- 条件路由 — 后续版本支持
+- 人工审核节点 / 大纲确认节点 / 选择资料节点 — 后续版本支持
 
 ## Context
 
 - 产品服务公司内部多部门，典型场景：招投标文档、解决方案、PRD、技术方案、会议纪要等
-- 存储架构已确定：PostgreSQL（元数据+脱敏映射加密存储）+ 服务器文件系统（节点输出+上传文件+导出文件）
-- 模型调用采用统一抽象层：v1 首选 CLI 命令行调用（`claude -p "提示词"`），v2 扩展 API 直接调用
-- 脱敏机制：映射关系 DB 加密存储，脱敏规则（仅类型描述，不含真实值）自动注入后续模型调用提示词
-- 需求文档经过多轮审批会议迭代（v1→v4），当前以 `docs/requirements/v4-current.md` 为准
-- 技术栈已确定：Bun + ElysiaJS + Drizzle ORM + SolidJS + Tailwind CSS v4，详见 `docs/design/backend-tech-stack-research.md`
+- 存储架构：PostgreSQL（元数据+脱敏映射）+ 服务器文件系统（节点输出+上传文件+导出文件）
+- 模型调用：v1 使用 OpenAI-compatible API with SSE streaming；开发环境用 Coding Plan 转发，生产环境用火山方舟 API
+- 脱敏机制：映射关系 DB 存储（v2 加密），脱敏规则（仅类型描述）自动注入后续模型调用提示词
+- 需求文档以 `docs/requirements/v4-current.md` 为准
 
 ## Constraints
 
-- **技术栈**: Bun (runtime) + ElysiaJS (后端) + Drizzle ORM + PostgreSQL 18 + BullMQ + Redis + SolidJS (前端) + Tailwind CSS v4 — 所有组件使用最新版本
-- **存储架构**: PostgreSQL + 文件系统混合方案 — 已在审批会议中确定，详见 `docs/design/storage-architecture.md`
-- **模型调用**: v1 必须支持 CLI 命令行调用方式 — 当前各模型主要通过命令行 agent 方式使用
+- **技术栈**: Bun (runtime) + ElysiaJS (后端) + Drizzle ORM + PostgreSQL 18 + SolidJS (前端) + Tailwind CSS v4
+- **存储架构**: PostgreSQL + 文件系统混合方案
 - **安全**: 脱敏真实值不出服务器，脱敏节点仅可调用本地私有模型
 - **并发**: 支持 50+ 用户同时生成
 - **性能**: 流式生成首 Token 延迟 < 2 秒
-
-## Milestone Plan
-
-产品采用渐进式交付，按以下里程碑拆分：
-
-| Milestone | 内容 | 目标 |
-|-----------|------|------|
-| M1 | 框架搭建 + 用户认证 + 用户管理 + 文档类型管理 | 基础设施就绪，管理员可管理用户和文档类型 |
-| M2 | AI Provider 管理 + 模型配置 | 管理员可配置和调试 AI 模型 |
-| M3 | 流程编排配置（5 种节点编排、节点配置、变量系统、校验） | 管理员可创建和配置完整的文档生成流程 |
-| M4 | 项目管理 + 文档管理 + 版本管理 + 文件系统 | 项目和文档基础设施就绪 |
-| M5 | 文档创建 + 工作台 + 5 种节点执行 + 通用操作 + 失败恢复 | 用户可跑通完整流程生成文档 |
-| M6+ | 统计审计、用量管理、企业微信集成等 | 补齐辅助功能，准备内部推广 |
-
-每个里程碑交付后验收界面和功能，再推进下一阶段。
+- **包管理器**: Bun（不使用 pnpm/npm/yarn）
+- **代码规范**: Biome（不使用 ESLint/Prettier）
+- **认证**: Bearer Token + localStorage（不使用 JWT 或 Cookie Session）
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Bun + ElysiaJS + Drizzle ORM + SolidJS + Tailwind v4 | Bun 统一前后端运行时，Eden Treaty 端到端类型安全，Drizzle 原生 bun:sql 驱动 | — Pending |
-| PostgreSQL 18 + Redis + BullMQ | PG17 最新稳定版，BullMQ 已官方支持 Bun，Redis 在 50 用户规模运维简单 | — Pending |
-| v1 用户名密码认证，不做企业微信 | 先跑通核心流程，降低外部依赖 | — Pending |
-| 渐进式 6 阶段里程碑交付 | 每阶段可验收界面和功能，降低风险 | — Pending |
-| 存储采用 PostgreSQL + 文件系统混合 | 审批会议确定，结构化查询+大文件分离 | — Pending |
-| v1 模型调用首选 CLI 命令行 | 当前模型主要通过命令行使用，降低集成复杂度 | — Pending |
-| 资料库（RAG）移出 v1 范围 | 独立且复杂的子系统，暂不纳入规划 | — Pending |
+| Bun + ElysiaJS + Drizzle ORM + SolidJS + Tailwind v4 | Bun 统一前后端运行时，Eden Treaty 端到端类型安全 | Good |
+| PostgreSQL 18 + 文件系统混合存储 | 结构化查询+大文件分离，审批会议确定 | Good |
+| v1 用户名密码认证 | 先跑通核心流程，降低外部依赖 | Good |
+| Bearer Token + sessions table (非 JWT) | 支持服务端会话撤销，安全性更高 | Good |
+| 渐进式里程碑交付 | 每阶段可验收，降低风险 | Good |
+| v1 OpenAI-compatible API (非 CLI) | SSE streaming, 多模型并行, 标准化接口 | Good |
+| 资料库（RAG）移出 v1 范围 | 独立子系统，暂不纳入 | Good |
+| 自定义 SVG+HTML 画布 (替代 @dschz/solid-flow) | 完全控制交互和渲染，消除第三方限制 | Good |
+| Flow engine as pure library | 可测试性，与 UI 解耦 | Good |
+| postgres npm package (非 bun:sql) | 生产稳定性 | Good |
+| Elysia resolve (scoped) for auth plugin | TypeScript 类型跨插件传播 | Good |
+| Multiplexed SSE stream for multi-model | 所有模型共享一个连接，modelId 标记事件 | Good |
+| fetch+ReadableStream (非 EventSource) | 支持 Authorization header | Good |
+| RECV-03 cancel AI generation 延迟到 v2 | 复杂度高，v1 优先跑通核心流程 | Deferred |
+
+## Milestone Plan
+
+| Milestone | 内容 | 状态 |
+|-----------|------|------|
+| v1.0 MVP | 认证+管理+流程编排+项目文档+运行时 | Shipped 2026-03-25 |
+| v1.1 | 企业微信集成、统计审计、用量管理、tech debt 修复 | Planned |
+| v2.0 | 增强功能（全局搜索、批注、AI 辅助编辑、条件路由等） | Future |
 
 ---
-*Last updated: 2026-03-19 after initialization*
+*Last updated: 2026-03-25 after v1.0 milestone*

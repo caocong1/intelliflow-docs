@@ -80,37 +80,37 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BGND-01 | — | Pending |
-| BGND-02 | — | Pending |
-| BGND-03 | — | Pending |
-| BGND-04 | — | Pending |
-| BGND-05 | — | Pending |
-| BGND-06 | — | Pending |
-| STAT-01 | — | Pending |
-| STAT-02 | — | Pending |
-| STAT-03 | — | Pending |
-| STAT-04 | — | Pending |
-| STAT-05 | — | Pending |
-| STAT-06 | — | Pending |
-| STAT-07 | — | Pending |
-| SRCH-01 | — | Pending |
-| SRCH-02 | — | Pending |
-| SRCH-03 | — | Pending |
-| SRCH-04 | — | Pending |
-| SRCH-05 | — | Pending |
-| AIED-01 | — | Pending |
-| AIED-02 | — | Pending |
-| AIED-03 | — | Pending |
-| AIED-04 | — | Pending |
-| AIED-05 | — | Pending |
-| AIED-06 | — | Pending |
-| DEBT-01 | — | Pending |
+| DEBT-01 | Phase 17 | Pending |
+| BGND-01 | Phase 18 | Pending |
+| BGND-02 | Phase 18 | Pending |
+| BGND-03 | Phase 18 | Pending |
+| BGND-04 | Phase 18 | Pending |
+| BGND-05 | Phase 18 | Pending |
+| BGND-06 | Phase 18 | Pending |
+| STAT-01 | Phase 19 | Pending |
+| STAT-02 | Phase 19 | Pending |
+| STAT-03 | Phase 19 | Pending |
+| STAT-04 | Phase 19 | Pending |
+| STAT-05 | Phase 19 | Pending |
+| STAT-06 | Phase 19 | Pending |
+| STAT-07 | Phase 19 | Pending |
+| SRCH-01 | Phase 20 | Pending |
+| SRCH-02 | Phase 20 | Pending |
+| SRCH-03 | Phase 20 | Pending |
+| SRCH-04 | Phase 20 | Pending |
+| SRCH-05 | Phase 20 | Pending |
+| AIED-01 | Phase 21 | Pending |
+| AIED-02 | Phase 21 | Pending |
+| AIED-03 | Phase 21 | Pending |
+| AIED-04 | Phase 21 | Pending |
+| AIED-05 | Phase 21 | Pending |
+| AIED-06 | Phase 21 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 25 total
-- Mapped to phases: 0
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25/25
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after initial definition*
+*Last updated: 2026-03-25 after roadmap creation*

@@ -35,15 +35,15 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 
 ### Active (v1.1)
 
-- [ ] 后台 AI 生成 + 企业微信通知（ENHC-06）
-- [ ] 统计与审计面板（STAT-01~04）
-- [ ] 用量与限制管理（QUOT-01~03）
-- [ ] 全局搜索、最近访问、收藏功能（ENHC-01~02）
-- [ ] DTYPE-04 文档关联守卫（v1.0 tech debt）
-- [ ] AI 辅助内联编辑（ENHC-09）
+- [ ] 后台 AI 生成 + 应用内通知 + 企业微信通知（BGND-01~06）
+- [ ] 统计与审计面板（STAT-01~07）
+- [ ] 全局搜索、最近访问、收藏功能（SRCH-01~05）
+- [ ] AI 辅助内联编辑（AIED-01~06）
+- [ ] DTYPE-04 文档关联守卫（DEBT-01）
 
 ### Future
 
+- [ ] 用量与限制管理（QUOT-01~03）— v1.1 决定只统计不限制，待有使用数据后再设定合理配额
 - [ ] RECV-03: 支持取消正在进行的 AI 生成任务（v1.0 deferred）
 - [ ] 文档评论与行内批注（ENHC-03）
 - [ ] 从已有/历史文档导入/复制创建（ENHC-04~05）
@@ -107,12 +107,11 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 **Goal:** 补全运营管理能力（统计审计、用量控制）、提升用户效率（全局搜索、AI 辅助编辑、后台生成通知）、修复遗留 tech debt。
 
 **Target features:**
-- 后台 AI 生成 + 企微通知推送
-- 统计审计面板（使用统计、模型调用记录、操作日志）
-- 用量与限制管理（配额、用量预警）
+- 后台 AI 生成 + 应用内通知 + 企微通知推送
+- 统计审计面板（全量：概览、模型、用户、流程、审计明细、多维度交叉）
 - 全局搜索、最近访问、收藏
+- AI 辅助内联编辑（完整版：浮动工具栏、差异预览、安全感知模型过滤）
 - DTYPE-04 文档关联守卫
-- AI 辅助内联编辑
 
 ## Milestone Plan
 

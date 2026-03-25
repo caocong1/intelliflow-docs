@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 9: Integration Polish & UX Guards** - Association check guard for document type delete, fix frontend ownership derivation (completed 2026-03-20)
 - [x] **Phase 10: Non-Admin Read API Access** - Split doc-type/workflow listing to requireAuth so non-admin users can create documents (completed 2026-03-20)
 - [x] **Phase 11: Pre-Phase 5 API Access Fixes** - Split user/model/workflow-detail routes to requireAuth for non-admin access, closing INT-NEW-02/INT-NEW-03 (completed 2026-03-20)
-- [ ] **Phase 14: Milestone Tracking Housekeeping** - Fix RECV-03 tracking, Phase 5 stale metadata, Phase 13 verification discrepancy, Phase 5 VERIFICATION.md
+- [x] **Phase 14: Milestone Tracking Housekeeping** - Fix RECV-03 tracking, Phase 5 stale metadata, Phase 13 verification discrepancy, Phase 5 VERIFICATION.md (completed 2026-03-25)
 
 ## Phase Details
 
@@ -231,7 +231,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 11. Pre-Phase 5 API Access Fixes | 1/1 | Complete    | 2026-03-20 |
 | 12. Workflow Editor Fixes & Config Panel Alignment | 7/7 | Complete | 2026-03-20 |
 | 13. Document Runtime Refactor | 10/10 | Complete    | 2026-03-25 |
-| 14. Milestone Tracking Housekeeping | 0/1 | Not started | - |
+| 14. Milestone Tracking Housekeeping | 1/1 | Complete | 2026-03-25 |
 
 ### Phase 12: Workflow Editor Fixes & Config Panel Alignment
 
@@ -288,4 +288,4 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 14-01-PLAN.md — Fix all tracking inconsistencies, create Phase 5 VERIFICATION.md, verify all artifacts aligned
+- [x] 14-01-PLAN.md — Fix all tracking inconsistencies, create Phase 5 VERIFICATION.md, verify all artifacts aligned

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-24T02:37:36Z"
+last_updated: "2026-03-25T03:45:40Z"
 progress:
   total_phases: 13
   completed_phases: 13
-  total_plans: 46
-  completed_plans: 46
+  total_plans: 47
+  completed_plans: 47
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-19)
 ## Current Position
 
 Phase: 13 of 13 (Document Runtime Refactor — Align Phase 12)
-Plan: 9 of 9 in current phase (13-09 complete)
+Plan: 10 of 10 in current phase (13-10 complete)
 Status: Complete
-Last activity: 2026-03-24 — Completed 13-09 (Multi-Input Desensitize/Restore)
+Last activity: 2026-03-25 — Completed 13-10 (UAT Gap Closure)
 
-Progress: [██████████] 100% (46/46 plans)
+Progress: [██████████] 100% (47/47 plans)
 
 ## Performance Metrics
 
@@ -92,6 +92,7 @@ Progress: [██████████] 100% (46/46 plans)
 | Phase 13 P07 | 4min | 2 tasks | 8 files |
 | Phase 13 P06 | 3min | 2 tasks | 2 files |
 | Phase 13 P09 | 6min | 3 tasks | 9 files |
+| Phase 13 P10 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,9 @@ Recent decisions affecting current work:
 - [13-09] Validation Rule 9: max 1 desensitize node per workflow; Rule 10: valid inputSource references
 - [13-09] Multi-source inputData format: { sources: { [outputId]: { displayName, text } } }
 - [13-09] Single shared desensitize mapping table across all input sources; legacy fallback preserved
+- [13-10] outputData.text convention: InputTransform includes combinedText for downstream node consumption
+- [13-10] Draft save body envelope: always wrap as { data: ... } for backend PUT /draft compatibility
+- [13-10] Correlated SQL subqueries with is_current=true for progress aggregation in listDocuments
 
 ### Roadmap Evolution
 
@@ -226,6 +230,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-24
-Stopped at: Completed 13-09-PLAN.md
-Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-09-SUMMARY.md
+Last session: 2026-03-25
+Stopped at: Completed 13-10-PLAN.md
+Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-10-SUMMARY.md

@@ -31,7 +31,7 @@ const Login: Component = () => {
       localStorage.removeItem("pending_invitation");
       navigate(`/invitation/${pendingToken}`, { replace: true });
     } else {
-      navigateAfterLogin();
+      navigate("/", { replace: true });
     }
   }
 
@@ -59,7 +59,7 @@ const Login: Component = () => {
       if (oauthCode) {
         // 从 OAuth2 回调回来，用 code 登录
         setSubmitting(true);
-        handleWecomLogin(oauthCode);
+        handleWecomLogin(Array.isArray(oauthCode) ? oauthCode[0] : oauthCode);
       } else {
         // 跳转到 OAuth2 授权页
         setOauthRedirecting(true);
@@ -77,20 +77,20 @@ const Login: Component = () => {
       wwLoginInstance = ww.createWWLoginPanel({
         el: "#ww_login",
         params: {
-          login_type: "CorpApp",
+          login_type: ww.WWLoginType.corpApp,
           appid: config.corpId,
           agentid: config.agentId,
           redirect_uri: config.redirectUri,
           state: Math.random().toString(36).slice(2) + Date.now().toString(36),
-          redirect_type: "callback",
-          panel_size: "small",
-          lang: "zh",
+          redirect_type: ww.WWLoginRedirectType.callback,
+          panel_size: ww.WWLoginPanelSizeType.small,
+          lang: ww.WWLoginLangType.zh,
         },
         onLoginSuccess({ code }: { code: string }) {
           handleWecomLogin(code);
         },
-        onLoginFail(err: { errCode: number; errMsg: string }) {
-          setError(`企业微信登录失败: ${err.errMsg}`);
+        onLoginFail(err) {
+          setError(`企业微信登录失败: ${err.errMsg ?? "未知错误"}`);
         },
       });
     } catch (err) {

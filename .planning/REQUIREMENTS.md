@@ -291,8 +291,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RECV-03 | Phase 5 → v2 | Deferred |
 
 **Coverage:**
-- v1 requirements: 85 total (AIMC-08 moved to Out of Scope, RECV-03 deferred to v2)
-- Mapped to phases: 85
+- v1 requirements: 84 total (AIMC-08 moved to Out of Scope, RECV-03 deferred to v2)
+- Mapped to phases: 84
 - Satisfied: 82
 - Pending: 2 (VER-02, VER-03 — Phase 16)
 - Deferred: 1 (RECV-03)

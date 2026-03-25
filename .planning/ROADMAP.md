@@ -233,7 +233,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 12. Workflow Editor Fixes & Config Panel Alignment | 7/7 | Complete | 2026-03-20 |
 | 13. Document Runtime Refactor | 10/10 | Complete    | 2026-03-25 |
 | 14. Milestone Tracking Housekeeping | 1/1 | Complete    | 2026-03-25 |
-| 15. Integration Bug Fixes — Export URL, PPT Cleanup, Type Sync | 1/1 | Complete   | 2026-03-25 |
+| 15. Integration Bug Fixes — Export URL, PPT Cleanup, Type Sync | 1/1 | Complete    | 2026-03-25 |
 
 ### Phase 12: Workflow Editor Fixes & Config Panel Alignment
 

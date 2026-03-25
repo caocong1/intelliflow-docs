@@ -4,6 +4,7 @@ import {
   documentVersions,
   documentVisibilityMembers,
   documents,
+  nodeExecutions,
   users,
   workflows,
 } from "../../db/schema";
@@ -29,6 +30,9 @@ type DocumentRow = {
 
 type DocumentListItem = DocumentRow & {
   creatorName: string;
+  progressStep?: number;
+  totalSteps?: number;
+  currentNodeLabel?: string;
 };
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
@@ -108,7 +112,7 @@ export async function listDocuments(
     .from(documents)
     .where(whereClause);
 
-  // Data with creator name
+  // Data with creator name + progress subqueries
   const rows = await db
     .select({
       id: documents.id,
@@ -125,6 +129,24 @@ export async function listDocuments(
       createdAt: documents.createdAt,
       updatedAt: documents.updatedAt,
       creatorName: users.displayName,
+      progressStep: sql<number>`(
+        SELECT COUNT(*)::int FROM node_executions ne
+        WHERE ne.document_id = ${documents.id}
+          AND ne.is_current = true
+          AND ne.status IN ('completed', 'skipped')
+      )`.as("progress_step"),
+      totalSteps: sql<number>`(
+        SELECT COUNT(*)::int FROM node_executions ne
+        WHERE ne.document_id = ${documents.id}
+          AND ne.is_current = true
+      )`.as("total_steps"),
+      currentNodeLabel: sql<string>`(
+        SELECT ne.node_label FROM node_executions ne
+        WHERE ne.document_id = ${documents.id}
+          AND ne.is_current = true
+          AND ne.status = 'in_progress'
+        LIMIT 1
+      )`.as("current_node_label"),
     })
     .from(documents)
     .innerJoin(users, eq(documents.createdBy, users.id))

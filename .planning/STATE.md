@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-25T07:27:15.058Z"
+last_updated: "2026-03-25T08:00:57.229Z"
 progress:
-  total_phases: 14
-  completed_phases: 14
-  total_plans: 48
-  completed_plans: 48
+  total_phases: 15
+  completed_phases: 15
+  total_plans: 49
+  completed_plans: 49
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-19)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 14: Milestone Tracking Housekeeping (Complete)
+**Current focus:** Phase 15: Integration Bug Fixes — Export, PPT, Type Sync (Complete)
 
 ## Current Position
 
-Phase: 14 of 14 (Milestone Tracking Housekeeping)
-Plan: 1 of 1 in current phase (14-01 complete)
+Phase: 15 of 15 (Integration Bug Fixes — Export, PPT, Type Sync)
+Plan: 1 of 1 in current phase (15-01 complete)
 Status: Complete
-Last activity: 2026-03-25 — Completed 14-01 (Fix tracking inconsistencies, create Phase 5 VERIFICATION.md)
+Last activity: 2026-03-25 — Completed 15-01 (Fix ExportCompleted download, remove PPT format, add User avatar)
 
-Progress: [██████████] 100% (48/48 plans)
+Progress: [██████████] 100% (49/49 plans)
 
 ## Performance Metrics
 
@@ -95,6 +95,7 @@ Progress: [██████████] 100% (48/48 plans)
 | Phase 13 P10 | 2min | 2 tasks | 3 files |
 | Phase 13 P08 | 15min | 2 tasks | 6 files |
 | Phase 14 P01 | 4min | 2 tasks | 3 files |
+| Phase 15 P01 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -222,6 +223,7 @@ Recent decisions affecting current work:
 - [Phase 13]: Export format aliases (docx->word, doc->word, md->markdown) for workflow config compatibility
 - [Phase 14]: Phase 5 VERIFICATION.md uses delegated verification pattern -- references Phase 13 as primary evidence source
 - [Phase 14]: Historical SUMMARY files left unmodified; discrepancies documented in audit report instead
+- [Phase 15]: fetch+blob pattern for authenticated file download instead of window.open (requireAuth route needs Authorization header)
 
 ### Roadmap Evolution
 
@@ -238,5 +240,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-25
-Stopped at: Completed 14-01-PLAN.md (Milestone tracking housekeeping)
-Resume file: .planning/phases/14-milestone-tracking-housekeeping/14-01-SUMMARY.md
+Stopped at: Completed 15-01-PLAN.md
+Resume file: .planning/phases/15-integration-bug-fixes-export-ppt-type-sync/15-01-SUMMARY.md

@@ -24,7 +24,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 10: Non-Admin Read API Access** - Split doc-type/workflow listing to requireAuth so non-admin users can create documents (completed 2026-03-20)
 - [x] **Phase 11: Pre-Phase 5 API Access Fixes** - Split user/model/workflow-detail routes to requireAuth for non-admin access, closing INT-NEW-02/INT-NEW-03 (completed 2026-03-20)
 - [x] **Phase 14: Milestone Tracking Housekeeping** - Fix RECV-03 tracking, Phase 5 stale metadata, Phase 13 verification discrepancy, Phase 5 VERIFICATION.md (completed 2026-03-25)
-- [ ] **Phase 15: Integration Bug Fixes — Export URL, PPT Cleanup, Type Sync** - Fix ExportCompleted download URL, remove phantom PPT format, sync shared User type avatar field
+- [x] **Phase 15: Integration Bug Fixes — Export URL, PPT Cleanup, Type Sync** - Fix ExportCompleted download URL, remove phantom PPT format, sync shared User type avatar field (completed 2026-03-25)
 
 ## Phase Details
 
@@ -233,7 +233,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 12. Workflow Editor Fixes & Config Panel Alignment | 7/7 | Complete | 2026-03-20 |
 | 13. Document Runtime Refactor | 10/10 | Complete    | 2026-03-25 |
 | 14. Milestone Tracking Housekeeping | 1/1 | Complete    | 2026-03-25 |
-| 15. Integration Bug Fixes — Export URL, PPT Cleanup, Type Sync | 0/1 | Planned | — |
+| 15. Integration Bug Fixes — Export URL, PPT Cleanup, Type Sync | 1/1 | Complete   | 2026-03-25 |
 
 ### Phase 12: Workflow Editor Fixes & Config Panel Alignment
 

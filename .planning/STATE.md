@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-25T03:45:40Z"
+last_updated: "2026-03-25T06:05:57.548Z"
 progress:
   total_phases: 13
   completed_phases: 13
@@ -93,6 +93,7 @@ Progress: [██████████] 100% (47/47 plans)
 | Phase 13 P06 | 3min | 2 tasks | 2 files |
 | Phase 13 P09 | 6min | 3 tasks | 9 files |
 | Phase 13 P10 | 2min | 2 tasks | 3 files |
+| Phase 13 P08 | 15min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,9 @@ Recent decisions affecting current work:
 - [13-10] outputData.text convention: InputTransform includes combinedText for downstream node consumption
 - [13-10] Draft save body envelope: always wrap as { data: ... } for backend PUT /draft compatibility
 - [13-10] Correlated SQL subqueries with is_current=true for progress aggregation in listDocuments
+- [Phase 13]: Model display names resolved from config.modelNames map instead of showing raw UUIDs
+- [Phase 13]: Prompt variable resolution falls back to outputData.fields for input_transform nodes
+- [Phase 13]: Export format aliases (docx->word, doc->word, md->markdown) for workflow config compatibility
 
 ### Roadmap Evolution
 
@@ -231,5 +235,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-03-25
-Stopped at: Completed 13-10-PLAN.md
-Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-10-SUMMARY.md
+Stopped at: Completed 13-08-PLAN.md (E2E verification with bug fixes)
+Resume file: .planning/phases/13-document-runtime-refactor-align-phase12/13-08-SUMMARY.md

@@ -50,12 +50,11 @@ export default function ExportExecutor(props: Props) {
     const configured = props.config?.formats;
     if (configured && configured.length > 0) {
       return configured
-        .filter((f) => f !== "ppt")
         .map((f) => FORMAT_ALIASES[f] ?? f) as ExportFormat[];
     }
     // Backward compat: single format field
     const legacy = props.config?.format;
-    if (legacy && legacy !== "ppt") {
+    if (legacy) {
       const mapped = FORMAT_ALIASES[legacy] ?? legacy;
       return [mapped as ExportFormat];
     }

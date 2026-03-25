@@ -14,6 +14,7 @@ export interface User extends BaseEntity {
   displayName: string;
   role: UserRole;
   isActive: boolean;
+  avatar?: string | null;
 }
 
 /** Document type definition */
@@ -167,9 +168,9 @@ export interface RestoreConfig {
 export interface ExportConfig {
   type: "export";
   /** Allowed export formats (multi-select in config, user picks one at runtime) */
-  formats: Array<"word" | "pdf" | "markdown" | "ppt">;
+  formats: Array<"word" | "pdf" | "markdown">;
   /** @deprecated Use formats instead */
-  format?: "word" | "pdf" | "markdown" | "ppt";
+  format?: "word" | "pdf" | "markdown";
   templateId: string | null;
   contentMapping: VariableRef[];
   autoAdvance?: boolean;

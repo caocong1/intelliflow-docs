@@ -2,11 +2,12 @@ import { For } from "solid-js";
 import type { ExportConfig, VariableRef, OutputDef } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
 
-const FORMAT_OPTIONS: { value: ExportConfig["format"]; label: string; desc: string }[] = [
+type ExportFormat = "word" | "pdf" | "markdown";
+
+const FORMAT_OPTIONS: { value: ExportFormat; label: string; desc: string }[] = [
   { value: "word", label: "Word", desc: ".docx 格式，适合正式文档" },
   { value: "pdf", label: "PDF", desc: ".pdf 格式，适合固定版式" },
   { value: "markdown", label: "Markdown", desc: ".md 格式，适合技术文档" },
-  { value: "ppt", label: "PPT", desc: ".pptx 格式，适合演示汇报" },
 ];
 
 interface ExportConfigProps {
@@ -26,7 +27,7 @@ function getAvailableOutputs(nodes: FlowNodeData[]): Array<{ ref: VariableRef; o
           ref: {
             nodeId: node.id,
             outputId: output.id,
-            variableName: `${node.data.label}.${output.name}`,
+            variableName: `${node.id}.${output.id}`,
           },
           outputDef: output,
           nodeLabel: node.data.label,
@@ -58,34 +59,45 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
 
   return (
     <div class="space-y-4">
-      {/* Format Selector */}
+      {/* Format Selector (multi-select) */}
       <div>
         <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">导出格式</h4>
+        <p class="text-xs text-slate-500 mb-2">选择允许的导出格式（运行时用户从中选一个）：</p>
         <div class="space-y-1.5">
           <For each={FORMAT_OPTIONS}>
-            {(opt) => (
-              <label class="flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer select-none transition-colors hover:bg-slate-50"
-                classList={{
-                  "border-red-400 bg-red-50": props.config.format === opt.value,
-                  "border-slate-200": props.config.format !== opt.value,
-                }}
-              >
-                <input
-                  type="radio"
-                  name="export-format"
-                  value={opt.value}
-                  checked={props.config.format === opt.value}
-                  onChange={() => props.onChange({ ...props.config, format: opt.value })}
-                  class="mt-0.5 text-red-600 focus:ring-red-500 cursor-pointer"
-                />
-                <div>
-                  <p class="text-xs font-medium text-slate-800">{opt.label}</p>
-                  <p class="text-xs text-slate-400">{opt.desc}</p>
-                </div>
-              </label>
-            )}
+            {(opt) => {
+              const selected = () => (props.config.formats ?? []).includes(opt.value);
+              return (
+                <label class="flex items-start gap-2.5 p-2.5 rounded-md border cursor-pointer select-none transition-colors hover:bg-slate-50"
+                  classList={{
+                    "border-red-400 bg-red-50": selected(),
+                    "border-slate-200": !selected(),
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected()}
+                    onChange={() => {
+                      const current = props.config.formats ?? [];
+                      const next = selected()
+                        ? current.filter((f) => f !== opt.value)
+                        : [...current, opt.value];
+                      props.onChange({ ...props.config, formats: next });
+                    }}
+                    class="mt-0.5 rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                  />
+                  <div>
+                    <p class="text-xs font-medium text-slate-800">{opt.label}</p>
+                    <p class="text-xs text-slate-400">{opt.desc}</p>
+                  </div>
+                </label>
+              );
+            }}
           </For>
         </div>
+        {(props.config.formats ?? []).length === 0 && (
+          <p class="text-xs text-amber-600 mt-1.5">请至少选择一种导出格式</p>
+        )}
       </div>
 
       {/* Template Selector */}

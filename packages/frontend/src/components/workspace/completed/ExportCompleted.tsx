@@ -48,18 +48,38 @@ export default function ExportCompleted(props: Props) {
 
   const formatColor = () => FORMAT_COLORS[result()?.format ?? ""] ?? "bg-gray-100 text-gray-600";
 
-  function handleDownload() {
+  async function handleDownload() {
     const r = result();
     if (!r) return;
-    const downloadUrl = `/api/runtime/${props.documentId}/download/${r.filename}`;
-    window.open(downloadUrl);
+    const downloadUrl = `/api/runtime/${props.documentId}/export/${props.node.id}/download`;
+    const token = localStorage.getItem("auth_token");
+    try {
+      const res = await fetch(downloadUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = r.filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // silently fail
+    }
   }
 
   async function handleCopyAll() {
     const r = result();
     if (!r?.filename) return;
+    const token = localStorage.getItem("auth_token");
     try {
-      const resp = await fetch(`/api/runtime/${props.documentId}/download/${r.filename}`);
+      const resp = await fetch(`/api/runtime/${props.documentId}/export/${props.node.id}/download`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       const text = await resp.text();
       await navigator.clipboard.writeText(text);
     } catch {

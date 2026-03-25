@@ -25,7 +25,7 @@ type DocumentInfo = {
 };
 
 export default function VersionHistory() {
-  const params = useParams<{ id: string }>();
+  const params = useParams<{ documentId: string }>();
 
   const [versions, setVersions] = createSignal<VersionItem[]>([]);
   const [loading, setLoading] = createSignal(true);
@@ -41,7 +41,7 @@ export default function VersionHistory() {
   onMount(async () => {
     // Load document info for back navigation
     try {
-      const docRes = await api.api.documents({ id: params.id }).get();
+      const docRes = await api.api.documents({ id: params.documentId }).get();
       if (docRes.data && !("error" in docRes.data)) {
         setDocInfo({
           id: (docRes.data as Record<string, unknown>).id as string,
@@ -55,7 +55,7 @@ export default function VersionHistory() {
 
     // Load versions
     try {
-      const res = await api.api.versions.get({ query: { documentId: params.id } });
+      const res = await api.api.versions.get({ query: { documentId: params.documentId } });
       if (res.data && "data" in res.data) {
         setVersions((res.data as unknown as { data: VersionItem[] }).data);
       }
@@ -145,7 +145,7 @@ export default function VersionHistory() {
               </A>
               <span>/</span>
               <A
-                href={`/documents/${params.id}`}
+                href={`/documents/${params.documentId}`}
                 class="hover:text-indigo-600 transition-colors"
               >
                 {docInfo()?.title ?? "文档详情"}

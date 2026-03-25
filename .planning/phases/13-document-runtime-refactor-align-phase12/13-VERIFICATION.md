@@ -1,7 +1,7 @@
 ---
 phase: 13-document-runtime-refactor-align-phase12
 verified: 2026-03-25T04:30:00Z
-status: passed
+status: human_needed
 score: 11/12 must-haves verified
 human_verification:
   - test: "Execute full workflow end-to-end: create document, input transform, desensitize (auto-detect), model call (SSE streaming), restore, export (Word/PDF/Markdown, no PPT)"

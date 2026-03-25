@@ -16,13 +16,14 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: AI Provider and Model Configuration** - Provider management, model configuration with CLI templates, connectivity testing (completed 2026-03-19)
 - [x] **Phase 3: Workflow Orchestration** - Visual flow editor, 5 node types, variable system, flow validation, flow management (completed 2026-03-19)
 - [x] **Phase 4: Project + Document + Version + File System Infrastructure** - Project CRUD with members, document management, version snapshots, working directory lifecycle (completed 2026-03-20)
-- [ ] **Phase 5: Document Creation Runtime** - Workspace UI, all 5 node executors, multi-model streaming, common operations, failure recovery
+- [x] **Phase 5: Document Creation Runtime** - Workspace UI, all 5 node executors, multi-model streaming, common operations, failure recovery (completed 2026-03-25, verified via Phase 13)
 - [x] **Phase 6: Phase 1 Formal Verification & Housekeeping** - Verify Phase 1 implementation, update stale checkboxes and ROADMAP status (completed 2026-03-19)
 - [x] **Phase 7: Model Parameter Configuration** - Complete AIMC-05 parameter config, implement AIMC-09 (completed 2026-03-19)
 - [x] **Phase 8: Integration Bug Fixes** - Fix validation overlay shape, provider name in model list, shared type sync (completed 2026-03-20)
 - [x] **Phase 9: Integration Polish & UX Guards** - Association check guard for document type delete, fix frontend ownership derivation (completed 2026-03-20)
 - [x] **Phase 10: Non-Admin Read API Access** - Split doc-type/workflow listing to requireAuth so non-admin users can create documents (completed 2026-03-20)
 - [x] **Phase 11: Pre-Phase 5 API Access Fixes** - Split user/model/workflow-detail routes to requireAuth for non-admin access, closing INT-NEW-02/INT-NEW-03 (completed 2026-03-20)
+- [ ] **Phase 14: Milestone Tracking Housekeeping** - Fix RECV-03 tracking, Phase 5 stale metadata, Phase 13 verification discrepancy, Phase 5 VERIFICATION.md
 
 ## Phase Details
 
@@ -221,7 +222,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 2. AI Provider and Model Configuration | 2/2 | Complete   | 2026-03-19 |
 | 3. Workflow Orchestration | 5/5 | Complete   | 2026-03-19 |
 | 4. Project + Document + Version + File System Infrastructure | 6/6 | Complete | 2026-03-20 |
-| 5. Document Creation Runtime | 0/8 | Not started | - |
+| 5. Document Creation Runtime | 8/8 | Complete | 2026-03-25 |
 | 6. Phase 1 Formal Verification & Housekeeping | 1/1 | Complete | 2026-03-19 |
 | 7. Model Parameter Configuration | 1/1 | Complete | 2026-03-19 |
 | 8. Integration Bug Fixes | 1/1 | Complete | 2026-03-20 |
@@ -230,6 +231,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 11. Pre-Phase 5 API Access Fixes | 1/1 | Complete    | 2026-03-20 |
 | 12. Workflow Editor Fixes & Config Panel Alignment | 7/7 | Complete | 2026-03-20 |
 | 13. Document Runtime Refactor | 10/10 | Complete    | 2026-03-25 |
+| 14. Milestone Tracking Housekeeping | 0/1 | Not started | - |
 
 ### Phase 12: Workflow Editor Fixes & Config Panel Alignment
 
@@ -271,3 +273,19 @@ Plans:
 - [ ] 13-08-PLAN.md — Completed document read-only mode + re-execution versioning
 - [ ] 13-09-PLAN.md — Multi-input desensitize/restore data flow and executor UI
 - [ ] 13-10-PLAN.md — Gap closure: Fix upstream data flow (outputData.text), draft save body shape, and document list progress subqueries
+
+### Phase 14: Milestone Tracking Housekeeping
+
+**Goal:** Close all documentation and tracking gaps identified by v1.0 milestone audit — fix RECV-03 tracking inconsistency, update stale Phase 5 metadata, create Phase 5 VERIFICATION.md, and align Phase 13 verification frontmatter
+**Depends on:** Phase 13
+**Requirements**: RECV-03 (moved to v2 scope)
+**Gap Closure:** Closes all tracking/documentation gaps from v1.0 audit
+**Success Criteria** (what must be TRUE):
+  1. RECV-03 marked as deferred to v2 in REQUIREMENTS.md (not `[x] Complete`)
+  2. ROADMAP.md Phase 5 shows `[x]` and "8/8 Complete"
+  3. Phase 5 has a VERIFICATION.md referencing Phase 13's coverage of 33/34 requirements
+  4. Phase 13 VERIFICATION.md frontmatter `status` matches body text (`human_needed`)
+**Plans**: 1 plan
+
+Plans:
+- [ ] 14-01-PLAN.md — Fix all tracking inconsistencies, create Phase 5 VERIFICATION.md, verify all artifacts aligned

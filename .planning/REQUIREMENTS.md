@@ -139,7 +139,7 @@ Requirements for initial release (M1-M5). Each maps to roadmap phases.
 
 - [x] **RECV-01**: 每个节点操作过程自动保存草稿
 - [x] **RECV-02**: 浏览器关闭后重新进入文档可恢复到上次操作状态
-- [x] **RECV-03**: 支持取消正在进行的 AI 生成任务
+- [ ] **RECV-03**: 支持取消正在进行的 AI 生成任务 — *deferred to v2 (code comment in ModelCallExecutor.tsx confirms)*
 
 ## v2 Requirements
 
@@ -288,12 +288,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NOPS-04 | Phase 5 | Complete |
 | RECV-01 | Phase 5 | Complete |
 | RECV-02 | Phase 5 | Complete |
-| RECV-03 | Phase 5 | Complete |
+| RECV-03 | Phase 5 → v2 | Deferred |
 
 **Coverage:**
-- v1 requirements: 86 total (AIMC-08 moved to Out of Scope)
-- Mapped to phases: 86
-- Unmapped: 0
+- v1 requirements: 85 total (AIMC-08 moved to Out of Scope, RECV-03 deferred to v2)
+- Mapped to phases: 85
+- Satisfied: 85
+- Deferred: 1 (RECV-03)
 
 ---
 *Requirements defined: 2026-03-19*

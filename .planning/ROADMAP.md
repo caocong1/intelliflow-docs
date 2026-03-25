@@ -229,7 +229,7 @@ Note: Phase 4 depends on Phase 1 (not Phase 3), so Phases 3 and 4 could potentia
 | 10. Non-Admin Read API Access | 1/1 | Complete    | 2026-03-20 |
 | 11. Pre-Phase 5 API Access Fixes | 1/1 | Complete    | 2026-03-20 |
 | 12. Workflow Editor Fixes & Config Panel Alignment | 7/7 | Complete | 2026-03-20 |
-| 13. Document Runtime Refactor | 8/9 | In Progress|  |
+| 13. Document Runtime Refactor | 9/10 | In Progress|  |
 
 ### Phase 12: Workflow Editor Fixes & Config Panel Alignment
 
@@ -258,4 +258,16 @@ Plans:
   3. Export resolveContent correctly finds model outputs from the `models` Record structure (not stale `modelOutputs` Array)
   4. All 5 executor UIs display in Chinese and work correctly with the new config structures (categories, modelIds[], VariableRef, etc.)
   5. User can create a document, execute a workflow created in the Phase 12 editor end-to-end, and export the result
-**Plans**: TBD
+**Plans**: 10 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Backend data flow fixes (init API with workflowNodes, nodeId-based variable resolution, export resolveContent)
+- [ ] 13-02-PLAN.md — Model call logging (model_call_logs table, write on execute/retry)
+- [ ] 13-03-PLAN.md — DocumentWorkspace config wiring + executor null guards
+- [ ] 13-04-PLAN.md — Executor UI redesign: InputTransform + Desensitize (Chinese, Stitch-based)
+- [ ] 13-05-PLAN.md — Executor UI redesign: ModelCall + Restore + Export (Chinese, Stitch-based)
+- [ ] 13-06-PLAN.md — Workflow preview in create modal + document list progress display
+- [ ] 13-07-PLAN.md — Network banner, auto-save indicator, error handling
+- [ ] 13-08-PLAN.md — Completed document read-only mode + re-execution versioning
+- [ ] 13-09-PLAN.md — Multi-input desensitize/restore data flow and executor UI
+- [ ] 13-10-PLAN.md — Gap closure: Fix upstream data flow (outputData.text), draft save body shape, and document list progress subqueries

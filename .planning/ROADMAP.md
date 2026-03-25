@@ -103,7 +103,7 @@ Plans:
 ### Phase 5: Document Creation Runtime
 **Goal**: Users can create documents and execute the full workflow end-to-end — from input through AI generation, desensitization, recovery, to final export — with streaming output, multi-model comparison, and failure recovery
 **Depends on**: Phase 3, Phase 4
-**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, NODE-01, NODE-02, NODE-03, NODE-04, NODE-05, NODE-06, NODE-07, NODE-08, NODE-09, NODE-10, NODE-11, NODE-12, NODE-13, NODE-14, NODE-15, NODE-16, NODE-17, NODE-18, NODE-19, NODE-20, NODE-21, NODE-22, NOPS-01, NOPS-02, NOPS-03, NOPS-04, RECV-01, RECV-02, RECV-03
+**Requirements**: DOC-01, DOC-02, DOC-03, DOC-04, DOC-05, NODE-01, NODE-02, NODE-03, NODE-04, NODE-05, NODE-06, NODE-07, NODE-08, NODE-09, NODE-10, NODE-11, NODE-12, NODE-13, NODE-14, NODE-15, NODE-16, NODE-17, NODE-18, NODE-19, NODE-20, NODE-21, NODE-22, NOPS-01, NOPS-02, NOPS-03, NOPS-04, RECV-01, RECV-02, RECV-03 (deferred to v2)
 **Success Criteria** (what must be TRUE):
   1. User can create a document within a project (select document type, choose workflow, enter title) and the system creates a working directory automatically
   2. Workspace shows progress navigation (completed/in-progress/pending nodes), current node operation area, and history panel for past nodes
@@ -113,7 +113,7 @@ Plans:
   6. Restore node replaces placeholders with real values locally, shows before/after diff with highlights, and allows manual correction of failed recoveries
   7. Export node lets user choose format (Word/PDF/Markdown), preview the result, set filename, and download; exported file is stored in working directory export/ folder
   8. User can confirm/next, inline-edit current output, skip optional nodes, and roll back to previous nodes (resetting downstream state) at any node
-  9. System auto-saves drafts per node; user can close browser and resume from last state; user can cancel in-progress AI generation
+  9. System auto-saves drafts per node; user can close browser and resume from last state; user can cancel in-progress AI generation *(RECV-03 deferred to v2)*
 **Plans**: 8 plans
 
 Plans:

@@ -33,21 +33,23 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 - **FSYS-01~04**: 文件系统与工作目录 — v1.0
 - **RECV-01~02**: 失败恢复（草稿保存、断点续作） — v1.0
 
-### Active
+### Active (v1.1)
 
-- [ ] RECV-03: 支持取消正在进行的 AI 生成任务（v1.0 deferred）
-- [ ] 企业微信 OAuth 集成（WCOM-01~04）
+- [ ] 后台 AI 生成 + 企业微信通知（ENHC-06）
 - [ ] 统计与审计面板（STAT-01~04）
 - [ ] 用量与限制管理（QUOT-01~03）
 - [ ] 全局搜索、最近访问、收藏功能（ENHC-01~02）
+- [ ] DTYPE-04 文档关联守卫（v1.0 tech debt）
+- [ ] AI 辅助内联编辑（ENHC-09）
+
+### Future
+
+- [ ] RECV-03: 支持取消正在进行的 AI 生成任务（v1.0 deferred）
 - [ ] 文档评论与行内批注（ENHC-03）
 - [ ] 从已有/历史文档导入/复制创建（ENHC-04~05）
-- [ ] 后台 AI 生成 + 企业微信通知（ENHC-06）
 - [ ] Excel 导出格式支持（ENHC-08）
-- [ ] AI 辅助内联编辑（ENHC-09）
 - [ ] 模型调用改为 API 直接调用（替代 CLI）
 - [ ] 脱敏映射加密存储（v1.0 tech debt）
-- [ ] DTYPE-04 文档关联守卫（v1.0 tech debt）
 
 ### Out of Scope
 
@@ -100,13 +102,25 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 | fetch+ReadableStream (非 EventSource) | 支持 Authorization header | Good |
 | RECV-03 cancel AI generation 延迟到 v2 | 复杂度高，v1 优先跑通核心流程 | Deferred |
 
+## Current Milestone: v1.1 运营增强与智能编辑
+
+**Goal:** 补全运营管理能力（统计审计、用量控制）、提升用户效率（全局搜索、AI 辅助编辑、后台生成通知）、修复遗留 tech debt。
+
+**Target features:**
+- 后台 AI 生成 + 企微通知推送
+- 统计审计面板（使用统计、模型调用记录、操作日志）
+- 用量与限制管理（配额、用量预警）
+- 全局搜索、最近访问、收藏
+- DTYPE-04 文档关联守卫
+- AI 辅助内联编辑
+
 ## Milestone Plan
 
 | Milestone | 内容 | 状态 |
 |-----------|------|------|
 | v1.0 MVP | 认证+管理+流程编排+项目文档+运行时 | Shipped 2026-03-25 |
-| v1.1 | 企业微信集成、统计审计、用量管理、tech debt 修复 | Planned |
-| v2.0 | 增强功能（全局搜索、批注、AI 辅助编辑、条件路由等） | Future |
+| v1.1 运营增强与智能编辑 | 后台生成+通知、统计审计、用量管理、全局搜索、AI编辑、tech debt | Active |
+| v2.0 | 批注、文档导入/复制、条件路由、人工审核节点等 | Future |
 
 ---
-*Last updated: 2026-03-25 after v1.0 milestone*
+*Last updated: 2026-03-25 after v1.1 milestone started*

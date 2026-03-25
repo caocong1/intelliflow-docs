@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: IntelliFlow 智文平台 MVP
-status: complete
+milestone: v1.1
+milestone_name: 运营增强与智能编辑
+status: defining_requirements
 last_updated: "2026-03-25"
 progress:
-  total_phases: 16
-  completed_phases: 16
-  total_plans: 50
-  completed_plans: 50
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,21 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** v1.0 milestone complete. Planning next milestone.
+**Current focus:** v1.1 运营增强与智能编辑
 
 ## Current Position
 
-Milestone: v1.0 MVP — SHIPPED 2026-03-25
-All 16 phases complete, 50/50 plans executed.
-
-Next: `/gsd:new-milestone` to start v1.1 planning.
-
-## Performance Metrics
-
-**v1.0 Summary:**
-- 16 phases, 50 plans executed in 7 days
-- 255 commits, 146 files, ~31,100 LOC
-- Average plan duration: ~6 min
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-03-25 — Milestone v1.1 started
 
 ## Accumulated Context
 
@@ -50,9 +43,9 @@ None.
 
 ### Blockers/Concerns
 
-None for v1.0. v1.1 planning not yet started.
+None.
 
 ## Session Continuity
 
 Last session: 2026-03-25
-Milestone v1.0 archived. Ready for `/gsd:new-milestone`.
+Milestone v1.1 started. Defining requirements.

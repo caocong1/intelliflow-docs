@@ -2,6 +2,8 @@ import { asc, eq, and, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import { desensitizeMappings, modelCallLogs, models, nodeExecutions, providers, documents, workflows } from "../../db/schema";
 import type { DesensitizeRuleDesc, ModelOutput, NodeExecution, SSEEvent, WorkflowNodeDef } from "@intelliflow/shared";
+import { getStrategy } from "./strategies";
+import type { ModelCallInput } from "./strategies";
 
 // ─── Prompt Resolution ──────────────────────────────────────────────────────
 
@@ -36,8 +38,18 @@ export async function resolvePromptTemplate(
     const exec = nodeExecs.find((ne) => ne.nodeId === nodeId);
     if (!exec?.outputData) return _match;
 
-    // Extract value from outputData
-    const value = (exec.outputData as Record<string, unknown>)[outputId];
+    // Extract value from outputData — check direct key first, then nested fields
+    const od = exec.outputData as Record<string, unknown>;
+    let value = od[outputId];
+    if (value === undefined || value === null) {
+      // Try inside "fields" object (input_transform stores form data under fields.{fieldId})
+      const fields = od.fields as Record<string, unknown> | undefined;
+      if (fields) {
+        // outputId may be like "n1-field-f1", extract the field key after last "-"
+        const fieldKey = outputId.replace(/^.*-field-/, "");
+        value = fields[fieldKey] ?? fields[outputId];
+      }
+    }
     if (value === undefined || value === null) return _match;
     const resolvedValue = typeof value === "string" ? value : JSON.stringify(value);
     mapping[`{{${varName}}}`] = resolvedValue;
@@ -67,6 +79,7 @@ export async function executeModelCall(
   resolvedPrompt: string,
   promptTemplate?: string,
   variableMapping?: Record<string, string>,
+  userId?: string,
 ): Promise<ReadableStream<Uint8Array>> {
   // Look up all models + providers
   const modelRows = await db
@@ -79,6 +92,13 @@ export async function executeModelCall(
       topP: models.topP,
       baseUrl: providers.baseUrl,
       apiKey: providers.apiKey,
+      providerType: providers.type,
+      providerId: providers.id,
+      providerName: providers.name,
+      agentMode: models.agentMode,
+      agentMaxTurns: models.agentMaxTurns,
+      agentMaxBudgetUsd: models.agentMaxBudgetUsd,
+      agentAllowedTools: models.agentAllowedTools,
     })
     .from(models)
     .innerJoin(providers, eq(models.providerId, providers.id))
@@ -139,72 +159,20 @@ export async function executeModelCall(
           let fullContent = "";
 
           try {
-            const body: Record<string, unknown> = {
-              model: model.modelId,
-              messages: [{ role: "user", content: resolvedPrompt }],
-              stream: true,
+            const strategy = getStrategy(model.providerType);
+            const strategyInput: ModelCallInput = {
+              ...model,
+              providerType: model.providerType,
             };
-
-            if (model.temperature != null) body.temperature = model.temperature;
-            if (model.maxTokens != null) body.max_tokens = model.maxTokens;
-            if (model.topP != null) body.top_p = model.topP;
-
-            const response = await fetch(`${model.baseUrl}/chat/completions`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${model.apiKey}`,
-              },
-              body: JSON.stringify(body),
-              signal: AbortSignal.timeout(120000),
+            const result = await strategy.execute({
+              model: strategyInput,
+              resolvedPrompt,
+              sendEvent,
             });
+            fullContent = result.content;
 
-            if (!response.ok) {
-              const errText = await response.text().catch(() => "");
-              throw new Error(`HTTP ${response.status}: ${errText.slice(0, 200)}`);
-            }
-
-            if (!response.body) {
-              throw new Error("No response body for streaming");
-            }
-
-            // Read SSE stream from provider
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
-
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split("\n");
-              buffer = lines.pop() ?? "";
-
-              for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed.startsWith("data:")) continue;
-                const dataStr = trimmed.slice(5).trim();
-                if (dataStr === "[DONE]") continue;
-
-                try {
-                  const parsed = JSON.parse(dataStr) as {
-                    choices?: Array<{ delta?: { content?: string } }>;
-                  };
-                  const delta = parsed.choices?.[0]?.delta?.content;
-                  if (delta) {
-                    fullContent += delta;
-                    sendEvent({
-                      type: "delta",
-                      modelId: model.id,
-                      data: delta,
-                      timestamp: new Date().toISOString(),
-                    });
-                  }
-                } catch {
-                  // Skip unparseable chunks
-                }
-              }
+            if (result.status === "failed") {
+              throw new Error(result.errorMessage ?? "Model call failed");
             }
 
             // Send complete event
@@ -219,14 +187,19 @@ export async function executeModelCall(
             await db.insert(modelCallLogs).values({
               documentId,
               nodeExecutionId,
+              userId: userId ?? null,
+              providerId: model.providerId,
+              providerName: model.providerName,
               modelId: model.id,
               modelName: model.displayName,
+              callSource: "runtime",
               promptTemplate: promptTemplate ?? null,
               resolvedPrompt,
               variableMapping: variableMapping ?? null,
               temperature: model.temperature,
               maxTokens: model.maxTokens,
               responseStatus: "completed",
+              responseContent: fullContent,
               contentLength: fullContent.length,
               tokenUsage: null,
               duration: Date.now() - startTime,
@@ -247,14 +220,19 @@ export async function executeModelCall(
             await db.insert(modelCallLogs).values({
               documentId,
               nodeExecutionId,
+              userId: userId ?? null,
+              providerId: model.providerId,
+              providerName: model.providerName,
               modelId: model.id,
               modelName: model.displayName,
+              callSource: "runtime",
               promptTemplate: promptTemplate ?? null,
               resolvedPrompt,
               variableMapping: variableMapping ?? null,
               temperature: model.temperature,
               maxTokens: model.maxTokens,
               responseStatus: "failed",
+              responseContent: fullContent || null,
               contentLength: fullContent.length || null,
               tokenUsage: null,
               duration: Date.now() - startTime,
@@ -306,6 +284,7 @@ export async function retryModelCall(
   resolvedPrompt: string,
   promptTemplate?: string,
   variableMapping?: Record<string, string>,
+  userId?: string,
 ): Promise<ReadableStream<Uint8Array>> {
   // Get current outputData to preserve other models
   const [exec] = await db
@@ -328,6 +307,13 @@ export async function retryModelCall(
       topP: models.topP,
       baseUrl: providers.baseUrl,
       apiKey: providers.apiKey,
+      providerType: providers.type,
+      providerId: providers.id,
+      providerName: providers.name,
+      agentMode: models.agentMode,
+      agentMaxTurns: models.agentMaxTurns,
+      agentMaxBudgetUsd: models.agentMaxBudgetUsd,
+      agentAllowedTools: models.agentAllowedTools,
     })
     .from(models)
     .innerJoin(providers, eq(models.providerId, providers.id))
@@ -361,68 +347,20 @@ export async function retryModelCall(
       let fullContent = "";
 
       try {
-        const body: Record<string, unknown> = {
-          model: model.modelId,
-          messages: [{ role: "user", content: resolvedPrompt }],
-          stream: true,
+        const strategy = getStrategy(model.providerType);
+        const strategyInput: ModelCallInput = {
+          ...model,
+          providerType: model.providerType,
         };
-        if (model.temperature != null) body.temperature = model.temperature;
-        if (model.maxTokens != null) body.max_tokens = model.maxTokens;
-        if (model.topP != null) body.top_p = model.topP;
-
-        const response = await fetch(`${model.baseUrl}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${model.apiKey}`,
-          },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(120000),
+        const result = await strategy.execute({
+          model: strategyInput,
+          resolvedPrompt,
+          sendEvent,
         });
+        fullContent = result.content;
 
-        if (!response.ok) {
-          const errText = await response.text().catch(() => "");
-          throw new Error(`HTTP ${response.status}: ${errText.slice(0, 200)}`);
-        }
-
-        if (!response.body) throw new Error("No response body for streaming");
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() ?? "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.slice(5).trim();
-            if (dataStr === "[DONE]") continue;
-
-            try {
-              const parsed = JSON.parse(dataStr) as {
-                choices?: Array<{ delta?: { content?: string } }>;
-              };
-              const delta = parsed.choices?.[0]?.delta?.content;
-              if (delta) {
-                fullContent += delta;
-                sendEvent({
-                  type: "delta",
-                  modelId: model.id,
-                  data: delta,
-                  timestamp: new Date().toISOString(),
-                });
-              }
-            } catch {
-              // Skip
-            }
-          }
+        if (result.status === "failed") {
+          throw new Error(result.errorMessage ?? "Model call failed");
         }
 
         sendEvent({
@@ -444,14 +382,19 @@ export async function retryModelCall(
         await db.insert(modelCallLogs).values({
           documentId,
           nodeExecutionId,
+          userId: userId ?? null,
+          providerId: model.providerId,
+          providerName: model.providerName,
           modelId: model.id,
           modelName: model.displayName,
+          callSource: "runtime",
           promptTemplate: promptTemplate ?? null,
           resolvedPrompt,
           variableMapping: variableMapping ?? null,
           temperature: model.temperature,
           maxTokens: model.maxTokens,
           responseStatus: "completed",
+          responseContent: fullContent,
           contentLength: fullContent.length,
           tokenUsage: null,
           duration: Date.now() - startTime,
@@ -478,14 +421,19 @@ export async function retryModelCall(
         await db.insert(modelCallLogs).values({
           documentId,
           nodeExecutionId,
+          userId: userId ?? null,
+          providerId: model.providerId,
+          providerName: model.providerName,
           modelId: model.id,
           modelName: model.displayName,
+          callSource: "runtime",
           promptTemplate: promptTemplate ?? null,
           resolvedPrompt,
           variableMapping: variableMapping ?? null,
           temperature: model.temperature,
           maxTokens: model.maxTokens,
           responseStatus: "failed",
+          responseContent: fullContent || null,
           contentLength: fullContent.length || null,
           tokenUsage: null,
           duration: Date.now() - startTime,

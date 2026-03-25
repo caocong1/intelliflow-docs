@@ -18,7 +18,6 @@ import CompletedNodeCard from "../../components/workspace/CompletedNodeCard";
 import ContentPreviewModal from "../../components/workspace/ContentPreviewModal";
 import InlineEditor from "../../components/workspace/InlineEditor";
 import NetworkBanner from "../../components/workspace/NetworkBanner";
-import NodeHistoryPanel from "../../components/workspace/NodeHistoryPanel";
 import StepperBar from "../../components/workspace/StepperBar";
 import CompletedViewRouter from "../../components/workspace/completed/CompletedViewRouter";
 import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExecutor";
@@ -39,7 +38,7 @@ export default function DocumentWorkspace() {
   const [error, setError] = createSignal<string | null>(null);
   const [viewMode, setViewMode] = createSignal<ViewMode>("current");
   const [viewIndex, setViewIndex] = createSignal(0);
-  const [expandedHistory, setExpandedHistory] = createSignal<string | null>(null);
+
   const [actionLoading, setActionLoading] = createSignal(false);
   const [showRollbackDialog, setShowRollbackDialog] = createSignal(false);
   const [showReexecDialog, setShowReexecDialog] = createSignal<number | null>(null);
@@ -125,12 +124,6 @@ export default function DocumentWorkspace() {
     const s = state();
     if (!s) return undefined;
     return s.nodes[viewIndex()];
-  };
-
-  const completedNodes = (): NodeExecution[] => {
-    const s = state();
-    if (!s) return [];
-    return s.nodes.filter((n) => n.status === "completed" || n.status === "skipped");
   };
 
   /** Read-only mode: all nodes completed (no currentNode) */
@@ -613,27 +606,7 @@ export default function DocumentWorkspace() {
                           </div>
                         </Show>
 
-                        {/* Completed node history list */}
-                        <Show when={completedNodes().length > 0}>
-                          <div class="space-y-2">
-                            <h3 class="text-sm font-medium" style={{ color: "#464555" }}>
-                              已完成步骤
-                            </h3>
-                            <For each={completedNodes()}>
-                              {(node) => (
-                                <NodeHistoryPanel
-                                  node={node}
-                                  isExpanded={expandedHistory() === node.id}
-                                  onToggle={() =>
-                                    setExpandedHistory(
-                                      expandedHistory() === node.id ? null : node.id,
-                                    )
-                                  }
-                                />
-                              )}
-                            </For>
-                          </div>
-                        </Show>
+                        {/* Completed node history removed — stepper bar already shows progress */}
                       </div>
                     )}
                   </Match>

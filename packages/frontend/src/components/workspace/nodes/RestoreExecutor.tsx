@@ -348,7 +348,20 @@ export default function RestoreExecutor(props: Props) {
         {/* Phase 2: Review diff */}
         <Match when={phase() === "review" && outputData()}>
           <div class="p-6 space-y-4">
+            {/* No restorations needed — simplified view */}
+            <Show when={restoredCount() === 0 && failedCount() === 0}>
+              <div class="text-center py-6">
+                <div class="w-12 h-12 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
+                  <svg class="w-6 h-6 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p class="text-sm font-medium text-[#191c1e] mb-1">上游无脱敏项，无需恢复</p>
+                <p class="text-xs text-[#464555]">文本内容保持不变，可直接继续下一步</p>
+              </div>
+            </Show>
             {/* Summary bar */}
+            <Show when={restoredCount() > 0 || failedCount() > 0}>
             <div class="flex items-center gap-3 bg-[#f7f9fb] rounded-xl px-4 py-3">
               <div class="text-sm text-[#191c1e]">
                 <span class="text-green-600 font-medium">{restoredCount()} 处恢复成功</span>
@@ -464,6 +477,8 @@ export default function RestoreExecutor(props: Props) {
                   }}
                 </For>
               </div>
+            </Show>
+
             </Show>
 
             {/* Confirm button */}

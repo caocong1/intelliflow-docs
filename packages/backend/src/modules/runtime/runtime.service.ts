@@ -181,6 +181,33 @@ export async function advanceNode(
     .limit(1);
 
   if (completedNode) {
+    // Auto-generate text field for input_transform if missing (confirm may have been skipped)
+    if (completedNode.nodeType === "input_transform") {
+      const od = completedNode.outputData as Record<string, unknown> | null;
+      if (od?.fields && !od.text) {
+        const fields = od.fields as Record<string, string>;
+        const textParts: string[] = [];
+        for (const [key, value] of Object.entries(fields)) {
+          if (value) textParts.push(`[${key}]\n${value}`);
+        }
+        const files = od.files as Array<{ name?: string; parsedText?: string }> | undefined;
+        if (files) {
+          for (const f of files) {
+            if (f.parsedText) textParts.push(`[${f.name}]\n${f.parsedText}`);
+          }
+        }
+        od.text = textParts.join("\n\n---\n\n");
+        od.confirmedAt = od.confirmedAt ?? new Date().toISOString();
+        await db
+          .update(nodeExecutions)
+          .set({ outputData: od, updatedAt: now })
+          .where(eq(nodeExecutions.id, nodeExecutionId));
+        // Re-read after update
+        const [updated] = await db.select().from(nodeExecutions).where(eq(nodeExecutions.id, nodeExecutionId)).limit(1);
+        if (updated) Object.assign(completedNode, updated);
+      }
+    }
+
     // Create version snapshot
     await createVersionSnapshot(
       documentId,

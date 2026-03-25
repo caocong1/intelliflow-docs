@@ -40,19 +40,31 @@ export default function ExportExecutor(props: Props) {
     );
   }
 
-  // All supported formats (PPT hidden)
-  const availableFormats: ExportFormat[] = ["word", "pdf", "markdown"];
+  // Use configured formats, fallback to all non-PPT formats for backward compatibility
+  const FORMAT_ALIASES: Record<string, ExportFormat> = {
+    docx: "word",
+    doc: "word",
+    md: "markdown",
+  };
+  const availableFormats = (): ExportFormat[] => {
+    const configured = props.config?.formats;
+    if (configured && configured.length > 0) {
+      return configured
+        .filter((f) => f !== "ppt")
+        .map((f) => FORMAT_ALIASES[f] ?? f) as ExportFormat[];
+    }
+    // Backward compat: single format field
+    const legacy = props.config?.format;
+    if (legacy && legacy !== "ppt") {
+      const mapped = FORMAT_ALIASES[legacy] ?? legacy;
+      return [mapped as ExportFormat];
+    }
+    return ["word", "pdf", "markdown"];
+  };
 
   const defaultFormat = (): ExportFormat => {
-    const configured = props.config?.format;
-    if (
-      configured &&
-      configured !== "ppt" &&
-      availableFormats.includes(configured as ExportFormat)
-    ) {
-      return configured as ExportFormat;
-    }
-    return "markdown";
+    const formats = availableFormats();
+    return formats[0] ?? "markdown";
   };
 
   const [format, setFormat] = createSignal<ExportFormat>(defaultFormat());
@@ -149,14 +161,25 @@ export default function ExportExecutor(props: Props) {
     }
   }
 
-  function triggerDownload() {
+  async function triggerDownload() {
     const url = `/api/runtime/${props.documentId}/export/${props.nodeExecution.id}/download`;
+    const token = localStorage.getItem("auth_token");
+    const res = await fetch(url, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) {
+      setError("下载失败，请重试");
+      return;
+    }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
-    link.download = filename();
+    link.href = blobUrl;
+    link.download = filename() || exportResult()?.filename || "export";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
   }
 
   function formatFileSize(bytes: number): string {
@@ -260,7 +283,7 @@ export default function ExportExecutor(props: Props) {
             <span class="text-xs font-medium text-[#191c1e]">导出格式</span>
           </div>
           <div class="flex gap-2">
-            <For each={availableFormats}>
+            <For each={availableFormats()}>
               {(fmt) => (
                 <button
                   type="button"

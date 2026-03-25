@@ -1,10 +1,14 @@
 import type { NodeExecution, WorkflowNodeType } from "@intelliflow/shared";
-import { For } from "solid-js";
+import { For, Show } from "solid-js";
 
 type StepperBarProps = {
   nodes: NodeExecution[];
   currentIndex: number;
   onNodeClick: (index: number) => void;
+  /** Show a virtual "结果" step at the end when all nodes are done */
+  showResultStep?: boolean;
+  /** Called when the virtual result step is clicked */
+  onResultClick?: () => void;
 };
 
 const nodeTypeLabels: Record<WorkflowNodeType, string> = {
@@ -34,6 +38,20 @@ function CheckIcon() {
   );
 }
 
+/** Trophy icon for the virtual result step */
+function TrophyIcon() {
+  return (
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        d="M5 3h14M9 3v2a3 3 0 006 0V3M7 3H5a2 2 0 00-2 2v2a4 4 0 004 4h0M17 3h2a2 2 0 012 2v2a4 4 0 01-4 4h0M12 15v4M8 19h8"
+      />
+    </svg>
+  );
+}
+
 function NodeIcon(props: { nodeType: WorkflowNodeType }) {
   const d = nodeTypeIcons[props.nodeType] ?? nodeTypeIcons.model_call;
   return (
@@ -51,25 +69,29 @@ function getCircleStyle(
   if (status === "skipped") return { bg: "#f59e0b", color: "#ffffff" };
   if (status === "failed") return { bg: "#ef4444", color: "#ffffff" };
   if (isActive || status === "in_progress")
-    return { bg: "#4f46e5", color: "#ffffff", ring: "0 0 0 4px rgba(199,196,216,0.5)" };
+    return { bg: "#4f46e5", color: "#ffffff", ring: "0 0 0 4px rgba(99,102,241,0.2)" };
   return { bg: "#e6e8ea", color: "#464555" };
 }
 
-function getLineStyle(status: string, nextStatus: string): string {
+function getLineStyle(status: string, _nextStatus: string): string {
   if (status === "completed" || status === "skipped") return "#22c55e";
   if (status === "in_progress") return "#c7c4d8";
   return "#e0e3e5";
 }
 
 export default function StepperBar(props: StepperBarProps) {
+  const resultIndex = () => props.nodes.length;
+  const isResultActive = () => props.showResultStep && props.currentIndex === resultIndex();
+
   return (
-    <div class="flex items-start overflow-x-auto pb-2 px-1">
+    <div class="flex items-start overflow-x-auto pt-1 pb-2 px-1">
       <For each={props.nodes}>
         {(node, index) => {
           const isActive = () => index() === props.currentIndex;
           const circleStyle = () => getCircleStyle(node.status, isActive());
           const isClickable = node.status === "completed" || node.status === "skipped";
           const nextNode = () => props.nodes[index() + 1];
+          const isLast = () => index() === props.nodes.length - 1;
 
           return (
             <div class="flex items-start flex-shrink-0">
@@ -124,13 +146,18 @@ export default function StepperBar(props: StepperBarProps) {
                 </span>
               </button>
 
-              {/* Connecting line */}
-              {index() < props.nodes.length - 1 && (
+              {/* Connecting line — always show if not the very last element (accounting for result step) */}
+              {(!isLast() || props.showResultStep) && (
                 <div class="flex items-center mt-5 mx-1 flex-shrink-0">
                   <div
                     class="h-0.5 w-8 rounded-full transition-colors"
                     style={{
-                      background: getLineStyle(node.status, nextNode()?.status ?? "pending"),
+                      background:
+                        isLast() && props.showResultStep
+                          ? node.status === "completed" || node.status === "skipped"
+                            ? "#c7c4d8"
+                            : "#e0e3e5"
+                          : getLineStyle(node.status, nextNode()?.status ?? "pending"),
                     }}
                   />
                 </div>
@@ -139,6 +166,52 @@ export default function StepperBar(props: StepperBarProps) {
           );
         }}
       </For>
+
+      {/* Virtual "结果" step */}
+      <Show when={props.showResultStep}>
+        <div class="flex items-start flex-shrink-0">
+          <button
+            type="button"
+            class="flex flex-col items-center bg-transparent border-0 p-0 group"
+            style={{ cursor: "pointer", "min-width": "5rem" }}
+            onClick={() => props.onResultClick?.()}
+            title="查看结果总览"
+          >
+            {/* Circle — gradient bg when active, gray when not */}
+            <div
+              class="w-11 h-11 rounded-full flex items-center justify-center transition-transform"
+              style={{
+                background: isResultActive()
+                  ? "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)"
+                  : "#e6e8ea",
+                color: isResultActive() ? "#ffffff" : "#464555",
+                "box-shadow": isResultActive() ? "0 0 0 4px rgba(99,102,241,0.2)" : "none",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.transform = "scale(1.08)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+              }}
+            >
+              <TrophyIcon />
+            </div>
+
+            {/* Label */}
+            <span
+              class="mt-2 text-xs text-center leading-tight font-semibold"
+              style={{ color: isResultActive() ? "#3525cd" : "#191c1e" }}
+            >
+              结果
+            </span>
+
+            {/* Type badge */}
+            <span class="mt-0.5 text-[10px] text-center" style={{ color: "#464555" }}>
+              总览
+            </span>
+          </button>
+        </div>
+      </Show>
     </div>
   );
 }

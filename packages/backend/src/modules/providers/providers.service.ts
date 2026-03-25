@@ -1,11 +1,11 @@
 import { count, desc, eq } from "drizzle-orm";
 import { db } from "../../db";
-import { models, providers } from "../../db/schema";
+import { models, modelCallLogs, providers } from "../../db/schema";
 
 export type ProviderRow = {
   id: string;
   name: string;
-  type: "openai_compatible" | "opencode";
+  type: "openai_compatible" | "opencode" | "claude_agent_sdk" | "ollama";
   deploymentType: "cloud" | "local";
   baseUrl: string;
   apiKeyMasked: string | null;
@@ -28,7 +28,7 @@ function stripTrailingSlashes(url: string): string {
 function toProviderRow(row: {
   id: string;
   name: string;
-  type: "openai_compatible" | "opencode";
+  type: "openai_compatible" | "opencode" | "claude_agent_sdk" | "ollama";
   deploymentType: "cloud" | "local";
   baseUrl: string;
   apiKey: string | null;
@@ -75,7 +75,7 @@ export async function listProviders(): Promise<ProviderRow[]> {
 
 export async function createProvider(input: {
   name: string;
-  type?: "openai_compatible" | "opencode";
+  type?: "openai_compatible" | "opencode" | "claude_agent_sdk" | "ollama";
   deploymentType?: "cloud" | "local";
   baseUrl: string;
   apiKey?: string;
@@ -185,6 +185,7 @@ export async function toggleProviderStatus(id: string): Promise<ProviderRow> {
 export async function testProviderConnection(
   id: string,
   modelId?: string,
+  userId?: string,
 ): Promise<{ success: boolean; message: string; latencyMs: number }> {
   const providerRows = await db
     .select(providerColumns)
@@ -198,11 +199,43 @@ export async function testProviderConnection(
 
   const provider = providerRows[0];
   const startTime = Date.now();
+  const testModelName = modelId || (provider.type === "claude_agent_sdk" ? "doubao-seed-2.0-code" : provider.type === "ollama" ? "llama3" : "doubao-seed-2.0-lite");
 
   try {
     let response: Response;
 
-    if (provider.type === "openai_compatible") {
+    if (provider.type === "claude_agent_sdk") {
+      // Anthropic 兼容端点：POST /v1/messages
+      response = await fetch(`${provider.baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": provider.apiKey || "",
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: testModelName,
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 5,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+    } else if (provider.type === "ollama") {
+      // Ollama: OpenAI-compatible at /v1/chat/completions, no auth needed
+      response = await fetch(`${provider.baseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: testModelName,
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 5,
+        }),
+        signal: AbortSignal.timeout(15000),
+      });
+    } else {
+      // openai_compatible / opencode: POST /chat/completions
       response = await fetch(`${provider.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
@@ -210,22 +243,10 @@ export async function testProviderConnection(
           Authorization: `Bearer ${provider.apiKey}`,
         },
         body: JSON.stringify({
-          model: modelId || "doubao-seed-2.0-lite",
+          model: testModelName,
           messages: [{ role: "user", content: "hi" }],
           max_tokens: 5,
         }),
-        signal: AbortSignal.timeout(15000),
-      });
-    } else {
-      // opencode: GET /global/health
-      const headers: Record<string, string> = {};
-      if (provider.apiKey) {
-        const username = provider.username || "opencode";
-        headers.Authorization = `Basic ${btoa(`${username}:${provider.apiKey}`)}`;
-      }
-      response = await fetch(`${provider.baseUrl}/global/health`, {
-        method: "GET",
-        headers,
         signal: AbortSignal.timeout(15000),
       });
     }
@@ -233,18 +254,36 @@ export async function testProviderConnection(
     const latencyMs = Date.now() - startTime;
 
     if (response.ok) {
-      if (provider.type === "opencode") {
-        const body = await response.json();
-        if (body.healthy === true) {
-          return { success: true, message: "连接成功", latencyMs };
-        }
-        return { success: false, message: "服务未就绪: healthy !== true", latencyMs };
-      }
+      // Log successful provider test
+      await db.insert(modelCallLogs).values({
+        userId: userId ?? null,
+        providerId: provider.id,
+        providerName: provider.name,
+        modelName: testModelName,
+        callSource: "provider_test",
+        resolvedPrompt: "hi",
+        responseStatus: "completed",
+        duration: latencyMs,
+      });
       return { success: true, message: "连接成功", latencyMs };
     }
 
     const body = await response.text().catch(() => "");
     const truncated = body.length > 200 ? `${body.slice(0, 200)}...` : body;
+
+    // Log failed provider test
+    await db.insert(modelCallLogs).values({
+      userId: userId ?? null,
+      providerId: provider.id,
+      providerName: provider.name,
+      modelName: testModelName,
+      callSource: "provider_test",
+      resolvedPrompt: "hi",
+      responseStatus: "failed",
+      duration: latencyMs,
+      errorMessage: `HTTP ${response.status}: ${truncated}`,
+    });
+
     return {
       success: false,
       message: `HTTP ${response.status}: ${truncated}`,
@@ -252,10 +291,26 @@ export async function testProviderConnection(
     };
   } catch (err: unknown) {
     const latencyMs = Date.now() - startTime;
+    let message: string;
     if (err instanceof DOMException && err.name === "TimeoutError") {
-      return { success: false, message: "连接超时（15秒）", latencyMs };
+      message = "连接超时（15秒）";
+    } else {
+      message = err instanceof Error ? err.message : String(err);
     }
-    const message = err instanceof Error ? err.message : String(err);
+
+    // Log failed provider test
+    await db.insert(modelCallLogs).values({
+      userId: userId ?? null,
+      providerId: provider.id,
+      providerName: provider.name,
+      modelName: testModelName,
+      callSource: "provider_test",
+      resolvedPrompt: "hi",
+      responseStatus: "failed",
+      duration: latencyMs,
+      errorMessage: message,
+    });
+
     return { success: false, message, latencyMs };
   }
 }

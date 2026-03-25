@@ -33,12 +33,16 @@ export default function FlowNode(props: FlowNodeProps) {
     onCleanup(() => observer.disconnect());
   });
 
+  // Track mousedown position to distinguish click vs drag
+  let mouseDownPos = { x: 0, y: 0 };
+
   function handleMouseDown(e: MouseEvent) {
     // Don't start drag if clicking on a handle
     const target = e.target as HTMLElement;
     if (target.dataset.handleType || target.closest("[data-handle-type]")) {
       return;
     }
+    mouseDownPos = { x: e.clientX, y: e.clientY };
     e.stopPropagation();
     props.onDragStart(props.node.id, { x: e.clientX, y: e.clientY });
   }
@@ -46,6 +50,12 @@ export default function FlowNode(props: FlowNodeProps) {
   function handleClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
     if (target.dataset.handleType || target.closest("[data-handle-type]")) {
+      return;
+    }
+    // If mouse moved more than 5px since mousedown, it was a drag — skip click
+    const dx = e.clientX - mouseDownPos.x;
+    const dy = e.clientY - mouseDownPos.y;
+    if (dx * dx + dy * dy > 25) {
       return;
     }
     e.stopPropagation();

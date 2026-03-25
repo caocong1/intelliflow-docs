@@ -35,7 +35,7 @@ export const providerRoutes = new Elysia({ prefix: "/providers" })
       body: t.Object({
         name: t.String({ minLength: 1, maxLength: 100 }),
         type: t.Optional(
-          t.Union([t.Literal("openai_compatible"), t.Literal("opencode")]),
+          t.Union([t.Literal("openai_compatible"), t.Literal("opencode"), t.Literal("claude_agent_sdk"), t.Literal("ollama")]),
         ),
         deploymentType: t.Optional(
           t.Union([t.Literal("cloud"), t.Literal("local")]),
@@ -117,9 +117,9 @@ export const providerRoutes = new Elysia({ prefix: "/providers" })
   )
   .post(
     "/:id/test",
-    async ({ params, body, set }) => {
+    async ({ params, body, set, user }) => {
       try {
-        const result = await testProviderConnection(params.id, body?.modelId);
+        const result = await testProviderConnection(params.id, body?.modelId, user?.id);
         return result;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);

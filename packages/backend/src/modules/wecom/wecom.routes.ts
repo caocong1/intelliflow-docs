@@ -188,10 +188,52 @@ export const wecomAdminRoutes = new Elysia({ prefix: "/wecom" })
   );
 
 /**
- * 邀请相关路由
+ * 邀请公开路由（查看邀请信息，无需认证）
+ */
+export const invitationPublicRoutes = new Elysia()
+  .get(
+    "/invitation/:token",
+    async ({ params, set }) => {
+      const row = await db
+        .select({
+          id: projectInvitations.id,
+          projectName: projects.name,
+          inviterName: users.displayName,
+          wecomName: projectInvitations.wecomName,
+          status: projectInvitations.status,
+          expiresAt: projectInvitations.expiresAt,
+          createdAt: projectInvitations.createdAt,
+        })
+        .from(projectInvitations)
+        .innerJoin(projects, eq(projectInvitations.projectId, projects.id))
+        .innerJoin(users, eq(projectInvitations.inviterId, users.id))
+        .where(eq(projectInvitations.token, params.token))
+        .limit(1);
+
+      if (!row[0]) {
+        set.status = 404;
+        return { error: "邀请不存在" };
+      }
+
+      const invitation = row[0];
+
+      if (invitation.status === "pending" && new Date(invitation.expiresAt) < new Date()) {
+        await db
+          .update(projectInvitations)
+          .set({ status: "expired" })
+          .where(eq(projectInvitations.token, params.token));
+        return { ...invitation, status: "expired" as const };
+      }
+
+      return invitation;
+    },
+    { params: t.Object({ token: t.String() }) },
+  );
+
+/**
+ * 邀请认证路由（发送邀请、接受/拒绝，需登录）
  */
 export const invitationRoutes = new Elysia()
-  // 发送邀请（需项目 owner 权限，在 requireAuth 下）
   .use(requireAuth)
   .post(
     "/projects/:id/invite",
@@ -278,46 +320,6 @@ export const invitationRoutes = new Elysia()
       params: t.Object({ id: t.String() }),
       body: t.Object({ wecomUserIds: t.Array(t.String()) }),
     },
-  )
-  // 查看邀请信息（公开，无需认证 - 但在 requireAuth 之后，所以需要单独处理）
-  .get(
-    "/invitation/:token",
-    async ({ params, set }) => {
-      const row = await db
-        .select({
-          id: projectInvitations.id,
-          projectName: projects.name,
-          inviterName: users.displayName,
-          wecomName: projectInvitations.wecomName,
-          status: projectInvitations.status,
-          expiresAt: projectInvitations.expiresAt,
-          createdAt: projectInvitations.createdAt,
-        })
-        .from(projectInvitations)
-        .innerJoin(projects, eq(projectInvitations.projectId, projects.id))
-        .innerJoin(users, eq(projectInvitations.inviterId, users.id))
-        .where(eq(projectInvitations.token, params.token))
-        .limit(1);
-
-      if (!row[0]) {
-        set.status = 404;
-        return { error: "邀请不存在" };
-      }
-
-      const invitation = row[0];
-
-      // 检查过期
-      if (invitation.status === "pending" && new Date(invitation.expiresAt) < new Date()) {
-        await db
-          .update(projectInvitations)
-          .set({ status: "expired" })
-          .where(eq(projectInvitations.token, params.token));
-        return { ...invitation, status: "expired" as const };
-      }
-
-      return invitation;
-    },
-    { params: t.Object({ token: t.String() }) },
   )
   // 接受邀请
   .post(

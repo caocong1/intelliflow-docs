@@ -19,7 +19,9 @@ function isConfigured(config: NodeConfig): boolean {
 function getConfigSummary(config: NodeConfig): string {
   if (config.type !== "export") return "";
   const parts: string[] = [];
-  if (config.format) parts.push(config.format.toUpperCase());
+  if (config.formats && config.formats.length > 0) {
+    parts.push(config.formats.map((f) => f.toUpperCase()).join("/"));
+  }
   const mappingCount = config.contentMapping?.length ?? 0;
   if (mappingCount > 0) parts.push(`${mappingCount} 个映射`);
   return parts.length > 0 ? parts.join(", ") : "暂未配置导出";
@@ -58,6 +60,11 @@ export default function ExportNode(props: NodeContentProps) {
             </svg>
           </div>
           <span class="text-xs font-medium flex-1 truncate text-slate-700">{props.data.label}</span>
+          {props.data.config.autoAdvance && (
+            <span class="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-indigo-100 text-indigo-600 leading-none">
+              auto
+            </span>
+          )}
           <span
             class={`w-2 h-2 rounded-full flex-shrink-0 ${
               hasError() ? "bg-red-500" : configured() ? "bg-emerald-500" : "bg-amber-400"

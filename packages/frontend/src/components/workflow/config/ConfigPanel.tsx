@@ -190,8 +190,8 @@ export default function ConfigPanel(props: ConfigPanelProps) {
                 </Match>
               </Switch>
 
-              {/* Runtime Settings — common to all node types */}
-              <Show when={nodeConfig()}>
+              {/* Runtime Settings — not applicable to input_transform (user must fill form) */}
+              <Show when={nodeConfig() && nodeConfig()?.type !== "input_transform" && nodeConfig()?.type !== "export"}>
                 <RuntimeSettings
                   config={nodeConfig() as unknown as NodeConfig}
                   onChange={handleRuntimeChange}

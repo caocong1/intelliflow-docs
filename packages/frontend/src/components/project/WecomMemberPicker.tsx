@@ -1,4 +1,4 @@
-import { For, Show, createSignal, onMount } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import { api } from "../../api/client";
 
 type WecomDepartment = {
@@ -38,25 +38,14 @@ export default function WecomMemberPicker(props: WecomMemberPickerProps) {
   const [deptLoading, setDeptLoading] = createSignal(false);
   const [memberLoading, setMemberLoading] = createSignal(false);
 
-  onMount(() => {
-    if (props.isOpen) fetchDepartments();
-  });
-
-  // Re-fetch when opened
-  const prevOpen = { value: false };
-  const checkOpen = () => {
-    if (props.isOpen && !prevOpen.value) {
+  createEffect(() => {
+    if (props.isOpen) {
       fetchDepartments();
       setSelected(new Map());
       setMembers([]);
       setSelectedDeptId(null);
     }
-    prevOpen.value = props.isOpen;
-  };
-  // Reactive trigger
-  (() => {
-    checkOpen();
-  })();
+  });
 
   async function fetchDepartments() {
     setDeptLoading(true);
@@ -145,9 +134,8 @@ export default function WecomMemberPicker(props: WecomMemberPickerProps) {
     );
   }
 
-  if (!props.isOpen) return null;
-
   return (
+    <Show when={props.isOpen}>
     <div class="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div class="absolute inset-0 bg-black/40" onClick={props.onClose} />
@@ -299,5 +287,6 @@ export default function WecomMemberPicker(props: WecomMemberPickerProps) {
         </div>
       </div>
     </div>
+    </Show>
   );
 }

@@ -13,6 +13,7 @@ import FlowBackground from "./FlowBackground";
 import FlowControls from "./FlowControls";
 import FlowMiniMap from "./FlowMiniMap";
 import FlowViewport from "./FlowViewport";
+import SelectionBox from "./SelectionBox";
 import EdgeRenderer from "./edges/EdgeRenderer";
 import TempEdge from "./edges/TempEdge";
 import DesensitizeNode from "./nodes/DesensitizeNode";
@@ -76,11 +77,25 @@ export default function FlowCanvas(props: FlowCanvasProps) {
   let dragNodeId = "";
   let dragStart = { x: 0, y: 0 };
   let dragNodeStartPos = { x: 0, y: 0 };
+
+  // Auto-pan state for node dragging near canvas edges
+  const AUTO_PAN_MARGIN = 40; // px from edge to trigger
+  const AUTO_PAN_SPEED = 8; // px per frame
+  let autoPanRAF: number | null = null;
+  let autoPanVelocity = { x: 0, y: 0 };
+  let lastMousePos = { x: 0, y: 0 };
   // For batch drag: store initial positions of all selected nodes
   let batchDragStartPositions: Map<string, { x: number; y: number }> = new Map();
 
   // Alignment guides state
   const [activeGuides, setActiveGuides] = createSignal<Guide[]>([]);
+
+  // Rubber-band selection state (Ctrl+drag)
+  const [rubberBand, setRubberBand] = createSignal<{
+    startPos: { x: number; y: number };
+    currentPos: { x: number; y: number };
+    visible: boolean;
+  } | null>(null);
 
   // Connection state
   const [connecting, setConnecting] = createSignal<ConnectingState | null>(null);
@@ -126,18 +141,25 @@ export default function FlowCanvas(props: FlowCanvasProps) {
     props.setViewport({ x: newX, y: newY, zoom: newZoom });
   }
 
-  // --- Canvas mousedown: left-click on empty canvas deselects; drag pans ---
+  // --- Canvas mousedown: left-click drag = pan; Ctrl+drag = rubber-band select ---
   function handleCanvasMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
     const target = e.target as HTMLElement;
-    if (target !== canvasRef && !target.closest("svg.flow-background")) {
+    // Allow panning from canvas background, FlowViewport, FlowBackground SVG, or
+    // the inner edge SVG layer — but NOT from nodes, interactive controls, or dialogs.
+    if (target.closest("[data-node-id]") || target.closest(".flow-controls") || target.closest(".flow-minimap") || target.closest("[data-dialog]")) {
       return;
     }
 
     if (!canvasRef) return;
     const screenStartX = e.clientX;
     const screenStartY = e.clientY;
+    const isCtrl = e.ctrlKey || e.metaKey;
     let movedBeyondThreshold = false;
+
+    // Compute flow-coordinate start for rubber-band
+    const rect = canvasRef.getBoundingClientRect();
+    const flowStart = screenToFlow(screenStartX, screenStartY, rect, props.viewport);
 
     function onMove(ev: MouseEvent) {
       const dx = ev.clientX - screenStartX;
@@ -146,18 +168,36 @@ export default function FlowCanvas(props: FlowCanvasProps) {
 
       if (!movedBeyondThreshold && dist > DRAG_THRESHOLD) {
         movedBeyondThreshold = true;
-        // Begin pan
-        setIsPanning(true);
-        panStart = { x: screenStartX, y: screenStartY };
-        viewportStart = { x: props.viewport.x, y: props.viewport.y };
+        if (isCtrl) {
+          // Begin rubber-band selection
+          setRubberBand({
+            startPos: flowStart,
+            currentPos: flowStart,
+            visible: true,
+          });
+        } else {
+          // Begin pan
+          setIsPanning(true);
+          panStart = { x: screenStartX, y: screenStartY };
+          viewportStart = { x: props.viewport.x, y: props.viewport.y };
+        }
       }
 
       if (movedBeyondThreshold) {
-        props.setViewport({
-          x: viewportStart.x + (ev.clientX - panStart.x),
-          y: viewportStart.y + (ev.clientY - panStart.y),
-          zoom: props.viewport.zoom,
-        });
+        if (isCtrl) {
+          const flowCurrent = screenToFlow(ev.clientX, ev.clientY, rect, props.viewport);
+          setRubberBand({
+            startPos: flowStart,
+            currentPos: flowCurrent,
+            visible: true,
+          });
+        } else {
+          props.setViewport({
+            x: viewportStart.x + (ev.clientX - panStart.x),
+            y: viewportStart.y + (ev.clientY - panStart.y),
+            zoom: props.viewport.zoom,
+          });
+        }
       }
     }
 
@@ -166,6 +206,20 @@ export default function FlowCanvas(props: FlowCanvasProps) {
         // Plain click on empty canvas — deselect all
         props.onCanvasClick();
       }
+
+      // Finish rubber-band selection
+      const rb = rubberBand();
+      if (rb?.visible) {
+        const x = Math.min(rb.startPos.x, rb.currentPos.x);
+        const y = Math.min(rb.startPos.y, rb.currentPos.y);
+        const width = Math.abs(rb.currentPos.x - rb.startPos.x);
+        const height = Math.abs(rb.currentPos.y - rb.startPos.y);
+        if (width > 2 && height > 2) {
+          props.onRubberBandSelect({ x, y, width, height });
+        }
+      }
+
+      setRubberBand(null);
       setIsPanning(false);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
@@ -198,11 +252,56 @@ export default function FlowCanvas(props: FlowCanvasProps) {
       batchDragStartPositions.set(nodeId, { x: node.position.x, y: node.position.y });
     }
 
-    function onMove(ev: MouseEvent) {
-      const dx = (ev.clientX - dragStart.x) / props.viewport.zoom;
-      const dy = (ev.clientY - dragStart.y) / props.viewport.zoom;
+    // Auto-pan loop: runs while dragging near edge
+    function startAutoPan() {
+      if (autoPanRAF !== null) return;
+      function panStep() {
+        if (autoPanVelocity.x === 0 && autoPanVelocity.y === 0) {
+          autoPanRAF = null;
+          return;
+        }
+        // Pan viewport
+        const vx = autoPanVelocity.x;
+        const vy = autoPanVelocity.y;
+        props.setViewport({
+          x: props.viewport.x - vx,
+          y: props.viewport.y - vy,
+          zoom: props.viewport.zoom,
+        });
+        // Also shift drag start so node positions stay correct
+        dragStart.x += vx;
+        dragStart.y += vy;
+        // Recompute node positions from current mouse
+        updateNodePositionsFromMouse(lastMousePos.x, lastMousePos.y);
+        autoPanRAF = requestAnimationFrame(panStep);
+      }
+      autoPanRAF = requestAnimationFrame(panStep);
+    }
 
-      // For single node drag, compute alignment guides
+    function stopAutoPan() {
+      if (autoPanRAF !== null) {
+        cancelAnimationFrame(autoPanRAF);
+        autoPanRAF = null;
+      }
+      autoPanVelocity = { x: 0, y: 0 };
+    }
+
+    function computeAutoPanVelocity(clientX: number, clientY: number) {
+      if (!canvasRef) return { x: 0, y: 0 };
+      const rect = canvasRef.getBoundingClientRect();
+      let vx = 0;
+      let vy = 0;
+      if (clientX < rect.left + AUTO_PAN_MARGIN) vx = -AUTO_PAN_SPEED;
+      else if (clientX > rect.right - AUTO_PAN_MARGIN) vx = AUTO_PAN_SPEED;
+      if (clientY < rect.top + AUTO_PAN_MARGIN) vy = -AUTO_PAN_SPEED;
+      else if (clientY > rect.bottom - AUTO_PAN_MARGIN) vy = AUTO_PAN_SPEED;
+      return { x: vx, y: vy };
+    }
+
+    function updateNodePositionsFromMouse(clientX: number, clientY: number) {
+      const dx = (clientX - dragStart.x) / props.viewport.zoom;
+      const dy = (clientY - dragStart.y) / props.viewport.zoom;
+
       if (batchDragStartPositions.size === 1) {
         const startPos = batchDragStartPositions.get(nodeId);
         if (startPos) {
@@ -241,7 +340,20 @@ export default function FlowCanvas(props: FlowCanvasProps) {
       }
     }
 
+    function onMove(ev: MouseEvent) {
+      lastMousePos = { x: ev.clientX, y: ev.clientY };
+      updateNodePositionsFromMouse(ev.clientX, ev.clientY);
+
+      // Auto-pan near edges
+      const vel = computeAutoPanVelocity(ev.clientX, ev.clientY);
+      autoPanVelocity = vel;
+      if (vel.x !== 0 || vel.y !== 0) {
+        startAutoPan();
+      }
+    }
+
     function onUp(ev: MouseEvent) {
+      stopAutoPan();
       setIsDragging(false);
       setActiveGuides([]);
       const dx = (ev.clientX - dragStart.x) / props.viewport.zoom;
@@ -539,6 +651,16 @@ export default function FlowCanvas(props: FlowCanvasProps) {
           <Show when={activeGuides().length > 0}>
             <AlignmentGuides guides={activeGuides()} />
           </Show>
+          {/* Rubber-band selection box (Ctrl+drag) */}
+          <Show when={rubberBand()}>
+            {(rb) => (
+              <SelectionBox
+                startPos={rb().startPos}
+                currentPos={rb().currentPos}
+                visible={rb().visible}
+              />
+            )}
+          </Show>
         </svg>
         {/* HTML node layer */}
         <For each={[...props.nodes]}>
@@ -606,7 +728,7 @@ export default function FlowCanvas(props: FlowCanvasProps) {
 
       {/* Delete confirmation dialog */}
       <Show when={showDeleteConfirm()}>
-        <div class="absolute inset-0 z-50 flex items-center justify-center bg-black/30">
+        <div data-dialog class="absolute inset-0 z-50 flex items-center justify-center bg-black/30">
           <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full mx-4">
             <h3 class="text-base font-semibold text-slate-900 mb-2">确认删除</h3>
             <p class="text-sm text-slate-600 mb-5">

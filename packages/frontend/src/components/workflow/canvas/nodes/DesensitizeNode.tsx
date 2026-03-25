@@ -57,6 +57,11 @@ export default function DesensitizeNode(props: NodeContentProps) {
             </svg>
           </div>
           <span class="text-xs font-medium flex-1 truncate text-slate-700">{props.data.label}</span>
+          {props.data.config.autoAdvance && (
+            <span class="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-indigo-100 text-indigo-600 leading-none">
+              auto
+            </span>
+          )}
           <span
             class={`w-2 h-2 rounded-full flex-shrink-0 ${
               hasError() ? "bg-red-500" : configured() ? "bg-emerald-500" : "bg-amber-400"

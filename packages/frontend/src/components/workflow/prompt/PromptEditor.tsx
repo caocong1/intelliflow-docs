@@ -1,8 +1,8 @@
-import type { VariableRef } from "@intelliflow/shared";
-import { Show, createSignal, onCleanup } from "solid-js";
+import type { VariableRef, OutputDef } from "@intelliflow/shared";
+import { Show, createSignal, createEffect } from "solid-js";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
 import PromptOptimizeDialog from "./PromptOptimizeDialog";
-import VariablePicker from "./VariablePicker";
+import VariablePicker, { buildPickerItems } from "./VariablePicker";
 
 // Colors per node type for inline tag rendering
 const NODE_TYPE_TAG_CLASSES: Record<string, string> = {
@@ -14,8 +14,6 @@ const NODE_TYPE_TAG_CLASSES: Record<string, string> = {
   system: "bg-gray-100 text-gray-600 border-gray-200",
 };
 
-const SYSTEM_VAR_NAMES = new Set(["工作目录", "输入目录", "输出目录", "脱敏规则"]);
-
 interface PromptEditorProps {
   value: string;
   availableVariables: VariableRef[];
@@ -23,16 +21,30 @@ interface PromptEditorProps {
   onChange: (value: string) => void;
 }
 
-/** Resolve which node type owns this variable name */
-function resolveNodeType(varName: string, upstreamNodes: FlowNodeData[]): string {
-  if (SYSTEM_VAR_NAMES.has(varName)) return "system";
-  for (const node of upstreamNodes) {
-    const nodePrefix = `${node.data.label}.`;
-    if (varName.startsWith(nodePrefix)) {
-      return node.data.nodeType;
-    }
-  }
-  return "system";
+/**
+ * Resolve a variable key (nodeId.outputId) to its display name (nodeLabel.outputName).
+ * Falls back to the raw key if the node/output can't be found.
+ */
+function resolveVarDisplayName(varKey: string, upstreamNodes: FlowNodeData[]): string {
+  const dotIndex = varKey.indexOf(".");
+  if (dotIndex < 0) return varKey;
+  const nodeId = varKey.slice(0, dotIndex);
+  const outputId = varKey.slice(dotIndex + 1);
+  const node = upstreamNodes.find((n) => n.id === nodeId);
+  if (!node) return varKey;
+  const outputs = node.data.outputs as OutputDef[];
+  const output = outputs.find((o) => o.id === outputId);
+  if (!output) return `${node.data.label}.${outputId}`;
+  return `${node.data.label}.${output.name}`;
+}
+
+/** Resolve which node type owns this variable key (nodeId.outputId) */
+function resolveNodeType(varKey: string, upstreamNodes: FlowNodeData[]): string {
+  const dotIndex = varKey.indexOf(".");
+  if (dotIndex < 0) return "system";
+  const nodeId = varKey.slice(0, dotIndex);
+  const node = upstreamNodes.find((n) => n.id === nodeId);
+  return node ? node.data.nodeType : "system";
 }
 
 /**
@@ -51,11 +63,12 @@ function buildEditorHTML(template: string, upstreamNodes: FlowNodeData[]): strin
       // Escape plain text
       result += escapeHtml(template.slice(lastIndex, match.index));
     }
-    const varName = match[1].trim();
-    const nodeType = resolveNodeType(varName, upstreamNodes);
+    const varKey = match[1].trim();
+    const nodeType = resolveNodeType(varKey, upstreamNodes);
     const tagClasses = NODE_TYPE_TAG_CLASSES[nodeType] ?? NODE_TYPE_TAG_CLASSES.system;
-    // data-var stores the raw template token for serialization
-    result += `<span contenteditable="false" data-var="${escapeAttr(varName)}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border mx-0.5 cursor-default select-none ${tagClasses}">${escapeHtml(varName)}</span>`;
+    const displayName = resolveVarDisplayName(varKey, upstreamNodes);
+    // data-var stores the stable ID key for serialization; text shows human-readable name
+    result += `<span contenteditable="false" data-var="${escapeAttr(varKey)}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border mx-0.5 cursor-default select-none ${tagClasses}">${escapeHtml(displayName)}</span>`;
     lastIndex = match.index + match[0].length;
     match = regex.exec(template);
   }
@@ -107,9 +120,11 @@ function serializeEditorContent(el: HTMLElement): string {
 export default function PromptEditor(props: PromptEditorProps) {
   const [showPicker, setShowPicker] = createSignal(false);
   const [showOptimize, setShowOptimize] = createSignal(false);
+  const [highlightedIndex, setHighlightedIndex] = createSignal(0);
   let editorRef: HTMLDivElement | undefined;
   // Track if we're updating programmatically to avoid re-entrant updates
   let isUpdatingFromProp = false;
+  let blurTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Update DOM when value prop changes externally (e.g. after optimize)
   // We use a simple comparison — only update if serialized content differs
@@ -146,6 +161,23 @@ export default function PromptEditor(props: PromptEditorProps) {
       if (node.nodeType === Node.TEXT_NODE) {
         const textBefore = (node.textContent ?? "").slice(0, range.startOffset);
         if (textBefore.endsWith("{{")) {
+          // Remove the {{ trigger characters immediately
+          const textNode = node as Text;
+          textNode.textContent =
+            textBefore.slice(0, -2) + (textNode.textContent ?? "").slice(range.startOffset);
+          // Reposition cursor where {{ was
+          const newOffset = textBefore.length - 2;
+          range.setStart(textNode, newOffset);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          // Sync the raw value without {{
+          if (editorRef) {
+            const raw = serializeEditorContent(editorRef);
+            props.onChange(raw);
+          }
+
+          setHighlightedIndex(0);
           setShowPicker(true);
         }
       }
@@ -153,10 +185,32 @@ export default function PromptEditor(props: PromptEditorProps) {
   }
 
   function handleKeyDown(e: KeyboardEvent) {
-    if (e.key === "Escape" && showPicker()) {
-      setShowPicker(false);
-      e.preventDefault();
-      return;
+    // Keyboard navigation when picker is open
+    if (showPicker()) {
+      const items = buildPickerItems(props.upstreamNodes);
+      if (e.key === "Escape") {
+        setShowPicker(false);
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((i) => (i + 1) % items.length);
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex((i) => (i - 1 + items.length) % items.length);
+        return;
+      }
+      if (e.key === "Enter" && items.length > 0) {
+        e.preventDefault();
+        const item = items[highlightedIndex()];
+        if (item) {
+          insertVariable(item.key);
+        }
+        return;
+      }
     }
 
     // Handle backspace/delete near tag spans
@@ -204,17 +258,14 @@ export default function PromptEditor(props: PromptEditorProps) {
   }
 
   function handleBlur() {
-    setTimeout(() => setShowPicker(false), 150);
+    clearTimeout(blurTimer);
+    blurTimer = setTimeout(() => setShowPicker(false), 150);
   }
 
   function insertVariable(variableName: string) {
     if (!editorRef) {
       // Fallback: append to raw value
-      const currentValue = props.value;
-      const newValue = currentValue.endsWith("{{")
-        ? `${currentValue.slice(0, -2)}{{${variableName}}}`
-        : `${currentValue}{{${variableName}}}`;
-      props.onChange(newValue);
+      props.onChange(`${props.value}{{${variableName}}}`);
       setShowPicker(false);
       // Trigger sync
       setTimeout(syncEditorFromProp, 0);
@@ -224,26 +275,17 @@ export default function PromptEditor(props: PromptEditorProps) {
     const sel = window.getSelection();
     if (sel && sel.rangeCount > 0) {
       const range = sel.getRangeAt(0);
-      // Remove trailing {{ from text node if present
-      if (range.startContainer.nodeType === Node.TEXT_NODE) {
-        const textNode = range.startContainer as Text;
-        const text = textNode.textContent ?? "";
-        if (text.endsWith("{{")) {
-          textNode.textContent = text.slice(0, -2);
-          range.setStart(textNode, textNode.length);
-          range.collapse(true);
-        }
-      }
       range.deleteContents();
 
-      // Create tag span
+      // Create tag span — store ID key in data-var, show display name as text
       const nodeType = resolveNodeType(variableName, props.upstreamNodes);
       const tagClasses = NODE_TYPE_TAG_CLASSES[nodeType] ?? NODE_TYPE_TAG_CLASSES.system;
+      const displayName = resolveVarDisplayName(variableName, props.upstreamNodes);
       const span = document.createElement("span");
       span.contentEditable = "false";
       span.dataset.var = variableName;
       span.className = `inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border mx-0.5 cursor-default select-none ${tagClasses}`;
-      span.textContent = variableName;
+      span.textContent = displayName;
       range.insertNode(span);
 
       // Move cursor after the span
@@ -262,6 +304,8 @@ export default function PromptEditor(props: PromptEditorProps) {
   }
 
   function handleOpenPicker() {
+    clearTimeout(blurTimer);
+    setHighlightedIndex(0);
     setShowPicker(true);
   }
 
@@ -270,6 +314,17 @@ export default function PromptEditor(props: PromptEditorProps) {
     editorRef = el;
     el.innerHTML = buildEditorHTML(props.value, props.upstreamNodes);
   }
+
+  // Reactively sync editor when value or upstream node outputs change
+  // JSON.stringify ensures deep tracking of output names through SolidJS store proxies
+  createEffect(() => {
+    const _value = props.value;
+    const _outputs = JSON.stringify(props.upstreamNodes.map((n) => n.data.outputs));
+    if (!editorRef) return;
+    // Only rebuild innerHTML when the external value differs from what the editor has,
+    // avoiding cursor-position destruction on every keystroke
+    syncEditorFromProp();
+  });
 
   const hasVariables = () => props.availableVariables.length > 0 || true;
 
@@ -292,6 +347,7 @@ export default function PromptEditor(props: PromptEditorProps) {
         <Show when={showPicker() && hasVariables()}>
           <VariablePicker
             upstreamNodes={props.upstreamNodes}
+            highlightedIndex={highlightedIndex()}
             onSelect={(name) => insertVariable(name)}
             onClose={() => setShowPicker(false)}
           />

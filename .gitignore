@@ -27,3 +27,25 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Codex plan loop working directories
+.codex-plan-loop/
+
+# Claude Code / OMC local state
+.claude/
+.omc/
+packages/backend/.omc/
+packages/frontend/.omc/
+
+# Playwright MCP screenshots
+.playwright-mcp/
+
+# Test screenshots
+test-screenshots/
+
+# Runtime data (workspaces, uploads, exports)
+data/
+packages/backend/data/
+
+# Temporary design drafts
+STITCH-UI-PLAN.md

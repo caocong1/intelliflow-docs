@@ -3,7 +3,7 @@ import { api } from "../../api/client";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
 import { showToast } from "../../components/ui/Toast";
-type ProviderType = "openai_compatible" | "opencode";
+type ProviderType = "openai_compatible" | "opencode" | "claude_agent_sdk" | "ollama";
 type DeploymentType = "cloud" | "local";
 
 type Provider = {
@@ -19,6 +19,8 @@ type Provider = {
   updatedAt: string;
 };
 
+type AgentMode = "simple_chat" | "autonomous_agent";
+
 type Model = {
   id: string;
   providerId: string;
@@ -29,6 +31,10 @@ type Model = {
   temperature: number | null;
   maxTokens: number | null;
   topP: number | null;
+  agentMode: AgentMode | null;
+  agentMaxTurns: number | null;
+  agentMaxBudgetUsd: string | null;
+  agentAllowedTools: string[] | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -54,8 +60,6 @@ export default function ModelConfiguration() {
     deploymentType: "cloud" as DeploymentType,
     baseUrl: "",
     apiKey: "",
-    username: "",
-    password: "",
   });
 
   // Model modal state
@@ -68,6 +72,10 @@ export default function ModelConfiguration() {
     temperature: null as number | null,
     maxTokens: null as number | null,
     topP: null as number | null,
+    agentMode: "simple_chat" as AgentMode,
+    agentMaxTurns: 15 as number | null,
+    agentMaxBudgetUsd: "2.00" as string,
+    agentAllowedTools: ["Read", "Write", "Glob", "Grep"] as string[],
   });
 
   // Delete confirm state
@@ -79,6 +87,19 @@ export default function ModelConfiguration() {
 
   const [submitting, setSubmitting] = createSignal(false);
   const [testingProvider, setTestingProvider] = createSignal<string | null>(null);
+
+  // Model test state
+  const [showTestModal, setShowTestModal] = createSignal(false);
+  const [testingModelId, setTestingModelId] = createSignal<string>("");
+  const [testingModelName, setTestingModelName] = createSignal<string>("");
+  const [testPrompt, setTestPrompt] = createSignal("你好，请用一句话介绍一下你自己。");
+  const [testResult, setTestResult] = createSignal<{
+    loading: boolean;
+    success?: boolean;
+    content?: string;
+    latencyMs?: number;
+    errorMessage?: string;
+  }>({ loading: false });
 
   async function fetchProviders() {
     setLoading(true);
@@ -126,8 +147,6 @@ export default function ModelConfiguration() {
       deploymentType: "cloud",
       baseUrl: "",
       apiKey: "",
-      username: "",
-      password: "",
     });
     setShowProviderModal(true);
   }
@@ -140,8 +159,6 @@ export default function ModelConfiguration() {
       deploymentType: provider.deploymentType,
       baseUrl: provider.baseUrl,
       apiKey: "",
-      username: provider.username ?? "",
-      password: "",
     });
     setShowProviderModal(true);
   }
@@ -162,14 +179,8 @@ export default function ModelConfiguration() {
           name: form.name,
           baseUrl: form.baseUrl,
         };
-        if (form.type === "openai_compatible" && form.apiKey) {
+        if (form.apiKey) {
           body.apiKey = form.apiKey;
-        }
-        if (form.type === "opencode") {
-          body.username = form.username || "opencode";
-          if (form.password) {
-            body.apiKey = form.password;
-          }
         }
         const { error } = await api.api.providers({ id: editing.id }).patch(body);
         if (error) {
@@ -193,19 +204,12 @@ export default function ModelConfiguration() {
           type: form.type,
           deploymentType: form.deploymentType,
         };
-        if (form.type === "openai_compatible") {
-          if (!form.apiKey.trim()) {
-            showToast("OpenAI 兼容类型需要填写 API Key", "error");
-            setSubmitting(false);
-            return;
-          }
-          body.apiKey = form.apiKey;
-        } else {
-          body.username = form.username || "opencode";
-          if (form.password) {
-            body.apiKey = form.password;
-          }
+        if (!form.apiKey.trim()) {
+          showToast("请填写 API Key", "error");
+          setSubmitting(false);
+          return;
         }
+        body.apiKey = form.apiKey;
         const { error } = await api.api.providers.post(body);
         if (error) {
           const errData = error.value as { error?: string } | undefined;
@@ -264,7 +268,11 @@ export default function ModelConfiguration() {
   function openCreateModel(providerId: string) {
     setEditingModel(null);
     setModelForProvider(providerId);
-    setModelForm({ modelId: "", displayName: "", temperature: null, maxTokens: null, topP: null });
+    setModelForm({
+      modelId: "", displayName: "", temperature: null, maxTokens: null, topP: null,
+      agentMode: "simple_chat", agentMaxTurns: 15, agentMaxBudgetUsd: "2.00",
+      agentAllowedTools: ["Read", "Write", "Glob", "Grep"],
+    });
     setShowModelModal(true);
   }
 
@@ -277,6 +285,10 @@ export default function ModelConfiguration() {
       temperature: model.temperature ?? null,
       maxTokens: model.maxTokens ?? null,
       topP: model.topP ?? null,
+      agentMode: model.agentMode ?? "simple_chat",
+      agentMaxTurns: model.agentMaxTurns ?? 15,
+      agentMaxBudgetUsd: model.agentMaxBudgetUsd ?? "2.00",
+      agentAllowedTools: model.agentAllowedTools ?? ["Read", "Write", "Glob", "Grep"],
     });
     setShowModelModal(true);
   }
@@ -291,6 +303,10 @@ export default function ModelConfiguration() {
 
     setSubmitting(true);
     try {
+      // Check if provider is claude_agent_sdk
+      const currentProvider = providers().find((p) => p.id === modelForProvider());
+      const isAgentSdk = currentProvider?.type === "claude_agent_sdk";
+
       if (editing) {
         const { error } = await api.api.models({ id: editing.id }).patch({
           modelId: form.modelId,
@@ -298,6 +314,12 @@ export default function ModelConfiguration() {
           temperature: form.temperature,
           maxTokens: form.maxTokens,
           topP: form.topP,
+          ...(isAgentSdk && {
+            agentMode: form.agentMode,
+            agentMaxTurns: form.agentMaxTurns,
+            agentMaxBudgetUsd: form.agentMaxBudgetUsd,
+            agentAllowedTools: form.agentAllowedTools,
+          }),
         });
         if (error) {
           const errData = error.value as { error?: string } | undefined;
@@ -313,6 +335,12 @@ export default function ModelConfiguration() {
           temperature: form.temperature,
           maxTokens: form.maxTokens,
           topP: form.topP,
+          ...(isAgentSdk && {
+            agentMode: form.agentMode,
+            agentMaxTurns: form.agentMaxTurns,
+            agentMaxBudgetUsd: form.agentMaxBudgetUsd,
+            agentAllowedTools: form.agentAllowedTools,
+          }),
         });
         if (error) {
           const errData = error.value as { error?: string } | undefined;
@@ -375,6 +403,48 @@ export default function ModelConfiguration() {
       showToast("网络错误，请稍后重试", "error");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  // --- Model Test ---
+
+  function openTestModel(model: Model) {
+    setTestingModelId(model.id);
+    setTestingModelName(model.displayName);
+    setTestResult({ loading: false });
+    setShowTestModal(true);
+  }
+
+  async function handleTestModel() {
+    const modelId = testingModelId();
+    const prompt = testPrompt();
+    if (!prompt.trim()) {
+      showToast("请输入测试提示词", "error");
+      return;
+    }
+
+    setTestResult({ loading: true });
+    try {
+      const { data, error } = await api.api.models({ id: modelId }).test.post({ prompt });
+      if (error) {
+        setTestResult({ loading: false, success: false, errorMessage: "请求失败" });
+        return;
+      }
+      const result = data as unknown as {
+        success: boolean;
+        content: string;
+        latencyMs: number;
+        errorMessage?: string;
+      };
+      setTestResult({
+        loading: false,
+        success: result.success,
+        content: result.content,
+        latencyMs: result.latencyMs,
+        errorMessage: result.errorMessage,
+      });
+    } catch {
+      setTestResult({ loading: false, success: false, errorMessage: "网络错误" });
     }
   }
 
@@ -468,7 +538,7 @@ export default function ModelConfiguration() {
                   <div class="flex items-center gap-3 min-w-0">
                     <h3 class="text-base font-semibold text-indigo-950 truncate">{provider.name}</h3>
                     <Badge
-                      label={provider.type === "openai_compatible" ? "OpenAI 兼容" : "OpenCode"}
+                      label={provider.type === "openai_compatible" ? "OpenAI 兼容" : provider.type === "claude_agent_sdk" ? "Claude Agent SDK" : provider.type === "ollama" ? "Ollama" : "OpenCode"}
                       variant="info"
                     />
                     <Badge
@@ -550,7 +620,7 @@ export default function ModelConfiguration() {
                     }
                   >
                     <div class="divide-y divide-slate-100">
-                      <div class="grid grid-cols-[1fr_1fr_80px_150px] gap-4 px-6 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50/80">
+                      <div class="grid grid-cols-[1fr_1fr_80px_200px] gap-4 px-6 py-2.5 text-xs font-medium text-slate-500 uppercase tracking-wider bg-slate-50/80">
                         <span>显示名称</span>
                         <span>模型 ID</span>
                         <span class="text-center">状态</span>
@@ -559,7 +629,7 @@ export default function ModelConfiguration() {
                       <For each={provider.models}>
                         {(model) => (
                           <div
-                            class={`grid grid-cols-[1fr_1fr_80px_150px] gap-4 px-6 py-3 items-center text-sm ${
+                            class={`grid grid-cols-[1fr_1fr_80px_200px] gap-4 px-6 py-3 items-center text-sm ${
                               model.isProviderDisabled ? "opacity-50" : ""
                             }`}
                           >
@@ -572,6 +642,13 @@ export default function ModelConfiguration() {
                               />
                             </div>
                             <div class="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                onClick={() => openTestModel(model)}
+                                class={`${actionBtnClass} text-cyan-600 hover:text-cyan-800`}
+                              >
+                                测试
+                              </button>
                               <button
                                 type="button"
                                 onClick={() => openEditModel(model)}
@@ -657,6 +734,8 @@ export default function ModelConfiguration() {
             >
               <option value="openai_compatible">OpenAI 兼容</option>
               <option value="opencode">OpenCode Server</option>
+              <option value="claude_agent_sdk">Claude Agent SDK</option>
+              <option value="ollama">Ollama</option>
             </select>
           </div>
           <div>
@@ -696,52 +775,39 @@ export default function ModelConfiguration() {
               placeholder={
                 providerForm().type === "openai_compatible"
                   ? "https://ark.cn-beijing.volces.com/api/v3"
-                  : "http://localhost:4096"
+                  : providerForm().type === "claude_agent_sdk"
+                    ? "https://ark.cn-beijing.volces.com/api/coding"
+                    : providerForm().type === "ollama"
+                      ? "http://localhost:11434"
+                      : "http://localhost:4096"
               }
               required
             />
           </div>
 
-          {/* Conditional fields based on type */}
-          <Show when={providerForm().type === "openai_compatible"}>
-            <div>
-              <label for="provider-apikey" class={labelClass}>API Key</label>
-              <input
-                id="provider-apikey"
-                type="password"
-                value={providerForm().apiKey}
-                onInput={(e) => setProviderForm((f) => ({ ...f, apiKey: e.currentTarget.value }))}
-                class={inputClass}
-                placeholder={editingProvider() ? "保持原密钥不变，或输入新密钥" : "sk-..."}
-                required={!editingProvider()}
-              />
-            </div>
-          </Show>
-
-          <Show when={providerForm().type === "opencode"}>
-            <div>
-              <label for="provider-username" class={labelClass}>用户名</label>
-              <input
-                id="provider-username"
-                type="text"
-                value={providerForm().username}
-                onInput={(e) => setProviderForm((f) => ({ ...f, username: e.currentTarget.value }))}
-                class={inputClass}
-                placeholder="opencode"
-              />
-            </div>
-            <div>
-              <label for="provider-password" class={labelClass}>密码</label>
-              <input
-                id="provider-password"
-                type="password"
-                value={providerForm().password}
-                onInput={(e) => setProviderForm((f) => ({ ...f, password: e.currentTarget.value }))}
-                class={inputClass}
-                placeholder="留空则无认证"
-              />
-            </div>
-          </Show>
+          {/* API Key field — all provider types use API Key */}
+          <div>
+            <label for="provider-apikey" class={labelClass}>API Key</label>
+            <input
+              id="provider-apikey"
+              type="password"
+              value={providerForm().apiKey}
+              onInput={(e) => setProviderForm((f) => ({ ...f, apiKey: e.currentTarget.value }))}
+              class={inputClass}
+              placeholder={
+                editingProvider()
+                  ? "保持原密钥不变，或输入新密钥"
+                  : providerForm().type === "ollama"
+                    ? "可选，Ollama 通常无需密钥"
+                    : providerForm().type === "claude_agent_sdk"
+                      ? "火山方舟 API Key"
+                      : providerForm().type === "opencode"
+                        ? "OpenCode Serve API Key"
+                        : "sk-..."
+              }
+              required={!editingProvider() && providerForm().type !== "ollama"}
+            />
+          </div>
 
           <div class="flex justify-end gap-3 pt-2">
             <button
@@ -856,6 +922,91 @@ export default function ModelConfiguration() {
             </div>
           </div>
 
+          {/* Agent SDK Configuration (only for claude_agent_sdk providers) */}
+          <Show when={providers().find((p) => p.id === modelForProvider())?.type === "claude_agent_sdk"}>
+            <div class="border-t border-slate-200 pt-4 mt-4">
+              <p class="text-sm font-medium text-slate-700 mb-1">Agent SDK 配置</p>
+              <p class="text-xs text-slate-400 mb-3">Claude Agent SDK 专属参数</p>
+
+              <div class="space-y-4">
+                <div>
+                  <label for="model-agent-mode" class={labelClass}>运行模式</label>
+                  <select
+                    id="model-agent-mode"
+                    value={modelForm().agentMode}
+                    onChange={(e) =>
+                      setModelForm((f) => ({ ...f, agentMode: e.currentTarget.value as AgentMode }))
+                    }
+                    class={inputClass}
+                  >
+                    <option value="simple_chat">简单对话（Simple Chat）</option>
+                    <option value="autonomous_agent">自主 Agent（Autonomous）</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="model-max-turns" class={labelClass}>最大交互轮数</label>
+                  <input
+                    id="model-max-turns"
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={modelForm().agentMaxTurns ?? ""}
+                    onInput={(e) => {
+                      const val = e.currentTarget.value;
+                      setModelForm((f) => ({ ...f, agentMaxTurns: val === "" ? null : Number.parseInt(val, 10) }));
+                    }}
+                    class={inputClass}
+                    placeholder="15"
+                  />
+                </div>
+                <div>
+                  <label for="model-max-budget" class={labelClass}>预算上限（USD）</label>
+                  <input
+                    id="model-max-budget"
+                    type="text"
+                    value={modelForm().agentMaxBudgetUsd}
+                    onInput={(e) =>
+                      setModelForm((f) => ({ ...f, agentMaxBudgetUsd: e.currentTarget.value }))
+                    }
+                    class={inputClass}
+                    placeholder="2.00"
+                  />
+                </div>
+                <Show when={modelForm().agentMode === "autonomous_agent"}>
+                  <div>
+                    <label for="model-allowed-tools" class={labelClass}>允许的内置工具</label>
+                    <div id="model-allowed-tools" class="flex flex-wrap gap-2 mt-1">
+                      <For each={["Read", "Write", "Glob", "Grep", "Edit", "Bash"]}>
+                        {(tool) => {
+                          const isChecked = () => modelForm().agentAllowedTools.includes(tool);
+                          return (
+                            <label class="inline-flex items-center gap-1.5 text-sm text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={isChecked()}
+                                onChange={() => {
+                                  setModelForm((f) => ({
+                                    ...f,
+                                    agentAllowedTools: isChecked()
+                                      ? f.agentAllowedTools.filter((t) => t !== tool)
+                                      : [...f.agentAllowedTools, tool],
+                                  }));
+                                }}
+                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              {tool}
+                            </label>
+                          );
+                        }}
+                      </For>
+                    </div>
+                  </div>
+                </Show>
+              </div>
+            </div>
+          </Show>
+
           <div class="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -899,6 +1050,65 @@ export default function ModelConfiguration() {
               {submitting() ? "删除中..." : "确认删除"}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Model Test Modal */}
+      <Modal
+        isOpen={showTestModal()}
+        onClose={() => setShowTestModal(false)}
+        title={`测试模型 — ${testingModelName()}`}
+      >
+        <div class="space-y-4">
+          <div>
+            <label for="test-prompt" class={labelClass}>测试提示词</label>
+            <textarea
+              id="test-prompt"
+              value={testPrompt()}
+              onInput={(e) => setTestPrompt(e.currentTarget.value)}
+              class={`${inputClass} min-h-[80px] resize-y`}
+              placeholder="输入提示词..."
+              rows={3}
+            />
+          </div>
+          <div class="flex justify-end">
+            <button
+              type="button"
+              onClick={handleTestModel}
+              disabled={testResult().loading}
+              class={primaryBtnClass}
+            >
+              {testResult().loading ? "请求中..." : "发送测试"}
+            </button>
+          </div>
+          <Show when={testResult().loading}>
+            <div class="flex items-center gap-2 text-sm text-slate-500">
+              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                <title>加载中</title>
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              正在等待模型响应...
+            </div>
+          </Show>
+          <Show when={!testResult().loading && testResult().success !== undefined}>
+            <div class={`rounded-lg border p-4 ${testResult().success ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
+              <div class="flex items-center justify-between mb-2">
+                <span class={`text-xs font-medium ${testResult().success ? "text-emerald-700" : "text-red-700"}`}>
+                  {testResult().success ? "测试成功" : "测试失败"}
+                </span>
+                <Show when={testResult().latencyMs !== undefined}>
+                  <span class="text-xs text-slate-500">耗时 {testResult().latencyMs}ms</span>
+                </Show>
+              </div>
+              <Show when={testResult().success}>
+                <pre class="text-sm text-slate-800 whitespace-pre-wrap break-words font-sans leading-relaxed max-h-[300px] overflow-y-auto">{testResult().content}</pre>
+              </Show>
+              <Show when={!testResult().success}>
+                <p class="text-sm text-red-600">{testResult().errorMessage ?? "未知错误"}</p>
+              </Show>
+            </div>
+          </Show>
         </div>
       </Modal>
     </div>

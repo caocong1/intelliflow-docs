@@ -40,9 +40,9 @@ const AppLayout: ParentComponent = (props) => {
       }
     >
       <Show when={auth.user()} fallback={<Navigate href="/login" />}>
-        <div class="min-h-screen flex bg-slate-50">
+        <div class="h-screen flex overflow-hidden bg-slate-50">
           <Sidebar />
-          <main class="flex-1 min-w-0">{props.children}</main>
+          <main class="flex-1 min-w-0 overflow-y-auto">{props.children}</main>
         </div>
       </Show>
     </Show>

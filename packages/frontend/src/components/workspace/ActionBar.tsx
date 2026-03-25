@@ -19,7 +19,7 @@ interface ActionBarProps {
 export default function ActionBar(props: ActionBarProps) {
   return (
     <div
-      class="fixed bottom-0 left-0 right-0 z-40 px-6 py-4 flex items-center justify-between"
+      class="sticky bottom-0 z-40 px-6 py-4 flex items-center justify-between"
       style={{
         background: "#ffffff",
         "box-shadow": "0 -4px 20px rgba(25,28,30,0.04)",

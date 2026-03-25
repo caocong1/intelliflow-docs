@@ -353,10 +353,7 @@ export default function ProjectSettings() {
             <h2 class="text-base font-semibold text-slate-900">成员管理</h2>
             <button
               type="button"
-              onClick={() => {
-                setInviteUsername("");
-                setShowInviteModal(true);
-              }}
+              onClick={() => setShowInviteModal(true)}
               class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">

@@ -253,10 +253,24 @@ export default function InputTransformExecutor(props: Props) {
     }
   }
 
-  const acceptedTypes = () =>
-    (
-      props.config?.acceptedFileTypes ?? [".docx", ".pdf", ".txt", ".png", ".jpg", ".mp3", ".mp4"]
-    ).join(",");
+  /** Merge accepted file types from all file-type fields */
+  const acceptedTypes = () => {
+    const fileFields = (props.config?.formFields ?? []).filter((f) => f.type === "file");
+    const allTypes = fileFields.flatMap((f) => f.acceptedFileTypes ?? []);
+    // If no restrictions on any field, allow all common types
+    if (allTypes.length === 0) return "";
+    return [...new Set(allTypes)].join(",");
+  };
+
+  /** Max file count across all file fields (0 = unlimited) */
+  const maxFileCount = () => {
+    const fileFields = (props.config?.formFields ?? []).filter((f) => f.type === "file");
+    if (fileFields.length === 0) return 0;
+    // If any field is unlimited, total is unlimited
+    if (fileFields.some((f) => (f.fileCountMode ?? "unlimited") === "unlimited")) return 0;
+    // All fields are "single"
+    return fileFields.length;
+  };
 
   // Render form field based on type
   function renderField(field: FormFieldDef, isWide: boolean) {
@@ -309,7 +323,6 @@ export default function InputTransformExecutor(props: Props) {
   }
 
   const hasFileFields = () =>
-    props.config?.allowFileUpload ||
     (props.config?.formFields ?? []).some((f) => f.type === "file");
 
   const textFields = () => (props.config?.formFields ?? []).filter((f) => f.type !== "file");
@@ -439,8 +452,8 @@ export default function InputTransformExecutor(props: Props) {
               <input
                 id="file-input-transform"
                 type="file"
-                multiple
-                accept={acceptedTypes()}
+                multiple={maxFileCount() !== 1}
+                accept={acceptedTypes() || undefined}
                 class="hidden"
                 onChange={handleFileSelect}
               />

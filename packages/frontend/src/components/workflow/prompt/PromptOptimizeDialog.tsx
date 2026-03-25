@@ -4,10 +4,19 @@ const DEFAULT_META_PROMPT_PLACEHOLDER = `你是一个提示词优化专家。请
 保留原始意图和所有节点输出引用（如 {{节点名.输出名}}），不要改变引用格式。
 只返回优化后的提示词文本，不要添加解释。`;
 
-interface ModelOption {
+interface ApiModel {
   id: string;
   displayName: string;
-  providerName: string | null;
+  isActive: boolean;
+  isProviderDisabled: boolean;
+  deploymentType?: string;
+}
+
+interface ProviderGroup {
+  providerId: string;
+  providerName: string;
+  deploymentType: string;
+  models: ApiModel[];
 }
 
 interface PromptOptimizeDialogProps {
@@ -18,13 +27,14 @@ interface PromptOptimizeDialogProps {
 }
 
 export default function PromptOptimizeDialog(props: PromptOptimizeDialogProps) {
-  const [models, setModels] = createSignal<ModelOption[]>([]);
+  const [providerGroups, setProviderGroups] = createSignal<ProviderGroup[]>([]);
   const [selectedModelId, setSelectedModelId] = createSignal("");
-  const [metaPrompt, setMetaPrompt] = createSignal("");
+  const [metaPrompt, setMetaPrompt] = createSignal(DEFAULT_META_PROMPT_PLACEHOLDER);
   const [showMetaPrompt, setShowMetaPrompt] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal("");
   const [optimizedText, setOptimizedText] = createSignal("");
+  const [modelsLoading, setModelsLoading] = createSignal(true);
 
   onMount(async () => {
     try {
@@ -33,13 +43,49 @@ export default function PromptOptimizeDialog(props: PromptOptimizeDialogProps) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) throw new Error("Failed to fetch models");
-      const json = (await res.json()) as { data: ModelOption[] };
-      setModels(json.data ?? []);
-      if (json.data?.length > 0) {
-        setSelectedModelId(json.data[0].id);
+      const json = (await res.json()) as {
+        data: Array<{
+          id: string;
+          displayName: string;
+          providerId: string;
+          providerName?: string;
+          deploymentType?: string;
+          isActive: boolean;
+          isProviderDisabled: boolean;
+        }>;
+      };
+
+      // Filter: only active, non-disabled-provider, non-local models
+      const active = (json.data ?? []).filter(
+        (m) => m.isActive && !m.isProviderDisabled && m.deploymentType !== "local",
+      );
+
+      // Group by provider
+      const groups = new Map<string, ProviderGroup>();
+      for (const m of active) {
+        if (!groups.has(m.providerId)) {
+          groups.set(m.providerId, {
+            providerId: m.providerId,
+            providerName: m.providerName ?? m.providerId,
+            deploymentType: m.deploymentType ?? "cloud",
+            models: [],
+          });
+        }
+        const group = groups.get(m.providerId);
+        if (group) group.models.push(m);
+      }
+
+      const result = Array.from(groups.values());
+      setProviderGroups(result);
+
+      // Auto-select first model
+      if (result.length > 0 && result[0].models.length > 0) {
+        setSelectedModelId(result[0].models[0].id);
       }
     } catch {
       setError("无法获取模型列表");
+    } finally {
+      setModelsLoading(false);
     }
   });
 
@@ -94,7 +140,7 @@ export default function PromptOptimizeDialog(props: PromptOptimizeDialogProps) {
   function handleReset() {
     setOptimizedText("");
     setError("");
-    setMetaPrompt("");
+    setMetaPrompt(DEFAULT_META_PROMPT_PLACEHOLDER);
     setShowMetaPrompt(false);
   }
 
@@ -126,23 +172,47 @@ export default function PromptOptimizeDialog(props: PromptOptimizeDialogProps) {
 
           {/* Body */}
           <div class="px-5 py-4 space-y-4">
-            {/* Model selector */}
+            {/* Model selector — grouped by provider, radio buttons */}
             <div>
               <label class="block text-xs font-medium text-slate-600 mb-1.5">选择模型</label>
-              <select
-                value={selectedModelId()}
-                onChange={(e) => setSelectedModelId(e.currentTarget.value)}
-                class="w-full text-xs px-2.5 py-2 border border-slate-200 rounded-md bg-white text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+              <Show
+                when={!modelsLoading()}
+                fallback={<p class="text-xs text-slate-400">加载模型列表...</p>}
               >
-                <For each={models()}>
-                  {(m) => (
-                    <option value={m.id}>
-                      {m.displayName}
-                      {m.providerName ? ` (${m.providerName})` : ""}
-                    </option>
-                  )}
-                </For>
-              </select>
+                <Show
+                  when={providerGroups().length > 0}
+                  fallback={<p class="text-xs text-slate-400 italic">暂无可用模型</p>}
+                >
+                  <div class="space-y-2 max-h-48 overflow-y-auto border border-slate-200 rounded-md p-2">
+                    <For each={providerGroups()}>
+                      {(group) => (
+                        <div>
+                          <div class="flex items-center gap-1.5 mb-1">
+                            <span class="text-xs font-medium text-slate-600">{group.providerName}</span>
+                            <span class="px-1.5 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">云端</span>
+                          </div>
+                          <div class="space-y-0.5">
+                            <For each={group.models}>
+                              {(model) => (
+                                <label class="flex items-center gap-2 p-1.5 rounded hover:bg-slate-50 cursor-pointer select-none">
+                                  <input
+                                    type="radio"
+                                    name="optimize-model"
+                                    checked={selectedModelId() === model.id}
+                                    onChange={() => setSelectedModelId(model.id)}
+                                    class="border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                  />
+                                  <span class="text-xs text-slate-800">{model.displayName}</span>
+                                </label>
+                              )}
+                            </For>
+                          </div>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+              </Show>
             </div>
 
             {/* Meta-prompt toggle + field */}
@@ -216,7 +286,7 @@ export default function PromptOptimizeDialog(props: PromptOptimizeDialogProps) {
                   <button
                     type="button"
                     onClick={handleOptimize}
-                    disabled={loading() || models().length === 0}
+                    disabled={loading() || !selectedModelId()}
                     class="px-3 py-1.5 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer inline-flex items-center gap-1.5"
                   >
                     <Show when={loading()}>

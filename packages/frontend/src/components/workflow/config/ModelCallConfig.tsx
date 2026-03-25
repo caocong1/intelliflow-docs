@@ -41,7 +41,7 @@ async function fetchModels(): Promise<ProviderGroup[]> {
       }>;
     };
 
-    const active = data.data.filter((m) => m.isActive && !m.isProviderDisabled);
+    const active = data.data.filter((m) => m.isActive && !m.isProviderDisabled && m.deploymentType !== "local");
 
     // Group by providerId
     const groups = new Map<string, ProviderGroup>();
@@ -73,7 +73,7 @@ function computeAvailableVariables(upstreamNodes: FlowNodeData[]): VariableRef[]
         refs.push({
           nodeId: node.id,
           outputId: output.id,
-          variableName: `${node.data.label}.${output.name}`,
+          variableName: `${node.id}.${output.id}`,
         });
       }
     }
@@ -96,12 +96,19 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
 
   const selectedModelIds = () => props.config.modelIds ?? [];
 
-  function toggleModel(modelId: string) {
+  function toggleModel(modelId: string, displayName?: string) {
     const current = selectedModelIds();
-    const next = current.includes(modelId)
+    const isRemoving = current.includes(modelId);
+    const next = isRemoving
       ? current.filter((id) => id !== modelId)
       : [...current, modelId];
-    props.onChange({ ...props.config, modelIds: next });
+    const names = { ...(props.config.modelNames ?? {}) };
+    if (isRemoving) {
+      delete names[modelId];
+    } else if (displayName) {
+      names[modelId] = displayName;
+    }
+    props.onChange({ ...props.config, modelIds: next, modelNames: names });
   }
 
   function handlePromptChange(template: string) {
@@ -143,7 +150,7 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
                             <input
                               type="checkbox"
                               checked={selectedModelIds().includes(model.id)}
-                              onChange={() => toggleModel(model.id)}
+                              onChange={() => toggleModel(model.id, model.displayName)}
                               class="rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
                             />
                             <span class="text-xs text-slate-800">{model.displayName}</span>

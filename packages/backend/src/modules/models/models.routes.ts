@@ -5,6 +5,7 @@ import {
   deleteModel,
   listActiveModels,
   listModelsByProvider,
+  testModelPrompt,
   toggleModelStatus,
   updateModel,
 } from "./models.service";
@@ -56,6 +57,10 @@ export const modelAdminRoutes = new Elysia({ prefix: "/models" })
         temperature: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 2 }))),
         maxTokens: t.Optional(t.Nullable(t.Integer({ minimum: 1, maximum: 1000000 }))),
         topP: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 1 }))),
+        agentMode: t.Optional(t.Nullable(t.Union([t.Literal("simple_chat"), t.Literal("autonomous_agent")]))),
+        agentMaxTurns: t.Optional(t.Nullable(t.Integer({ minimum: 1, maximum: 100 }))),
+        agentMaxBudgetUsd: t.Optional(t.Nullable(t.String({ maxLength: 20 }))),
+        agentAllowedTools: t.Optional(t.Nullable(t.Array(t.String()))),
       }),
     },
   )
@@ -82,6 +87,10 @@ export const modelAdminRoutes = new Elysia({ prefix: "/models" })
         temperature: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 2 }))),
         maxTokens: t.Optional(t.Nullable(t.Integer({ minimum: 1, maximum: 1000000 }))),
         topP: t.Optional(t.Nullable(t.Number({ minimum: 0, maximum: 1 }))),
+        agentMode: t.Optional(t.Nullable(t.Union([t.Literal("simple_chat"), t.Literal("autonomous_agent")]))),
+        agentMaxTurns: t.Optional(t.Nullable(t.Integer({ minimum: 1, maximum: 100 }))),
+        agentMaxBudgetUsd: t.Optional(t.Nullable(t.String({ maxLength: 20 }))),
+        agentAllowedTools: t.Optional(t.Nullable(t.Array(t.String()))),
       }),
     },
   )
@@ -120,5 +129,27 @@ export const modelAdminRoutes = new Elysia({ prefix: "/models" })
     },
     {
       params: t.Object({ id: t.String() }),
+    },
+  )
+  .post(
+    "/:id/test",
+    async ({ params, body, set, user }) => {
+      try {
+        const result = await testModelPrompt(params.id, body.prompt, user?.id);
+        return result;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message === "MODEL_NOT_FOUND") {
+          set.status = 404;
+          return { error: "模型不存在" };
+        }
+        throw err;
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        prompt: t.String({ minLength: 1, maxLength: 10000 }),
+      }),
     },
   );

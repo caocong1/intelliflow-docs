@@ -1,18 +1,31 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createSignal, createMemo, createEffect } from "solid-js";
 import type { VariableRef, OutputDef } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
 
-const SYSTEM_VARIABLES: Array<{ name: string; label: string }> = [
-  { name: "工作目录", label: "工作目录" },
-  { name: "输入目录", label: "输入目录" },
-  { name: "输出目录", label: "输出目录" },
-  { name: "脱敏规则", label: "脱敏规则" },
-];
+/** A flat selectable item for keyboard navigation */
+export interface PickerItem {
+  node: FlowNodeData;
+  output: OutputDef;
+  key: string; // "nodeId.outputId"
+}
 
 interface VariablePickerProps {
   upstreamNodes: FlowNodeData[];
   onSelect: (variableName: string, ref: VariableRef | null) => void;
   onClose: () => void;
+  highlightedIndex?: number;
+}
+
+/** Build a flat list of all selectable items from upstream nodes */
+export function buildPickerItems(upstreamNodes: FlowNodeData[]): PickerItem[] {
+  const items: PickerItem[] = [];
+  for (const node of upstreamNodes) {
+    const outputs = (node.data.outputs as OutputDef[]).filter((o) => o.name);
+    for (const output of outputs) {
+      items.push({ node, output, key: `${node.id}.${output.id}` });
+    }
+  }
+  return items;
 }
 
 export default function VariablePicker(props: VariablePickerProps) {
@@ -28,17 +41,13 @@ export default function VariablePicker(props: VariablePickerProps) {
   }
 
   function handleSelectOutput(node: FlowNodeData, output: OutputDef) {
-    const variableName = `${node.data.label}.${output.name}`;
+    const variableKey = `${node.id}.${output.id}`;
     const ref: VariableRef = {
       nodeId: node.id,
       outputId: output.id,
-      variableName,
+      variableName: variableKey,
     };
-    props.onSelect(variableName, ref);
-  }
-
-  function handleSelectSystem(sysVar: { name: string }) {
-    props.onSelect(sysVar.name, null);
+    props.onSelect(variableKey, ref);
   }
 
   const filteredNodes = () =>
@@ -52,10 +61,34 @@ export default function VariablePicker(props: VariablePickerProps) {
       );
     });
 
-  const filteredSystemVars = () =>
-    SYSTEM_VARIABLES.filter((v) => matchesSearch(v.name));
+  // Flat list of filtered items to map highlightedIndex to the correct item
+  const flatFilteredItems = createMemo(() => {
+    const items: PickerItem[] = [];
+    for (const node of filteredNodes()) {
+      const outputs = nodeOutputs(node);
+      const filtered = search() === ""
+        ? outputs
+        : outputs.filter((o) => matchesSearch(node.data.label) || matchesSearch(o.name));
+      for (const output of filtered) {
+        items.push({ node, output, key: `${node.id}.${output.id}` });
+      }
+    }
+    return items;
+  });
 
-  const hasResults = () => filteredNodes().length > 0 || filteredSystemVars().length > 0;
+  const hasResults = () => filteredNodes().length > 0;
+
+  let listRef: HTMLDivElement | undefined;
+
+  // Auto-scroll highlighted item into view reactively
+  createEffect(() => {
+    const idx = props.highlightedIndex;
+    if (idx === undefined || idx < 0 || !listRef) return;
+    const items = flatFilteredItems();
+    if (idx >= items.length) return;
+    const el = listRef.querySelector(`[data-picker-key="${items[idx].key}"]`);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  });
 
   return (
     <div class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
@@ -66,12 +99,11 @@ export default function VariablePicker(props: VariablePickerProps) {
           value={search()}
           onInput={(e) => setSearch(e.currentTarget.value)}
           placeholder="搜索节点输出..."
-          autofocus
           class="w-full text-xs px-2 py-1.5 border border-slate-200 rounded bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
         />
       </div>
 
-      <div class="max-h-60 overflow-y-auto">
+      <div ref={listRef} class="max-h-60 overflow-y-auto">
         <Show when={!hasResults()}>
           <p class="text-xs text-slate-400 text-center py-4">无匹配节点输出</p>
         </Show>
@@ -94,47 +126,36 @@ export default function VariablePicker(props: VariablePickerProps) {
                 </div>
                 {/* Outputs */}
                 <For each={outputs()}>
-                  {(output) => (
-                    <button
-                      type="button"
-                      class="w-full text-left px-4 py-1.5 text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors cursor-pointer focus:outline-none focus:bg-indigo-50"
-                      onClick={() => handleSelectOutput(node, output)}
-                    >
-                      <span class="text-slate-400 mr-1">{node.data.label}.</span>
-                      <span class="font-medium">{output.name}</span>
-                    </button>
-                  )}
+                  {(output) => {
+                    const itemKey = `${node.id}.${output.id}`;
+                    const isHighlighted = () => {
+                      const idx = props.highlightedIndex;
+                      if (idx === undefined || idx < 0) return false;
+                      const items = flatFilteredItems();
+                      return idx < items.length && items[idx].key === itemKey;
+                    };
+                    return (
+                      <button
+                        type="button"
+                        data-picker-key={itemKey}
+                        class={`w-full text-left px-4 py-1.5 text-xs transition-colors cursor-pointer focus:outline-none ${
+                          isHighlighted()
+                            ? "bg-indigo-50 text-indigo-700"
+                            : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                        }`}
+                        onClick={() => handleSelectOutput(node, output)}
+                      >
+                        <span class="text-slate-400 mr-1">{node.data.label}.</span>
+                        <span class="font-medium">{output.name}</span>
+                      </button>
+                    );
+                  }}
                 </For>
               </div>
             );
           }}
         </For>
 
-        {/* System variables */}
-        <Show when={filteredSystemVars().length > 0}>
-          <div>
-            <div class="px-3 py-1.5 bg-slate-50 border-b border-slate-100">
-              <span class="text-xs font-semibold text-slate-500">系统节点输出</span>
-            </div>
-            <For each={filteredSystemVars()}>
-              {(sysVar) => (
-                <button
-                  type="button"
-                  class="w-full text-left px-4 py-1.5 text-xs text-slate-600 hover:bg-gray-50 hover:text-gray-700 transition-colors cursor-pointer focus:outline-none focus:bg-gray-50"
-                  onClick={() => handleSelectSystem(sysVar)}
-                >
-                  <span class="font-medium">{sysVar.label}</span>
-                  <span class="text-slate-400 ml-1">(系统)</span>
-                </button>
-              )}
-            </For>
-          </div>
-        </Show>
-      </div>
-
-      {/* Footer */}
-      <div class="px-3 py-1.5 border-t border-slate-100 bg-slate-50">
-        <p class="text-xs text-slate-400">按 Esc 关闭</p>
       </div>
     </div>
   );

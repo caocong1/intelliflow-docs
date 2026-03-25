@@ -9,6 +9,17 @@ interface RuntimeSettingsProps {
 export default function RuntimeSettings(props: RuntimeSettingsProps) {
   const [open, setOpen] = createSignal(false);
 
+  const isAuto = () => props.config.autoAdvance ?? false;
+
+  function handleAutoAdvanceChange(checked: boolean) {
+    if (checked) {
+      // Auto mode: force disable allowEdit and skippable
+      props.onChange({ autoAdvance: true, allowEdit: false, skippable: false });
+    } else {
+      props.onChange({ autoAdvance: false });
+    }
+  }
+
   return (
     <div class="mt-4 border border-gray-200 rounded-md">
       {/* Collapsible header */}
@@ -41,37 +52,43 @@ export default function RuntimeSettings(props: RuntimeSettingsProps) {
             </div>
             <input
               type="checkbox"
-              checked={props.config.autoAdvance ?? false}
-              onChange={(e) => props.onChange({ autoAdvance: e.currentTarget.checked })}
+              checked={isAuto()}
+              onChange={(e) => handleAutoAdvanceChange(e.currentTarget.checked)}
               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
             />
           </label>
 
           {/* allowEdit */}
-          <label class="flex items-center justify-between gap-2 cursor-pointer select-none">
+          <label class={`flex items-center justify-between gap-2 select-none ${isAuto() ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}>
             <div>
               <p class="text-xs font-medium text-gray-700">允许编辑</p>
-              <p class="text-xs text-gray-400">用户可在此节点编辑输出内容</p>
+              <p class="text-xs text-gray-400">
+                {isAuto() ? "自动推进模式下不可编辑" : "用户可在此节点编辑输出内容"}
+              </p>
             </div>
             <input
               type="checkbox"
-              checked={props.config.allowEdit ?? true}
+              checked={isAuto() ? false : (props.config.allowEdit ?? true)}
+              disabled={isAuto()}
               onChange={(e) => props.onChange({ allowEdit: e.currentTarget.checked })}
-              class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
             />
           </label>
 
           {/* skippable */}
-          <label class="flex items-center justify-between gap-2 cursor-pointer select-none">
+          <label class={`flex items-center justify-between gap-2 select-none ${isAuto() ? "opacity-40 cursor-not-allowed" : "cursor-pointer"}`}>
             <div>
               <p class="text-xs font-medium text-gray-700">可跳过</p>
-              <p class="text-xs text-gray-400">用户可跳过此节点</p>
+              <p class="text-xs text-gray-400">
+                {isAuto() ? "自动推进模式下不可跳过" : "用户可跳过此节点"}
+              </p>
             </div>
             <input
               type="checkbox"
-              checked={props.config.skippable ?? false}
+              checked={isAuto() ? false : (props.config.skippable ?? false)}
+              disabled={isAuto()}
               onChange={(e) => props.onChange({ skippable: e.currentTarget.checked })}
-              class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer disabled:cursor-not-allowed"
             />
           </label>
         </div>

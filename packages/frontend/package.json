@@ -10,6 +10,7 @@
   "dependencies": {
     "@solidjs/router": "^0.15.3",
     "@wecom/jssdk": "^2.3.4",
+    "diff-match-patch": "^1.0.5",
     "echarts": "^6.0.0",
     "solid-js": "^1.9.5"
   },
@@ -17,6 +18,7 @@
     "@elysiajs/eden": "^1.4.8",
     "@intelliflow/backend": "workspace:*",
     "@tailwindcss/vite": "^4.1.3",
+    "@types/diff-match-patch": "^1.0.36",
     "@types/node": "^22.13.10",
     "elysia": "^1.4.28",
     "tailwindcss": "^4.1.3",

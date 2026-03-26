@@ -17,6 +17,7 @@ import { exportRoutes } from "./modules/runtime/export.routes";
 import { modelCallRoutes } from "./modules/runtime/model-call.routes";
 import { restoreRoutes } from "./modules/runtime/restore.routes";
 import { modelCallLogRoutes } from "./modules/runtime/model-call-log.routes";
+import { inlineEditRoutes } from "./modules/runtime/inline-edit.routes";
 import { promptOptimizeRoutes } from "./modules/prompts";
 import { versionRoutes } from "./modules/versions/versions.routes";
 import { detectOrphanTasks } from "./modules/runtime/background.service";
@@ -57,6 +58,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(modelCallRoutes)
   .use(restoreRoutes)
   .use(modelCallLogRoutes)
+  .use(inlineEditRoutes)
   .use(promptOptimizeRoutes)
   .use(notificationRoutes)
   .use(statisticsRoutes)

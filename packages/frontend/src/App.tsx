@@ -21,6 +21,9 @@ import ProjectSettings from "./pages/projects/ProjectSettings";
 import VersionHistory from "./pages/documents/VersionHistory";
 import Invitation from "./pages/Invitation";
 import DocumentWorkspace from "./pages/workspace/DocumentWorkspace";
+import Search from "./pages/Search";
+import Favorites from "./pages/Favorites";
+import RecentAccess from "./pages/RecentAccess";
 
 const AdminRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -58,6 +61,9 @@ const App: Component = () => {
         {/* Documents: merged detail + workspace */}
         <Route path="/documents/:documentId" component={DocumentWorkspace} />
         <Route path="/documents/:documentId/versions" component={VersionHistory} />
+        <Route path="/search" component={Search} />
+        <Route path="/favorites" component={Favorites} />
+        <Route path="/recent" component={RecentAccess} />
         {/* Redirect old workspace URL */}
         <Route path="/workspace/:documentId" component={() => {
           const p = useParams<{ documentId: string }>();

@@ -1,9 +1,63 @@
+import { A } from "@solidjs/router";
 import type { Component } from "solid-js";
+import { createResource, For, Show } from "solid-js";
+import Badge from "../components/ui/Badge";
 import { useAuth } from "../contexts/auth";
+import {
+  fetchFavorites,
+  fetchRecentAccess,
+  type RecentAccessItem,
+  type FavoritesResponse,
+} from "../lib/api/user-activity";
+
+function relativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "刚刚";
+  if (mins < 60) return `${mins} 分钟前`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} 天前`;
+  const months = Math.floor(days / 30);
+  return `${months} 个月前`;
+}
+
+const typeLabels: Record<RecentAccessItem["targetType"], string> = {
+  project: "项目",
+  document: "文档",
+  workflow: "流程",
+};
+
+const typeBadgeVariant: Record<RecentAccessItem["targetType"], "info" | "success" | "warning"> = {
+  project: "info",
+  document: "success",
+  workflow: "warning",
+};
+
+function targetLink(targetType: string, targetId: string): string | undefined {
+  if (targetType === "project") return `/projects/${targetId}`;
+  if (targetType === "document") return `/documents/${targetId}`;
+  return undefined;
+}
+
+type FlatFavorite = { targetId: string; name: string; targetType: string; createdAt: string };
+
+function flattenFavorites(data: FavoritesResponse): FlatFavorite[] {
+  const all: FlatFavorite[] = [
+    ...data.projects.map((p) => ({ ...p, targetType: "project" })),
+    ...data.documents.map((d) => ({ ...d, targetType: "document" })),
+    ...data.workflows.map((w) => ({ ...w, targetType: "workflow" })),
+  ];
+  all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  return all.slice(0, 5);
+}
 
 const Dashboard: Component = () => {
   const auth = useAuth();
   const user = auth.user;
+  const [recentData] = createResource(() => fetchRecentAccess(5));
+  const [favData] = createResource(fetchFavorites);
 
   return (
     <div class="p-8">
@@ -73,6 +127,81 @@ const Dashboard: Component = () => {
           </div>
           <p class="text-2xl font-bold text-indigo-950">—</p>
           <p class="mt-1 text-xs text-slate-400">数据加载中</p>
+        </div>
+      </div>
+
+      {/* Summary cards */}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+        {/* Recent Access card */}
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">最近访问</p>
+            <A href="/recent" class="text-xs text-indigo-600 hover:text-indigo-800 cursor-pointer">查看全部</A>
+          </div>
+          <Show when={!recentData.loading && recentData()} fallback={<p class="text-sm text-slate-400">加载中...</p>}>
+            <Show when={(recentData() ?? []).length > 0} fallback={<p class="text-sm text-slate-400">暂无最近访问</p>}>
+              <ul class="space-y-2">
+                <For each={recentData()}>
+                  {(item) => {
+                    const href = targetLink(item.targetType, item.targetId);
+                    return (
+                      <li class="flex items-center justify-between">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <Badge label={typeLabels[item.targetType]} variant={typeBadgeVariant[item.targetType]} />
+                          {href ? (
+                            <A href={href} class="text-sm text-indigo-600 hover:text-indigo-800 truncate">{item.name}</A>
+                          ) : (
+                            <span class="text-sm text-slate-700 truncate">{item.name}</span>
+                          )}
+                        </div>
+                        <span class="text-xs text-slate-400 flex-shrink-0 ml-3">{relativeTime(item.accessedAt)}</span>
+                      </li>
+                    );
+                  }}
+                </For>
+              </ul>
+            </Show>
+          </Show>
+        </div>
+
+        {/* Favorites card */}
+        <div class="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+          <div class="flex items-center justify-between mb-3">
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">我的收藏</p>
+            <A href="/favorites" class="text-xs text-indigo-600 hover:text-indigo-800 cursor-pointer">查看全部</A>
+          </div>
+          <Show when={!favData.loading && favData()} fallback={<p class="text-sm text-slate-400">加载中...</p>}>
+            {(() => {
+              const flat = () => {
+                const d = favData();
+                if (!d) return [];
+                return flattenFavorites(d);
+              };
+              return (
+                <Show when={flat().length > 0} fallback={<p class="text-sm text-slate-400">暂无收藏</p>}>
+                  <ul class="space-y-2">
+                    <For each={flat()}>
+                      {(item) => {
+                        const href = targetLink(item.targetType, item.targetId);
+                        const label = typeLabels[item.targetType as RecentAccessItem["targetType"]] ?? item.targetType;
+                        const variant = typeBadgeVariant[item.targetType as RecentAccessItem["targetType"]] ?? "info";
+                        return (
+                          <li class="flex items-center gap-2 min-w-0">
+                            <Badge label={label} variant={variant} />
+                            {href ? (
+                              <A href={href} class="text-sm text-indigo-600 hover:text-indigo-800 truncate">{item.name}</A>
+                            ) : (
+                              <span class="text-sm text-slate-700 truncate">{item.name}</span>
+                            )}
+                          </li>
+                        );
+                      }}
+                    </For>
+                  </ul>
+                </Show>
+              );
+            })()}
+          </Show>
         </div>
       </div>
 

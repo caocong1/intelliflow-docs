@@ -12,11 +12,11 @@ export interface OverviewData {
   totalCalls: number;
   totalTokens: number;
   activeUsers: number;
-  documentCount: number;
+  docCount: number;
   estimatedCost: number;
   todayCalls: number;
   avgDuration: number;
-  successRate: number;
+  avgSuccessRate: number;
 }
 
 function buildQuery(filters: StatisticsFilters): string {
@@ -55,11 +55,11 @@ export function fetchByModel(filters: StatisticsFilters) {
 }
 
 export function fetchByUser(filters: StatisticsFilters) {
-  return apiFetch<{ userId: string; displayName: string; callCount: number; documentCount: number; totalTokens: number; estimatedCost: number }[]>("by-user", filters);
+  return apiFetch<{ userId: string; userName: string; callCount: number; docCount: number; totalTokens: number; estimatedCost: number }[]>("by-user", filters);
 }
 
 export function fetchByWorkflow(filters: StatisticsFilters) {
-  return apiFetch<{ workflowId: string; workflowName: string; usageCount: number; userCount: number; documentCount: number }[]>("by-workflow", filters);
+  return apiFetch<{ workflowId: string; workflowName: string; callCount: number; userCount: number; docCount: number }[]>("by-workflow", filters);
 }
 
 export interface AuditUserRow {

@@ -132,6 +132,82 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 | 16. Version History & Dead Code Cleanup | v1.0 | 1/1 | Complete | 2026-03-25 |
 | 17. Schema Migration + Tech Debt | 2/2 | Complete    | 2026-03-26 | - |
 | 18. Background Execution + Notifications | 6/6 | Complete   | 2026-03-26 | - |
-| 19. Statistics & Audit Dashboard | 5/5 | Complete   | 2026-03-26 | - |
+| 19. Statistics & Audit Dashboard | 6/6 | Complete   | 2026-03-26 | - |
 | 20. Search + Favorites + Recent Access | v1.1 | 0/0 | Not started | - |
 | 21. AI-Assisted Inline Editing | v1.1 | 0/0 | Not started | - |
+
+### Phase 22: Bug Fixes + Form Field Type Extension
+**Goal**: Fix 2 known bugs in background execution and extend input transform form field types with machineKey support
+**Depends on**: Phase 17
+**Design Reference**: `docs/design/flow-node-capability-analysis.md` — Section 一 "已知 Bug" table + Section 三 "缺口 1"
+**Success Criteria** (what must be TRUE):
+  1. `background.service.ts` export node case uses `"export"` (matching `types.ts` WorkflowNodeType enum), not `"file_export"`
+  2. Background execution respects `skippable+autoAdvance` node config: nodes with both flags set are auto-skipped instead of directly executed
+  3. `FormFieldDef.type` supports `"number"`, `"date"`, `"datetime"`, `"select"`, `"multiselect"` in addition to existing types
+  4. `FormFieldDef` has optional `machineKey` field with `/^[a-zA-Z_][a-zA-Z0-9_]*$/` format constraint
+  5. Frontend renders native input controls (number input, date picker, dropdown) for new field types
+  6. Backend validates new field types (number range, date format, select value in options)
+  7. `outputData` stores values in both `fields` (by UUID) and `fieldsByKey` (by machineKey) dual-view
+  8. Downstream nodes can reference new field values via `{{nodeId.machineKey}}`
+**Plans**: TBD
+
+### Phase 23: Output Path Grammar + File Slots + Export ContentMapping
+**Goal**: Establish unified output path grammar (segmentKey canonical form), add file slot semantics to input transform, and make export contentMapping work at runtime
+**Depends on**: Phase 22
+**Design Reference**: `docs/design/flow-node-capability-analysis.md` — Section 二 (Output Path Grammar) + Section 三 缺口 #2 + #4a
+**Success Criteria** (what must be TRUE):
+  1. `OutputDef` has `segmentKey` field; `VariableRef` has `fieldPath` field; all type-specific prefixes in OutputDef.id (field/fileslot/namedoutput/model)
+  2. `resolvePromptTemplate()` refactored into `resolveRef()` supporting segmentKey lookup with priority: fieldsByKey → fields → fileSlots → namedOutputs → models → direct property
+  3. `FormFieldDef` has optional `fileSlotId` and `fileSlotLabel`; frontend renders separate upload areas per slot
+  4. `outputData` includes `fileSlots` aggregation view (new field), `files` array unchanged
+  5. `{{n1.tender_doc}}` resolves to the file slot's `.text`; `{{n1.text}}` still returns merged text
+  6. `derive-outputs.ts` generates per-slot OutputDef for file fields with fileSlotId
+  7. `export.service.ts::resolveContent()` and `getExportPreview()` both use `contentMapping` from node config via `loadNodeConfig()`
+  8. Export with contentMapping referencing 3 upstream outputs produces file with all 3 segments in order
+  9. `VariablePicker` and `PromptEditor` use segmentKey format; `validation.ts` checks segmentKey cross-type uniqueness within a node
+**Plans**: TBD
+
+### Phase 24: Structured Output + Named Artifacts + Field References
+**Goal**: Enable model call nodes to output structured JSON and multiple named artifacts, with downstream field-level references
+**Depends on**: Phase 23
+**Design Reference**: `docs/design/flow-node-capability-analysis.md` — Section 三 缺口 #3
+**Success Criteria** (what must be TRUE):
+  1. `ModelCallConfig` has `outputFormat` (text/json/markdown), `jsonSchema`, `stepDescription`, and `namedOutputs` fields
+  2. `outputFormat: "json"` triggers automatic JSON validation; invalid JSON shows as `format_error` status with "fix and revalidate" UI
+  3. `ModelOutput.status` type includes `"format_error"` value
+  4. `namedOutputs` mode: AI output parsed by `===OUTPUT:id===...===END:id===` delimiters into `outputData.namedOutputs[id]`
+  5. Frontend renders named outputs as separate cards, each independently editable
+  6. `{{n3.blueprint}}` returns named output content; `{{n3.clause_list.items[0].name}}` returns nested JSON field value
+  7. `resolveRef()` auto-unwraps namedOutput/model objects to `.content` when no fieldPath; parses `.content` as JSON when fieldPath present
+  8. Fallback: if AI doesn't follow delimiter format, entire output stored as default single artifact with frontend warning
+**Plans**: TBD
+
+### Phase 25: Export Table Rendering + System Prompt Separation
+**Goal**: Upgrade Word export to render Markdown tables and support system/user prompt separation in model calls
+**Depends on**: Phase 23
+**Design Reference**: `docs/design/flow-node-capability-analysis.md` — Section 三 缺口 #4b + #6
+**Success Criteria** (what must be TRUE):
+  1. Word export renders Markdown tables as `docx.Table` objects with borders and bold headers
+  2. Word export supports ordered lists, nested lists, and code blocks
+  3. `ModelCallConfig` has optional `systemPromptTemplate` field
+  4. When `systemPromptTemplate` is set, API request sends `[{role:"system",...}, {role:"user",...}]` two messages
+  5. When `systemPromptTemplate` is not set, behavior unchanged (single user message)
+  6. Both prompt templates support `{{variable}}` interpolation and desensitize rule injection
+  7. Frontend config panel shows two text areas (System Prompt / User Prompt) for model call nodes
+  8. Model call logs record system and user messages separately
+**Plans**: TBD
+
+### Phase 26: Conditional Node Execution
+**Goal**: Enable nodes to be automatically skipped or blocked based on upstream output values
+**Depends on**: Phase 24
+**Design Reference**: `docs/design/flow-node-capability-analysis.md` — Section 三 缺口 #5
+**Success Criteria** (what must be TRUE):
+  1. `NodeCondition` uses `VariableRef` as `sourceRef` (with fieldPath support); operators: equals/not_equals/exists/not_exists/contains
+  2. `NodeExecutionRule` with action (skip/block), conditions array, and logic (and/or) can be configured on any node
+  3. `NodeExecutionStatus` type includes `"blocked"` value
+  4. `advanceNode()` evaluates executionRule before entering a node; `skip` auto-skips with logged reason; `block` sets status to `"blocked"`
+  5. Frontend shows blocked nodes with red "已阻断" label, blocking reason, and "返回修改上游" button
+  6. "返回修改上游" triggers `rollbackToNode()` to the earliest stepOrder among all sourceRef.nodeId values
+  7. After rollback and re-advance, blocked node is re-evaluated; condition no longer met → proceeds normally
+  8. Background execution stops pipeline on blocked node and sends notification
+**Plans**: TBD

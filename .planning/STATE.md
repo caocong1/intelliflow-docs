@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-26T09:04:00Z"
+last_updated: "2026-03-26T09:32:41.277Z"
 progress:
-  total_phases: 19
+  total_phases: 24
   completed_phases: 19
-  total_plans: 63
-  completed_plans: 63
+  total_plans: 64
+  completed_plans: 64
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 19 of 21 (Statistics & Audit Dashboard)
-Plan: 5 of 5
+Plan: 6 of 6
 Status: Phase Complete
-Last activity: 2026-03-26 — Completed 19-05 (audit detail tab + dashboard wiring)
+Last activity: 2026-03-26 — Completed 19-06 (frontend data-binding fixes)
 
 Progress: [████████████████████] 100%
 
@@ -55,6 +55,7 @@ Progress: [████████████████████] 100%
 | Phase 19-03 P03 | 2min | 2 tasks | 2 files |
 | Phase 19-04 P04 | 2min | 2 tasks | 4 files |
 | Phase 19-05 P05 | 2min | 2 tasks | 4 files |
+| Phase 19 P06 | 2min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -86,11 +87,13 @@ Recent decisions affecting current work:
 - [19-04]: WorkflowStats omits estimatedCost — API type does not include cost for workflow dimension
 - [19-05]: Audit by-user expand reuses fetchAuditByDocument endpoint; by-document expand uses document-detail for node/model breakdown
 - [19-05]: /admin/statistics route alias added alongside /admin/stats for backward compatibility
+- [Phase 19]: Frontend-only fixes: backend API verified correct, only frontend types and components updated to match backend field names
 
 ### Roadmap Evolution
 
 v1.0: 5 core phases grew to 16 with gap-closure phases. 50 plans, 82 requirements.
 v1.1: 5 phases (17-21), 25 requirements. Schema foundation first, then parallel feature tracks, AI editing last.
+v1.2 (节点能力增强): Phase 22 added — Bug Fixes + Form Field Type Extension. Design doc: docs/design/flow-node-capability-analysis.md
 
 ### Pending Todos
 
@@ -104,5 +107,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 19-05-PLAN.md (audit detail tab + dashboard wiring) — Phase 19 complete
+Stopped at: Completed 19-06-PLAN.md (frontend data-binding fixes) — Phase 19 gap closure complete
 Resume file: None

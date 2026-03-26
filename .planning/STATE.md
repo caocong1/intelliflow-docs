@@ -57,6 +57,7 @@ Progress: [██████████████████░░] 90%
 | Phase 19-05 P05 | 2min | 2 tasks | 4 files |
 | Phase 19 P06 | 2min | 2 tasks | 6 files |
 | Phase 20-01 P01 | 3min | 2 tasks | 5 files |
+| Phase 20-02 P02 | 4min | 2 tasks | 8 files |
 | Phase 20-03 P03 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
@@ -93,6 +94,9 @@ Recent decisions affecting current work:
 - [20-01]: Batch name resolution via Map for polymorphic targets instead of per-row JOINs
 - [20-01]: checkFavorites returns targetType:targetId string array for easy frontend Set lookup
 - [20-01]: Upsert on unique constraint for recent access dedup, OFFSET-based eviction for 20-record cap
+- [20-02]: Sidebar section "效率工具" groups search/favorites/recent access links between dashboard and workspace
+- [20-02]: Dashboard favorites card flattens all types into single sorted list for at-a-glance view
+- [20-02]: Workflows have no detail page link — displayed as plain text in search/favorites/recent results
 - [20-03]: Frontend user-activity API client uses raw fetch (consistent with statistics.ts pattern); batch checkFavorites on list, single on detail pages
 
 ### Roadmap Evolution
@@ -118,5 +122,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 20-03-PLAN.md (frontend favorites & recent access integration)
+Stopped at: Completed 20-02-PLAN.md (frontend search, favorites, recent access pages)
 Resume file: None

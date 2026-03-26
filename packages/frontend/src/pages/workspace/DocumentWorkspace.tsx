@@ -22,6 +22,8 @@ import {
   onMount,
 } from "solid-js";
 import { api } from "../../api/client";
+import FavoriteButton from "../../components/favorites/FavoriteButton";
+import { checkFavorites, recordAccess } from "../../lib/api/user-activity";
 import ActionBar from "../../components/workspace/ActionBar";
 import AutoSaveIndicator from "../../components/workspace/AutoSaveIndicator";
 import type { SaveStatus } from "../../components/workspace/AutoSaveIndicator";
@@ -200,7 +202,24 @@ export default function DocumentWorkspace() {
     if (pollTimer) clearInterval(pollTimer);
   });
 
+  // Favorite state for this document
+  const [docFavorited, setDocFavorited] = createSignal(false);
+
   onMount(async () => {
+    // Record recent access (fire-and-forget)
+    if (params.documentId) {
+      recordAccess("document", params.documentId).catch(() => {});
+    }
+
+    // Check favorite status for this document
+    if (params.documentId) {
+      checkFavorites([{ targetType: "document", targetId: params.documentId }])
+        .then((favKeys) => {
+          setDocFavorited(favKeys.includes(`document:${params.documentId}`));
+        })
+        .catch(() => {});
+    }
+
     try {
       const res = await (api.api.runtime as any)[params.documentId].init.post();
       if (res.data && !("error" in res.data)) {
@@ -606,6 +625,11 @@ export default function DocumentWorkspace() {
                     <h1 class="text-lg font-bold" style={{ color: "#191c1e" }}>
                       {s().workflowName ?? "文档工作台"}
                     </h1>
+                    <FavoriteButton
+                      targetType="document"
+                      targetId={params.documentId}
+                      initialFavorited={docFavorited()}
+                    />
                     <span
                       class="text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1"
                       style={{

@@ -93,7 +93,11 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
   2. Search results respect document visibility permissions -- users only see content they are authorized to access
   3. User can favorite/unfavorite projects and documents, and view all favorites in a dedicated "My Favorites" view
   4. System automatically tracks recently accessed projects and documents, displayed in a "Recent Access" view
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 20-01-PLAN.md — Backend APIs: search module + user-activity module
+- [ ] 20-02-PLAN.md — Frontend pages, sidebar navigation, dashboard cards
+- [ ] 20-03-PLAN.md — FavoriteButton integration + recent access recording hooks
 
 ### Phase 21: AI-Assisted Inline Editing
 **Goal**: Users can select text in node output editors and use AI to rewrite, simplify, expand, fix, or translate it with streaming inline diff preview
@@ -133,7 +137,7 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 | 17. Schema Migration + Tech Debt | 2/2 | Complete    | 2026-03-26 | - |
 | 18. Background Execution + Notifications | 6/6 | Complete   | 2026-03-26 | - |
 | 19. Statistics & Audit Dashboard | 6/6 | Complete   | 2026-03-26 | - |
-| 20. Search + Favorites + Recent Access | v1.1 | 0/0 | Not started | - |
+| 20. Search + Favorites + Recent Access | v1.1 | 0/3 | Planned | - |
 | 21. AI-Assisted Inline Editing | v1.1 | 0/0 | Not started | - |
 
 ### Phase 22: Bug Fixes + Form Field Type Extension

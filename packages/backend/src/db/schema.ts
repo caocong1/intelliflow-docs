@@ -73,6 +73,9 @@ export const models = pgTable("models", {
   agentMaxTurns: integer("agent_max_turns").default(15),
   agentMaxBudgetUsd: varchar("agent_max_budget_usd", { length: 20 }).default("2.00"),
   agentAllowedTools: jsonb("agent_allowed_tools").$type<string[]>().default([]),
+  // Pricing fields for cost estimation
+  inputPricePerMTok: varchar("input_price_per_mtok", { length: 20 }),
+  outputPricePerMTok: varchar("output_price_per_mtok", { length: 20 }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });

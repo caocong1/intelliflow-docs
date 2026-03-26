@@ -1,4 +1,7 @@
+import { and, count, eq, inArray } from "drizzle-orm";
 import Elysia, { t } from "elysia";
+import { db } from "../../db";
+import { backgroundTasks } from "../../db/schema";
 import { requireAuth } from "../auth/auth.guard";
 import { isDocumentProjectMember } from "../versions/versions.service";
 import {
@@ -10,6 +13,8 @@ import {
   skipNode,
 } from "./runtime.service";
 import { executeDocumentPipeline } from "./background.service";
+
+const MAX_CONCURRENT_TASKS_PER_USER = 3;
 
 export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
   .use(requireAuth)
@@ -174,6 +179,22 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
       if (!isMember) {
         set.status = 403;
         return { error: "仅项目成员可启动后台生成" };
+      }
+
+      // Per-user concurrent task limit
+      const [{ count: activeCount }] = await db
+        .select({ count: count() })
+        .from(backgroundTasks)
+        .where(
+          and(
+            eq(backgroundTasks.userId, user!.id),
+            inArray(backgroundTasks.status, ["queued", "running"]),
+          ),
+        );
+
+      if (activeCount >= MAX_CONCURRENT_TASKS_PER_USER) {
+        set.status = 429;
+        return { error: "已达到并发任务上限（最多 3 个），请等待现有任务完成后再试" };
       }
 
       try {

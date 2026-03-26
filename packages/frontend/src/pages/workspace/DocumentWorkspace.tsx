@@ -9,7 +9,17 @@ import type {
   RestoreConfig,
 } from "@intelliflow/shared";
 import { A, useParams } from "@solidjs/router";
-import { For, Match, Show, Switch, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+} from "solid-js";
 import { api } from "../../api/client";
 import ActionBar from "../../components/workspace/ActionBar";
 import AutoSaveIndicator from "../../components/workspace/AutoSaveIndicator";
@@ -29,6 +39,9 @@ import { formatDuration, formatFileSize } from "../../lib/format-utils";
 import { renderMarkdown } from "../../lib/render-markdown";
 
 type ViewMode = "current" | "history";
+
+/** Polling interval for workspace during active generation (seconds) */
+const WORKSPACE_POLL_INTERVAL = 3;
 
 export default function DocumentWorkspace() {
   const params = useParams<{ documentId: string }>();
@@ -52,6 +65,10 @@ export default function DocumentWorkspace() {
     title: string;
   } | null>(null);
   const [copiedFullText, setCopiedFullText] = createSignal(false);
+
+  // Background execution polling state
+  const [isGenerating, setIsGenerating] = createSignal(false);
+  const [countdown, setCountdown] = createSignal(WORKSPACE_POLL_INTERVAL);
 
   /** Unified 1.5s debounced auto-save for all editable nodes */
   let saveTimeout: ReturnType<typeof setTimeout>;
@@ -82,6 +99,88 @@ export default function DocumentWorkspace() {
 
   onCleanup(() => clearTimeout(saveTimeout));
 
+  /** Check if any node is still running or pending (generation active) */
+  function isGenerationActive(runtimeState: DocumentRuntimeState): boolean {
+    return runtimeState.nodes.some(
+      (n) => n.status === "in_progress" || n.status === "pending",
+    );
+  }
+
+  /** Fetch current runtime state from backend (used for polling and state recovery) */
+  async function fetchRuntimeState() {
+    try {
+      const res = await (api.api.runtime as any)[params.documentId].get();
+      if (res.data && !("error" in res.data)) {
+        const runtimeState = res.data as unknown as DocumentRuntimeState;
+        setState(runtimeState);
+
+        // Update generation status based on node states
+        if (!isGenerationActive(runtimeState)) {
+          setIsGenerating(false);
+        }
+      }
+    } catch {
+      // Silent fail for polling — network hiccups should not break the UI
+    }
+  }
+
+  /** Start background execution — fires and forgets, then starts polling */
+  async function startBackgroundExecution() {
+    setActionLoading(true);
+    try {
+      const res = await (api.api.runtime as any)[params.documentId]["start-background"].post();
+      if (res.data && !("error" in res.data)) {
+        setIsGenerating(true);
+        setCountdown(WORKSPACE_POLL_INTERVAL);
+        // Immediately fetch to get the latest state
+        await fetchRuntimeState();
+      }
+    } catch {
+      setError("启动后台生成失败，请重试");
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  /** Retry failed generation — restart background execution from failed node */
+  async function handleRetryGeneration() {
+    await startBackgroundExecution();
+  }
+
+  /** Manual refresh — immediately poll and reset countdown */
+  function handleManualRefresh() {
+    fetchRuntimeState();
+    setCountdown(WORKSPACE_POLL_INTERVAL);
+  }
+
+  // Polling timer: tick every 1s, fetch on countdown expiry
+  let pollTimer: ReturnType<typeof setInterval> | undefined;
+
+  createEffect(() => {
+    if (isGenerating()) {
+      // Start polling
+      pollTimer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            fetchRuntimeState();
+            return WORKSPACE_POLL_INTERVAL;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      // Stop polling
+      if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = undefined;
+      }
+    }
+  });
+
+  onCleanup(() => {
+    if (pollTimer) clearInterval(pollTimer);
+  });
+
   onMount(async () => {
     try {
       const res = await (api.api.runtime as any)[params.documentId].init.post();
@@ -95,6 +194,12 @@ export default function DocumentWorkspace() {
         );
         if (firstPendingIdx >= 0 && firstPendingIdx !== runtimeState.currentNodeIndex) {
           setState((prev) => (prev ? { ...prev, currentNodeIndex: firstPendingIdx } : prev));
+        }
+
+        // If generation is active (nodes in_progress/pending), start polling automatically
+        if (isGenerationActive(runtimeState)) {
+          setIsGenerating(true);
+          setCountdown(WORKSPACE_POLL_INTERVAL);
         }
       } else {
         setError((res.data as any)?.error ?? "加载工作台失败");
@@ -131,6 +236,13 @@ export default function DocumentWorkspace() {
     const s = state();
     if (!s) return false;
     return s.nodes.every((n) => n.status === "completed" || n.status === "skipped");
+  });
+
+  /** Check if any node has failed */
+  const hasFailedNodes = createMemo(() => {
+    const s = state();
+    if (!s) return false;
+    return s.nodes.some((n) => n.status === "failed");
   });
 
   /** Extract the main text content from node outputData based on node type */
@@ -207,11 +319,9 @@ export default function DocumentWorkspace() {
     setActionLoading(true);
     setShowInlineEditor(false);
     try {
-      const res = await (api.api.runtime as any)[params.documentId].advance[node.id].post();
-      if (res.data && !("error" in res.data)) {
-        setState(res.data as unknown as DocumentRuntimeState);
-        setViewMode("current");
-      }
+      // Use background execution: submit to backend and start polling
+      await startBackgroundExecution();
+      setViewMode("current");
     } catch {
       // ignore
     } finally {
@@ -471,10 +581,31 @@ export default function DocumentWorkspace() {
                       {s().workflowName ?? "文档工作台"}
                     </h1>
                     <span
-                      class="text-xs px-2.5 py-0.5 rounded-full font-medium"
-                      style={{ background: "rgba(53,37,205,0.08)", color: "#3525cd" }}
+                      class="text-xs px-2.5 py-0.5 rounded-full font-medium inline-flex items-center gap-1"
+                      style={{
+                        background: hasFailedNodes()
+                          ? "rgba(220,38,38,0.08)"
+                          : isGenerating()
+                            ? "rgba(245,158,11,0.08)"
+                            : readOnly()
+                              ? "rgba(16,185,129,0.08)"
+                              : "rgba(53,37,205,0.08)",
+                        color: hasFailedNodes()
+                          ? "#dc2626"
+                          : isGenerating()
+                            ? "#d97706"
+                            : readOnly()
+                              ? "#059669"
+                              : "#3525cd",
+                      }}
                     >
-                      {readOnly() ? "已完成" : "进行中"}
+                      <Show when={isGenerating()}>
+                        <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      </Show>
+                      {hasFailedNodes() ? "生成失败" : isGenerating() ? "生成中" : readOnly() ? "已完成" : "进行中"}
                     </span>
                   </div>
                   <div class="flex items-center gap-4 text-xs" style={{ color: "#464555" }}>
@@ -483,6 +614,49 @@ export default function DocumentWorkspace() {
                         ? `全部 ${s().nodes.length} 个节点已完成`
                         : `步骤 ${s().currentNodeIndex + 1}/${s().nodes.length}`}
                     </span>
+                    {/* Polling countdown + manual refresh during active generation */}
+                    <Show when={isGenerating()}>
+                      <span
+                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                        style={{ background: "rgba(79,70,229,0.08)", color: "#4f46e5" }}
+                      >
+                        <svg
+                          class="w-3 h-3 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <circle
+                            class="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            stroke-width="4"
+                          />
+                          <path
+                            class="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        {countdown()}秒后自动刷新
+                        <button
+                          type="button"
+                          class="ml-1 p-0.5 rounded hover:bg-white/50 transition-colors cursor-pointer border-0 bg-transparent"
+                          style={{ color: "#4f46e5" }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleManualRefresh();
+                          }}
+                          title="立即刷新"
+                        >
+                          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        </button>
+                      </span>
+                    </Show>
                   </div>
                 </div>
 
@@ -560,8 +734,210 @@ export default function DocumentWorkspace() {
                     )}
                   </Match>
 
-                  {/* Current in-progress node */}
-                  <Match when={viewMode() === "current" && !readOnly() ? currentNode() : undefined}>
+                  {/* Failed node summary with retry — shown when generation failed */}
+                  <Match when={viewMode() === "current" && hasFailedNodes() && !isGenerating()}>
+                    <div class="space-y-6">
+                      {/* Failed banner */}
+                      <section
+                        class="rounded-xl p-6"
+                        style={{
+                          background: "#fef2f2",
+                          border: "1px solid rgba(220,38,38,0.15)",
+                        }}
+                      >
+                        <div class="flex items-start gap-4">
+                          <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            </svg>
+                          </div>
+                          <div class="flex-1">
+                            <h3 class="text-lg font-bold" style={{ color: "#991b1b" }}>
+                              文档生成失败
+                            </h3>
+                            <p class="text-sm mt-1" style={{ color: "#b91c1c" }}>
+                              部分节点执行出错，请查看下方详情后重试。
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            class="px-5 py-2.5 rounded-lg text-sm font-bold text-white transition-all cursor-pointer border-0 flex items-center gap-2"
+                            style={{
+                              background: "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)",
+                              "box-shadow": "0 4px 12px rgba(79,70,229,0.2)",
+                            }}
+                            disabled={actionLoading()}
+                            onClick={handleRetryGeneration}
+                          >
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            重新生成
+                          </button>
+                        </div>
+                      </section>
+
+                      {/* Failed node details */}
+                      <For each={s().nodes.filter((n) => n.status === "failed")}>
+                        {(node) => (
+                          <div
+                            class="rounded-xl p-5"
+                            style={{
+                              background: "#ffffff",
+                              border: "1px solid rgba(220,38,38,0.2)",
+                              "box-shadow": "0 2px 8px rgba(220,38,38,0.06)",
+                            }}
+                          >
+                            <div class="flex items-center gap-3 mb-3">
+                              <span
+                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}
+                              >
+                                失败
+                              </span>
+                              <span class="text-sm font-semibold" style={{ color: "#191c1e" }}>
+                                步骤 {node.stepOrder + 1}: {node.nodeLabel}
+                              </span>
+                              <span class="text-xs" style={{ color: "#464555" }}>
+                                ({node.nodeType})
+                              </span>
+                            </div>
+                            <Show when={node.errorMessage}>
+                              <div
+                                class="rounded-lg px-4 py-3 text-sm"
+                                style={{ background: "#fef2f2", color: "#991b1b" }}
+                              >
+                                {node.errorMessage}
+                              </div>
+                            </Show>
+                          </div>
+                        )}
+                      </For>
+
+                      {/* Completed nodes before failure */}
+                      <Show when={s().nodes.some((n) => n.status === "completed")}>
+                        <div class="space-y-4">
+                          <h3 class="text-sm font-medium" style={{ color: "#464555" }}>
+                            已完成的节点
+                          </h3>
+                          <For each={s().nodes.filter((n) => n.status === "completed")}>
+                            {(node) => (
+                              <CompletedNodeCard
+                                node={node}
+                                config={getNodeConfig(node)}
+                                isExpanded={expandedCompletedNode() === node.id}
+                                onToggle={() =>
+                                  setExpandedCompletedNode(
+                                    expandedCompletedNode() === node.id ? null : node.id,
+                                  )
+                                }
+                                onReexecute={() => {}}
+                                onFullscreen={(content, title) =>
+                                  setFullscreenContent({ content, title })
+                                }
+                                documentId={params.documentId}
+                              />
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                    </div>
+                  </Match>
+
+                  {/* Background generation in progress — show node progress */}
+                  <Match when={viewMode() === "current" && isGenerating()}>
+                    <div class="space-y-4">
+                      <For each={s().nodes}>
+                        {(node) => (
+                          <div
+                            class="rounded-xl p-5"
+                            style={{
+                              background: "#ffffff",
+                              border: node.status === "in_progress"
+                                ? "2px solid rgba(79,70,229,0.4)"
+                                : "1px solid rgba(199,196,216,0.2)",
+                              "box-shadow": node.status === "in_progress"
+                                ? "0 4px 16px rgba(79,70,229,0.08)"
+                                : "0 2px 8px rgba(25,28,30,0.04)",
+                            }}
+                          >
+                            <div class="flex items-center gap-3">
+                              {/* Status icon */}
+                              <Switch>
+                                <Match when={node.status === "completed"}>
+                                  <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                                    </svg>
+                                  </div>
+                                </Match>
+                                <Match when={node.status === "in_progress"}>
+                                  <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                    </svg>
+                                  </div>
+                                </Match>
+                                <Match when={node.status === "failed"}>
+                                  <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                  </div>
+                                </Match>
+                                <Match when={node.status === "pending"}>
+                                  <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <div class="w-2 h-2 rounded-full bg-slate-300" />
+                                  </div>
+                                </Match>
+                                <Match when={node.status === "skipped"}>
+                                  <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                                    </svg>
+                                  </div>
+                                </Match>
+                              </Switch>
+
+                              {/* Node info */}
+                              <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2">
+                                  <span class="text-sm font-semibold" style={{ color: "#191c1e" }}>
+                                    步骤 {node.stepOrder + 1}: {node.nodeLabel}
+                                  </span>
+                                  <span
+                                    class="text-xs px-2 py-0.5 rounded-full"
+                                    style={{ background: "rgba(79,70,229,0.06)", color: "#4f46e5" }}
+                                  >
+                                    {node.nodeType}
+                                  </span>
+                                </div>
+                                <Show when={node.status === "in_progress"}>
+                                  <p class="text-xs mt-1" style={{ color: "#4f46e5" }}>
+                                    正在执行...
+                                  </p>
+                                </Show>
+                                <Show when={node.status === "completed" && node.completedAt}>
+                                  <p class="text-xs mt-1" style={{ color: "#059669" }}>
+                                    已完成
+                                  </p>
+                                </Show>
+                                <Show when={node.status === "failed" && node.errorMessage}>
+                                  <p class="text-xs mt-1" style={{ color: "#dc2626" }}>
+                                    {node.errorMessage}
+                                  </p>
+                                </Show>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Match>
+
+                  {/* Current in-progress node (manual step-by-step mode) */}
+                  <Match when={viewMode() === "current" && !readOnly() && !isGenerating() && !hasFailedNodes() ? currentNode() : undefined}>
                     {(curNode) => (
                       <div class="space-y-6">
                         {/* Node executor -- route by nodeType with real config */}

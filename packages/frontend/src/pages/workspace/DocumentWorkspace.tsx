@@ -9,6 +9,7 @@ import type {
   RestoreConfig,
 } from "@intelliflow/shared";
 import { A, useParams } from "@solidjs/router";
+import { showToast } from "../../components/ui/Toast";
 import {
   For,
   Match,
@@ -112,11 +113,29 @@ export default function DocumentWorkspace() {
       const res = await (api.api.runtime as any)[params.documentId].get();
       if (res.data && !("error" in res.data)) {
         const runtimeState = res.data as unknown as DocumentRuntimeState;
+        const wasGenerating = isGenerating();
         setState(runtimeState);
 
         // Update generation status based on node states
         if (!isGenerationActive(runtimeState)) {
           setIsGenerating(false);
+
+          // Detect state transition: generation just finished
+          if (wasGenerating) {
+            const hasFailed = runtimeState.nodes.some((n) => n.status === "failed");
+            const docUrl = `/projects/${(runtimeState as any).projectId ?? ""}/documents/${params.documentId}/workspace`;
+            if (hasFailed) {
+              showToast("文档生成失败", "error", {
+                label: "查看详情",
+                href: docUrl,
+              });
+            } else {
+              showToast("文档生成完成", "success", {
+                label: "查看文档",
+                href: docUrl,
+              });
+            }
+          }
         }
       }
     } catch {

@@ -8,8 +8,8 @@
 ### 后台生成与通知 (Background Generation & Notifications)
 
 - [x] **BGND-01**: 用户可将文档生成任务提交到后台执行，关闭页面后任务继续运行
-- [ ] **BGND-02**: 后台任务状态（排队中/执行中/已完成/失败）在文档列表和详情页可见
-- [ ] **BGND-03**: 用户可查看后台任务列表，了解所有进行中和已完成的任务
+- [x] **BGND-02**: 后台任务状态（排队中/执行中/已完成/失败）在文档列表和详情页可见
+- [x] **BGND-03**: 用户可查看后台任务列表，了解所有进行中和已完成的任务
 - [x] **BGND-04**: 后台生成完成后，用户在应用内收到通知（通知列表+未读徽标）
 - [x] **BGND-05**: 后台生成完成后，用户收到企业微信 TextCard 推送通知，点击可跳转到文档
 - [x] **BGND-06**: 后台生成失败时，通知包含失败原因和重试入口
@@ -82,8 +82,8 @@
 |-------------|-------|--------|
 | DEBT-01 | Phase 17 | Complete |
 | BGND-01 | Phase 18 | Complete |
-| BGND-02 | Phase 18 | Pending |
-| BGND-03 | Phase 18 | Pending |
+| BGND-02 | Phase 18 | Complete |
+| BGND-03 | Phase 18 | Complete |
 | BGND-04 | Phase 18 | Complete |
 | BGND-05 | Phase 18 | Complete |
 | BGND-06 | Phase 18 | Complete |

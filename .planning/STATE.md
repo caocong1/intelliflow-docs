@@ -8,7 +8,7 @@ progress:
   total_phases: 18
   completed_phases: 17
   total_plans: 56
-  completed_plans: 54
+  completed_plans: 55
 ---
 
 # Project State
@@ -23,17 +23,17 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 18 of 21 (Background Execution & Notifications)
-Plan: 2 of 4
+Plan: 3 of 4
 Status: In Progress
-Last activity: 2026-03-26 — Completed 18-02 (notification service and pipeline integration)
+Last activity: 2026-03-26 — Completed 18-03 (frontend polling and status badges)
 
-Progress: [█████░░░░░] 50%
+Progress: [███████░░░] 75%
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 50 (v1.0)
-- v1.1 plans completed: 4
+- v1.1 plans completed: 5
 - Average duration: 3min
 - Total execution time: 3min
 
@@ -46,6 +46,7 @@ Progress: [█████░░░░░] 50%
 | Phase 17 P02 | 3min | 2 tasks | 3 files |
 | Phase 18 P01 | 6min | 2 tasks | 7 files |
 | Phase 18 P02 | 3min | 2 tasks | 4 files |
+| Phase 18 P03 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,7 @@ Recent decisions affecting current work:
 - [Phase 18]: Auto-confirm desensitize detections in background mode, auto-select first model output
 - [Phase 18]: Fire-and-forget pipeline with immediate queued response and async error capture
 - [Phase 18]: WeChat push titles use plain text for enterprise compatibility; notification helpers kept in background.service.ts for cohesion
+- [18-03]: Frontend switches from step-by-step advance to single background execution call; 3s workspace polling, 10s list polling
 
 ### Roadmap Evolution
 
@@ -80,5 +82,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 18-02-PLAN.md (notification service and pipeline integration)
+Stopped at: Completed 18-03-PLAN.md (frontend polling and status badges)
 Resume file: None

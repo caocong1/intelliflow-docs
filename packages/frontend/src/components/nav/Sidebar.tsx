@@ -1,11 +1,14 @@
 import { A, useLocation } from "@solidjs/router";
 import type { Component } from "solid-js";
-import { Show } from "solid-js";
+import { createSignal, Show } from "solid-js";
 import { useAuth } from "../../contexts/auth";
+import NotificationBell from "../notifications/NotificationBell";
+import NotificationDrawer from "../notifications/NotificationDrawer";
 
 const Sidebar: Component = () => {
   const auth = useAuth();
   const location = useLocation();
+  const [drawerOpen, setDrawerOpen] = createSignal(false);
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
@@ -221,6 +224,7 @@ const Sidebar: Component = () => {
               {auth.user()?.role === "admin" ? "管理员" : "用户"}
             </span>
           </div>
+          <NotificationBell onOpen={() => setDrawerOpen(true)} />
         </div>
         <button
           type="button"
@@ -245,6 +249,7 @@ const Sidebar: Component = () => {
           退出登录
         </button>
       </div>
+      <NotificationDrawer isOpen={drawerOpen()} onClose={() => setDrawerOpen(false)} />
     </aside>
   );
 };

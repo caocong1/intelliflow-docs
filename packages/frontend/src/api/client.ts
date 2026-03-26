@@ -11,6 +11,50 @@ export const api = treaty<App>(window.location.origin, {
   },
 });
 
+/** Fetch notifications list */
+export async function getNotifications(
+  opts?: { limit?: number; offset?: number },
+): Promise<{ notifications: unknown[]; total: number }> {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.offset) params.set("offset", String(opts.offset));
+  const token = localStorage.getItem("auth_token");
+  const res = await fetch(`/api/notifications?${params.toString()}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error("Failed to fetch notifications");
+  return res.json();
+}
+
+/** Fetch unread notification count */
+export async function getUnreadCount(): Promise<number> {
+  const token = localStorage.getItem("auth_token");
+  const res = await fetch("/api/notifications/unread-count", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error("Failed to fetch unread count");
+  const data = await res.json();
+  return data.count;
+}
+
+/** Mark a single notification as read */
+export async function markNotificationRead(id: string): Promise<void> {
+  const token = localStorage.getItem("auth_token");
+  await fetch(`/api/notifications/${id}/read`, {
+    method: "PATCH",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+}
+
+/** Mark all notifications as read */
+export async function markAllNotificationsRead(): Promise<void> {
+  const token = localStorage.getItem("auth_token");
+  await fetch("/api/notifications/read-all", {
+    method: "PATCH",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+}
+
 /** Start background document generation — fires and forgets, backend runs pipeline async */
 export async function startBackgroundExecution(
   documentId: string,

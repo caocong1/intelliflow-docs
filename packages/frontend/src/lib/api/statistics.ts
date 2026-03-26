@@ -62,10 +62,75 @@ export function fetchByWorkflow(filters: StatisticsFilters) {
   return apiFetch<{ workflowId: string; workflowName: string; usageCount: number; userCount: number; documentCount: number }[]>("by-workflow", filters);
 }
 
-export function fetchAuditByUser(filters: StatisticsFilters) {
-  return apiFetch<{ userId: string; displayName: string; records: unknown[] }[]>("audit/by-user", filters);
+export interface AuditUserRow {
+  userId: string;
+  userName: string;
+  callCount: number;
+  docCount: number;
+  totalTokens: number;
+  estimatedCost: number;
 }
 
-export function fetchAuditByDocument(filters: StatisticsFilters) {
-  return apiFetch<{ documentId: string; documentTitle: string; records: unknown[] }[]>("audit/by-document", filters);
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AuditDocumentRow {
+  documentId: string;
+  documentName: string;
+  userName: string;
+  workflowName: string;
+  totalCalls: number;
+  totalTokens: number;
+  totalDuration: number;
+  estimatedCost: number;
+  createdAt: string;
+}
+
+export interface DocumentDetailRow {
+  id: string;
+  nodeExecutionId: string;
+  nodeLabel: string;
+  modelName: string;
+  tokenUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null;
+  duration: number | null;
+  responseStatus: string;
+  budgetUsedUsd: number | null;
+  estimatedCost: string;
+  createdAt: string;
+}
+
+export function fetchAuditByUser(filters: StatisticsFilters, page = 1, pageSize = 20): Promise<PaginatedResponse<AuditUserRow>> {
+  const token = localStorage.getItem("auth_token");
+  const query = buildQuery(filters);
+  return fetch(`/api/admin/statistics/audit/by-user?${query}&page=${page}&pageSize=${pageSize}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  }).then((res) => {
+    if (!res.ok) throw new Error(`Statistics API error: ${res.status}`);
+    return res.json();
+  });
+}
+
+export function fetchAuditByDocument(filters: StatisticsFilters, page = 1, pageSize = 20): Promise<PaginatedResponse<AuditDocumentRow>> {
+  const token = localStorage.getItem("auth_token");
+  const query = buildQuery(filters);
+  return fetch(`/api/admin/statistics/audit/by-document?${query}&page=${page}&pageSize=${pageSize}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  }).then((res) => {
+    if (!res.ok) throw new Error(`Statistics API error: ${res.status}`);
+    return res.json();
+  });
+}
+
+export function fetchDocumentDetail(documentId: string): Promise<DocumentDetailRow[]> {
+  const token = localStorage.getItem("auth_token");
+  return fetch(`/api/admin/statistics/audit/document-detail/${documentId}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  }).then((res) => {
+    if (!res.ok) throw new Error(`Statistics API error: ${res.status}`);
+    return res.json();
+  });
 }

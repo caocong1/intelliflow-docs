@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: in-progress
-last_updated: "2026-03-26T10:11:00Z"
+last_updated: "2026-03-26T10:19:52Z"
 progress:
   total_phases: 24
   completed_phases: 19
   total_plans: 67
-  completed_plans: 65
+  completed_plans: 66
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 20 of 24 (Search, Favorites & Recent Access)
-Plan: 1 of 3
-Status: Plan 1 Complete
-Last activity: 2026-03-26 — Completed 20-01 (backend search, favorites, recent access APIs)
+Plan: 2 of 3
+Status: Plan 2 Complete
+Last activity: 2026-03-26 — Completed 20-02 (frontend search, favorites, recent access pages)
 
-Progress: [█████████████████░░░] 85%
+Progress: [██████████████████░░] 90%
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Progress: [█████████████████░░░] 85%
 | Phase 19-05 P05 | 2min | 2 tasks | 4 files |
 | Phase 19 P06 | 2min | 2 tasks | 6 files |
 | Phase 20-01 P01 | 3min | 2 tasks | 5 files |
+| Phase 20-03 P03 | 2min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,7 @@ Recent decisions affecting current work:
 - [20-01]: Batch name resolution via Map for polymorphic targets instead of per-row JOINs
 - [20-01]: checkFavorites returns targetType:targetId string array for easy frontend Set lookup
 - [20-01]: Upsert on unique constraint for recent access dedup, OFFSET-based eviction for 20-record cap
+- [20-03]: Frontend user-activity API client uses raw fetch (consistent with statistics.ts pattern); batch checkFavorites on list, single on detail pages
 
 ### Roadmap Evolution
 
@@ -116,5 +118,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 20-01-PLAN.md (backend search, favorites, recent access APIs)
+Stopped at: Completed 20-03-PLAN.md (frontend favorites & recent access integration)
 Resume file: None

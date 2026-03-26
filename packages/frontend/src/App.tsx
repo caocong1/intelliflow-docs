@@ -14,6 +14,7 @@ import UserManagement from "./pages/admin/UserManagement";
 import WorkflowManagement from "./pages/admin/WorkflowManagement";
 import WorkflowEditor from "./pages/admin/WorkflowEditor";
 import ModelCallLogs from "./pages/admin/ModelCallLogs";
+import StatsDashboard from "./pages/admin/StatsDashboard";
 import ProjectList from "./pages/projects/ProjectList";
 import ProjectHome from "./pages/projects/ProjectHome";
 import ProjectSettings from "./pages/projects/ProjectSettings";
@@ -91,6 +92,14 @@ const App: Component = () => {
           component={() => (
             <AdminRoute>
               <ModelCallLogs />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/stats"
+          component={() => (
+            <AdminRoute>
+              <StatsDashboard />
             </AdminRoute>
           )}
         />

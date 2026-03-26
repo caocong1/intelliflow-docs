@@ -4,6 +4,8 @@ import { api } from "../../api/client";
 import { useAuth } from "../../contexts/auth";
 import { showToast } from "../../components/ui/Toast";
 import Badge from "../../components/ui/Badge";
+import FavoriteButton from "../../components/favorites/FavoriteButton";
+import { checkFavorites, recordAccess } from "../../lib/api/user-activity";
 import Modal from "../../components/ui/Modal";
 import VisibilityBadge from "../../components/documents/VisibilityBadge";
 import MemberSelectModal from "../../components/documents/MemberSelectModal";
@@ -272,10 +274,27 @@ export default function ProjectHome() {
     return sorted;
   }
 
+  // Favorite state for this project
+  const [projectFavorited, setProjectFavorited] = createSignal(false);
+
   onMount(async () => {
     await fetchProject();
     if (!notFound()) {
       await fetchDocs();
+
+      // Record recent access (fire-and-forget)
+      if (params.id) {
+        recordAccess("project", params.id).catch(() => {});
+      }
+
+      // Check favorite status for this project
+      if (params.id) {
+        checkFavorites([{ targetType: "project", targetId: params.id }])
+          .then((favKeys) => {
+            setProjectFavorited(favKeys.includes(`project:${params.id}`));
+          })
+          .catch(() => {});
+      }
     }
   });
 
@@ -474,7 +493,14 @@ export default function ProjectHome() {
         <div class="bg-white border border-slate-200 rounded-xl p-5 mb-6">
           <div class="flex items-start justify-between">
             <div>
-              <h1 class="text-xl font-bold text-indigo-950">{project()!.name}</h1>
+              <div class="flex items-center gap-2">
+                <h1 class="text-xl font-bold text-indigo-950">{project()!.name}</h1>
+                <FavoriteButton
+                  targetType="project"
+                  targetId={params.id}
+                  initialFavorited={projectFavorited()}
+                />
+              </div>
               <Show when={project()!.description}>
                 <p class="text-sm text-slate-500 mt-1">{project()!.description}</p>
               </Show>

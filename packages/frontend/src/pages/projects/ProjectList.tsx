@@ -2,6 +2,8 @@ import { useNavigate } from "@solidjs/router";
 import { createEffect, createSignal, For, onMount } from "solid-js";
 import { api } from "../../api/client";
 import Badge from "../../components/ui/Badge";
+import FavoriteButton from "../../components/favorites/FavoriteButton";
+import { checkFavorites } from "../../lib/api/user-activity";
 import Modal from "../../components/ui/Modal";
 import Pagination from "../../components/ui/Pagination";
 import SearchInput from "../../components/ui/SearchInput";
@@ -40,6 +42,9 @@ export default function ProjectList() {
 
   const pageSize = 20;
 
+  // Favorite state: set of favorited project IDs
+  const [favoritedIds, setFavoritedIds] = createSignal<Set<string>>(new Set());
+
   async function fetchProjects() {
     setLoading(true);
     try {
@@ -58,6 +63,22 @@ export default function ProjectList() {
       const result = data as unknown as { data: ProjectItem[]; total: number };
       setProjects(result.data);
       setTotal(result.total);
+
+      // Batch-check favorites for loaded projects
+      if (result.data.length > 0) {
+        checkFavorites(
+          result.data.map((p) => ({ targetType: "project", targetId: p.id })),
+        )
+          .then((favKeys) => {
+            const ids = new Set(
+              favKeys.map((k) => k.replace("project:", "")),
+            );
+            setFavoritedIds(ids);
+          })
+          .catch(() => {
+            // Non-critical — don't block project list
+          });
+      }
     } catch {
       showToast("网络错误，请稍后重试", "error");
     } finally {
@@ -141,13 +162,20 @@ export default function ProjectList() {
       key: "name",
       header: "项目名称",
       render: (p) => (
-        <button
-          type="button"
-          onClick={() => navigate(`/projects/${p.id}`)}
-          class="font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors focus:outline-none"
-        >
-          {p.name}
-        </button>
+        <div class="flex items-center gap-2">
+          <FavoriteButton
+            targetType="project"
+            targetId={p.id}
+            initialFavorited={favoritedIds().has(p.id)}
+          />
+          <button
+            type="button"
+            onClick={() => navigate(`/projects/${p.id}`)}
+            class="font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors focus:outline-none"
+          >
+            {p.name}
+          </button>
+        </div>
       ),
     },
     {

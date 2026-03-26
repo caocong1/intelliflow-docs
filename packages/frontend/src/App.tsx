@@ -104,6 +104,14 @@ const App: Component = () => {
           )}
         />
         <Route
+          path="/admin/statistics"
+          component={() => (
+            <AdminRoute>
+              <StatsDashboard />
+            </AdminRoute>
+          )}
+        />
+        <Route
           path="/admin/workflows"
           component={() => (
             <AdminRoute>

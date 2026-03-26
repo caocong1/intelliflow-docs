@@ -6,6 +6,7 @@ import ModelStats from "./stats/ModelStats";
 import OverviewCharts from "./stats/OverviewCharts";
 import UserStats from "./stats/UserStats";
 import WorkflowStats from "./stats/WorkflowStats";
+import AuditDetails from "./stats/AuditDetails";
 
 const tabs = [
   { id: "overview", label: "总览" },
@@ -183,11 +184,7 @@ export default function StatsDashboard() {
       {activeTab() === "model" && <ModelStats filters={filters} />}
       {activeTab() === "user" && <UserStats filters={filters} />}
       {activeTab() === "workflow" && <WorkflowStats filters={filters} />}
-      {activeTab() === "audit" && (
-        <div class="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-400">
-          审计明细（后续计划实现）
-        </div>
-      )}
+      {activeTab() === "audit" && <AuditDetails filters={filters} />}
     </div>
   );
 }

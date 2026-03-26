@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgEnum, pgTable, real, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
 import type { WorkflowEdgeDef, WorkflowNodeDef } from "@intelliflow/shared";
 
 export const providerTypeEnum = pgEnum("provider_type", ["openai_compatible", "opencode", "claude_agent_sdk", "ollama"]);
@@ -244,6 +244,7 @@ export const callSourceEnum = pgEnum("call_source", [
   "model_test",
   "provider_test",
   "prompt_optimize",
+  "inline_edit",
 ]);
 
 export const modelCallLogs = pgTable("model_call_logs", {
@@ -296,3 +297,52 @@ export const documentFiles = pgTable("document_files", {
     .references(() => users.id),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─── Phase 17 (v1.1): New tables and enums ────────────────────────────────────
+
+export const backgroundTaskStatusEnum = pgEnum("background_task_status", ["queued", "running", "completed", "failed"]);
+export const backgroundTaskTypeEnum = pgEnum("background_task_type", ["document_generation"]);
+export const favoriteTargetTypeEnum = pgEnum("favorite_target_type", ["project", "document", "workflow"]);
+export const recentAccessTargetTypeEnum = pgEnum("recent_access_target_type", ["project", "document", "workflow"]);
+
+export const backgroundTasks = pgTable("background_tasks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  taskType: backgroundTaskTypeEnum("task_type").notNull(),
+  status: backgroundTaskStatusEnum("status").default("queued").notNull(),
+  documentId: uuid("document_id").references(() => documents.id),
+  progress: integer("progress").default(0),
+  errorMessage: varchar("error_message", { length: 2000 }),
+  retryCount: integer("retry_count").default(0).notNull(),
+  maxRetries: integer("max_retries").default(3).notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const userFavorites = pgTable("user_favorites", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  targetType: favoriteTargetTypeEnum("target_type").notNull(),
+  targetId: uuid("target_id").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique("uq_user_favorites_user_target").on(table.userId, table.targetType, table.targetId),
+]);
+
+export const userRecentAccess = pgTable("user_recent_access", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  targetType: recentAccessTargetTypeEnum("target_type").notNull(),
+  targetId: uuid("target_id").notNull(),
+  accessedAt: timestamp("accessed_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  unique("uq_user_recent_access_user_target").on(table.userId, table.targetType, table.targetId),
+]);

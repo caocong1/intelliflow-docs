@@ -9,8 +9,8 @@ dist/
 .env.local
 .env.*.local
 
-# Drizzle
-drizzle/
+# Drizzle (allow packages/backend/drizzle/ migrations to be tracked)
+# drizzle/
 
 # Database
 *.db

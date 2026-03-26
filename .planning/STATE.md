@@ -102,6 +102,10 @@ Recent decisions affecting current work:
 - [20-03]: Frontend user-activity API client uses raw fetch (consistent with statistics.ts pattern); batch checkFavorites on list, single on detail pages
 - [21-01]: Inline edit routes mounted in index.ts (not runtime.routes.ts) — consistent with existing pattern where each route file is independently mounted
 - [21-01]: AppError statusCode preserved in route error handler for proper 403 on security constraint violations
+- [21-02]: mouseup+keyup listeners instead of selectionchange for reliable textarea selection tracking
+- [21-02]: onMouseDown+preventDefault on all toolbar buttons to prevent textarea blur clearing selection
+- [21-02]: diff-match-patch with diff_cleanupSemantic for CJK-friendly character-level diffs
+- [21-02]: SSE utility supports both GET and POST methods for inline edit endpoint flexibility
 
 ### Roadmap Evolution
 
@@ -126,5 +130,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 21-01-PLAN.md (backend inline edit SSE endpoint)
+Stopped at: Completed 21-02-PLAN.md (frontend UI components for AI inline editing)
 Resume file: None

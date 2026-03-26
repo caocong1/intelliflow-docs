@@ -4,6 +4,8 @@ import {
   backgroundTasks,
   documents,
   nodeExecutions,
+  projects,
+  users,
   workflows,
 } from "../../db/schema";
 import type {
@@ -18,6 +20,127 @@ import { detectSensitiveInfo, confirmDesensitization } from "./desensitize.servi
 import { executeModelCallBackground } from "./model-call.service";
 import { executeRestore } from "./restore.service";
 import { generateExport } from "./export.service";
+import { createNotification } from "../notifications/notifications.service";
+import { sendTextCardMessage } from "../wecom/wecom.service";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getBaseUrl(): string {
+  return process.env.APP_BASE_URL || "http://localhost:3000";
+}
+
+function formatDuration(ms: number): string {
+  const totalSeconds = Math.round(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}秒`;
+  if (seconds === 0) return `${minutes}分`;
+  return `${minutes}分${seconds}秒`;
+}
+
+/**
+ * Fetch document title and project info for notification content.
+ */
+async function getDocumentContext(documentId: string) {
+  const [row] = await db
+    .select({
+      documentTitle: documents.title,
+      projectId: documents.projectId,
+      projectName: projects.name,
+    })
+    .from(documents)
+    .innerJoin(projects, eq(documents.projectId, projects.id))
+    .where(eq(documents.id, documentId))
+    .limit(1);
+
+  return row ?? { documentTitle: "未知文档", projectId: null, projectName: "未知项目" };
+}
+
+/**
+ * Fetch user's wecomUserId for WeChat push.
+ */
+async function getUserWecomId(userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ wecomUserId: users.wecomUserId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  return row?.wecomUserId ?? null;
+}
+
+/**
+ * Send completion notification (in-app + WeChat push).
+ */
+async function notifyCompletion(
+  userId: string,
+  documentId: string,
+  durationMs: number,
+) {
+  const ctx = await getDocumentContext(documentId);
+  const duration = formatDuration(durationMs);
+
+  // In-app notification
+  await createNotification({
+    userId,
+    type: "generation_completed",
+    title: "文档生成完成",
+    message: `文档「${ctx.documentTitle}」已生成完成，耗时 ${duration}`,
+    documentId,
+    projectId: ctx.projectId ?? undefined,
+  });
+
+  // WeChat push (best-effort)
+  try {
+    const wecomUserId = await getUserWecomId(userId);
+    if (wecomUserId) {
+      await sendTextCardMessage([wecomUserId], {
+        title: "文档生成完成",
+        description: `<div class="gray">项目：${ctx.projectName}</div><div class="normal">文档「${ctx.documentTitle}」已生成完成，耗时 ${duration}</div>`,
+        url: `${getBaseUrl()}/projects/${ctx.projectId}/documents/${documentId}/workspace`,
+        btntxt: "查看文档",
+      });
+    }
+  } catch (err) {
+    console.error("[background] WeChat push failed (completion):", err);
+  }
+}
+
+/**
+ * Send failure notification (in-app + WeChat push).
+ */
+async function notifyFailure(
+  userId: string,
+  documentId: string,
+  errorSummary: string,
+) {
+  const ctx = await getDocumentContext(documentId);
+
+  // In-app notification
+  await createNotification({
+    userId,
+    type: "generation_failed",
+    title: "文档生成失败",
+    message: `文档「${ctx.documentTitle}」生成失败：${errorSummary}`,
+    documentId,
+    projectId: ctx.projectId ?? undefined,
+  });
+
+  // WeChat push (best-effort)
+  try {
+    const wecomUserId = await getUserWecomId(userId);
+    if (wecomUserId) {
+      await sendTextCardMessage([wecomUserId], {
+        title: "文档生成失败",
+        description: `<div class="gray">项目：${ctx.projectName}</div><div class="normal">文档「${ctx.documentTitle}」生成失败：${errorSummary}</div>`,
+        url: `${getBaseUrl()}/projects/${ctx.projectId}/documents/${documentId}/workspace`,
+        btntxt: "查看详情",
+      });
+    }
+  } catch (err) {
+    console.error("[background] WeChat push failed (failure):", err);
+  }
+}
 
 // ─── Background Pipeline Orchestrator ────────────────────────────────────────
 
@@ -179,6 +302,10 @@ export async function executeDocumentPipeline(
       .where(eq(documents.id, documentId));
 
     console.log(`[background] Pipeline completed for document ${documentId}`);
+
+    // Send completion notifications
+    const durationMs = completedAt.getTime() - now.getTime();
+    await notifyCompletion(userId, documentId, durationMs);
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error(`[background] Pipeline failed for document ${documentId}:`, errorMessage);
@@ -223,6 +350,9 @@ export async function executeDocumentPipeline(
       .update(documents)
       .set({ status: "failed", updatedAt: failedAt })
       .where(eq(documents.id, documentId));
+
+    // Send failure notifications
+    await notifyFailure(userId, documentId, errorMessage.slice(0, 200));
   }
 }
 
@@ -308,6 +438,7 @@ export async function detectOrphanTasks(): Promise<number> {
     .select({
       id: backgroundTasks.id,
       documentId: backgroundTasks.documentId,
+      userId: backgroundTasks.userId,
     })
     .from(backgroundTasks)
     .where(eq(backgroundTasks.status, "running"));
@@ -357,6 +488,15 @@ export async function detectOrphanTasks(): Promise<number> {
         .update(documents)
         .set({ status: "failed", updatedAt: now })
         .where(eq(documents.id, orphan.documentId));
+    }
+
+    // Send failure notification for orphaned task
+    if (orphan.documentId) {
+      try {
+        await notifyFailure(orphan.userId, orphan.documentId, errorMessage);
+      } catch (notifyErr) {
+        console.error(`[background] Failed to send orphan notification for task ${orphan.id}:`, notifyErr);
+      }
     }
 
     console.warn(`[background] Orphaned task ${orphan.id} marked as failed (server restart)`);

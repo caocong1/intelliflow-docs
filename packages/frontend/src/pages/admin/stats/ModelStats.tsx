@@ -95,7 +95,7 @@ export default function ModelStats(props: ModelStatsProps) {
                         {fmt.format(row.totalTokens)}
                       </td>
                       <td class="px-6 py-3 text-right text-gray-700">
-                        {(row.successRate * 100).toFixed(1)}%
+                        {Number(row.successRate).toFixed(1)}%
                       </td>
                       <td class="px-6 py-3 text-right text-gray-700">
                         {costFmt.format(row.estimatedCost)}

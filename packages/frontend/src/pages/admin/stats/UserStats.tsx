@@ -27,7 +27,7 @@ export default function UserStats(props: UserStatsProps) {
       xAxis: { type: "value", name: "调用次数" },
       yAxis: {
         type: "category",
-        data: items.map((u) => u.displayName).reverse(),
+        data: items.map((u) => u.userName).reverse(),
         axisLabel: {
           width: 60,
           overflow: "truncate",
@@ -102,12 +102,12 @@ export default function UserStats(props: UserStatsProps) {
                 <For each={sortedByCallCount()}>
                   {(row) => (
                     <tr class="hover:bg-gray-50 transition-colors">
-                      <td class="px-6 py-3 font-medium text-gray-900">{row.displayName}</td>
+                      <td class="px-6 py-3 font-medium text-gray-900">{row.userName}</td>
                       <td class="px-6 py-3 text-right text-gray-700">
                         {fmt.format(row.callCount)}
                       </td>
                       <td class="px-6 py-3 text-right text-gray-700">
-                        {fmt.format(row.documentCount)}
+                        {fmt.format(row.docCount)}
                       </td>
                       <td class="px-6 py-3 text-right text-gray-700">
                         {fmt.format(row.totalTokens)}

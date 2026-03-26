@@ -34,7 +34,7 @@ export default function WorkflowStats(props: WorkflowStatsProps) {
         {
           name: "使用次数",
           type: "bar",
-          data: items.map((w) => w.usageCount),
+          data: items.map((w) => w.callCount),
           itemStyle: {
             borderRadius: [4, 4, 0, 0],
             color: {
@@ -95,18 +95,18 @@ export default function WorkflowStats(props: WorkflowStatsProps) {
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
-                <For each={sortedByUsageCount()}>
+                <For each={sortedByCallCount()}>
                   {(row) => (
                     <tr class="hover:bg-gray-50 transition-colors">
                       <td class="px-6 py-3 font-medium text-gray-900">{row.workflowName}</td>
                       <td class="px-6 py-3 text-right text-gray-700">
-                        {fmt.format(row.usageCount)}
+                        {fmt.format(row.callCount)}
                       </td>
                       <td class="px-6 py-3 text-right text-gray-700">
                         {fmt.format(row.userCount)}
                       </td>
                       <td class="px-6 py-3 text-right text-gray-700">
-                        {fmt.format(row.documentCount)}
+                        {fmt.format(row.docCount)}
                       </td>
                     </tr>
                   )}
@@ -119,8 +119,8 @@ export default function WorkflowStats(props: WorkflowStatsProps) {
     </div>
   );
 
-  function sortedByUsageCount() {
-    return [...(data() ?? [])].sort((a, b) => b.usageCount - a.usageCount);
+  function sortedByCallCount() {
+    return [...(data() ?? [])].sort((a, b) => b.callCount - a.callCount);
   }
 }
 

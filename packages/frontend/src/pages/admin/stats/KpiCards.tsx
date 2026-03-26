@@ -20,11 +20,11 @@ const cards: KpiCard[] = [
   { label: "总调用次数", key: "totalCalls", icon: "call", format: (v) => fmt.format(v), span2: true },
   { label: "总 Token 消耗", key: "totalTokens", icon: "token", format: (v) => fmt.format(v) },
   { label: "活跃用户数", key: "activeUsers", icon: "user", format: (v) => fmt.format(v) },
-  { label: "文档生成数", key: "documentCount", icon: "doc", format: (v) => fmt.format(v) },
+  { label: "文档生成数", key: "docCount", icon: "doc", format: (v) => fmt.format(v) },
   { label: "总成本估算", key: "estimatedCost", icon: "cost", format: (v) => `$${fmt.format(v)}`, span2: true },
   { label: "今日调用量", key: "todayCalls", icon: "today", format: (v) => fmt.format(v) },
   { label: "平均耗时(ms)", key: "avgDuration", icon: "time", format: (v) => fmt.format(Math.round(v)) },
-  { label: "平均成功率(%)", key: "successRate", icon: "rate", format: (v) => `${fmtPct.format(v)}%` },
+  { label: "平均成功率(%)", key: "avgSuccessRate", icon: "rate", format: (v) => `${fmtPct.format(v)}%` },
 ];
 
 function KpiIcon(props: { type: string }) {

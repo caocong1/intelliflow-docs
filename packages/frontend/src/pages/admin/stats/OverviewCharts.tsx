@@ -120,7 +120,7 @@ export default function OverviewCharts(props: OverviewChartsProps) {
       xAxis: { type: "value", axisLabel: { fontSize: 11 } },
       yAxis: {
         type: "category",
-        data: data.map((d) => d.displayName),
+        data: data.map((d) => d.userName),
         axisLabel: { fontSize: 11, width: 70, overflow: "truncate" },
       },
       series: [
@@ -147,19 +147,20 @@ export default function OverviewCharts(props: OverviewChartsProps) {
   }
 
   function flattenAuditRecords(): AuditRecord[] {
-    const docs = auditDocs() ?? [];
-    const all: AuditRecord[] = [];
-    for (const doc of docs) {
-      for (const r of doc.records as AuditRecord[]) {
-        all.push(r);
-      }
-    }
-    return all
-      .sort(
-        (a, b) =>
-          new Date(b.calledAt).getTime() - new Date(a.calledAt).getTime(),
-      )
-      .slice(0, 10);
+    const response = auditDocs();
+    const docs = response?.data ?? [];
+    return docs
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10)
+      .map((doc) => ({
+        calledAt: doc.createdAt,
+        displayName: doc.userName,
+        workflowName: doc.workflowName,
+        modelName: "-",
+        totalTokens: doc.totalTokens,
+        durationMs: doc.totalDuration,
+        estimatedCost: doc.estimatedCost,
+      }));
   }
 
   return (

@@ -338,6 +338,13 @@ export default function DocumentWorkspace() {
     setActionLoading(true);
     setShowInlineEditor(false);
     try {
+      // For input_transform nodes, advance first to complete them before background execution
+      if (node.nodeType === "input_transform" && node.status !== "completed") {
+        const advRes = await (api.api.runtime as any)[params.documentId].advance[node.id].post();
+        if (advRes.data && !("error" in advRes.data)) {
+          setState(advRes.data as unknown as DocumentRuntimeState);
+        }
+      }
       // Use background execution: submit to backend and start polling
       await startBackgroundExecution();
       setViewMode("current");

@@ -8,7 +8,7 @@ progress:
   total_phases: 18
   completed_phases: 18
   total_plans: 58
-  completed_plans: 57
+  completed_plans: 58
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 18 of 21 (Background Execution & Notifications)
-Plan: 5 of 6
-Status: In Progress
-Last activity: 2026-03-26 — Completed 18-05 (per-user concurrent task limit)
+Plan: 6 of 6
+Status: Phase Complete
+Last activity: 2026-03-26 — Completed 18-06 (global task list in notification drawer)
 
 Progress: [██████████] 100%
 
@@ -33,7 +33,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 - Total plans completed: 50 (v1.0)
-- v1.1 plans completed: 7
+- v1.1 plans completed: 8
 - Average duration: 3min
 - Total execution time: 3min
 
@@ -49,6 +49,7 @@ Progress: [██████████] 100%
 | Phase 18 P03 | 6min | 2 tasks | 3 files |
 | Phase 18 P04 | 4min | 2 tasks | 6 files |
 | Phase 18 P05 | 1min | 1 tasks | 1 files |
+| Phase 18 P06 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,7 @@ Recent decisions affecting current work:
 - [18-03]: Frontend switches from step-by-step advance to single background execution call; 3s workspace polling, 10s list polling
 - [18-04]: Notification API helpers use raw fetch; Toast action uses window.location.href outside router context; Bell polls at 15s independently
 - [18-05]: Per-user concurrent task limit (MAX=3) at module scope for easy tuning; count query on backgroundTasks table
+- [18-06]: Tabbed NotificationDrawer with lazy-loaded task tab; GET /runtime/my-tasks joins backgroundTasks+documents+projects
 
 ### Roadmap Evolution
 
@@ -86,5 +88,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 18-05-PLAN.md (per-user concurrent task limit)
+Stopped at: Completed 18-06-PLAN.md (global task list — Phase 18 complete)
 Resume file: None

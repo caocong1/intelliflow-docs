@@ -18,7 +18,7 @@ type DocumentRow = {
   workflowId: string;
   title: string;
   description: string | null;
-  status: "draft" | "in_progress" | "completed";
+  status: "draft" | "in_progress" | "completed" | "failed";
   visibility: "self" | "project" | "specific";
   createdBy: string;
   isDeleted: boolean;

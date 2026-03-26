@@ -272,6 +272,210 @@ export async function executeModelCall(
   });
 }
 
+// ─── Background (non-streaming) Model Execution ─────────────────────────────
+
+/**
+ * Execute model calls for background pipeline — collects full response without SSE streaming.
+ * Writes results to nodeExecutions.outputData and auto-selects the first model output.
+ */
+export async function executeModelCallBackground(
+  documentId: string,
+  nodeExecutionId: string,
+  userId: string,
+): Promise<void> {
+  // Load node config to get model IDs and prompt
+  const config = await getModelCallConfig(nodeExecutionId);
+  if (!config || config.type !== "model_call") {
+    throw new Error("Model call config not found for node execution");
+  }
+
+  const mcConfig = config as import("@intelliflow/shared").ModelCallConfig;
+  const modelIds = mcConfig.modelIds.length > 0
+    ? mcConfig.modelIds
+    : mcConfig.modelId ? [mcConfig.modelId] : [];
+
+  if (modelIds.length === 0) {
+    throw new Error("No models configured for model_call node");
+  }
+
+  // Resolve prompt
+  const allExecs = await getUpstreamNodeExecutions(documentId);
+  const desensitizeRules = await getUpstreamDesensitizeRules(documentId);
+  const { resolved: resolvedPrompt, mapping: variableMapping } = await resolvePromptTemplate(
+    mcConfig.promptTemplate,
+    documentId,
+    allExecs.map((e) => ({
+      nodeId: e.nodeId,
+      nodeLabel: e.nodeLabel,
+      outputData: e.outputData as Record<string, unknown> | null,
+    })),
+    desensitizeRules,
+  );
+
+  // Look up all models + providers
+  const modelRows = await db
+    .select({
+      id: models.id,
+      modelId: models.modelId,
+      displayName: models.displayName,
+      temperature: models.temperature,
+      maxTokens: models.maxTokens,
+      topP: models.topP,
+      baseUrl: providers.baseUrl,
+      apiKey: providers.apiKey,
+      providerType: providers.type,
+      providerId: providers.id,
+      providerName: providers.name,
+      agentMode: models.agentMode,
+      agentMaxTurns: models.agentMaxTurns,
+      agentMaxBudgetUsd: models.agentMaxBudgetUsd,
+      agentAllowedTools: models.agentAllowedTools,
+    })
+    .from(models)
+    .innerJoin(providers, eq(models.providerId, providers.id))
+    .where(inArray(models.id, modelIds));
+
+  if (modelRows.length === 0) {
+    throw new Error("No models found for the given IDs");
+  }
+
+  // Execute all models in parallel, collect full responses (no SSE)
+  const results = await Promise.allSettled(
+    modelRows.map(async (model) => {
+      const startTime = Date.now();
+      let fullContent = "";
+
+      try {
+        const strategy = getStrategy(model.providerType);
+        const strategyInput: ModelCallInput = {
+          ...model,
+          providerType: model.providerType,
+        };
+
+        // Use a no-op sendEvent since we don't need SSE in background mode
+        const noopSendEvent = () => {};
+        const result = await strategy.execute({
+          model: strategyInput,
+          resolvedPrompt,
+          sendEvent: noopSendEvent,
+        });
+        fullContent = result.content;
+
+        if (result.status === "failed") {
+          throw new Error(result.errorMessage ?? "Model call failed");
+        }
+
+        // Log successful call
+        await db.insert(modelCallLogs).values({
+          documentId,
+          nodeExecutionId,
+          userId,
+          providerId: model.providerId,
+          providerName: model.providerName,
+          modelId: model.id,
+          modelName: model.displayName,
+          callSource: "runtime",
+          promptTemplate: mcConfig.promptTemplate,
+          resolvedPrompt,
+          variableMapping: variableMapping ?? null,
+          temperature: model.temperature,
+          maxTokens: model.maxTokens,
+          responseStatus: "completed",
+          responseContent: fullContent,
+          contentLength: fullContent.length,
+          tokenUsage: null,
+          duration: Date.now() - startTime,
+          errorMessage: null,
+        });
+
+        return {
+          modelId: model.id,
+          displayName: model.displayName,
+          content: fullContent,
+          status: "completed" as const,
+        };
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : String(err);
+
+        // Log failed call
+        await db.insert(modelCallLogs).values({
+          documentId,
+          nodeExecutionId,
+          userId,
+          providerId: model.providerId,
+          providerName: model.providerName,
+          modelId: model.id,
+          modelName: model.displayName,
+          callSource: "runtime",
+          promptTemplate: mcConfig.promptTemplate,
+          resolvedPrompt,
+          variableMapping: variableMapping ?? null,
+          temperature: model.temperature,
+          maxTokens: model.maxTokens,
+          responseStatus: "failed",
+          responseContent: fullContent || null,
+          contentLength: fullContent.length || null,
+          tokenUsage: null,
+          duration: Date.now() - startTime,
+          errorMessage,
+        });
+
+        return {
+          modelId: model.id,
+          displayName: model.displayName,
+          content: fullContent,
+          status: "failed" as const,
+          errorMessage,
+        };
+      }
+    }),
+  );
+
+  // Build final output data
+  const finalModels: Record<string, ModelOutput> = {};
+  let firstCompletedModelId: string | null = null;
+
+  for (const result of results) {
+    if (result.status === "fulfilled") {
+      const r = result.value;
+      finalModels[r.modelId] = {
+        modelId: r.modelId,
+        modelDisplayName: r.displayName,
+        content: r.content,
+        status: r.status,
+        errorMessage: "errorMessage" in r ? r.errorMessage : undefined,
+      };
+
+      if (r.status === "completed" && !firstCompletedModelId) {
+        firstCompletedModelId = r.modelId;
+      }
+    }
+  }
+
+  // Check if at least one model succeeded
+  if (!firstCompletedModelId) {
+    // All models failed — collect error messages
+    const errors = results
+      .map((r) => r.status === "fulfilled" && r.value.status === "failed" ? r.value.errorMessage : null)
+      .filter(Boolean)
+      .join("; ");
+    throw new Error(`All model calls failed: ${errors}`);
+  }
+
+  // Auto-select first completed model output
+  const selectedContent = finalModels[firstCompletedModelId]?.content ?? "";
+
+  await db
+    .update(nodeExecutions)
+    .set({
+      outputData: { models: finalModels, selectedContent, text: selectedContent },
+      selectedOutputKey: firstCompletedModelId,
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(nodeExecutions.id, nodeExecutionId));
+}
+
 // ─── Retry ──────────────────────────────────────────────────────────────────
 
 /**

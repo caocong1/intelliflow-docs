@@ -9,6 +9,7 @@ import {
   saveNodeDraft,
   skipNode,
 } from "./runtime.service";
+import { executeDocumentPipeline } from "./background.service";
 
 export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
   .use(requireAuth)
@@ -161,5 +162,44 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
     },
     {
       params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
+    },
+  )
+
+  // ─── Start background document generation ─────────────────────────────────
+
+  .post(
+    "/:documentId/start-background",
+    async ({ params, user, set }) => {
+      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
+      if (!isMember) {
+        set.status = 403;
+        return { error: "仅项目成员可启动后台生成" };
+      }
+
+      try {
+        // Initialize execution if not already initialized
+        const state = await initDocumentExecution(params.documentId, user!.id);
+
+        // Verify input_transform node is confirmed (completed)
+        const inputNode = state.nodes.find((n) => n.nodeType === "input_transform");
+        if (inputNode && inputNode.status !== "completed") {
+          set.status = 400;
+          return { error: "请先确认输入转换节点" };
+        }
+
+        // Fire-and-forget: run pipeline in background
+        executeDocumentPipeline(params.documentId, user!.id).catch((err) => {
+          console.error(`[background] Pipeline error for ${params.documentId}:`, err);
+        });
+
+        return { status: "queued" };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        set.status = 400;
+        return { error: message };
+      }
+    },
+    {
+      params: t.Object({ documentId: t.String() }),
     },
   );

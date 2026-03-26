@@ -19,6 +19,7 @@ import { restoreRoutes } from "./modules/runtime/restore.routes";
 import { modelCallLogRoutes } from "./modules/runtime/model-call-log.routes";
 import { promptOptimizeRoutes } from "./modules/prompts";
 import { versionRoutes } from "./modules/versions/versions.routes";
+import { detectOrphanTasks } from "./modules/runtime/background.service";
 import { wecomAuthRoutes, wecomAdminRoutes, invitationPublicRoutes, invitationRoutes } from "./modules/wecom/wecom.routes";
 import { workflowAdminRoutes, workflowReadRoutes } from "./modules/workflows/workflows.routes";
 
@@ -54,6 +55,17 @@ const app = new Elysia({ prefix: "/api" })
   .use(modelCallLogRoutes)
   .use(promptOptimizeRoutes)
   .listen({ port: 3001, hostname: "0.0.0.0" });
+
+// Detect and clean up orphaned background tasks from previous server runs
+detectOrphanTasks()
+  .then((count) => {
+    if (count > 0) {
+      console.warn(`[startup] Detected and cleaned up ${count} orphaned background task(s)`);
+    }
+  })
+  .catch((err) => {
+    console.error("[startup] Failed to detect orphan tasks:", err);
+  });
 
 console.log(`Backend running on http://localhost:${app.server?.port}`);
 

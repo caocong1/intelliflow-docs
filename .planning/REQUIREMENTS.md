@@ -16,13 +16,13 @@
 
 ### 统计审计 (Statistics & Audit)
 
-- [ ] **STAT-01**: 管理员可查看总览面板：总调用次数、总 Token 消耗、活跃用户数、文档生成数、总成本估算
-- [ ] **STAT-02**: 管理员可按模型查看使用统计：调用次数、Token 消耗、成功率、成本、趋势图
-- [ ] **STAT-03**: 管理员可按用户查看使用统计：使用频率、文档生成数、Token 消耗、成本
+- [x] **STAT-01**: 管理员可查看总览面板：总调用次数、总 Token 消耗、活跃用户数、文档生成数、总成本估算
+- [x] **STAT-02**: 管理员可按模型查看使用统计：调用次数、Token 消耗、成功率、成本、趋势图
+- [x] **STAT-03**: 管理员可按用户查看使用统计：使用频率、文档生成数、Token 消耗、成本
 - [ ] **STAT-04**: 管理员可查看生成记录审计明细：谁、用什么流程、哪些节点、哪些模型、耗时、Token 数、成本
-- [ ] **STAT-05**: 管理员可按部门/项目/文档类型/流程多维度交叉查看统计数据
-- [ ] **STAT-06**: 管理员可按流程查看使用统计：使用次数、用户分布、文档数、趋势
-- [ ] **STAT-07**: 所有统计面板支持自定义日期范围和时间粒度（日/周/月）筛选
+- [x] **STAT-05**: 管理员可按部门/项目/文档类型/流程多维度交叉查看统计数据
+- [x] **STAT-06**: 管理员可按流程查看使用统计：使用次数、用户分布、文档数、趋势
+- [x] **STAT-07**: 所有统计面板支持自定义日期范围和时间粒度（日/周/月）筛选
 
 ### 全局搜索与效率 (Search & Productivity)
 
@@ -87,13 +87,13 @@
 | BGND-04 | Phase 18 | Complete |
 | BGND-05 | Phase 18 | Complete |
 | BGND-06 | Phase 18 | Complete |
-| STAT-01 | Phase 19 | Pending |
-| STAT-02 | Phase 19 | Pending |
-| STAT-03 | Phase 19 | Pending |
+| STAT-01 | Phase 19 | Complete |
+| STAT-02 | Phase 19 | Complete |
+| STAT-03 | Phase 19 | Complete |
 | STAT-04 | Phase 19 | Pending |
-| STAT-05 | Phase 19 | Pending |
-| STAT-06 | Phase 19 | Pending |
-| STAT-07 | Phase 19 | Pending |
+| STAT-05 | Phase 19 | Complete |
+| STAT-06 | Phase 19 | Complete |
+| STAT-07 | Phase 19 | Complete |
 | SRCH-01 | Phase 20 | Pending |
 | SRCH-02 | Phase 20 | Pending |
 | SRCH-03 | Phase 20 | Pending |

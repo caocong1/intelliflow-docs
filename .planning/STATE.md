@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-26T07:21:00Z"
+last_updated: "2026-03-26T08:53:45.515Z"
 progress:
-  total_phases: 18
+  total_phases: 19
   completed_phases: 18
-  total_plans: 58
-  completed_plans: 58
+  total_plans: 63
+  completed_plans: 59
 ---
 
 # Project State
@@ -18,22 +18,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 18 — Background Execution & Notifications
+**Current focus:** Phase 19 — Statistics & Audit Dashboard
 
 ## Current Position
 
-Phase: 18 of 21 (Background Execution & Notifications)
-Plan: 6 of 6
-Status: Phase Complete
-Last activity: 2026-03-26 — Completed 18-06 (global task list in notification drawer)
+Phase: 19 of 21 (Statistics & Audit Dashboard)
+Plan: 1 of 5
+Status: In Progress
+Last activity: 2026-03-26 — Completed 19-01 (backend statistics API)
 
-Progress: [██████████] 100%
+Progress: [██████████████████░░] 93%
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 50 (v1.0)
-- v1.1 plans completed: 8
+- v1.1 plans completed: 9
 - Average duration: 3min
 - Total execution time: 3min
 
@@ -50,6 +50,7 @@ Progress: [██████████] 100%
 | Phase 18 P04 | 4min | 2 tasks | 6 files |
 | Phase 18 P05 | 1min | 1 tasks | 1 files |
 | Phase 18 P06 | 3min | 2 tasks | 3 files |
+| Phase 19-01 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ Recent decisions affecting current work:
 - [18-04]: Notification API helpers use raw fetch; Toast action uses window.location.href outside router context; Bell polls at 15s independently
 - [18-05]: Per-user concurrent task limit (MAX=3) at module scope for easy tuning; count query on backgroundTasks table
 - [18-06]: Tabbed NotificationDrawer with lazy-loaded task tab; GET /runtime/my-tasks joins backgroundTasks+documents+projects
+- [19-01]: Cost estimation sums budgetUsedUsd + token-based pricing (not either/or); conditional JOINs for filter performance
+- [19-01]: Dimension endpoints return { aggregation, trends } in single response for frontend chart+table rendering
 
 ### Roadmap Evolution
 
@@ -88,5 +91,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 18-06-PLAN.md (global task list — Phase 18 complete)
+Stopped at: Completed 19-01-PLAN.md (backend statistics API)
 Resume file: None

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-26T04:15:21.132Z"
+last_updated: "2026-03-26T06:38:28.077Z"
 progress:
-  total_phases: 17
+  total_phases: 18
   completed_phases: 17
-  total_plans: 52
-  completed_plans: 52
+  total_plans: 56
+  completed_plans: 53
 ---
 
 # Project State
@@ -18,22 +18,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 17 — Schema Migration + Tech Debt
+**Current focus:** Phase 18 — Background Execution & Notifications
 
 ## Current Position
 
-Phase: 17 of 21 (Schema Migration + Tech Debt) -- COMPLETE
-Plan: 2 of 2
-Status: Phase Complete
-Last activity: 2026-03-26 — Completed 17-02 (DTYPE-04 delete guard)
+Phase: 18 of 21 (Background Execution & Notifications)
+Plan: 1 of 4
+Status: In Progress
+Last activity: 2026-03-26 — Completed 18-01 (backend background execution foundation)
 
-Progress: [██░░░░░░░░] 20%
+Progress: [███░░░░░░░] 25%
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 50 (v1.0)
-- v1.1 plans completed: 2
+- v1.1 plans completed: 3
 - Average duration: 3min
 - Total execution time: 3min
 
@@ -44,6 +44,7 @@ Progress: [██░░░░░░░░] 20%
 | — | — | — | — |
 | Phase 17 P01 | 3min | 2 tasks | 5 files |
 | Phase 17 P02 | 3min | 2 tasks | 3 files |
+| Phase 18 P01 | 6min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -57,6 +58,8 @@ Recent decisions affecting current work:
 - [17-01]: Migration history reset — clean baseline with single generated + one custom SQL migration
 - [17-01]: Polymorphic target_id (no FK) for favorites/recent-access tables — enforced at app layer
 - [Phase 17]: Unified HAS_ASSOCIATIONS error with structured data replaces separate workflow/document error codes
+- [Phase 18]: Auto-confirm desensitize detections in background mode, auto-select first model output
+- [Phase 18]: Fire-and-forget pipeline with immediate queued response and async error capture
 
 ### Roadmap Evolution
 
@@ -75,5 +78,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 17-02-PLAN.md (DTYPE-04 delete guard) — Phase 17 complete
+Stopped at: Completed 18-01-PLAN.md (backend background execution foundation)
 Resume file: None

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-26T08:59:00Z"
+last_updated: "2026-03-26T09:04:00Z"
 progress:
   total_phases: 19
-  completed_phases: 18
+  completed_phases: 19
   total_plans: 63
-  completed_plans: 62
+  completed_plans: 63
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 19 — Statistics & Audit Dashboard
+**Current focus:** Phase 19 complete — Statistics & Audit Dashboard
 
 ## Current Position
 
 Phase: 19 of 21 (Statistics & Audit Dashboard)
-Plan: 4 of 5
-Status: In Progress
-Last activity: 2026-03-26 — Completed 19-04 (dimension drill-down tabs)
+Plan: 5 of 5
+Status: Phase Complete
+Last activity: 2026-03-26 — Completed 19-05 (audit detail tab + dashboard wiring)
 
-Progress: [███████████████████░] 98%
+Progress: [████████████████████] 100%
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [███████████████████░] 98%
 | Phase 19-02 P02 | 4min | 2 tasks | 8 files |
 | Phase 19-03 P03 | 2min | 2 tasks | 2 files |
 | Phase 19-04 P04 | 2min | 2 tasks | 4 files |
+| Phase 19-05 P05 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [19-03]: Audit records flattened from by-document grouping into chronological list for table display
 - [19-04]: Bar charts for dimension tabs — API returns aggregated summaries not time-series, bar visualization more appropriate
 - [19-04]: WorkflowStats omits estimatedCost — API type does not include cost for workflow dimension
+- [19-05]: Audit by-user expand reuses fetchAuditByDocument endpoint; by-document expand uses document-detail for node/model breakdown
+- [19-05]: /admin/statistics route alias added alongside /admin/stats for backward compatibility
 
 ### Roadmap Evolution
 
@@ -101,5 +104,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 19-04-PLAN.md (dimension drill-down tabs)
+Stopped at: Completed 19-05-PLAN.md (audit detail tab + dashboard wiring) — Phase 19 complete
 Resume file: None

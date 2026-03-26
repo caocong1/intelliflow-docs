@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-26T08:58:06Z"
+last_updated: "2026-03-26T08:59:00Z"
 progress:
   total_phases: 19
   completed_phases: 18
   total_plans: 63
-  completed_plans: 61
+  completed_plans: 62
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 19 of 21 (Statistics & Audit Dashboard)
-Plan: 3 of 5
+Plan: 4 of 5
 Status: In Progress
-Last activity: 2026-03-26 — Completed 19-03 (overview charts)
+Last activity: 2026-03-26 — Completed 19-04 (dimension drill-down tabs)
 
-Progress: [██████████████████░░] 95%
+Progress: [███████████████████░] 98%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [██████████████████░░] 95%
 | Phase 19-01 P01 | 3min | 2 tasks | 5 files |
 | Phase 19-02 P02 | 4min | 2 tasks | 8 files |
 | Phase 19-03 P03 | 2min | 2 tasks | 2 files |
+| Phase 19-04 P04 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [19-02]: Filter state uses createStore with JSON.stringify key for createResource reactive refetching
 - [19-03]: Each chart panel uses its own createResource for independent loading states
 - [19-03]: Audit records flattened from by-document grouping into chronological list for table display
+- [19-04]: Bar charts for dimension tabs — API returns aggregated summaries not time-series, bar visualization more appropriate
+- [19-04]: WorkflowStats omits estimatedCost — API type does not include cost for workflow dimension
 
 ### Roadmap Evolution
 
@@ -98,5 +101,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 19-03-PLAN.md (overview charts)
+Stopped at: Completed 19-04-PLAN.md (dimension drill-down tabs)
 Resume file: None

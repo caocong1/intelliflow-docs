@@ -2,7 +2,10 @@ import { createResource, createSignal } from "solid-js";
 import { createStore } from "solid-js/store";
 import { fetchOverview, type StatisticsFilters } from "../../lib/api/statistics";
 import KpiCards from "./stats/KpiCards";
+import ModelStats from "./stats/ModelStats";
 import OverviewCharts from "./stats/OverviewCharts";
+import UserStats from "./stats/UserStats";
+import WorkflowStats from "./stats/WorkflowStats";
 
 const tabs = [
   { id: "overview", label: "总览" },
@@ -177,21 +180,9 @@ export default function StatsDashboard() {
 
       {/* Tab content */}
       {activeTab() === "overview" && <OverviewCharts filters={filters} />}
-      {activeTab() === "model" && (
-        <div class="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-400">
-          模型统计详情（后续计划实现）
-        </div>
-      )}
-      {activeTab() === "user" && (
-        <div class="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-400">
-          用户统计详情（后续计划实现）
-        </div>
-      )}
-      {activeTab() === "workflow" && (
-        <div class="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-400">
-          流程统计详情（后续计划实现）
-        </div>
-      )}
+      {activeTab() === "model" && <ModelStats filters={filters} />}
+      {activeTab() === "user" && <UserStats filters={filters} />}
+      {activeTab() === "workflow" && <WorkflowStats filters={filters} />}
       {activeTab() === "audit" && (
         <div class="bg-white border border-gray-200 rounded-xl p-8 text-center text-sm text-gray-400">
           审计明细（后续计划实现）

@@ -37,9 +37,9 @@
 - [ ] **AIED-01**: 用户在节点输出编辑器中选中文本时，出现 AI 浮动工具栏
 - [ ] **AIED-02**: 浮动工具栏提供预置操作：重写、简化、扩展、修正语法、翻译、自定义指令
 - [ ] **AIED-03**: AI 生成结果以内联差异预览展示（删除红色/新增绿色），支持逐项接受/拒绝
-- [ ] **AIED-04**: AI 编辑使用流式响应（SSE streaming），实时展示生成过程
-- [ ] **AIED-05**: 信息恢复节点之前的编辑可使用在线模型；之后的编辑仅可使用本地/私有模型（安全约束）
-- [ ] **AIED-06**: 用户可选择用于 AI 编辑的模型（模型列表根据安全约束自动过滤）
+- [x] **AIED-04**: AI 编辑使用流式响应（SSE streaming），实时展示生成过程
+- [x] **AIED-05**: 信息恢复节点之前的编辑可使用在线模型；之后的编辑仅可使用本地/私有模型（安全约束）
+- [x] **AIED-06**: 用户可选择用于 AI 编辑的模型（模型列表根据安全约束自动过滤）
 
 ### Tech Debt 修复
 
@@ -102,9 +102,9 @@
 | AIED-01 | Phase 21 | Pending |
 | AIED-02 | Phase 21 | Pending |
 | AIED-03 | Phase 21 | Pending |
-| AIED-04 | Phase 21 | Pending |
-| AIED-05 | Phase 21 | Pending |
-| AIED-06 | Phase 21 | Pending |
+| AIED-04 | Phase 21 | Complete |
+| AIED-05 | Phase 21 | Complete |
+| AIED-06 | Phase 21 | Complete |
 
 **Coverage:**
 - v1.1 requirements: 25 total

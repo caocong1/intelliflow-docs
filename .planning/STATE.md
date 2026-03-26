@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 20 in progress — Search, Favorites & Recent Access
+**Current focus:** Phase 21 in progress — AI-Assisted Inline Editing
 
 ## Current Position
 
-Phase: 20 of 24 (Search, Favorites & Recent Access)
+Phase: 21 of 26 (AI-Assisted Inline Editing)
 Plan: 2 of 3
 Status: Plan 2 Complete
-Last activity: 2026-03-26 — Completed 20-02 (frontend search, favorites, recent access pages)
+Last activity: 2026-03-26 — Completed 21-02 (frontend UI components for AI inline editing)
 
-Progress: [██████████████████░░] 90%
+Progress: [██████████████████░░] 93%
 
 ## Performance Metrics
 
@@ -59,6 +59,8 @@ Progress: [██████████████████░░] 90%
 | Phase 20-01 P01 | 3min | 2 tasks | 5 files |
 | Phase 20-02 P02 | 4min | 2 tasks | 8 files |
 | Phase 20-03 P03 | 2min | 2 tasks | 5 files |
+| Phase 21-01 P01 | 3min | 2 tasks | 3 files |
+| Phase 21-02 P02 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -98,6 +100,8 @@ Recent decisions affecting current work:
 - [20-02]: Dashboard favorites card flattens all types into single sorted list for at-a-glance view
 - [20-02]: Workflows have no detail page link — displayed as plain text in search/favorites/recent results
 - [20-03]: Frontend user-activity API client uses raw fetch (consistent with statistics.ts pattern); batch checkFavorites on list, single on detail pages
+- [21-01]: Inline edit routes mounted in index.ts (not runtime.routes.ts) — consistent with existing pattern where each route file is independently mounted
+- [21-01]: AppError statusCode preserved in route error handler for proper 403 on security constraint violations
 
 ### Roadmap Evolution
 
@@ -122,5 +126,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 20-02-PLAN.md (frontend search, favorites, recent access pages)
+Stopped at: Completed 21-01-PLAN.md (backend inline edit SSE endpoint)
 Resume file: None

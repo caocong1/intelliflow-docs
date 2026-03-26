@@ -1,6 +1,6 @@
 import { and, count, desc, eq, ilike, or } from "drizzle-orm";
 import { db } from "../../db";
-import { documentTypes, workflows } from "../../db/schema";
+import { documentTypes, documents, workflows } from "../../db/schema";
 
 export type DocumentTypeRow = {
   id: string;
@@ -124,16 +124,37 @@ export async function getAssociatedWorkflows(
   return rows;
 }
 
-export async function deleteDocumentType(id: string): Promise<{ success: true }> {
-  // Guard: check for associated workflows
-  const associated = await getAssociatedWorkflows(id);
-  if (associated.length > 0) {
-    throw new Error("HAS_ASSOCIATED_WORKFLOWS");
-  }
+export async function getAssociatedDocuments(
+  documentTypeId: string,
+): Promise<{ id: string; title: string }[]> {
+  const rows = await db
+    .select({ id: documents.id, title: documents.title })
+    .from(documents)
+    .innerJoin(workflows, eq(documents.workflowId, workflows.id))
+    .where(and(eq(workflows.documentTypeId, documentTypeId), eq(documents.isDeleted, false)));
+  return rows;
+}
 
-  // TODO: Phase 4 — check for associated documents in the documents table
-  // When the documents table exists, query it to see if any documents reference this type.
-  // If found, throw new Error("HAS_ASSOCIATED_DOCUMENTS") to block deletion.
+export async function deleteDocumentType(id: string): Promise<{ success: true }> {
+  // Guard: check for associated workflows and documents
+  const [associatedWorkflows, associatedDocuments] = await Promise.all([
+    getAssociatedWorkflows(id),
+    getAssociatedDocuments(id),
+  ]);
+
+  if (associatedWorkflows.length > 0 || associatedDocuments.length > 0) {
+    const error = new Error("HAS_ASSOCIATIONS") as Error & {
+      associations: {
+        workflows: { id: string; name: string }[];
+        documents: { id: string; title: string }[];
+      };
+    };
+    error.associations = {
+      workflows: associatedWorkflows,
+      documents: associatedDocuments,
+    };
+    throw error;
+  }
 
   const result = await db
     .delete(documentTypes)

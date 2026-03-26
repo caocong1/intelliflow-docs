@@ -3,6 +3,7 @@ import { requireAdmin, requireAuth } from "../auth/auth.guard";
 import {
   createDocumentType,
   deleteDocumentType,
+  getAssociatedDocuments,
   getAssociatedWorkflows,
   listDocumentTypes,
   toggleDocumentTypeStatus,
@@ -120,8 +121,11 @@ export const documentTypeAdminRoutes = new Elysia({ prefix: "/document-types" })
   .get(
     "/:id/associations",
     async ({ params }) => {
-      const workflows = await getAssociatedWorkflows(params.id);
-      return { workflows };
+      const [wfs, docs] = await Promise.all([
+        getAssociatedWorkflows(params.id),
+        getAssociatedDocuments(params.id),
+      ]);
+      return { workflows: wfs, documents: docs };
     },
     {
       params: t.Object({ id: t.String() }),
@@ -138,13 +142,19 @@ export const documentTypeAdminRoutes = new Elysia({ prefix: "/document-types" })
           set.status = 404;
           return { error: "文档类型不存在" };
         }
-        if (message === "HAS_ASSOCIATED_WORKFLOWS") {
+        if (message === "HAS_ASSOCIATIONS") {
+          const assocErr = err as Error & {
+            associations: {
+              workflows: { id: string; name: string }[];
+              documents: { id: string; title: string }[];
+            };
+          };
           set.status = 409;
-          return { error: "无法删除：存在关联的工作流", workflows: [] as { id: string; name: string }[] };
-        }
-        if (message === "HAS_ASSOCIATED_DOCUMENTS") {
-          set.status = 409;
-          return { error: "无法删除已关联文档的文档类型" };
+          return {
+            error: "无法删除：该文档类型存在关联的工作流或文档",
+            workflows: assocErr.associations?.workflows ?? [],
+            documents: assocErr.associations?.documents ?? [],
+          };
         }
         throw err;
       }

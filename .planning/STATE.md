@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-26T06:54:57Z"
+last_updated: "2026-03-26T07:21:00Z"
 progress:
   total_phases: 18
   completed_phases: 18
-  total_plans: 56
-  completed_plans: 56
+  total_plans: 58
+  completed_plans: 57
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 18 of 21 (Background Execution & Notifications)
-Plan: 4 of 4
-Status: Phase Complete
-Last activity: 2026-03-26 — Completed 18-04 (notification UI)
+Plan: 5 of 6
+Status: In Progress
+Last activity: 2026-03-26 — Completed 18-05 (per-user concurrent task limit)
 
 Progress: [██████████] 100%
 
@@ -33,7 +33,7 @@ Progress: [██████████] 100%
 
 **Velocity:**
 - Total plans completed: 50 (v1.0)
-- v1.1 plans completed: 6
+- v1.1 plans completed: 7
 - Average duration: 3min
 - Total execution time: 3min
 
@@ -48,6 +48,7 @@ Progress: [██████████] 100%
 | Phase 18 P02 | 3min | 2 tasks | 4 files |
 | Phase 18 P03 | 6min | 2 tasks | 3 files |
 | Phase 18 P04 | 4min | 2 tasks | 6 files |
+| Phase 18 P05 | 1min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,7 @@ Recent decisions affecting current work:
 - [Phase 18]: WeChat push titles use plain text for enterprise compatibility; notification helpers kept in background.service.ts for cohesion
 - [18-03]: Frontend switches from step-by-step advance to single background execution call; 3s workspace polling, 10s list polling
 - [18-04]: Notification API helpers use raw fetch; Toast action uses window.location.href outside router context; Bell polls at 15s independently
+- [18-05]: Per-user concurrent task limit (MAX=3) at module scope for easy tuning; count query on backgroundTasks table
 
 ### Roadmap Evolution
 
@@ -84,5 +86,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 18-04-PLAN.md (notification UI) — Phase 18 complete
+Stopped at: Completed 18-05-PLAN.md (per-user concurrent task limit)
 Resume file: None

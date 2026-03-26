@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
-status: ready_to_plan
-last_updated: "2026-03-25"
+status: executing
+last_updated: "2026-03-26T04:05:27Z"
 progress:
-  total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 17
+  completed_phases: 16
+  total_plans: 52
+  completed_plans: 51
 ---
 
 # Project State
@@ -23,25 +23,26 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 17 of 21 (Schema Migration + Tech Debt)
-Plan: —
-Status: Ready to plan
-Last activity: 2026-03-25 — Roadmap created for v1.1 milestone (5 phases, 25 requirements)
+Plan: 1 of 2
+Status: Executing
+Last activity: 2026-03-26 — Completed 17-01 (Schema migration reset + new tables)
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 50 (v1.0)
-- v1.1 plans completed: 0
-- Average duration: —
-- Total execution time: —
+- v1.1 plans completed: 1
+- Average duration: 3min
+- Total execution time: 3min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | — | — | — | — |
+| Phase 17 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -52,6 +53,8 @@ Recent decisions affecting current work:
 
 - [v1.1 scope]: Quota management (QUOT-01~03) deferred to v2 — admins need usage visibility before setting limits
 - [v1.1 scope]: No new infrastructure dependencies — in-process background execution with PostgreSQL, pg_trgm for search
+- [17-01]: Migration history reset — clean baseline with single generated + one custom SQL migration
+- [17-01]: Polymorphic target_id (no FK) for favorites/recent-access tables — enforced at app layer
 
 ### Roadmap Evolution
 
@@ -69,6 +72,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-25
-Stopped at: Roadmap created for v1.1. Ready to plan Phase 17.
+Last session: 2026-03-26
+Stopped at: Completed 17-01-PLAN.md (Schema migration reset)
 Resume file: None

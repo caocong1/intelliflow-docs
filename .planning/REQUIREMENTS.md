@@ -43,7 +43,7 @@
 
 ### Tech Debt 修复
 
-- [ ] **DEBT-01**: 文档类型删除时检查关联文档，有关联则阻止删除并提示（DTYPE-04 守卫）
+- [x] **DEBT-01**: 文档类型删除时检查关联文档，有关联则阻止删除并提示（DTYPE-04 守卫）
 
 ## v2 Requirements (Deferred)
 
@@ -80,7 +80,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEBT-01 | Phase 17 | Pending |
+| DEBT-01 | Phase 17 | Complete |
 | BGND-01 | Phase 18 | Pending |
 | BGND-02 | Phase 18 | Pending |
 | BGND-03 | Phase 18 | Pending |

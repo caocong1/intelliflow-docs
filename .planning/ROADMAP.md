@@ -130,7 +130,7 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 | 14. Milestone Tracking Housekeeping | v1.0 | 1/1 | Complete | 2026-03-25 |
 | 15. Integration Bug Fixes — Export/PPT/Type | v1.0 | 1/1 | Complete | 2026-03-25 |
 | 16. Version History & Dead Code Cleanup | v1.0 | 1/1 | Complete | 2026-03-25 |
-| 17. Schema Migration + Tech Debt | v1.1 | 0/0 | Not started | - |
+| 17. Schema Migration + Tech Debt | 1/2 | In Progress|  | - |
 | 18. Background Execution + Notifications | v1.1 | 0/0 | Not started | - |
 | 19. Statistics & Audit Dashboard | v1.1 | 0/0 | Not started | - |
 | 20. Search + Favorites + Recent Access | v1.1 | 0/0 | Not started | - |

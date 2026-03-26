@@ -1,7 +1,7 @@
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import Elysia, { t } from "elysia";
 import { db } from "../../db";
-import { backgroundTasks } from "../../db/schema";
+import { backgroundTasks, documents, projects } from "../../db/schema";
 import { requireAuth } from "../auth/auth.guard";
 import { isDocumentProjectMember } from "../versions/versions.service";
 import {
@@ -18,6 +18,46 @@ const MAX_CONCURRENT_TASKS_PER_USER = 3;
 
 export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
   .use(requireAuth)
+
+  // ─── Get all background tasks for current user ────────────────────────────
+
+  .get(
+    "/my-tasks",
+    async ({ query, user }) => {
+      const limit = Number(query.limit) || 20;
+      const offset = Number(query.offset) || 0;
+
+      const tasks = await db
+        .select({
+          id: backgroundTasks.id,
+          status: backgroundTasks.status,
+          progress: backgroundTasks.progress,
+          errorMessage: backgroundTasks.errorMessage,
+          documentId: backgroundTasks.documentId,
+          documentTitle: documents.title,
+          projectId: documents.projectId,
+          projectName: projects.name,
+          startedAt: backgroundTasks.startedAt,
+          completedAt: backgroundTasks.completedAt,
+          createdAt: backgroundTasks.createdAt,
+        })
+        .from(backgroundTasks)
+        .leftJoin(documents, eq(backgroundTasks.documentId, documents.id))
+        .leftJoin(projects, eq(documents.projectId, projects.id))
+        .where(eq(backgroundTasks.userId, user!.id))
+        .orderBy(desc(backgroundTasks.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      return { tasks };
+    },
+    {
+      query: t.Object({
+        limit: t.Optional(t.String()),
+        offset: t.Optional(t.String()),
+      }),
+    },
+  )
 
   // ─── Initialize or resume document execution ─────────────────────────────
 

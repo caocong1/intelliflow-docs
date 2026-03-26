@@ -55,6 +55,20 @@ export async function markAllNotificationsRead(): Promise<void> {
   });
 }
 
+/** Fetch all background tasks for current user across all projects */
+export async function getMyTasks(opts?: { limit?: number; offset?: number }) {
+  const params = new URLSearchParams();
+  if (opts?.limit) params.set("limit", String(opts.limit));
+  if (opts?.offset) params.set("offset", String(opts.offset));
+  const qs = params.toString();
+  const token = localStorage.getItem("auth_token");
+  const res = await fetch(`/api/runtime/my-tasks${qs ? `?${qs}` : ""}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) throw new Error("Failed to fetch tasks");
+  return res.json();
+}
+
 /** Start background document generation — fires and forgets, backend runs pipeline async */
 export async function startBackgroundExecution(
   documentId: string,

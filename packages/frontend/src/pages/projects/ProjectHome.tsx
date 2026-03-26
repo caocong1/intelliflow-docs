@@ -1,5 +1,5 @@
 import { A, useNavigate, useParams } from "@solidjs/router";
-import { createSignal, For, onMount, Show } from "solid-js";
+import { createEffect, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { api } from "../../api/client";
 import { useAuth } from "../../contexts/auth";
 import { showToast } from "../../components/ui/Toast";
@@ -28,7 +28,7 @@ type DocumentItem = {
   workflowId: string;
   title: string;
   description: string | null;
-  status: "draft" | "in_progress" | "completed";
+  status: "draft" | "in_progress" | "completed" | "failed";
   visibility: "self" | "project" | "specific";
   createdBy: string;
   creatorName: string;
@@ -52,11 +52,18 @@ type WorkflowItem = {
   status: string;
 };
 
-const statusMap: Record<string, { label: string; variant: "success" | "warning" | "info" }> = {
+const statusMap: Record<
+  string,
+  { label: string; variant: "success" | "warning" | "error" | "info"; spinning?: boolean }
+> = {
   draft: { label: "草稿", variant: "info" },
-  in_progress: { label: "进行中", variant: "warning" },
+  in_progress: { label: "生成中", variant: "warning", spinning: true },
   completed: { label: "已完成", variant: "success" },
+  failed: { label: "生成失败", variant: "error" },
 };
+
+/** Polling interval for document list (seconds) */
+const LIST_POLL_INTERVAL = 10;
 
 export default function ProjectHome() {
   const params = useParams<{ id: string }>();
@@ -99,6 +106,42 @@ export default function ProjectHome() {
   // Action menu
   const [activeMenu, setActiveMenu] = createSignal<string | null>(null);
 
+  // Document list polling state
+  const [hasActiveGenerations, setHasActiveGenerations] = createSignal(false);
+  const [listCountdown, setListCountdown] = createSignal(LIST_POLL_INTERVAL);
+
+  // Polling timer: only runs when there are active generations
+  let listPollTimer: ReturnType<typeof setInterval> | undefined;
+
+  createEffect(() => {
+    if (hasActiveGenerations()) {
+      listPollTimer = setInterval(() => {
+        setListCountdown((prev) => {
+          if (prev <= 1) {
+            fetchDocs();
+            return LIST_POLL_INTERVAL;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (listPollTimer) {
+        clearInterval(listPollTimer);
+        listPollTimer = undefined;
+      }
+    }
+  });
+
+  onCleanup(() => {
+    if (listPollTimer) clearInterval(listPollTimer);
+  });
+
+  /** Manual refresh — immediately refetch and reset countdown */
+  function handleManualListRefresh() {
+    fetchDocs();
+    setListCountdown(LIST_POLL_INTERVAL);
+  }
+
   async function fetchProject() {
     setLoading(true);
     try {
@@ -131,6 +174,13 @@ export default function ProjectHome() {
       const result = data as unknown as { data: DocumentItem[]; total: number };
       setDocs(result.data);
       setDocsTotal(result.total);
+
+      // Check for active generations to control polling
+      const hasActive = result.data.some((d) => d.status === "in_progress");
+      setHasActiveGenerations(hasActive);
+      if (hasActive) {
+        setListCountdown(LIST_POLL_INTERVAL);
+      }
     } catch {
       showToast("加载文档列表失败", "error");
     } finally {
@@ -493,23 +543,52 @@ export default function ProjectHome() {
               >
                 <option value="">全部状态</option>
                 <option value="draft">草稿</option>
-                <option value="in_progress">进行中</option>
+                <option value="in_progress">生成中</option>
                 <option value="completed">已完成</option>
+                <option value="failed">生成失败</option>
               </select>
             </div>
 
-            {/* Create button */}
-            <button
-              type="button"
-              onClick={openCreateModal}
-              class="inline-flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <title>新建</title>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-              </svg>
-              新建文档
-            </button>
+            <div class="flex items-center gap-3">
+              {/* Polling countdown + manual refresh */}
+              <Show when={hasActiveGenerations()}>
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200/60">
+                  <svg
+                    class="w-3 h-3 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  {listCountdown()}秒后自动刷新
+                  <button
+                    type="button"
+                    class="ml-0.5 p-0.5 rounded hover:bg-amber-100 transition-colors cursor-pointer border-0 bg-transparent text-amber-700"
+                    onClick={handleManualListRefresh}
+                    title="立即刷新"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </span>
+              </Show>
+
+              {/* Create button */}
+              <button
+                type="button"
+                onClick={openCreateModal}
+                class="inline-flex items-center gap-1.5 px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                  <title>新建</title>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                新建文档
+              </button>
+            </div>
           </div>
 
           {/* Table */}
@@ -577,7 +656,21 @@ export default function ProjectHome() {
                               </Show>
                             </td>
                             <td class="px-5 py-3 text-sm">
-                              <Badge label={st().label} variant={st().variant} />
+                              <span class="inline-flex items-center gap-1">
+                                <Show when={st().spinning}>
+                                  <svg
+                                    class="w-3 h-3 animate-spin"
+                                    style={{ color: "#d97706" }}
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                  >
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                  </svg>
+                                </Show>
+                                <Badge label={st().label} variant={st().variant} />
+                              </span>
                             </td>
                             <td class="px-5 py-3 text-sm">
                               <VisibilityBadge visibility={doc.visibility} />

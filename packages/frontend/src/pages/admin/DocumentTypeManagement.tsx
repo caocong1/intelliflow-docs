@@ -32,6 +32,12 @@ export default function DocumentTypeManagement() {
   const [submitting, setSubmitting] = createSignal(false);
   const [deleteCheckLoading, setDeleteCheckLoading] = createSignal(false);
   const [associatedWorkflows, setAssociatedWorkflows] = createSignal<{id: string; name: string}[]>([]);
+  const [associatedDocuments, setAssociatedDocuments] = createSignal<{id: string; title: string}[]>([]);
+  const [deleteFailedInfo, setDeleteFailedInfo] = createSignal<{
+    docTypeName: string;
+    workflows: {id: string; name: string}[];
+    documents: {id: string; title: string}[];
+  } | null>(null);
 
   // Create form
   const [createName, setCreateName] = createSignal("");
@@ -194,14 +200,22 @@ export default function DocumentTypeManagement() {
     try {
       const { error } = await api.api["document-types"]({ id: action.docType.id }).delete();
       if (error) {
-        const errData = error.value as { error?: string } | undefined;
-        const msg = errData?.error ?? "删除文档类型失败";
-        showToast(
-          msg.includes("associated")
-            ? "无法删除：该文档类型存在关联文档"
-            : msg,
-          "error",
-        );
+        const errData = error.value as {
+          error?: string;
+          workflows?: { id: string; name: string }[];
+          documents?: { id: string; title: string }[];
+        } | undefined;
+        // If 409 with associations, show the detail dialog instead of a toast
+        if (error.status === 409 && errData && (errData.workflows?.length || errData.documents?.length)) {
+          setConfirmAction(null);
+          setDeleteFailedInfo({
+            docTypeName: action.docType.name,
+            workflows: errData.workflows ?? [],
+            documents: errData.documents ?? [],
+          });
+          return;
+        }
+        showToast(errData?.error ?? "删除文档类型失败", "error");
         return;
       }
       showToast("文档类型已删除", "success");
@@ -292,11 +306,16 @@ export default function DocumentTypeManagement() {
               setConfirmAction({ docType: dt, action: "delete" });
               setDeleteCheckLoading(true);
               setAssociatedWorkflows([]);
+              setAssociatedDocuments([]);
               api.api["document-types"]({ id: dt.id }).associations.get()
                 .then(({ data, error }) => {
                   if (!error && data) {
-                    const result = data as unknown as { workflows: { id: string; name: string }[] };
+                    const result = data as unknown as {
+                      workflows: { id: string; name: string }[];
+                      documents: { id: string; title: string }[];
+                    };
                     setAssociatedWorkflows(result.workflows);
+                    setAssociatedDocuments(result.documents ?? []);
                   }
                 })
                 .catch(() => {})
@@ -525,16 +544,31 @@ export default function DocumentTypeManagement() {
                 <div class="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
                 <span>正在检查关联...</span>
               </div>
-            ) : associatedWorkflows().length > 0 ? (
+            ) : (associatedWorkflows().length > 0 || associatedDocuments().length > 0) ? (
               <div>
-                <p class="text-sm text-red-600 font-medium mb-2">
-                  无法删除：以下工作流正在使用该文档类型，请先修改或删除这些工作流。
+                <p class="text-sm text-red-600 font-medium mb-3">
+                  无法删除：该文档类型存在关联的工作流或文档，请先处理这些关联项。
                 </p>
-                <ul class="list-disc list-inside space-y-1">
-                  <For each={associatedWorkflows()}>
-                    {(w) => <li class="text-sm text-slate-600">{w.name}</li>}
-                  </For>
-                </ul>
+                {associatedWorkflows().length > 0 && (
+                  <div class="mb-3">
+                    <p class="text-sm font-medium text-slate-700 mb-1">{`关联的工作流（${associatedWorkflows().length}个）：`}</p>
+                    <ul class="list-disc list-inside space-y-1">
+                      <For each={associatedWorkflows()}>
+                        {(w) => <li class="text-sm text-slate-600">{w.name}</li>}
+                      </For>
+                    </ul>
+                  </div>
+                )}
+                {associatedDocuments().length > 0 && (
+                  <div>
+                    <p class="text-sm font-medium text-slate-700 mb-1">{`关联的文档（${associatedDocuments().length}个）：`}</p>
+                    <ul class="list-disc list-inside space-y-1">
+                      <For each={associatedDocuments()}>
+                        {(d) => <li class="text-sm text-slate-600">{d.title}</li>}
+                      </For>
+                    </ul>
+                  </div>
+                )}
               </div>
             ) : (
               <p class="text-sm text-slate-600">
@@ -562,7 +596,7 @@ export default function DocumentTypeManagement() {
                 if (confirmAction()?.action === "delete") handleDelete();
                 else handleToggleStatus();
               }}
-              disabled={submitting() || deleteCheckLoading() || (confirmAction()?.action === "delete" && associatedWorkflows().length > 0)}
+              disabled={submitting() || deleteCheckLoading() || (confirmAction()?.action === "delete" && (associatedWorkflows().length > 0 || associatedDocuments().length > 0))}
               class={`px-4 py-2 text-sm text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                 confirmAction()?.action === "delete" || confirmAction()?.docType.isActive
                   ? "bg-red-600 hover:bg-red-700 focus:ring-red-500"
@@ -576,6 +610,48 @@ export default function DocumentTypeManagement() {
                   : confirmAction()?.docType.isActive
                     ? "确认停用"
                     : "确认启用"}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Delete Failed — Association Details Dialog */}
+      <Modal
+        isOpen={!!deleteFailedInfo()}
+        onClose={() => setDeleteFailedInfo(null)}
+        title="无法删除文档类型"
+      >
+        <div class="space-y-4">
+          <p class="text-sm text-red-600 font-medium">
+            {`「${deleteFailedInfo()?.docTypeName}」存在关联的工作流或文档，无法删除。请先处理以下关联项：`}
+          </p>
+          {(deleteFailedInfo()?.workflows?.length ?? 0) > 0 && (
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">{`关联的工作流（${deleteFailedInfo()?.workflows?.length ?? 0}个）：`}</p>
+              <ul class="list-disc list-inside space-y-1">
+                <For each={deleteFailedInfo()?.workflows ?? []}>
+                  {(w) => <li class="text-sm text-slate-600">{w.name}</li>}
+                </For>
+              </ul>
+            </div>
+          )}
+          {(deleteFailedInfo()?.documents?.length ?? 0) > 0 && (
+            <div>
+              <p class="text-sm font-medium text-slate-700 mb-1">{`关联的文档（${deleteFailedInfo()?.documents?.length ?? 0}个）：`}</p>
+              <ul class="list-disc list-inside space-y-1">
+                <For each={deleteFailedInfo()?.documents ?? []}>
+                  {(d) => <li class="text-sm text-slate-600">{d.title}</li>}
+                </For>
+              </ul>
+            </div>
+          )}
+          <div class="flex justify-end pt-2">
+            <button
+              type="button"
+              onClick={() => setDeleteFailedInfo(null)}
+              class={cancelBtnClass}
+            >
+              关闭
             </button>
           </div>
         </div>

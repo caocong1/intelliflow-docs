@@ -37,7 +37,7 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 
 **Milestone Goal:** 补全运营管理能力（统计审计）、提升用户效率（后台生成通知、全局搜索、AI 辅助编辑）、修复遗留 tech debt。
 
-- [ ] **Phase 17: Schema Migration + Tech Debt** - 新建数据库表/索引，修复 DTYPE-04 文档关联守卫
+- [x] **Phase 17: Schema Migration + Tech Debt** - 新建数据库表/索引，修复 DTYPE-04 文档关联守卫 (completed 2026-03-26)
 - [ ] **Phase 18: Background Execution + Notifications** - 后台 AI 生成、任务管理、应用内通知、企微推送
 - [ ] **Phase 19: Statistics & Audit Dashboard** - 管理员统计面板、模型/用户/流程使用分析、审计明细
 - [ ] **Phase 20: Search + Favorites + Recent Access** - 全局搜索、收藏、最近访问
@@ -130,7 +130,7 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 | 14. Milestone Tracking Housekeeping | v1.0 | 1/1 | Complete | 2026-03-25 |
 | 15. Integration Bug Fixes — Export/PPT/Type | v1.0 | 1/1 | Complete | 2026-03-25 |
 | 16. Version History & Dead Code Cleanup | v1.0 | 1/1 | Complete | 2026-03-25 |
-| 17. Schema Migration + Tech Debt | 1/2 | In Progress|  | - |
+| 17. Schema Migration + Tech Debt | 2/2 | Complete   | 2026-03-26 | - |
 | 18. Background Execution + Notifications | v1.1 | 0/0 | Not started | - |
 | 19. Statistics & Audit Dashboard | v1.1 | 0/0 | Not started | - |
 | 20. Search + Favorites + Recent Access | v1.1 | 0/0 | Not started | - |

@@ -26,11 +26,11 @@
 
 ### 全局搜索与效率 (Search & Productivity)
 
-- [ ] **SRCH-01**: 用户可通过全局搜索框跨项目搜索文档（标题、描述）
-- [ ] **SRCH-02**: 用户可通过全局搜索框搜索项目（名称、描述）和流程（名称）
-- [ ] **SRCH-03**: 搜索结果遵守文档可见性权限，用户只能搜到有权访问的内容
-- [ ] **SRCH-04**: 用户可收藏/取消收藏项目和文档，在"我的收藏"视图快速访问
-- [ ] **SRCH-05**: 系统自动记录用户最近访问的项目和文档，在"最近访问"视图展示
+- [x] **SRCH-01**: 用户可通过全局搜索框跨项目搜索文档（标题、描述）
+- [x] **SRCH-02**: 用户可通过全局搜索框搜索项目（名称、描述）和流程（名称）
+- [x] **SRCH-03**: 搜索结果遵守文档可见性权限，用户只能搜到有权访问的内容
+- [x] **SRCH-04**: 用户可收藏/取消收藏项目和文档，在"我的收藏"视图快速访问
+- [x] **SRCH-05**: 系统自动记录用户最近访问的项目和文档，在"最近访问"视图展示
 
 ### AI 辅助内联编辑 (AI-Assisted Inline Editing)
 
@@ -94,11 +94,11 @@
 | STAT-05 | Phase 19 | Complete |
 | STAT-06 | Phase 19 | Complete |
 | STAT-07 | Phase 19 | Complete |
-| SRCH-01 | Phase 20 | Pending |
-| SRCH-02 | Phase 20 | Pending |
-| SRCH-03 | Phase 20 | Pending |
-| SRCH-04 | Phase 20 | Pending |
-| SRCH-05 | Phase 20 | Pending |
+| SRCH-01 | Phase 20 | Complete |
+| SRCH-02 | Phase 20 | Complete |
+| SRCH-03 | Phase 20 | Complete |
+| SRCH-04 | Phase 20 | Complete |
+| SRCH-05 | Phase 20 | Complete |
 | AIED-01 | Phase 21 | Pending |
 | AIED-02 | Phase 21 | Pending |
 | AIED-03 | Phase 21 | Pending |

@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
-status: unknown
-last_updated: "2026-03-26T09:32:41.277Z"
+status: in-progress
+last_updated: "2026-03-26T10:11:00Z"
 progress:
   total_phases: 24
   completed_phases: 19
-  total_plans: 64
-  completed_plans: 64
+  total_plans: 67
+  completed_plans: 65
 ---
 
 # Project State
@@ -18,22 +18,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 19 complete — Statistics & Audit Dashboard
+**Current focus:** Phase 20 in progress — Search, Favorites & Recent Access
 
 ## Current Position
 
-Phase: 19 of 21 (Statistics & Audit Dashboard)
-Plan: 6 of 6
-Status: Phase Complete
-Last activity: 2026-03-26 — Completed 19-06 (frontend data-binding fixes)
+Phase: 20 of 24 (Search, Favorites & Recent Access)
+Plan: 1 of 3
+Status: Plan 1 Complete
+Last activity: 2026-03-26 — Completed 20-01 (backend search, favorites, recent access APIs)
 
-Progress: [████████████████████] 100%
+Progress: [█████████████████░░░] 85%
 
 ## Performance Metrics
 
 **Velocity:**
 - Total plans completed: 50 (v1.0)
-- v1.1 plans completed: 10
+- v1.1 plans completed: 11
 - Average duration: 3min
 - Total execution time: 3min
 
@@ -56,6 +56,7 @@ Progress: [████████████████████] 100%
 | Phase 19-04 P04 | 2min | 2 tasks | 4 files |
 | Phase 19-05 P05 | 2min | 2 tasks | 4 files |
 | Phase 19 P06 | 2min | 2 tasks | 6 files |
+| Phase 20-01 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,9 @@ Recent decisions affecting current work:
 - [19-05]: Audit by-user expand reuses fetchAuditByDocument endpoint; by-document expand uses document-detail for node/model breakdown
 - [19-05]: /admin/statistics route alias added alongside /admin/stats for backward compatibility
 - [Phase 19]: Frontend-only fixes: backend API verified correct, only frontend types and components updated to match backend field names
+- [20-01]: Batch name resolution via Map for polymorphic targets instead of per-row JOINs
+- [20-01]: checkFavorites returns targetType:targetId string array for easy frontend Set lookup
+- [20-01]: Upsert on unique constraint for recent access dedup, OFFSET-based eviction for 20-record cap
 
 ### Roadmap Evolution
 
@@ -112,5 +116,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 19-06-PLAN.md (frontend data-binding fixes) — Phase 19 gap closure complete
+Stopped at: Completed 20-01-PLAN.md (backend search, favorites, recent access APIs)
 Resume file: None

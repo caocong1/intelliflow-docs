@@ -79,7 +79,7 @@ export const models = pgTable("models", {
 
 export const projectRoleEnum = pgEnum("project_role", ["owner", "participant"]);
 export const documentVisibilityEnum = pgEnum("document_visibility", ["self", "project", "specific"]);
-export const documentStatusEnum = pgEnum("document_status", ["draft", "in_progress", "completed"]);
+export const documentStatusEnum = pgEnum("document_status", ["draft", "in_progress", "completed", "failed"]);
 
 export const workflowStatusEnum = pgEnum("workflow_status", ["draft", "active", "disabled"]);
 
@@ -346,3 +346,24 @@ export const userRecentAccess = pgTable("user_recent_access", {
 }, (table) => [
   unique("uq_user_recent_access_user_target").on(table.userId, table.targetType, table.targetId),
 ]);
+
+// ─── Phase 18: Notifications ────────────────────────────────────────────────
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "generation_completed",
+  "generation_failed",
+]);
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  type: notificationTypeEnum("type").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  message: varchar("message", { length: 1000 }),
+  documentId: uuid("document_id").references(() => documents.id),
+  projectId: uuid("project_id").references(() => projects.id),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});

@@ -15,6 +15,13 @@
       "when": 1774497900000,
       "tag": "0001_extensions_and_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1774506735611,
+      "tag": "0002_superb_doctor_doom",
+      "breakpoints": true
     }
   ]
 }

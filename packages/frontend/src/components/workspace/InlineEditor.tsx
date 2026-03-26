@@ -1,10 +1,23 @@
-import { Show, createSignal } from "solid-js";
+import { Show, createMemo, createSignal } from "solid-js";
+import type { NodeExecution } from "@intelliflow/shared";
+import { showToast } from "../ui/Toast";
+import { streamSSE } from "../../lib/sse-stream";
+import { useTextSelection } from "./useTextSelection";
+import AIEditToolbar from "./AIEditToolbar";
+import AIEditDiffPreview from "./AIEditDiffPreview";
 
 interface Props {
   content: string;
   onChange: (content: string) => void;
   readOnly: boolean;
   placeholder?: string;
+  // AI editing context
+  documentId?: string;
+  nodeExecutionId?: string;
+  nodes?: NodeExecution[];
+  currentNodeIndex?: number;
+  availableModels?: Array<{ id: string; name: string; deploymentType: "cloud" | "local" }>;
+  defaultModelId?: string;
 }
 
 /** Simple markdown to HTML for preview */
@@ -82,11 +95,55 @@ function markdownToHtml(text: string): string {
 }
 
 type ViewMode = "edit" | "preview" | "split";
+type AIEditState = "idle" | "streaming" | "diff_preview";
 
 export default function InlineEditor(props: Props) {
   const [viewMode, setViewMode] = createSignal<ViewMode>(props.readOnly ? "preview" : "split");
   const [localContent, setLocalContent] = createSignal(props.content);
   const [focused, setFocused] = createSignal(false);
+
+  // AI editing state machine
+  const [aiEditState, setAiEditState] = createSignal<AIEditState>("idle");
+  const [originalSelection, setOriginalSelection] = createSignal<{ text: string; start: number; end: number } | null>(null);
+  const [streamingContent, setStreamingContent] = createSignal("");
+  const [completedContent, setCompletedContent] = createSignal("");
+  const [selectedModelId, setSelectedModelId] = createSignal(props.defaultModelId ?? "");
+  let abortController: AbortController | null = null;
+
+  // Textarea ref for useTextSelection hook
+  let textareaRef: HTMLTextAreaElement | undefined;
+  const selection = useTextSelection(() => textareaRef);
+
+  // Security context: check if any preceding node is a completed restore node
+  const isPostRestore = createMemo(() => {
+    const nodes = props.nodes;
+    const idx = props.currentNodeIndex;
+    if (!nodes || idx == null || idx <= 0) return false;
+    for (let i = 0; i < idx; i++) {
+      if (nodes[i].nodeType === "restore" && nodes[i].status === "completed") {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  // Filter models based on security context
+  const filteredModels = createMemo(() => {
+    const models = props.availableModels ?? [];
+    if (isPostRestore()) {
+      return models.filter((m) => m.deploymentType === "local");
+    }
+    return models;
+  });
+
+  // Validate selectedModelId against filtered models
+  const validSelectedModelId = createMemo(() => {
+    const models = filteredModels();
+    const current = selectedModelId();
+    if (models.length === 0) return "";
+    if (models.some((m) => m.id === current)) return current;
+    return models[0].id;
+  });
 
   function handleInput(value: string) {
     setLocalContent(value);
@@ -139,6 +196,88 @@ export default function InlineEditor(props: Props) {
     });
   }
 
+  /** AI action handler: starts SSE streaming to backend */
+  async function handleAIAction(action: string, customInstruction?: string) {
+    const sel = selection();
+    if (!sel || !props.documentId || !props.nodeExecutionId) return;
+
+    // Save selection state
+    setOriginalSelection({ text: sel.text, start: sel.start, end: sel.end });
+    setAiEditState("streaming");
+    setStreamingContent("");
+    setCompletedContent("");
+
+    const controller = new AbortController();
+    abortController = controller;
+
+    const modelId = validSelectedModelId();
+
+    try {
+      await streamSSE({
+        url: `/api/runtime/${props.documentId}/inline-edit/${props.nodeExecutionId}/stream`,
+        method: "POST",
+        body: {
+          action,
+          selectedText: sel.text,
+          modelId,
+          customInstruction,
+        },
+        onDelta: (_modelId, data) => {
+          setStreamingContent((prev) => prev + data);
+        },
+        onComplete: (_modelId, data) => {
+          setCompletedContent(data);
+          setAiEditState("diff_preview");
+        },
+        onError: (_modelId, data) => {
+          showToast(data || "AI 编辑失败", "error");
+          setAiEditState("idle");
+        },
+        signal: controller.signal,
+      });
+    } catch (err: unknown) {
+      // AbortError is handled inside streamSSE, other errors surface here
+      if (err instanceof Error) {
+        showToast(err.message || "AI 编辑请求失败", "error");
+      }
+      setAiEditState("idle");
+    }
+  }
+
+  /** Cancel streaming and restore original */
+  function handleCancel() {
+    abortController?.abort();
+    abortController = null;
+    setAiEditState("idle");
+    setStreamingContent("");
+  }
+
+  /** Accept AI edit: replace selected range with completed content */
+  function handleAccept() {
+    const orig = originalSelection();
+    const completed = completedContent();
+    if (!orig) return;
+
+    const text = localContent();
+    const newContent = text.slice(0, orig.start) + completed + text.slice(orig.end);
+    setLocalContent(newContent);
+    props.onChange(newContent);
+
+    // Reset AI editing state
+    setAiEditState("idle");
+    setOriginalSelection(null);
+    setStreamingContent("");
+    setCompletedContent("");
+    abortController = null;
+  }
+
+  /** Reject AI edit: keep original, reset state but keep selection for retry */
+  function handleReject() {
+    setAiEditState("idle");
+    setStreamingContent("");
+    setCompletedContent("");
+  }
+
   // Read-only: just show rendered preview
   if (props.readOnly) {
     return (
@@ -150,7 +289,7 @@ export default function InlineEditor(props: Props) {
 
   const wrapperClass = () =>
     [
-      "rounded-xl overflow-hidden transition-all duration-150",
+      "relative rounded-xl overflow-hidden transition-all duration-150",
       focused()
         ? "ring-2 ring-[#c3c0ff] border border-[#4f46e5] shadow-[0_0_0_4px_rgba(195,192,255,0.15)]"
         : "border border-[rgba(199,196,216,0.3)] shadow-[0_4px_16px_rgba(25,28,30,0.04)] hover:border-[rgba(199,196,216,0.6)]",
@@ -280,6 +419,7 @@ export default function InlineEditor(props: Props) {
         <Show when={viewMode() !== "preview"}>
           <textarea
             id="inline-editor-textarea"
+            ref={(el) => { textareaRef = el; }}
             value={localContent()}
             onInput={(e) => handleInput(e.currentTarget.value)}
             onFocus={() => setFocused(true)}
@@ -308,6 +448,45 @@ export default function InlineEditor(props: Props) {
           </div>
         </Show>
       </div>
+
+      {/* AI Edit Toolbar -- shown on text selection when AI editing context is available */}
+      {(() => {
+        const sel = selection();
+        if (!sel || aiEditState() === "diff_preview" || props.readOnly || !props.documentId) return null;
+        return (
+          <AIEditToolbar
+            selectionRect={sel.rect}
+            onAction={handleAIAction}
+            models={filteredModels()}
+            selectedModelId={validSelectedModelId()}
+            onModelChange={setSelectedModelId}
+            isPostRestore={isPostRestore()}
+            isStreaming={aiEditState() === "streaming"}
+            onCancel={handleCancel}
+          />
+        );
+      })()}
+
+      {/* Streaming overlay -- shows progressive AI response */}
+      <Show when={aiEditState() === "streaming"}>
+        <div class="mx-4 my-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm whitespace-pre-wrap animate-pulse">
+          {streamingContent() || "AI 正在生成..."}
+        </div>
+      </Show>
+
+      {/* Diff preview -- shown after streaming completes */}
+      {(() => {
+        const orig = originalSelection();
+        if (aiEditState() !== "diff_preview" || !orig) return null;
+        return (
+          <AIEditDiffPreview
+            originalText={orig.text}
+            modifiedText={completedContent()}
+            onAccept={handleAccept}
+            onReject={handleReject}
+          />
+        );
+      })()}
     </div>
   );
 }

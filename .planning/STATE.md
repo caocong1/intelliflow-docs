@@ -93,7 +93,12 @@ Recent decisions affecting current work:
 
 v1.0: 5 core phases grew to 16 with gap-closure phases. 50 plans, 82 requirements.
 v1.1: 5 phases (17-21), 25 requirements. Schema foundation first, then parallel feature tracks, AI editing last.
-v1.2 (节点能力增强): Phase 22 added — Bug Fixes + Form Field Type Extension. Design doc: docs/design/flow-node-capability-analysis.md
+v1.2 (节点能力增强): Phases 22-26 added. Design doc: docs/design/flow-node-capability-analysis.md
+  - Phase 22: Bug Fixes + Form Field Type Extension
+  - Phase 23: Output Path Grammar + File Slots + Export ContentMapping
+  - Phase 24: Structured Output + Named Artifacts + Field References
+  - Phase 25: Export Table Rendering + System Prompt Separation (parallel with 24)
+  - Phase 26: Conditional Node Execution
 
 ### Pending Todos
 

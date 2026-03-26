@@ -73,6 +73,9 @@ export default function DocumentWorkspace() {
   const [isGenerating, setIsGenerating] = createSignal(false);
   const [countdown, setCountdown] = createSignal(WORKSPACE_POLL_INTERVAL);
 
+  // AI inline editing: available models
+  const [availableModels, setAvailableModels] = createSignal<Array<{ id: string; name: string; deploymentType: "cloud" | "local" }>>([]);
+
   /** Unified 1.5s debounced auto-save for all editable nodes */
   let saveTimeout: ReturnType<typeof setTimeout>;
   const debouncedDraftSave = (data: Record<string, unknown>) => {
@@ -220,6 +223,26 @@ export default function DocumentWorkspace() {
         .catch(() => {});
     }
 
+    // Fetch available models for AI inline editing (fire-and-forget)
+    (async () => {
+      try {
+        const token = localStorage.getItem("auth_token");
+        const res = await fetch("/api/models", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          data: Array<{ id: string; displayName: string; deploymentType?: string; isActive: boolean; isProviderDisabled: boolean }>;
+        };
+        const active = json.data
+          .filter((m) => m.isActive && !m.isProviderDisabled)
+          .map((m) => ({ id: m.id, name: m.displayName, deploymentType: (m.deploymentType ?? "cloud") as "cloud" | "local" }));
+        setAvailableModels(active);
+      } catch {
+        // Non-critical — AI editing just won't have model options
+      }
+    })();
+
     try {
       const res = await (api.api.runtime as any)[params.documentId].init.post();
       if (res.data && !("error" in res.data)) {
@@ -261,6 +284,17 @@ export default function DocumentWorkspace() {
     const s = state();
     if (!s) return undefined;
     return s.nodes[s.currentNodeIndex];
+  };
+
+  /** Default model ID from current node's model config (first modelId) */
+  const defaultModelId = (): string | undefined => {
+    const node = currentNode();
+    if (!node) return undefined;
+    const s = state();
+    if (!s?.workflowNodes) return undefined;
+    const wfNode = s.workflowNodes.find((wn) => wn.id === node.nodeId);
+    if (!wfNode || wfNode.config.type !== "model_call") return undefined;
+    return (wfNode.config as ModelCallConfig).modelIds?.[0];
   };
 
   const viewedNode = (): NodeExecution | undefined => {
@@ -1026,6 +1060,12 @@ export default function DocumentWorkspace() {
                                   onChange={handleInlineEditorSave}
                                   readOnly={false}
                                   placeholder="编辑节点输出内容..."
+                                  documentId={params.documentId}
+                                  nodeExecutionId={node().id}
+                                  nodes={state()?.nodes}
+                                  currentNodeIndex={state()?.currentNodeIndex}
+                                  availableModels={availableModels()}
+                                  defaultModelId={defaultModelId()}
                                 />
                               )}
                             </Show>

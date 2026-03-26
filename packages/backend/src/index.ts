@@ -20,6 +20,7 @@ import { modelCallLogRoutes } from "./modules/runtime/model-call-log.routes";
 import { promptOptimizeRoutes } from "./modules/prompts";
 import { versionRoutes } from "./modules/versions/versions.routes";
 import { detectOrphanTasks } from "./modules/runtime/background.service";
+import { notificationRoutes } from "./modules/notifications/notifications.routes";
 import { wecomAuthRoutes, wecomAdminRoutes, invitationPublicRoutes, invitationRoutes } from "./modules/wecom/wecom.routes";
 import { workflowAdminRoutes, workflowReadRoutes } from "./modules/workflows/workflows.routes";
 
@@ -54,6 +55,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(restoreRoutes)
   .use(modelCallLogRoutes)
   .use(promptOptimizeRoutes)
+  .use(notificationRoutes)
   .listen({ port: 3001, hostname: "0.0.0.0" });
 
 // Detect and clean up orphaned background tasks from previous server runs

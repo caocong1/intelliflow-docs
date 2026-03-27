@@ -1,8 +1,9 @@
-import { For, Show, createResource } from "solid-js";
-import type { ModelCallConfig, VariableRef, OutputDef } from "@intelliflow/shared";
+import { For, Show, createResource, createSignal } from "solid-js";
+import type { ModelCallConfig, VariableRef, OutputDef, NamedOutputDef } from "@intelliflow/shared";
 import type { FlowNodeData, FlowEdgeData } from "../../../lib/flow-engine/types";
 import { api } from "../../../api/client";
 import PromptEditor from "../prompt/PromptEditor";
+import JsonSchemaEditor from "./JsonSchemaEditor";
 
 type ApiModel = {
   id: string;
@@ -81,6 +82,8 @@ function computeAvailableVariables(upstreamNodes: FlowNodeData[]): VariableRef[]
   return refs;
 }
 
+const NAMED_OUTPUT_ID_PATTERN = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
 interface ModelCallConfigProps {
   config: ModelCallConfig;
   upstreamNodes: FlowNodeData[];
@@ -115,9 +118,66 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
     props.onChange({ ...props.config, promptTemplate: template });
   }
 
+  // --- JSON Schema helpers ---
+  function schemaToString(schema: object | undefined): string {
+    if (!schema) return "";
+    try {
+      return JSON.stringify(schema, null, 2);
+    } catch {
+      return "";
+    }
+  }
+
+  function parseSchemaString(str: string): object | undefined {
+    if (!str.trim()) return undefined;
+    try {
+      return JSON.parse(str) as object;
+    } catch {
+      return undefined;
+    }
+  }
+
+  // --- Named outputs helpers ---
+  function addNamedOutput() {
+    const current = props.config.namedOutputs ?? [];
+    const newOutput: NamedOutputDef = {
+      id: "",
+      name: "",
+      format: "text",
+    };
+    props.onChange({ ...props.config, namedOutputs: [...current, newOutput] });
+  }
+
+  function updateNamedOutput(index: number, patch: Partial<NamedOutputDef>) {
+    const current = [...(props.config.namedOutputs ?? [])];
+    current[index] = { ...current[index], ...patch };
+    props.onChange({ ...props.config, namedOutputs: current });
+  }
+
+  function removeNamedOutput(index: number) {
+    const current = [...(props.config.namedOutputs ?? [])];
+    current.splice(index, 1);
+    props.onChange({ ...props.config, namedOutputs: current });
+  }
+
+  // Track which named output schema sections are expanded
+  const [expandedSchemas, setExpandedSchemas] = createSignal<Set<number>>(new Set());
+
+  function toggleSchemaExpand(index: number) {
+    setExpandedSchemas((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) {
+        next.delete(index);
+      } else {
+        next.add(index);
+      }
+      return next;
+    });
+  }
+
   return (
     <div class="space-y-4">
-      {/* Model Selector — multi-select checkbox list */}
+      {/* Model Selector -- multi-select checkbox list */}
       <div>
         <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">选择模型</h4>
 
@@ -176,6 +236,20 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
         )}
       </div>
 
+      {/* Step Description */}
+      <div class="border-t border-slate-100 pt-3">
+        <label class="text-sm font-medium text-gray-700 mb-1 block">
+          步骤描述
+          <input
+            type="text"
+            value={props.config.stepDescription ?? ""}
+            onInput={(e) => props.onChange({ ...props.config, stepDescription: e.currentTarget.value || undefined })}
+            placeholder="可选：描述此步骤的用途"
+            class="mt-1 w-full px-3 py-1.5 text-sm font-normal border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent"
+          />
+        </label>
+      </div>
+
       {/* Prompt Editor */}
       <div class="border-t border-slate-100 pt-3">
         <p class="text-sm font-medium text-gray-700 mb-1">提示词模板</p>
@@ -185,6 +259,169 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
           upstreamNodes={props.upstreamNodes}
           onChange={handlePromptChange}
         />
+      </div>
+
+      {/* Output Format */}
+      <div class="border-t border-slate-100 pt-3">
+        <label class="text-sm font-medium text-gray-700 mb-1 block">
+          输出格式
+          <select
+            value={props.config.outputFormat ?? "text"}
+            onChange={(e) => {
+              const value = e.currentTarget.value as "text" | "json" | "markdown";
+              const update: Partial<ModelCallConfig> = { outputFormat: value };
+              // Clear jsonSchema when switching away from json
+              if (value !== "json") {
+                update.jsonSchema = undefined;
+              }
+              props.onChange({ ...props.config, ...update });
+            }}
+            class="mt-1 w-full px-3 py-1.5 text-sm font-normal border border-slate-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent"
+          >
+            <option value="text">文本</option>
+            <option value="json">JSON</option>
+            <option value="markdown">Markdown</option>
+          </select>
+        </label>
+      </div>
+
+      {/* JSON Schema Editor (conditional) */}
+      <Show when={(props.config.outputFormat ?? "text") === "json"}>
+        <div class="border-t border-slate-100 pt-3">
+          <span class="text-sm font-medium text-gray-700 mb-1 block">JSON Schema (可选)</span>
+          <JsonSchemaEditor
+            value={schemaToString(props.config.jsonSchema)}
+            onChange={(val) => {
+              const parsed = parseSchemaString(val);
+              props.onChange({ ...props.config, jsonSchema: parsed });
+            }}
+          />
+          <p class="text-xs text-slate-400 mt-1">不填则仅做 JSON 语法校验，填写后额外做结构校验</p>
+        </div>
+      </Show>
+
+      {/* Named Outputs */}
+      <div class="border-t border-slate-100 pt-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-sm font-medium text-gray-700">命名产物</span>
+          <button
+            type="button"
+            onClick={addNamedOutput}
+            class="px-2 py-1 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 transition-colors"
+          >
+            + 添加产物
+          </button>
+        </div>
+
+        <Show
+          when={(props.config.namedOutputs ?? []).length > 0}
+          fallback={
+            <p class="text-xs text-slate-400 italic py-2">
+              未配置命名产物时，模型输出作为单个整体
+            </p>
+          }
+        >
+          <div class="space-y-3">
+            <For each={props.config.namedOutputs ?? []}>
+              {(output, index) => (
+                <div class="border border-slate-200 rounded-lg p-3 bg-slate-50/50">
+                  <div class="flex items-start gap-2">
+                    {/* ID input */}
+                    <div class="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={output.id}
+                        onInput={(e) => updateNamedOutput(index(), { id: e.currentTarget.value })}
+                        placeholder="标识符, 如 blueprint"
+                        class={`w-full px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-purple-400 ${
+                          output.id && !NAMED_OUTPUT_ID_PATTERN.test(output.id)
+                            ? "border-red-300 bg-red-50"
+                            : "border-slate-200"
+                        }`}
+                      />
+                      <Show when={output.id && !NAMED_OUTPUT_ID_PATTERN.test(output.id)}>
+                        <p class="text-xs text-red-500 mt-0.5">仅允许字母、数字、下划线，以字母或下划线开头</p>
+                      </Show>
+                    </div>
+
+                    {/* Name input */}
+                    <div class="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={output.name}
+                        onInput={(e) => updateNamedOutput(index(), { name: e.currentTarget.value })}
+                        placeholder="显示名称, 如 投标蓝图"
+                        class="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400"
+                      />
+                    </div>
+
+                    {/* Format dropdown */}
+                    <select
+                      value={output.format}
+                      onChange={(e) => {
+                        const fmt = e.currentTarget.value as "text" | "json" | "markdown";
+                        const patch: Partial<NamedOutputDef> = { format: fmt };
+                        if (fmt !== "json") {
+                          patch.jsonSchema = undefined;
+                        }
+                        updateNamedOutput(index(), patch);
+                      }}
+                      class="px-2 py-1 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-400"
+                    >
+                      <option value="text">文本</option>
+                      <option value="json">JSON</option>
+                      <option value="markdown">Markdown</option>
+                    </select>
+
+                    {/* Delete button */}
+                    <button
+                      type="button"
+                      onClick={() => removeNamedOutput(index())}
+                      class="p-1 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
+                      title="删除产物"
+                    >
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <title>删除</title>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Per-artifact JSON Schema (when format is json) */}
+                  <Show when={output.format === "json"}>
+                    <div class="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleSchemaExpand(index())}
+                        class="text-xs text-purple-600 hover:text-purple-800 flex items-center gap-1"
+                      >
+                        <svg
+                          class={`w-3 h-3 transition-transform ${expandedSchemas().has(index()) ? "rotate-90" : ""}`}
+                          fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"
+                        >
+                          <title>展开</title>
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                        配置 Schema
+                      </button>
+                      <Show when={expandedSchemas().has(index())}>
+                        <div class="mt-1.5">
+                          <JsonSchemaEditor
+                            value={schemaToString(output.jsonSchema)}
+                            onChange={(val) => {
+                              const parsed = parseSchemaString(val);
+                              updateNamedOutput(index(), { jsonSchema: parsed });
+                            }}
+                          />
+                        </div>
+                      </Show>
+                    </div>
+                  </Show>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
     </div>
   );

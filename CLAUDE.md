@@ -40,8 +40,8 @@ docs/
 
 **禁止混淆前后端端口：**
 - **4000** — Frontend (Vite dev server)，配置文件：`packages/frontend/vite.config.ts`
-- **4001** — Backend (Elysia API)，配置文件：`packages/backend/src/index.ts`
-- Frontend 通过 Vite proxy（`/api` → `http://127.0.0.1:4001`）访问后端，无需前端跨域配置
+- **14001** — Backend (Elysia API)，配置文件：`packages/backend/src/index.ts`
+- Frontend 通过 Vite proxy（`/api` → `http://127.0.0.1:14001`）访问后端，无需前端跨域配置
 
 ## 需求文档阅读指引
 

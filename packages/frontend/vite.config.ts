@@ -10,7 +10,7 @@ export default defineConfig({
     allowedHosts: ["bjqjgc.cn", "dev10.noahplus.cn"],
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:4001",
+        target: "http://127.0.0.1:14001",
         changeOrigin: true,
         configure: (proxy) => {
           // Disable response buffering for SSE streams

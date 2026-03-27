@@ -107,10 +107,16 @@ export default function DocumentWorkspace() {
 
   onCleanup(() => clearTimeout(saveTimeout));
 
-  /** Check if any node is actively executing (generation active) */
+  /** Check if any node is actively executing (generation active).
+   *  Excludes user-input nodes (input_transform, desensitize) at the current step
+   *  since those require manual interaction, not background generation. */
   function isGenerationActive(runtimeState: DocumentRuntimeState): boolean {
+    const userInputTypes = new Set(["input_transform", "desensitize"]);
+    const currentIdx = runtimeState.currentNodeIndex;
     return runtimeState.nodes.some(
-      (n) => n.status === "in_progress",
+      (n, i) =>
+        n.status === "in_progress" &&
+        !(i === currentIdx && userInputTypes.has(n.nodeType)),
     );
   }
 

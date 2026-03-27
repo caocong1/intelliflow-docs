@@ -11,6 +11,8 @@ interface UploadedFile {
   progress: number;
   error: string | null;
   showParsed: boolean;
+  /** Which file slot this file belongs to (undefined = unslotted / "other files") */
+  slotId?: string;
 }
 
 interface Props {
@@ -196,7 +198,7 @@ export default function InputTransformExecutor(props: Props) {
     );
   }
 
-  async function uploadFile(file: File) {
+  async function uploadFile(file: File, slotId?: string) {
     const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const placeholder: UploadedFile = {
       fileId: tempId,
@@ -208,6 +210,7 @@ export default function InputTransformExecutor(props: Props) {
       progress: 0,
       error: null,
       showParsed: false,
+      slotId,
     };
 
     setFiles((prev) => [...prev, placeholder]);
@@ -246,6 +249,7 @@ export default function InputTransformExecutor(props: Props) {
               progress: 100,
               error: null,
               showParsed: false,
+              slotId,
             });
           } else {
             const err = JSON.parse(xhr.responseText);
@@ -312,6 +316,7 @@ export default function InputTransformExecutor(props: Props) {
         fileId: f.fileId,
         name: f.originalName,
         parsedText: f.parsedText,
+        ...(f.slotId ? { slotId: f.slotId } : {}),
       }));
 
     try {
@@ -545,6 +550,47 @@ export default function InputTransformExecutor(props: Props) {
 
   const textFields = () => (props.config?.formFields ?? []).filter((f) => f.type !== "file");
 
+  /** File fields with fileSlotId configured — render as independent slot cards */
+  const slotFileFields = () => (props.config?.formFields ?? []).filter((f) => f.type === "file" && f.fileSlotId);
+
+  /** File fields without fileSlotId — render in "other files" area */
+  const nonSlotFileFields = () => (props.config?.formFields ?? []).filter((f) => f.type === "file" && !f.fileSlotId);
+
+  /** Whether we have any file slots configured */
+  const hasFileSlots = () => slotFileFields().length > 0;
+
+  /** Get files for a specific slot */
+  function filesForSlot(slotId: string) {
+    return files().filter((f) => f.slotId === slotId);
+  }
+
+  /** Get files not assigned to any slot */
+  function unslottedFiles() {
+    return files().filter((f) => !f.slotId);
+  }
+
+  /** Handle file drop for a specific slot */
+  function handleSlotFileDrop(e: DragEvent, slotId: string) {
+    e.preventDefault();
+    setDragOver(false);
+    const droppedFiles = e.dataTransfer?.files;
+    if (!droppedFiles) return;
+    for (let i = 0; i < droppedFiles.length; i++) {
+      uploadFile(droppedFiles[i], slotId);
+    }
+  }
+
+  /** Handle file select for a specific slot */
+  function handleSlotFileSelect(e: Event, slotId: string) {
+    const input = e.target as HTMLInputElement;
+    const selectedFiles = input.files;
+    if (!selectedFiles) return;
+    for (let i = 0; i < selectedFiles.length; i++) {
+      uploadFile(selectedFiles[i], slotId);
+    }
+    input.value = "";
+  }
+
   return (
     <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
       {/* Header */}
@@ -619,63 +665,152 @@ export default function InputTransformExecutor(props: Props) {
           </div>
         </Show>
 
-        {/* File upload area */}
+        {/* File upload area — mixed layout: slot cards first, then "other files" */}
         <Show when={hasFileFields() && !props.readOnly}>
-          <div class="space-y-3">
+          <div class="space-y-4">
             <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
               <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
               文件上传
             </h3>
 
-            {/* Drop zone */}
-            <button
-              type="button"
-              class={`w-full border-2 border-dashed rounded-xl py-10 text-center transition-all cursor-pointer ${
-                dragOver()
-                  ? "border-[#4f46e5] bg-[#f0efff] scale-[1.01]"
-                  : "border-[rgba(199,196,216,0.6)] hover:border-[#4f46e5] hover:bg-[#fafafe]"
-              }`}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleFileDrop}
-              onClick={() => {
-                const input = document.getElementById("file-input-transform") as HTMLInputElement;
-                input?.click();
-              }}
-            >
-              <div class="flex flex-col items-center gap-2">
-                <div class="w-10 h-10 rounded-full bg-[#f0efff] flex items-center justify-center">
-                  <svg
-                    aria-hidden="true"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#4f46e5"
-                    stroke-width="1.8"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <polyline points="16 16 12 12 8 16" />
-                    <line x1="12" y1="12" x2="12" y2="21" />
-                    <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-                  </svg>
-                </div>
-                <p class="text-sm font-medium text-[#464555]">拖拽文件到此处，或点击选择文件</p>
-                <p class="text-xs text-[#9fa0a8]">支持格式：{acceptedTypes()}</p>
+            {/* File slot cards */}
+            <Show when={hasFileSlots()}>
+              <For each={slotFileFields()}>
+                {(slotField) => {
+                  const slotId = slotField.fileSlotId ?? slotField.id;
+                  const slotFiles = () => filesForSlot(slotId);
+                  const slotInputId = () => `file-slot-${slotId}`;
+                  return (
+                    <div class="rounded-xl border border-slate-200 bg-[#fafafe] overflow-hidden">
+                      {/* Slot card header */}
+                      <div class="px-4 py-3 bg-gradient-to-r from-[#f0efff] to-white border-b border-slate-100 flex items-center gap-2">
+                        <span class="w-6 h-6 rounded-md bg-[#4f46e5] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                          {"\uD83D\uDCC1"}
+                        </span>
+                        <span class="text-sm font-medium text-[#191c1e]">
+                          {slotField.fileSlotLabel || slotField.label}
+                        </span>
+                        <Show when={slotFiles().length > 0}>
+                          <span class="text-xs text-[#9fa0a8]">({slotFiles().length})</span>
+                        </Show>
+                      </div>
+                      {/* Slot drop zone */}
+                      <div class="p-3">
+                        <button
+                          type="button"
+                          class="w-full border-2 border-dashed rounded-lg py-6 text-center transition-all cursor-pointer border-[rgba(199,196,216,0.5)] hover:border-[#4f46e5] hover:bg-[#f0efff]"
+                          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                          onDragLeave={() => setDragOver(false)}
+                          onDrop={(e) => handleSlotFileDrop(e, slotId)}
+                          onClick={() => {
+                            const input = document.getElementById(slotInputId()) as HTMLInputElement;
+                            input?.click();
+                          }}
+                        >
+                          <p class="text-xs text-[#9fa0a8]">拖拽或点击上传文件到此槽位</p>
+                          <input
+                            id={slotInputId()}
+                            type="file"
+                            multiple={(slotField.fileCountMode ?? "unlimited") !== "single"}
+                            accept={slotField.acceptedFileTypes?.join(",") || undefined}
+                            class="hidden"
+                            onChange={(e) => handleSlotFileSelect(e, slotId)}
+                          />
+                        </button>
+                        {/* Slot uploaded files */}
+                        <Show when={slotFiles().length > 0}>
+                          <div class="mt-2 space-y-1.5">
+                            <For each={slotFiles()}>
+                              {(file) => {
+                                const ext = file.originalName.split(".").pop()?.toLowerCase() ?? "";
+                                return (
+                                  <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-slate-100">
+                                    <div class="flex items-center gap-2 min-w-0">
+                                      <span class={`flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold ${getFileExtColor(ext)}`}>
+                                        {ext.toUpperCase().slice(0, 4) || "?"}
+                                      </span>
+                                      <span class="text-xs text-[#191c1e] truncate">{file.originalName}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 flex-shrink-0">
+                                      <Show when={file.uploading}>
+                                        <span class="text-xs text-blue-600">{file.progress}%</span>
+                                      </Show>
+                                      <Show when={!file.uploading && !file.error}>
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                      </Show>
+                                      <button type="button" class="text-xs text-[#9fa0a8] hover:text-red-500" onClick={() => removeFile(file.fileId)}>
+                                        移除
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              }}
+                            </For>
+                          </div>
+                        </Show>
+                      </div>
+                    </div>
+                  );
+                }}
+              </For>
+            </Show>
+
+            {/* "Other files" area — non-slot file fields or all file fields when no slots configured */}
+            <Show when={!hasFileSlots() || nonSlotFileFields().length > 0}>
+              <div>
+                <Show when={hasFileSlots()}>
+                  <p class="text-xs font-medium text-slate-500 mb-2">其他文件</p>
+                </Show>
+                <button
+                  type="button"
+                  class={`w-full border-2 border-dashed rounded-xl py-10 text-center transition-all cursor-pointer ${
+                    dragOver()
+                      ? "border-[#4f46e5] bg-[#f0efff] scale-[1.01]"
+                      : "border-[rgba(199,196,216,0.6)] hover:border-[#4f46e5] hover:bg-[#fafafe]"
+                  }`}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOver(true);
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={handleFileDrop}
+                  onClick={() => {
+                    const input = document.getElementById("file-input-transform") as HTMLInputElement;
+                    input?.click();
+                  }}
+                >
+                  <div class="flex flex-col items-center gap-2">
+                    <div class="w-10 h-10 rounded-full bg-[#f0efff] flex items-center justify-center">
+                      <svg
+                        aria-hidden="true"
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#4f46e5"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <polyline points="16 16 12 12 8 16" />
+                        <line x1="12" y1="12" x2="12" y2="21" />
+                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
+                      </svg>
+                    </div>
+                    <p class="text-sm font-medium text-[#464555]">拖拽文件到此处，或点击选择文件</p>
+                    <p class="text-xs text-[#9fa0a8]">支持格式：{acceptedTypes()}</p>
+                  </div>
+                  <input
+                    id="file-input-transform"
+                    type="file"
+                    multiple={maxFileCount() !== 1}
+                    accept={acceptedTypes() || undefined}
+                    class="hidden"
+                    onChange={handleFileSelect}
+                  />
+                </button>
               </div>
-              <input
-                id="file-input-transform"
-                type="file"
-                multiple={maxFileCount() !== 1}
-                accept={acceptedTypes() || undefined}
-                class="hidden"
-                onChange={handleFileSelect}
-              />
-            </button>
+            </Show>
           </div>
         </Show>
 

@@ -1,6 +1,7 @@
-import { For } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import type { ExportConfig, VariableRef, OutputDef } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
+import VariablePicker from "../prompt/VariablePicker";
 
 type ExportFormat = "word" | "pdf" | "markdown";
 
@@ -17,44 +18,64 @@ interface ExportConfigProps {
   onChange: (config: ExportConfig) => void;
 }
 
-function getAvailableOutputs(nodes: FlowNodeData[]): Array<{ ref: VariableRef; outputDef: OutputDef; nodeLabel: string }> {
-  const result: Array<{ ref: VariableRef; outputDef: OutputDef; nodeLabel: string }> = [];
-  for (const node of nodes) {
-    const outputs = node.data.outputs as OutputDef[];
-    for (const output of outputs) {
-      if (output.name) {
-        result.push({
-          ref: {
-            nodeId: node.id,
-            outputId: output.id,
-            variableName: `${node.id}.${output.id}`,
-          },
-          outputDef: output,
-          nodeLabel: node.data.label,
-        });
-      }
-    }
-  }
-  return result;
-}
-
 export default function ExportConfigPanel(props: ExportConfigProps) {
-  const availableOutputs = () => getAvailableOutputs(props.upstreamNodes);
+  const [showPicker, setShowPicker] = createSignal(false);
+  const [dragIndex, setDragIndex] = createSignal<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = createSignal<number | null>(null);
 
-  function isSelected(ref: VariableRef) {
-    return props.config.contentMapping.some(
-      (r) => r.nodeId === ref.nodeId && r.outputId === ref.outputId
+  function addMapping(ref: VariableRef) {
+    // Avoid duplicates
+    const exists = props.config.contentMapping.some(
+      (r) => r.nodeId === ref.nodeId && r.outputId === ref.outputId,
     );
+    if (exists) return;
+    props.onChange({ ...props.config, contentMapping: [...props.config.contentMapping, ref] });
   }
 
-  function toggleOutput(ref: VariableRef) {
-    const selected = isSelected(ref);
-    const next = selected
-      ? props.config.contentMapping.filter(
-          (r) => !(r.nodeId === ref.nodeId && r.outputId === ref.outputId)
-        )
-      : [...props.config.contentMapping, ref];
+  function removeMapping(index: number) {
+    const next = [...props.config.contentMapping];
+    next.splice(index, 1);
     props.onChange({ ...props.config, contentMapping: next });
+  }
+
+  /** Resolve a VariableRef to a display label using upstream node data */
+  function resolveLabel(ref: VariableRef): string {
+    if (ref.variableName) return ref.variableName;
+    const node = props.upstreamNodes.find((n) => n.id === ref.nodeId);
+    if (!node) return `${ref.nodeId}.${ref.outputId}`;
+    const outputs = node.data.outputs as OutputDef[];
+    const output = outputs.find((o) => o.segmentKey === ref.outputId) ?? outputs.find((o) => o.id === ref.outputId);
+    return `${node.data.label}.${output?.name ?? ref.outputId}`;
+  }
+
+  // --- Drag reorder handlers ---
+  function handleDragStart(index: number) {
+    setDragIndex(index);
+  }
+
+  function handleDragOver(e: DragEvent, index: number) {
+    e.preventDefault();
+    setDragOverIndex(index);
+  }
+
+  function handleDrop(targetIndex: number) {
+    const from = dragIndex();
+    if (from === null || from === targetIndex) {
+      setDragIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+    const items = [...props.config.contentMapping];
+    const [moved] = items.splice(from, 1);
+    items.splice(targetIndex, 0, moved);
+    props.onChange({ ...props.config, contentMapping: items });
+    setDragIndex(null);
+    setDragOverIndex(null);
+  }
+
+  function handleDragEnd() {
+    setDragIndex(null);
+    setDragOverIndex(null);
   }
 
   return (
@@ -116,34 +137,97 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
         <p class="text-xs text-slate-400 mt-1">模板系统将在后续版本中支持</p>
       </div>
 
-      {/* Content Mapping */}
+      {/* Content Mapping with VariablePicker + drag reorder */}
       <div class="border-t border-slate-100 pt-3">
         <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-2">导出内容</h4>
-        <p class="text-xs text-slate-500 mb-2">选择要包含在导出文件中的上游输出内容：</p>
+        <p class="text-xs text-slate-500 mb-2">选择要包含在导出文件中的上游输出，拖拽调整顺序：</p>
 
-        {availableOutputs().length === 0 ? (
-          <p class="text-xs text-slate-400 italic text-center py-3">
-            暂无可用的上游输出。请先为上游节点定义输出内容块。
-          </p>
-        ) : (
-          <div class="space-y-1">
-            <For each={availableOutputs()}>
-              {({ ref, outputDef, nodeLabel }) => (
-                <label class="flex items-center gap-2 p-2 rounded hover:bg-slate-50 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={isSelected(ref)}
-                    onChange={() => toggleOutput(ref)}
-                    class="rounded border-gray-300 text-red-600 focus:ring-red-500 cursor-pointer"
-                  />
-                  <span class="text-xs text-slate-400">{nodeLabel}</span>
-                  <span class="text-slate-300 text-xs">&rsaquo;</span>
-                  <span class="text-xs text-slate-700 font-medium">{outputDef.name}</span>
-                </label>
+        {/* Selected content mapping items (drag reorderable) */}
+        <Show when={props.config.contentMapping.length > 0}>
+          <div class="space-y-1 mb-3">
+            <For each={props.config.contentMapping}>
+              {(ref, index) => (
+                <div
+                  draggable={true}
+                  onDragStart={() => handleDragStart(index())}
+                  onDragOver={(e) => handleDragOver(e, index())}
+                  onDrop={() => handleDrop(index())}
+                  onDragEnd={handleDragEnd}
+                  class={`flex items-center gap-2 px-3 py-2 rounded-md border text-xs transition-all cursor-grab active:cursor-grabbing ${
+                    dragOverIndex() === index() && dragIndex() !== index()
+                      ? "border-indigo-400 bg-indigo-50"
+                      : "border-slate-200 bg-white hover:bg-slate-50"
+                  } ${dragIndex() === index() ? "opacity-40" : ""}`}
+                >
+                  {/* Drag handle */}
+                  <span class="text-slate-300 flex-shrink-0 select-none">
+                    <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <title>拖拽排序</title>
+                      <circle cx="9" cy="6" r="1.5" />
+                      <circle cx="15" cy="6" r="1.5" />
+                      <circle cx="9" cy="12" r="1.5" />
+                      <circle cx="15" cy="12" r="1.5" />
+                      <circle cx="9" cy="18" r="1.5" />
+                      <circle cx="15" cy="18" r="1.5" />
+                    </svg>
+                  </span>
+                  {/* Order number */}
+                  <span class="w-5 h-5 rounded bg-slate-100 text-slate-500 flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                    {index() + 1}
+                  </span>
+                  {/* Variable label */}
+                  <span class="flex-1 text-slate-700 font-medium truncate">{resolveLabel(ref)}</span>
+                  {/* Remove button */}
+                  <button
+                    type="button"
+                    onClick={() => removeMapping(index())}
+                    class="flex-shrink-0 p-0.5 text-slate-300 hover:text-red-500 transition-colors cursor-pointer focus:outline-none"
+                    title="移除"
+                  >
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                      <title>移除</title>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               )}
             </For>
           </div>
-        )}
+        </Show>
+
+        {/* Add variable button + VariablePicker */}
+        <div class="relative">
+          <button
+            type="button"
+            onClick={() => setShowPicker(!showPicker())}
+            class="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border border-indigo-200 rounded-md transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <title>添加内容</title>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            添加输出内容
+          </button>
+
+          <Show when={showPicker()}>
+            <VariablePicker
+              upstreamNodes={props.upstreamNodes}
+              onSelect={(_name, ref) => {
+                if (ref) {
+                  addMapping(ref);
+                }
+                setShowPicker(false);
+              }}
+              onClose={() => setShowPicker(false)}
+            />
+          </Show>
+        </div>
+
+        <Show when={props.config.contentMapping.length === 0}>
+          <p class="text-xs text-slate-400 italic text-center py-3 mt-2">
+            尚未选择导出内容。点击上方按钮添加上游输出。
+          </p>
+        </Show>
       </div>
     </div>
   );

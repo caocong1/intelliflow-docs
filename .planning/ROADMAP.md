@@ -170,6 +170,7 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 | 19. Statistics & Audit Dashboard              | 6/6       | Complete       | 2026-03-26  | -          |
 | 20. Search + Favorites + Recent Access        | 3/3       | Complete       | 2026-03-26  | -          |
 | 21. AI-Assisted Inline Editing                | 3/3 | Complete    | 2026-03-27 | -          |
+| 26. Conditional Node Execution                | 4/4 | Complete    | 2026-03-27 | -          |
 
 
 ### Phase 22: Bug Fixes + Form Field Type Extension
@@ -277,9 +278,10 @@ Plans:
 6. "返回修改上游" triggers `rollbackToNode()` to the earliest stepOrder among all sourceRef.nodeId values
 7. After rollback and re-advance, blocked node is re-evaluated; condition no longer met → proceeds normally
 8. Background execution stops pipeline on blocked node and sends notification
-**Plans**: 3 plans
+**Plans**: 4 plans
 Plans:
 
 - [x] 26-01-PLAN.md — Shared types + DB migration + conditions service + runtime integration
 - [x] 26-02-PLAN.md — Frontend ExecutionRuleEditor component + ConfigPanel integration
 - [x] 26-03-PLAN.md — Frontend blocked/skip display + rollback interaction
+- [x] 26-04-PLAN.md — Fix handleBlockedRollback to derive stepOrder from s.nodes and send { targetStepOrder } to rollback API

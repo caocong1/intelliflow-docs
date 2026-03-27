@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: in_progress
-last_updated: "2026-03-27T14:27:35+08:00"
+last_updated: "2026-03-27T14:46:00+08:00"
 progress:
   total_phases: 26
   completed_phases: 25
   total_plans: 88
-  completed_plans: 87
+  completed_plans: 88
 ---
 
 # Project State
@@ -18,21 +18,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 26 (Conditional Node Execution) — Plan 03 complete; all Phase 26 plans done
+**Current focus:** Phase 26 (Conditional Node Execution) — Plan 04 complete; all Phase 26 plans done
 
 ## Current Position
 
 Phase: 26 of 26 (Conditional Node Execution)
-Plan: 3 of 3
+Plan: 4 of 4
 Status: COMPLETED
-Last activity: 2026-03-27 — Phase 26-03 executed: BlockedNodeCard.tsx (inline warning card, rollback delegation), StepperBar red blocked styling, NodeHistoryPanel conditional skip differentiation, DocumentWorkspace blocked Match case + hasBlockedNodes memo + handleBlockedRollback
+Last activity: 2026-03-27 — Phase 26-04 executed: Fixed handleBlockedRollback to derive stepOrder from s.nodes via nodeId lookup and send { targetStepOrder } instead of { targetNodeId } to rollback API
 
 ### Phase 26 Summary (completed)
 - **26-01**: NodeCondition/NodeExecutionRule types, blocked status, conditions.service.ts (evaluateCondition/evaluateExecutionRule), advanceNode integration (skip/block with depth guard), background pipeline integration (skip continues, block stops with notification), validation Rule 12
 - **26-02**: ExecutionRuleEditor component (collapsible "执行条件" panel, action selector skip/block, row-based conditions with VariablePicker + operator dropdown + value input with smart suggestions), ConfigPanel integration for all 5 node types
 - **26-03**: BlockedNodeCard (pure display, rollback delegation), StepperBar red blocked circle + "(已阻断)" label, NodeHistoryPanel getNodeBadge() for conditional vs user skip, DocumentWorkspace hasBlockedNodes + handleBlockedRollback (earliest sourceRef by stepOrder), blocked Match case + background progress icon/reason
+- **26-04**: Fixed handleBlockedRollback to derive stepOrder from s.nodes NodeExecution records via nodeId lookup, send { targetStepOrder } in fetch body (not { targetNodeId }), guard on missing stepOrder
 
-Progress: [██████████████░░░░░░░░] 100% (3/3 plans)
+Progress: [████████████████████] 100% (4/4 plans)
 
 ## Performance Metrics
 
@@ -83,6 +84,7 @@ Progress: [██████████████░░░░░░░░] 1
 | Phase 26 P01 | 6min | 2 tasks | 5 files |
 | Phase 26 P02 | 4min | 2 tasks | 2 files |
 | Phase 26 P03 | 4min | 2 tasks | 4 files |
+| Phase 26 P04 | 2min | 1 task | 1 file |
 
 ## Accumulated Context
 
@@ -186,5 +188,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Phase 26-03 executed — All Phase 26 plans complete (26-01 backend types+runtime, 26-02 ExecutionRuleEditor, 26-03 blocked UI display + rollback)
+Stopped at: Phase 26-04 executed — All Phase 26 plans complete (26-01 backend types+runtime, 26-02 ExecutionRuleEditor, 26-03 blocked UI display + rollback stub, 26-04 rollback API body fix)
 Resume file: None

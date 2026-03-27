@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T02:17:57.408Z"
+last_updated: "2026-03-27T02:55:28Z"
 progress:
   total_phases: 26
   completed_phases: 21
@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 22 in progress — Bug fixes and FormFieldDef type extension, plan 01 complete
+**Current focus:** Phase 22 in progress — Bug fixes and FormFieldDef type extension, plan 03 complete
 
 ## Current Position
 
 Phase: 22 of 26 (Bug Fixes + Form Field Type Extension)
-Plan: 1 of 3
+Plan: 3 of 3
 Status: In Progress
-Last activity: 2026-03-27 — Completed 22-01 (Bug fixes + FormFieldDef type extension)
+Last activity: 2026-03-27 — Completed 22-03 (fieldsByKey dual-view + runtime validation + machineKey derive-outputs)
 
 Progress: [███████████████████░] 97%
 
@@ -63,6 +63,7 @@ Progress: [███████████████████░] 97%
 | Phase 21-02 P02 | 3min | 2 tasks | 5 files |
 | Phase 21-03 P03 | 5min | 3 tasks | 2 files |
 | Phase 22-01 P01 | 2min | 2 tasks | 3 files |
+| Phase 22-03 P03 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -114,6 +115,9 @@ Recent decisions affecting current work:
 - [22-01]: FormFieldType extracted as named type alias for reuse across packages
 - [22-01]: machineKey regex enforces identifier-style naming (no leading digits)
 - [22-01]: Comma restriction on select options supports comma-joined multiselect storage
+- [22-03]: Workflow config loaded via workflowId JOIN (not workflowSnapshot) matching existing codebase pattern
+- [22-03]: Variable resolution order: direct outputData key -> fields[UUID] -> fieldsByKey[machineKey]
+- [22-03]: Validation errors collected and thrown as single AppError(400) with all field errors joined
 
 ### Roadmap Evolution
 
@@ -138,5 +142,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 22-01-PLAN.md (Bug fixes + FormFieldDef type extension)
+Stopped at: Completed 22-03-PLAN.md (fieldsByKey dual-view + runtime validation + machineKey derive-outputs)
 Resume file: None

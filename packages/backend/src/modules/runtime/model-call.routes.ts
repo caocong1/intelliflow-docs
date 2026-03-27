@@ -66,6 +66,22 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           mcConfig,
         );
 
+        // Resolve system prompt (no desensitize rules)
+        let resolvedSystemPrompt: string | undefined;
+        if (mcConfig.systemPromptTemplate) {
+          const { resolved } = await resolvePromptTemplate(
+            mcConfig.systemPromptTemplate,
+            params.documentId,
+            allExecs.map((e) => ({
+              nodeId: e.nodeId,
+              nodeLabel: e.nodeLabel,
+              outputData: e.outputData as Record<string, unknown> | null,
+            })),
+            [],  // No desensitize rules for system prompt
+          );
+          resolvedSystemPrompt = resolved;
+        }
+
         // Execute and return SSE stream
         const stream = await executeModelCall(
           params.documentId,
@@ -73,6 +89,8 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           modelIds,
           resolvedPrompt,
           mcConfig.promptTemplate,
+          mcConfig.systemPromptTemplate,
+          resolvedSystemPrompt,
           variableMapping,
           user!.id,
           mcConfig,
@@ -130,12 +148,30 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           mcConfig,
         );
 
+        // Resolve system prompt (no desensitize rules)
+        let resolvedSystemPrompt: string | undefined;
+        if (mcConfig.systemPromptTemplate) {
+          const { resolved } = await resolvePromptTemplate(
+            mcConfig.systemPromptTemplate,
+            params.documentId,
+            allExecs.map((e) => ({
+              nodeId: e.nodeId,
+              nodeLabel: e.nodeLabel,
+              outputData: e.outputData as Record<string, unknown> | null,
+            })),
+            [],  // No desensitize rules for system prompt
+          );
+          resolvedSystemPrompt = resolved;
+        }
+
         const stream = await retryModelCall(
           params.documentId,
           params.nodeExecutionId,
           params.modelId,
           resolvedPrompt,
           mcConfig.promptTemplate,
+          mcConfig.systemPromptTemplate,
+          resolvedSystemPrompt,
           variableMapping,
           user!.id,
         );

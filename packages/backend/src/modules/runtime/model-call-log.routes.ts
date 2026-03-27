@@ -65,6 +65,7 @@ export const modelCallLogRoutes = new Elysia({ prefix: "/admin/model-call-logs" 
           modelName: modelCallLogs.modelName,
           callSource: modelCallLogs.callSource,
           promptTemplate: modelCallLogs.promptTemplate,
+          systemPrompt: modelCallLogs.systemPrompt,
           resolvedPrompt: modelCallLogs.resolvedPrompt,
           variableMapping: modelCallLogs.variableMapping,
           temperature: modelCallLogs.temperature,

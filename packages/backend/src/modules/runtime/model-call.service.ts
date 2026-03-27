@@ -321,6 +321,8 @@ export async function executeModelCall(
   modelIds: string[],
   resolvedPrompt: string,
   promptTemplate?: string,
+  systemPromptTemplate?: string,
+  resolvedSystemPrompt?: string,
   variableMapping?: Record<string, string>,
   userId?: string,
   config?: ModelCallConfig,
@@ -411,6 +413,7 @@ export async function executeModelCall(
             const result = await strategy.execute({
               model: strategyInput,
               resolvedPrompt,
+              resolvedSystemPrompt,
               sendEvent,
             });
             fullContent = result.content;
@@ -438,6 +441,7 @@ export async function executeModelCall(
               modelName: model.displayName,
               callSource: "runtime",
               promptTemplate: promptTemplate ?? null,
+              systemPrompt: resolvedSystemPrompt ?? null,
               resolvedPrompt,
               variableMapping: variableMapping ?? null,
               temperature: model.temperature,
@@ -471,6 +475,7 @@ export async function executeModelCall(
               modelName: model.displayName,
               callSource: "runtime",
               promptTemplate: promptTemplate ?? null,
+              systemPrompt: resolvedSystemPrompt ?? null,
               resolvedPrompt,
               variableMapping: variableMapping ?? null,
               temperature: model.temperature,
@@ -584,6 +589,22 @@ export async function executeModelCallBackground(
     mcConfig,
   );
 
+  // Resolve system prompt (no desensitize rules per user decision)
+  let resolvedSystemPrompt: string | undefined;
+  if (mcConfig.systemPromptTemplate) {
+    const { resolved } = await resolvePromptTemplate(
+      mcConfig.systemPromptTemplate,
+      documentId,
+      allExecs.map((e) => ({
+        nodeId: e.nodeId,
+        nodeLabel: e.nodeLabel,
+        outputData: e.outputData as Record<string, unknown> | null,
+      })),
+      [],  // No desensitize rules — system prompt stays clean
+    );
+    resolvedSystemPrompt = resolved;
+  }
+
   // Look up all models + providers
   const modelRows = await db
     .select({
@@ -629,6 +650,7 @@ export async function executeModelCallBackground(
         const result = await strategy.execute({
           model: strategyInput,
           resolvedPrompt,
+          resolvedSystemPrompt,
           sendEvent: noopSendEvent,
         });
         fullContent = result.content;
@@ -648,6 +670,7 @@ export async function executeModelCallBackground(
           modelName: model.displayName,
           callSource: "runtime",
           promptTemplate: mcConfig.promptTemplate,
+          systemPrompt: resolvedSystemPrompt ?? null,
           resolvedPrompt,
           variableMapping: variableMapping ?? null,
           temperature: model.temperature,
@@ -680,6 +703,7 @@ export async function executeModelCallBackground(
           modelName: model.displayName,
           callSource: "runtime",
           promptTemplate: mcConfig.promptTemplate,
+          systemPrompt: resolvedSystemPrompt ?? null,
           resolvedPrompt,
           variableMapping: variableMapping ?? null,
           temperature: model.temperature,
@@ -786,6 +810,8 @@ export async function retryModelCall(
   modelId: string,
   resolvedPrompt: string,
   promptTemplate?: string,
+  systemPromptTemplate?: string,
+  resolvedSystemPrompt?: string,
   variableMapping?: Record<string, string>,
   userId?: string,
 ): Promise<ReadableStream<Uint8Array>> {
@@ -858,6 +884,7 @@ export async function retryModelCall(
         const result = await strategy.execute({
           model: strategyInput,
           resolvedPrompt,
+          resolvedSystemPrompt,
           sendEvent,
         });
         fullContent = result.content;
@@ -892,6 +919,7 @@ export async function retryModelCall(
           modelName: model.displayName,
           callSource: "runtime",
           promptTemplate: promptTemplate ?? null,
+          systemPrompt: resolvedSystemPrompt ?? null,
           resolvedPrompt,
           variableMapping: variableMapping ?? null,
           temperature: model.temperature,
@@ -931,6 +959,7 @@ export async function retryModelCall(
           modelName: model.displayName,
           callSource: "runtime",
           promptTemplate: promptTemplate ?? null,
+          systemPrompt: resolvedSystemPrompt ?? null,
           resolvedPrompt,
           variableMapping: variableMapping ?? null,
           temperature: model.temperature,

@@ -268,8 +268,17 @@ export async function advanceNode(
               const s = upstreamSources[src.outputId];
               text = s.restoredText ?? s.desensitizedText ?? s.text ?? "";
             } else {
-              // Try direct text field or model output content
-              text = (upstreamOutput.text as string) ?? (upstreamOutput.content as string) ?? "";
+              // Try field-level lookup: strip "{nodeId}-field-" prefix from outputId to get fields key
+              // e.g. "n1-field-f1" -> "f1", then look up upstreamOutput.fields["f1"]
+              const fieldKeyMatch = src.outputId.match(/^.+-field-(.+)$/);
+              const fieldKey = fieldKeyMatch?.[1];
+              const fields = upstreamOutput.fields as Record<string, string> | undefined;
+              if (fieldKey && fields?.[fieldKey]) {
+                text = fields[fieldKey];
+              } else {
+                // Fall back to combined text or model output content
+                text = (upstreamOutput.text as string) ?? (upstreamOutput.content as string) ?? "";
+              }
             }
           }
           sources[src.outputId] = { displayName: src.displayName, text };

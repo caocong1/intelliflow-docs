@@ -32,14 +32,36 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 - **VER-01~03**: 版本管理 — v1.0
 - **FSYS-01~04**: 文件系统与工作目录 — v1.0
 - **RECV-01~02**: 失败恢复（草稿保存、断点续作） — v1.0
+- **BGND-01~06**: 后台 AI 生成 + 应用内通知 + 企业微信通知 — v1.1
+- **STAT-01~07**: 统计与审计面板（概览、模型/用户/流程维度、审计明细、多维度交叉） — v1.1
+- **SRCH-01~05**: 全局搜索、收藏、最近访问 — v1.1
+- **AIED-01~06**: AI 辅助内联编辑（浮动工具栏、差异预览、安全约束） — v1.1
+- **DEBT-01**: DTYPE-04 文档关联守卫 — v1.1
+- **NODE-23~31**: 扩展 FormFieldDef 8 种字段类型、machineKey、fieldsByKey 双视图 — v1.1
 
-### Active (v1.1)
+### Active (v1.2 — 节点能力增强)
 
-- [ ] 后台 AI 生成 + 应用内通知 + 企业微信通知（BGND-01~06）
-- [ ] 统计与审计面板（STAT-01~07）
-- [ ] 全局搜索、最近访问、收藏功能（SRCH-01~05）
-- [ ] AI 辅助内联编辑（AIED-01~06）
-- [ ] DTYPE-04 文档关联守卫（DEBT-01）
+> **设计文档**：`docs/design/flow-node-capability-analysis.md` — 包含所有缺口的现状证据、类型定义、路径规范、实现边界和验收标准。**GSD 规划和执行时必须参考此文档。**
+
+- [ ] Phase 23: 输出路径规范（segmentKey canonical form + resolveRef() 统一解析）
+- [ ] Phase 24: 模型调用结构化输出 + 多产物命名（outputFormat/namedOutputs/JSON 校验）
+- [ ] Phase 22-01: 后台执行 Bug 修复（file_export 枚举不匹配 + autoAdvance 语义缺失） ✓
+- [ ] Phase 22-02: 输入转换表单字段类型扩展（number/date/select/multiselect） ✓
+- [ ] Phase 25: 导出 Word 表格渲染（Markdown AST → docx Table）✓
+- [ ] Phase 25: System/User Prompt 分离（systemPromptTemplate）✓
+- [ ] Phase 26: 条件执行能力（NodeExecutionRule + blocked 状态）✓
+
+> **设计文档**：`docs/design/flow-node-capability-analysis.md` — 包含所有缺口的现状证据、类型定义、路径规范、实现边界和验收标准。**GSD 规划和执行时必须参考此文档。**
+
+- [ ] 后台执行 Bug 修复（file_export 枚举不匹配 + autoAdvance 语义缺失）
+- [ ] 输入转换表单字段类型扩展（number/date/select/multiselect + machineKey）
+- [ ] 输出路径规范（segmentKey canonical form + resolveRef() 统一解析）
+- [ ] 文件槽位语义（fileSlotId + fileSlots 聚合视图）
+- [ ] 导出 contentMapping 生效（resolveContent + getExportPreview 同步修复）
+- [ ] 模型调用结构化输出 + 多产物命名（outputFormat/namedOutputs/JSON 校验）
+- [ ] 导出 Word 表格渲染（Markdown AST → docx Table）
+- [ ] System/User Prompt 分离（systemPromptTemplate）
+- [ ] 条件执行能力（NodeExecutionRule + blocked 状态）
 
 ### Future
 
@@ -102,24 +124,24 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 | fetch+ReadableStream (非 EventSource) | 支持 Authorization header | Good |
 | RECV-03 cancel AI generation 延迟到 v2 | 复杂度高，v1 优先跑通核心流程 | Deferred |
 
-## Current Milestone: v1.1 运营增强与智能编辑
+## Current Milestone: v1.2 节点能力增强
 
-**Goal:** 补全运营管理能力（统计审计、用量控制）、提升用户效率（全局搜索、AI 辅助编辑、后台生成通知）、修复遗留 tech debt。
+**Goal:** 完善节点能力（字段类型扩展、输出路径规范、结构化输出、Word 表格渲染、System Prompt 分离、条件执行）。
 
 **Target features:**
-- 后台 AI 生成 + 应用内通知 + 企微通知推送
-- 统计审计面板（全量：概览、模型、用户、流程、审计明细、多维度交叉）
-- 全局搜索、最近访问、收藏
-- AI 辅助内联编辑（完整版：浮动工具栏、差异预览、安全感知模型过滤）
-- DTYPE-04 文档关联守卫
+- Phase 23: 输出路径规范（segmentKey）+ 文件槽位 + export contentMapping 生效
+- Phase 24: 结构化输出（JSON Schema）+ 多产物命名 + fieldPath 解析
+- Phase 25: Word 表格渲染 + System/User Prompt 分离 ✓
+- Phase 26: 条件执行（skip/block）✓
 
 ## Milestone Plan
 
 | Milestone | 内容 | 状态 |
 |-----------|------|------|
 | v1.0 MVP | 认证+管理+流程编排+项目文档+运行时 | Shipped 2026-03-25 |
-| v1.1 运营增强与智能编辑 | 后台生成+通知、统计审计、用量管理、全局搜索、AI编辑、tech debt | Active |
+| v1.1 运营增强与智能编辑 | 后台生成+通知、统计审计、全局搜索、AI编辑 | Shipped 2026-03-27 |
+| v1.2 节点能力增强 | 字段扩展、输出规范、结构化输出、Word表格、System Prompt、条件执行 | Active |
 | v2.0 | 批注、文档导入/复制、条件路由、人工审核节点等 | Future |
 
 ---
-*Last updated: 2026-03-25 after v1.1 milestone started*
+*Last updated: 2026-03-27 after v1.1 shipped — v1.2 milestone started*

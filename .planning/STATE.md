@@ -1,31 +1,41 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: 运营增强与智能编辑
-status: unknown
-last_updated: "2026-03-27T06:48:27.224Z"
+milestone: v1.2
+milestone_name: 节点能力增强
+status: in_progress
+last_updated: "2026-03-27T06:55:00Z"
 progress:
-  total_phases: 26
-  completed_phases: 26
-  total_plans: 87
-  completed_plans: 87
+  total_phases: 4
+  completed_phases: 2
+  total_plans: 13
+  completed_plans: 13
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-25)
+See: .planning/PROJECT.md (updated 2026-03-27)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 26 (Conditional Node Execution) — Plan 04 complete; all Phase 26 plans done
+**Current focus:** v1.2 节点能力增强 — Phase 22, 25, 26 已完成；Phase 23, 24 待执行
 
 ## Current Position
 
-Phase: 26 of 26 (Conditional Node Execution)
-Plan: 4 of 4
-Status: COMPLETED
-Last activity: 2026-03-27 — Phase 26-04 executed: Fixed handleBlockedRollback to derive stepOrder from s.nodes via nodeId lookup and send { targetStepOrder } instead of { targetNodeId } to rollback API
+Phase: v1.2 planning (defining requirements)
+Plan: —
+Status: DEFINING
+Last activity: 2026-03-27 — v1.1 shipped; v1.2 milestone initialized
+
+### v1.2 Phase Status
+
+| Phase | Goal | Plans | Status |
+|-------|------|-------|--------|
+| Phase 22 | Bug fixes + FormFieldDef type extension | 3/3 | ✓ Complete |
+| Phase 23 | Output path grammar + file slots + contentMapping | 0/3 | Pending |
+| Phase 24 | Structured output + named artifacts + field references | 0/4 | Pending |
+| Phase 25 | Word table rendering + System prompt separation | 3/3 | ✓ Complete |
+| Phase 26 | Conditional node execution | 4/4 | ✓ Complete |
 
 ### Phase 26 Summary (completed)
 - **26-01**: NodeCondition/NodeExecutionRule types, blocked status, conditions.service.ts (evaluateCondition/evaluateExecutionRule), advanceNode integration (skip/block with depth guard), background pipeline integration (skip continues, block stops with notification), validation Rule 12

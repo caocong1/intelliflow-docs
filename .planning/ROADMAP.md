@@ -7,7 +7,8 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 ## Milestones
 
 - **v1.0 MVP** — Phases 1-16 (shipped 2026-03-25) | [details](milestones/v1.0-ROADMAP.md)
-- **v1.1 运营增强与智能编辑** — Phases 17-21 (in progress)
+- **v1.1 运营增强与智能编辑** — Phases 17-21, 22 (shipped 2026-03-27)
+- **v1.2 节点能力增强** — Phases 23-26 (in progress)
 
 ## Phases
 
@@ -32,7 +33,7 @@ v1.0 MVP (Phases 1-16) — SHIPPED 2026-03-25
 
 
 
-### v1.1 运营增强与智能编辑 (In Progress)
+### v1.1 运营增强与智能编辑 (Shipped 2026-03-27)
 
 **Milestone Goal:** 补全运营管理能力（统计审计）、提升用户效率（后台生成通知、全局搜索、AI 辅助编辑）、修复遗留 tech debt。
 
@@ -40,7 +41,8 @@ v1.0 MVP (Phases 1-16) — SHIPPED 2026-03-25
 - **Phase 18: Background Execution + Notifications** - 后台 AI 生成、任务管理、应用内通知、企微推送 (completed 2026-03-26)
 - **Phase 19: Statistics & Audit Dashboard** - 管理员统计面板、模型/用户/流程使用分析、审计明细 (completed 2026-03-26)
 - **Phase 20: Search + Favorites + Recent Access** - 全局搜索、收藏、最近访问 (completed 2026-03-26)
-- **Phase 21: AI-Assisted Inline Editing** - 选中触发 AI 编辑、内联差异预览、流式响应、安全约束
+- **Phase 21: AI-Assisted Inline Editing** - 选中触发 AI 编辑、内联差异预览、流式响应、安全约束 (completed 2026-03-27)
+- **Phase 22: Bug Fixes + Form Field Type Extension** - 后台 Bug 修复 + 8 种字段类型扩展 (completed 2026-03-27)
 
 ## Phase Details
 
@@ -165,13 +167,21 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 | 14. Milestone Tracking Housekeeping           | v1.0      | 1/1            | Complete    | 2026-03-25 |
 | 15. Integration Bug Fixes — Export/PPT/Type   | v1.0      | 1/1            | Complete    | 2026-03-25 |
 | 16. Version History & Dead Code Cleanup       | v1.0      | 1/1            | Complete    | 2026-03-25 |
-| 17. Schema Migration + Tech Debt              | 2/2       | Complete       | 2026-03-26  | -          |
-| 18. Background Execution + Notifications      | 6/6       | Complete       | 2026-03-26  | -          |
-| 19. Statistics & Audit Dashboard              | 6/6       | Complete       | 2026-03-26  | -          |
-| 20. Search + Favorites + Recent Access        | 3/3       | Complete       | 2026-03-26  | -          |
-| 21. AI-Assisted Inline Editing                | 3/3 | Complete    | 2026-03-27 | -          |
-| 26. Conditional Node Execution                | 4/4 | Complete    | 2026-03-27 | -          |
+| 17. Schema Migration + Tech Debt              | v1.1      | 2/2            | Complete    | 2026-03-26 |
+| 18. Background Execution + Notifications      | v1.1      | 6/6            | Complete    | 2026-03-26 |
+| 19. Statistics & Audit Dashboard              | v1.1      | 6/6            | Complete    | 2026-03-26 |
+| 20. Search + Favorites + Recent Access        | v1.1      | 3/3            | Complete    | 2026-03-26 |
+| 21. AI-Assisted Inline Editing                | v1.1      | 3/3            | Complete    | 2026-03-27 |
+| 22. Bug Fixes + Form Field Type Extension    | v1.1      | 3/3            | Complete    | 2026-03-27 |
+| 23. Output Path Grammar + File Slots          | v1.2      | 0/3            | Pending     | —         |
+| 24. Structured Output + Named Artifacts       | v1.2      | 0/4            | Pending     | —         |
+| 25. Word Table Rendering + System Prompt      | v1.2      | 3/3            | Complete    | 2026-03-27 |
+| 26. Conditional Node Execution                | v1.2      | 4/4            | Complete    | 2026-03-27 |
 
+
+### v1.2 节点能力增强 (In Progress)
+
+**Milestone Goal:** 完善节点能力：字段类型扩展、输出路径规范、结构化输出、Word 表格渲染、System Prompt 分离、条件执行。
 
 ### Phase 22: Bug Fixes + Form Field Type Extension
 
@@ -191,9 +201,9 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 **Plans**: 3 plans
 Plans:
 
-- 22-01-PLAN.md — Bug fixes + shared types extension + backend validation
-- 22-02-PLAN.md — Frontend config panel + executor controls + validation
-- 22-03-PLAN.md — Backend fieldsByKey dual-view + variable resolution + derive-outputs
+- [x] 22-01-PLAN.md — Bug fixes + shared types extension + backend validation
+- [x] 22-02-PLAN.md — Frontend config panel + executor controls + validation
+- [x] 22-03-PLAN.md — Backend fieldsByKey dual-view + variable resolution + derive-outputs
 
 ### Phase 23: Output Path Grammar + File Slots + Export ContentMapping
 

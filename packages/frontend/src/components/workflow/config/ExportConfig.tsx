@@ -23,24 +23,25 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
   const [dragIndex, setDragIndex] = createSignal<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = createSignal<number | null>(null);
 
+  const mapping = () => props.config.contentMapping ?? [];
+
   function addMapping(ref: VariableRef) {
     // Avoid duplicates
-    const exists = props.config.contentMapping.some(
+    const exists = mapping().some(
       (r) => r.nodeId === ref.nodeId && r.outputId === ref.outputId,
     );
     if (exists) return;
-    props.onChange({ ...props.config, contentMapping: [...props.config.contentMapping, ref] });
+    props.onChange({ ...props.config, contentMapping: [...mapping(), ref] });
   }
 
   function removeMapping(index: number) {
-    const next = [...props.config.contentMapping];
+    const next = [...mapping()];
     next.splice(index, 1);
     props.onChange({ ...props.config, contentMapping: next });
   }
 
   /** Resolve a VariableRef to a display label using upstream node data */
   function resolveLabel(ref: VariableRef): string {
-    if (ref.variableName) return ref.variableName;
     const node = props.upstreamNodes.find((n) => n.id === ref.nodeId);
     if (!node) return `${ref.nodeId}.${ref.outputId}`;
     const outputs = node.data.outputs as OutputDef[];
@@ -65,7 +66,7 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
       setDragOverIndex(null);
       return;
     }
-    const items = [...props.config.contentMapping];
+    const items = [...mapping()];
     const [moved] = items.splice(from, 1);
     items.splice(targetIndex, 0, moved);
     props.onChange({ ...props.config, contentMapping: items });
@@ -143,9 +144,9 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
         <p class="text-xs text-slate-500 mb-2">选择要包含在导出文件中的上游输出，拖拽调整顺序：</p>
 
         {/* Selected content mapping items (drag reorderable) */}
-        <Show when={props.config.contentMapping.length > 0}>
+        <Show when={mapping().length > 0}>
           <div class="space-y-1 mb-3">
-            <For each={props.config.contentMapping}>
+            <For each={mapping()}>
               {(ref, index) => (
                 <div
                   draggable={true}
@@ -223,7 +224,7 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
           </Show>
         </div>
 
-        <Show when={props.config.contentMapping.length === 0}>
+        <Show when={mapping().length === 0}>
           <p class="text-xs text-slate-400 italic text-center py-3 mt-2">
             尚未选择导出内容。点击上方按钮添加上游输出。
           </p>

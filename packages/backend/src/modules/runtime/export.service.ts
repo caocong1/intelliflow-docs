@@ -4,18 +4,54 @@ import { eq } from "drizzle-orm";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from "docx";
 import PDFDocument from "pdfkit";
 import { db } from "../../db";
-import { nodeExecutions } from "../../db/schema";
+import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { getExportPath, insertDocumentFile } from "../files/files.service";
+import { resolveRef } from "./model-call.service";
+import type { ExportConfig, VariableRef, WorkflowNodeDef } from "@intelliflow/shared";
+
+// ─── Node config loader ─────────────────────────────────────────────────────
+
+/**
+ * Load ExportConfig from the workflow definition stored in the database.
+ */
+async function loadNodeConfig(documentId: string, nodeExecutionId: string): Promise<ExportConfig | null> {
+  // Get the current execution's nodeId
+  const [exec] = await db
+    .select({ nodeId: nodeExecutions.nodeId })
+    .from(nodeExecutions)
+    .where(eq(nodeExecutions.id, nodeExecutionId))
+    .limit(1);
+
+  if (!exec) return null;
+
+  // Get workflow definition via document -> workflow join
+  const [doc] = await db
+    .select({ nodes: workflows.nodes })
+    .from(documents)
+    .innerJoin(workflows, eq(documents.workflowId, workflows.id))
+    .where(eq(documents.id, documentId))
+    .limit(1);
+
+  if (!doc) return null;
+
+  const nodes = doc.nodes as WorkflowNodeDef[];
+  const nodeDef = nodes.find((n) => n.id === exec.nodeId);
+  if (!nodeDef || nodeDef.config.type !== "export") return null;
+
+  return nodeDef.config as ExportConfig;
+}
 
 // ─── Content resolution ──────────────────────────────────────────────────────
 
 /**
  * Resolve export content from upstream node outputs.
- * Looks at the node execution's inputData or the previous node's outputData.
+ * When contentMapping is provided and non-empty, resolves each ref via resolveRef()
+ * and joins with double newline. Falls back to upstream-scan logic when empty.
  */
 async function resolveContent(
   documentId: string,
   nodeExecutionId: string,
+  contentMapping?: VariableRef[],
 ): Promise<string> {
   // Get all executions for this document to find upstream content
   const executions = await db
@@ -25,6 +61,29 @@ async function resolveContent(
 
   const currentExec = executions.find((e) => e.id === nodeExecutionId);
   if (!currentExec) throw new Error("Node execution not found");
+
+  // ContentMapping priority path: resolve each ref via resolveRef() and join
+  if (contentMapping && contentMapping.length > 0) {
+    const nodeExecMap = executions.map((e) => ({
+      nodeId: e.nodeId,
+      outputData: e.outputData as Record<string, unknown> | null,
+    }));
+
+    const parts: string[] = [];
+    for (const ref of contentMapping) {
+      const value = resolveRef(ref, nodeExecMap);
+      if (value !== undefined) {
+        parts.push(value);
+      } else {
+        console.warn(`[export] contentMapping: failed to resolve ref ${ref.nodeId}.${ref.outputId}, skipping`);
+      }
+    }
+
+    if (parts.length > 0) {
+      return parts.join("\n\n");
+    }
+    // If all refs failed, fall through to upstream-scan logic
+  }
 
   // Check if inputData has content already set
   const inputData = currentExec.inputData as Record<string, unknown> | null;
@@ -231,8 +290,9 @@ export async function generateExport(
   filename: string,
   userId: string,
 ): Promise<{ filename: string; storagePath: string; fileSize: number; format: string }> {
-  // Resolve content from upstream nodes
-  const content = await resolveContent(documentId, nodeExecutionId);
+  // Load export config for contentMapping
+  const config = await loadNodeConfig(documentId, nodeExecutionId);
+  const content = await resolveContent(documentId, nodeExecutionId, config?.contentMapping);
 
   // Generate file buffer
   let buffer: Buffer;
@@ -294,7 +354,8 @@ export async function getExportPreview(
   documentId: string,
   nodeExecutionId: string,
 ): Promise<{ content: string; defaultFilename: string }> {
-  const content = await resolveContent(documentId, nodeExecutionId);
+  const config = await loadNodeConfig(documentId, nodeExecutionId);
+  const content = await resolveContent(documentId, nodeExecutionId, config?.contentMapping);
 
   // Generate default filename
   const dateStr = new Date().toISOString().slice(0, 10);

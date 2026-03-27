@@ -1,7 +1,9 @@
-import type { ModelCallConfig, ModelOutput, NodeExecution, SSEEvent } from "@intelliflow/shared";
+import type { ModelCallConfig, ModelOutput, NamedOutputDef, NodeExecution, SSEEvent } from "@intelliflow/shared";
 import { For, Match, Show, Switch, createEffect, createSignal, onCleanup } from "solid-js";
 import { renderMarkdown } from "../../../lib/render-markdown";
+import { streamSSE } from "../../../lib/sse-stream";
 import ModelCompareView from "./ModelCompareView";
+import NamedOutputCard from "./NamedOutputCard";
 
 interface Props {
   nodeExecution: NodeExecution;
@@ -20,6 +22,7 @@ const STATUS_LABELS: Record<string, string> = {
   streaming: "生成中",
   completed: "已完成",
   failed: "失败",
+  format_error: "格式错误",
 };
 
 const ERROR_MESSAGES: Record<string, string> = {
@@ -76,6 +79,34 @@ export default function ModelCallExecutor(props: Props) {
   const [selectLoading, setSelectLoading] = createSignal(false);
   const [viewMode, setViewMode] = createSignal<ViewMode>("markdown");
 
+  // ─── Format error + AI fix state ──────────────────────────────────────────
+  const [editedContent, setEditedContent] = createSignal<Record<string, string>>({});
+  const [revalidating, setRevalidating] = createSignal<string | null>(null);
+  const [aiFixModelId, setAiFixModelId] = createSignal<string | null>(null);
+  const [aiFixStreaming, setAiFixStreaming] = createSignal(false);
+  const [aiFixContent, setAiFixContent] = createSignal("");
+  let aiFixAbort: AbortController | null = null;
+
+  // ─── Named outputs from outputData ────────────────────────────────────────
+  const namedOutputs = () => {
+    const od = props.nodeExecution.outputData as Record<string, unknown> | null;
+    return (od?.namedOutputs as Record<string, { content: string; format: string; modelId: string }>) ?? null;
+  };
+
+  const fallbackWarning = () => {
+    const od = props.nodeExecution.outputData as Record<string, unknown> | null;
+    return (od?.fallbackWarning as boolean) ?? false;
+  };
+
+  const hasNamedOutputs = () => {
+    const no = namedOutputs();
+    return no !== null && Object.keys(no).length > 0;
+  };
+
+  const namedOutputDefs = (): NamedOutputDef[] => {
+    return props.config.namedOutputs ?? [];
+  };
+
   let abortController: AbortController | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -124,7 +155,7 @@ export default function ModelCallExecutor(props: Props) {
 
         // Check if all models are done
         const allDone = Object.values(data.models).every(
-          (m) => m.status === "completed" || m.status === "failed",
+          (m) => m.status === "completed" || m.status === "failed" || m.status === "format_error",
         );
         if (allDone) {
           if (pollTimer) clearInterval(pollTimer);
@@ -341,6 +372,113 @@ export default function ModelCallExecutor(props: Props) {
     }
   }
 
+  // ─── Format error: Revalidate & AI Fix ──────────────────────────────────
+
+  async function handleRevalidate(modelId: string) {
+    setRevalidating(modelId);
+    try {
+      const token = localStorage.getItem("auth_token");
+      const content = editedContent()[modelId] ?? modelOutputs()[modelId]?.content ?? "";
+      const res = await fetch(
+        `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/models/${modelId}/revalidate`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ content }),
+        },
+      );
+      if (res.ok) {
+        const data = (await res.json()) as { status: string; errors?: string[] };
+        setModelOutputs((prev) => ({
+          ...prev,
+          [modelId]: {
+            ...prev[modelId],
+            content,
+            status: data.status as ModelOutput["status"],
+            formatErrors: data.errors,
+          },
+        }));
+        if (data.status === "completed") {
+          // Clear edited content on success
+          setEditedContent((prev) => {
+            const next = { ...prev };
+            delete next[modelId];
+            return next;
+          });
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setRevalidating(null);
+    }
+  }
+
+  async function handleAiFix(modelId: string) {
+    setAiFixModelId(modelId);
+    setAiFixStreaming(true);
+    setAiFixContent("");
+
+    const controller = new AbortController();
+    aiFixAbort = controller;
+
+    try {
+      await streamSSE({
+        url: `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/models/${modelId}/ai-fix`,
+        method: "POST",
+        onDelta: (_mid, data) => {
+          setAiFixContent((prev) => prev + data);
+        },
+        onComplete: (_mid, data) => {
+          setAiFixContent(data);
+          setAiFixStreaming(false);
+        },
+        onError: (_mid, _data) => {
+          setAiFixStreaming(false);
+          setAiFixModelId(null);
+        },
+        signal: controller.signal,
+      });
+    } catch {
+      setAiFixStreaming(false);
+      setAiFixModelId(null);
+    }
+  }
+
+  function handleAdoptFix(modelId: string) {
+    const fixed = aiFixContent();
+    setEditedContent((prev) => ({ ...prev, [modelId]: fixed }));
+    setAiFixModelId(null);
+    setAiFixContent("");
+    // Auto-revalidate with fixed content
+    handleRevalidate(modelId);
+  }
+
+  function handleCancelFix() {
+    aiFixAbort?.abort();
+    aiFixAbort = null;
+    setAiFixModelId(null);
+    setAiFixStreaming(false);
+    setAiFixContent("");
+  }
+
+  function handleNamedOutputChange(artifactId: string, newContent: string) {
+    // Update outputData namedOutputs via draft save
+    const od = props.nodeExecution.outputData as Record<string, unknown> | null;
+    const currentNamedOutputs = (od?.namedOutputs as Record<string, { content: string; format: string; modelId: string }>) ?? {};
+    const updated = {
+      ...currentNamedOutputs,
+      [artifactId]: { ...currentNamedOutputs[artifactId], content: newContent },
+    };
+    props.onDraftSave({
+      ...od,
+      namedOutputs: updated,
+    });
+  }
+
   // ─── Helpers ──────────────────────────────────────────────────────────────
 
   function modelList(): ModelOutput[] {
@@ -350,7 +488,7 @@ export default function ModelCallExecutor(props: Props) {
   function allCompleted(): boolean {
     const outputs = modelList();
     return (
-      outputs.length > 0 && outputs.every((m) => m.status === "completed" || m.status === "failed")
+      outputs.length > 0 && outputs.every((m) => m.status === "completed" || m.status === "failed" || m.status === "format_error")
     );
   }
 
@@ -407,7 +545,126 @@ export default function ModelCallExecutor(props: Props) {
             {label}
           </span>
         );
+      case "format_error":
+        return (
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-600 ring-1 ring-orange-200">
+            <svg
+              class="w-3 h-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+            </svg>
+            {label}
+          </span>
+        );
     }
+  }
+
+  // ─── Format error rendering helper ───────────────────────────────────────
+
+  function renderFormatError(model: ModelOutput) {
+    const mid = model.modelId;
+    const currentContent = () => editedContent()[mid] ?? model.content;
+
+    return (
+      <div class="space-y-3">
+        {/* Error box */}
+        <div class="border border-red-300 bg-red-50 rounded-xl p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+            </svg>
+            <span class="text-sm font-medium text-red-700">JSON 格式验证失败</span>
+          </div>
+          <Show when={model.formatErrors && model.formatErrors.length > 0}>
+            <ul class="list-disc list-inside space-y-1">
+              <For each={model.formatErrors}>
+                {(err) => (
+                  <li class="text-xs text-red-600">{err}</li>
+                )}
+              </For>
+            </ul>
+          </Show>
+        </div>
+
+        {/* Editable textarea */}
+        <div class="border border-red-200 rounded-xl overflow-hidden">
+          <textarea
+            value={currentContent()}
+            onInput={(e) => setEditedContent((prev) => ({ ...prev, [mid]: e.currentTarget.value }))}
+            class="w-full min-h-[200px] max-h-[500px] p-4 text-sm font-mono text-[#191c1e] bg-[#fffbfb] border-0 focus:outline-none focus:ring-0 resize-y"
+          />
+        </div>
+
+        {/* Action buttons */}
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            onClick={() => handleRevalidate(mid)}
+            disabled={revalidating() === mid}
+          >
+            {revalidating() === mid ? "验证中..." : "重新验证"}
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors disabled:opacity-50"
+            onClick={() => handleAiFix(mid)}
+            disabled={aiFixModelId() !== null}
+          >
+            AI 修复
+          </button>
+        </div>
+
+        {/* AI Fix streaming preview */}
+        <Show when={aiFixModelId() === mid}>
+          <div class="border border-blue-200 bg-blue-50 rounded-xl p-4 space-y-3">
+            <div class="flex items-center gap-2">
+              <Show when={aiFixStreaming()}>
+                <span class="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
+              </Show>
+              <span class="text-sm font-medium text-blue-700">
+                {aiFixStreaming() ? "AI 修复中..." : "修复完成"}
+              </span>
+            </div>
+            <pre class="text-sm font-mono text-[#191c1e] whitespace-pre-wrap bg-white rounded-lg p-3 max-h-[300px] overflow-y-auto border border-blue-100">
+              {aiFixContent() || "..."}
+            </pre>
+            <Show when={!aiFixStreaming()}>
+              <div class="flex items-center gap-2">
+                <button
+                  type="button"
+                  class="px-4 py-2 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 transition-colors"
+                  onClick={() => handleAdoptFix(mid)}
+                >
+                  采用修复
+                </button>
+                <button
+                  type="button"
+                  class="px-4 py-2 text-xs font-medium text-[#464555] border border-[rgba(199,196,216,0.3)] rounded-lg hover:bg-[#f7f9fb] transition-colors"
+                  onClick={handleCancelFix}
+                >
+                  取消
+                </button>
+              </div>
+            </Show>
+            <Show when={aiFixStreaming()}>
+              <button
+                type="button"
+                class="px-4 py-2 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                onClick={handleCancelFix}
+              >
+                取消修复
+              </button>
+            </Show>
+          </div>
+        </Show>
+      </div>
+    );
   }
 
   // renderMarkdown is imported from lib/render-markdown.tsx
@@ -618,21 +875,29 @@ export default function ModelCallExecutor(props: Props) {
                         </div>
                       </Show>
 
-                      <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto">
-                        <Show
-                          when={viewMode() === "markdown"}
-                          fallback={
-                            <pre class="text-sm text-[#191c1e] whitespace-pre-wrap font-mono leading-relaxed">
-                              {model()?.content ?? ""}
-                            </pre>
-                          }
-                        >
-                          {renderMarkdown(model()?.content ?? "")}
-                        </Show>
-                        <Show when={model()?.status === "streaming"}>
-                          <span class="inline-block w-2 h-4 bg-indigo-500 animate-pulse ml-0.5" />
-                        </Show>
-                      </div>
+                      {/* format_error display */}
+                      <Show when={model()?.status === "format_error" ? model() : undefined}>
+                        {(errorModel) => renderFormatError(errorModel())}
+                      </Show>
+
+                      {/* Normal content (not format_error) */}
+                      <Show when={model()?.status !== "format_error"}>
+                        <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto">
+                          <Show
+                            when={viewMode() === "markdown"}
+                            fallback={
+                              <pre class="text-sm text-[#191c1e] whitespace-pre-wrap font-mono leading-relaxed">
+                                {model()?.content ?? ""}
+                              </pre>
+                            }
+                          >
+                            {renderMarkdown(model()?.content ?? "")}
+                          </Show>
+                          <Show when={model()?.status === "streaming"}>
+                            <span class="inline-block w-2 h-4 bg-indigo-500 animate-pulse ml-0.5" />
+                          </Show>
+                        </div>
+                      </Show>
                     </div>
                   );
                 })()}
@@ -694,27 +959,108 @@ export default function ModelCallExecutor(props: Props) {
                         </div>
                       </Show>
 
-                      <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto">
-                        <Show
-                          when={viewMode() === "markdown"}
-                          fallback={
-                            <pre class="text-sm text-[#191c1e] whitespace-pre-wrap font-mono leading-relaxed">
-                              {model().content}
-                            </pre>
-                          }
-                        >
-                          {renderMarkdown(model().content)}
-                        </Show>
-                        <Show when={model().status === "streaming"}>
-                          <span class="inline-block w-2 h-4 bg-indigo-500 animate-pulse ml-0.5" />
-                        </Show>
-                      </div>
+                      {/* format_error display */}
+                      <Show when={model().status === "format_error"}>
+                        {renderFormatError(model())}
+                      </Show>
+
+                      {/* Normal content (not format_error) */}
+                      <Show when={model().status !== "format_error"}>
+                        <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto">
+                          <Show
+                            when={viewMode() === "markdown"}
+                            fallback={
+                              <pre class="text-sm text-[#191c1e] whitespace-pre-wrap font-mono leading-relaxed">
+                                {model().content}
+                              </pre>
+                            }
+                          >
+                            {renderMarkdown(model().content)}
+                          </Show>
+                          <Show when={model().status === "streaming"}>
+                            <span class="inline-block w-2 h-4 bg-indigo-500 animate-pulse ml-0.5" />
+                          </Show>
+                        </div>
+                      </Show>
                     </div>
                   )}
                 </Show>
               </div>
             </Match>
           </Switch>
+
+          {/* Fallback warning */}
+          <Show when={fallbackWarning() && phase() === "done"}>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+              </svg>
+              <span class="text-sm text-amber-700">模型未按预期格式输出，已合并为单个产物</span>
+            </div>
+          </Show>
+
+          {/* Named output cards */}
+          <Show when={hasNamedOutputs() && phase() === "done"}>
+            <div class="space-y-3">
+              <Show when={isMultiModel()}>
+                {/* Multi-model: group by model */}
+                <For each={modelList().filter((m) => m.status === "completed" || m.status === "format_error")}>
+                  {(model) => {
+                    const modelArtifacts = () => {
+                      const no = namedOutputs();
+                      if (!no) return [];
+                      return Object.entries(no).filter(([_, v]) => v.modelId === model.modelId);
+                    };
+                    return (
+                      <Show when={modelArtifacts().length > 0}>
+                        <div class="space-y-2">
+                          <h4 class="text-sm font-semibold text-[#191c1e]">{model.modelDisplayName}</h4>
+                          <div class="space-y-2">
+                            <For each={modelArtifacts()}>
+                              {([artifactId, artifact]) => {
+                                const def = namedOutputDefs().find((d) => d.id === artifactId);
+                                return (
+                                  <NamedOutputCard
+                                    artifactId={artifactId}
+                                    artifactName={def?.name ?? artifactId}
+                                    content={artifact.content}
+                                    format={artifact.format}
+                                    modelId={artifact.modelId}
+                                    onContentChange={handleNamedOutputChange}
+                                    readonly={props.readOnly}
+                                  />
+                                );
+                              }}
+                            </For>
+                          </div>
+                        </div>
+                      </Show>
+                    );
+                  }}
+                </For>
+              </Show>
+
+              <Show when={!isMultiModel()}>
+                {/* Single model: render cards directly */}
+                <For each={Object.entries(namedOutputs() ?? {})}>
+                  {([artifactId, artifact]) => {
+                    const def = namedOutputDefs().find((d) => d.id === artifactId);
+                    return (
+                      <NamedOutputCard
+                        artifactId={artifactId}
+                        artifactName={def?.name ?? artifactId}
+                        content={artifact.content}
+                        format={artifact.format}
+                        modelId={artifact.modelId}
+                        onContentChange={handleNamedOutputChange}
+                        readonly={props.readOnly}
+                      />
+                    );
+                  }}
+                </For>
+              </Show>
+            </div>
+          </Show>
 
           {/* Output selection — show after at least one model completed */}
           <Show when={hasAnyCompleted() && !showCompare()}>

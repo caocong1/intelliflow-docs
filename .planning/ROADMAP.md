@@ -217,7 +217,13 @@ Plans:
 6. `{{n3.blueprint}}` returns named output content; `{{n3.clause_list.items[0].name}}` returns nested JSON field value
 7. `resolveRef()` auto-unwraps namedOutput/model objects to `.content` when no fieldPath; parses `.content` as JSON when fieldPath present
 8. Fallback: if AI doesn't follow delimiter format, entire output stored as default single artifact with frontend warning
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+
+- [ ] 24-01-PLAN.md — Shared types + backend validation/parsing + resolveRef fieldPath + derive-outputs
+- [ ] 24-02-PLAN.md — Frontend config UI: outputFormat/jsonSchema/namedOutputs panels + JsonSchemaEditor
+- [ ] 24-03-PLAN.md — Frontend runtime UI: format_error display, named output cards, AI fix, fallback warning
+- [ ] 24-04-PLAN.md — VariablePicker tree expansion + PromptEditor fieldPath highlighting
 
 ### Phase 25: Export Table Rendering + System Prompt Separation
 

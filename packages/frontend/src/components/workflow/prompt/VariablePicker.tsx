@@ -22,7 +22,7 @@ export function buildPickerItems(upstreamNodes: FlowNodeData[]): PickerItem[] {
   for (const node of upstreamNodes) {
     const outputs = (node.data.outputs as OutputDef[]).filter((o) => o.name);
     for (const output of outputs) {
-      items.push({ node, output, key: `${node.id}.${output.id}` });
+      items.push({ node, output, key: `${node.id}.${output.name}` });
     }
   }
   return items;
@@ -41,13 +41,27 @@ export default function VariablePicker(props: VariablePickerProps) {
   }
 
   function handleSelectOutput(node: FlowNodeData, output: OutputDef) {
-    const variableKey = `${node.id}.${output.id}`;
+    // Use segmentKey for outputId (resolveRef compatibility), fall back to output.id
+    const resolvedOutputId = output.segmentKey || output.id;
+    const variableName = `${node.id}.${output.name}`;
     const ref: VariableRef = {
       nodeId: node.id,
-      outputId: output.id,
-      variableName: variableKey,
+      outputId: resolvedOutputId,
+      variableName,
     };
-    props.onSelect(variableKey, ref);
+    props.onSelect(variableName, ref);
+  }
+
+  /** Determine output type from OutputDef.id prefix after nodeId */
+  function getOutputTypeIcon(output: OutputDef): { icon: string; class: string; title: string } {
+    const id = output.id;
+    // OutputDef.id format: ${nodeId}-field-${key}, ${nodeId}-fileslot-${key}, ${nodeId}-model-${key}, etc.
+    if (id.includes("-fileslot-")) return { icon: "\uD83D\uDCC1", class: "bg-purple-100 text-purple-600", title: "文件槽" };
+    if (id.includes("-model-")) return { icon: "\uD83E\uDD16", class: "bg-amber-100 text-amber-600", title: "模型输出" };
+    if (id.includes("-desensitized-")) return { icon: "\uD83D\uDD12", class: "bg-orange-100 text-orange-600", title: "脱敏" };
+    if (id.includes("-restored-")) return { icon: "\uD83D\uDD13", class: "bg-green-100 text-green-600", title: "恢复" };
+    // Default: field type
+    return { icon: "T", class: "bg-slate-100 text-slate-600", title: "文本字段" };
   }
 
   const filteredNodes = () =>
@@ -70,7 +84,7 @@ export default function VariablePicker(props: VariablePickerProps) {
         ? outputs
         : outputs.filter((o) => matchesSearch(node.data.label) || matchesSearch(o.name));
       for (const output of filtered) {
-        items.push({ node, output, key: `${node.id}.${output.id}` });
+        items.push({ node, output, key: `${node.id}.${output.name}` });
       }
     }
     return items;
@@ -127,7 +141,7 @@ export default function VariablePicker(props: VariablePickerProps) {
                 {/* Outputs */}
                 <For each={outputs()}>
                   {(output) => {
-                    const itemKey = `${node.id}.${output.id}`;
+                    const itemKey = `${node.id}.${output.name}`;
                     const isHighlighted = () => {
                       const idx = props.highlightedIndex;
                       if (idx === undefined || idx < 0) return false;
@@ -138,14 +152,22 @@ export default function VariablePicker(props: VariablePickerProps) {
                       <button
                         type="button"
                         data-picker-key={itemKey}
-                        class={`w-full text-left px-4 py-1.5 text-xs transition-colors cursor-pointer focus:outline-none ${
+                        class={`w-full text-left px-4 py-1.5 text-xs transition-colors cursor-pointer focus:outline-none flex items-center gap-1.5 ${
                           isHighlighted()
                             ? "bg-indigo-50 text-indigo-700"
                             : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
                         }`}
                         onClick={() => handleSelectOutput(node, output)}
                       >
-                        <span class="text-slate-400 mr-1">{node.data.label}.</span>
+                        {(() => {
+                          const typeIcon = getOutputTypeIcon(output);
+                          return (
+                            <span class={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${typeIcon.class}`} title={typeIcon.title}>
+                              {typeIcon.icon}
+                            </span>
+                          );
+                        })()}
+                        <span class="text-slate-400 mr-0.5">{node.data.label}.</span>
                         <span class="font-medium">{output.name}</span>
                       </button>
                     );

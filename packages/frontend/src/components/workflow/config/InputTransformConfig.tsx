@@ -143,9 +143,40 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
   function validateMachineKey(value: string): string | null {
     if (!value) return null;
     if (!MACHINE_KEY_REGEX.test(value)) {
-      return "只允许英文字母、数字和下划线，且不能以数字开头";
+      return "标识符格式错误，仅允许字母、数字和下划线，不能以数字开头";
     }
     return null;
+  }
+
+  /** Collect all segmentKeys within the node (machineKey + fileSlotId values) for collision detection */
+  function getSegmentKeyCollision(currentFieldId: string, key: string, keyType: "machineKey" | "fileSlotId"): string | null {
+    if (!key) return null;
+    for (const f of props.config.formFields) {
+      if (f.id === currentFieldId) continue;
+      if (f.machineKey === key) {
+        return `与 "${f.label || "未命名字段"}" 的机器标识冲突`;
+      }
+      if (f.fileSlotId === key) {
+        return `与 "${f.label || "未命名字段"}" 的文件槽标识冲突`;
+      }
+    }
+    // Also check same-field cross-key collision
+    if (keyType === "machineKey") {
+      const field = props.config.formFields.find((f) => f.id === currentFieldId);
+      if (field?.fileSlotId === key) return "与本字段的文件槽标识冲突";
+    }
+    if (keyType === "fileSlotId") {
+      const field = props.config.formFields.find((f) => f.id === currentFieldId);
+      if (field?.machineKey === key) return "与本字段的机器标识冲突";
+    }
+    return null;
+  }
+
+  /** Check if a field has any advanced setting configured */
+  function hasAdvancedValues(field: FormFieldDef): boolean {
+    if (field.machineKey) return true;
+    if (field.type === "file" && (field.fileSlotId || field.fileSlotLabel)) return true;
+    return false;
   }
 
   return (
@@ -212,6 +243,9 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
             {(field, index) => {
               const typeOpt = () => getTypeOption(field().type);
               const machineKeyError = () => validateMachineKey(field().machineKey ?? "");
+              const machineKeyCollision = () => getSegmentKeyCollision(field().id, field().machineKey ?? "", "machineKey");
+              const fileSlotIdError = () => validateMachineKey(field().fileSlotId ?? "");
+              const fileSlotIdCollision = () => getSegmentKeyCollision(field().id, field().fileSlotId ?? "", "fileSlotId");
               return (
                 <div class="bg-slate-50 rounded-lg border border-slate-200 p-3">
                   {/* Top row: move buttons + label input + type badge + delete */}
@@ -510,7 +544,7 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
                     </div>
                   </Show>
 
-                  {/* Advanced Settings (machineKey) */}
+                  {/* Advanced Settings (machineKey + fileSlotId/fileSlotLabel for file fields) */}
                   <div class="mt-2 pl-7">
                     <button
                       type="button"
@@ -528,22 +562,67 @@ export default function InputTransformConfigPanel(props: InputTransformConfigPro
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                       </svg>
                       高级设置
+                      <Show when={hasAdvancedValues(field())}>
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 inline-block" title="已配置高级设置" />
+                      </Show>
                     </button>
                     <Show when={expandedAdvanced()[field().id]}>
-                      <div class="mt-2 space-y-1.5">
-                        <label for={`machinekey-${field().id}`} class="block text-xs text-slate-600">
-                          机器标识 (machineKey)
-                        </label>
-                        <input
-                          id={`machinekey-${field().id}`}
-                          type="text"
-                          value={field().machineKey ?? ""}
-                          onInput={(e) => updateField(field().id, { machineKey: e.currentTarget.value || undefined })}
-                          placeholder={`如: field_${index + 1}`}
-                          class={`w-full text-xs px-2 py-1.5 border rounded-md bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 ${machineKeyError() ? "border-red-500" : "border-gray-300"}`}
-                        />
-                        <Show when={machineKeyError()}>
-                          <p class="text-red-500 text-[10px]">{machineKeyError()}</p>
+                      <div class="mt-2 space-y-3 p-3 bg-white rounded-md border border-slate-200">
+                        {/* machineKey (all field types) */}
+                        <div class="space-y-1.5">
+                          <label for={`machinekey-${field().id}`} class="block text-xs text-slate-600">
+                            机器标识 (machineKey)
+                          </label>
+                          <input
+                            id={`machinekey-${field().id}`}
+                            type="text"
+                            value={field().machineKey ?? ""}
+                            onInput={(e) => updateField(field().id, { machineKey: e.currentTarget.value || undefined })}
+                            placeholder="如: project_name"
+                            class={`w-full text-xs px-2 py-1.5 border rounded-md bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 ${machineKeyError() || machineKeyCollision() ? "border-red-500" : "border-gray-300"}`}
+                          />
+                          <Show when={machineKeyError()}>
+                            <p class="text-red-500 text-[10px]">{machineKeyError()}</p>
+                          </Show>
+                          <Show when={!machineKeyError() && machineKeyCollision()}>
+                            <p class="text-amber-600 text-[10px]">{machineKeyCollision()}</p>
+                          </Show>
+                        </div>
+
+                        {/* fileSlotId + fileSlotLabel (file fields only) */}
+                        <Show when={field().type === "file"}>
+                          <div class="space-y-1.5">
+                            <label for={`fileslotid-${field().id}`} class="block text-xs text-slate-600">
+                              文件槽标识 (fileSlotId)
+                            </label>
+                            <input
+                              id={`fileslotid-${field().id}`}
+                              type="text"
+                              value={field().fileSlotId ?? ""}
+                              onInput={(e) => updateField(field().id, { fileSlotId: e.currentTarget.value || undefined })}
+                              placeholder="如: contract_files"
+                              class={`w-full text-xs px-2 py-1.5 border rounded-md bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 ${fileSlotIdError() || fileSlotIdCollision() ? "border-red-500" : "border-gray-300"}`}
+                            />
+                            <Show when={fileSlotIdError()}>
+                              <p class="text-red-500 text-[10px]">{fileSlotIdError()}</p>
+                            </Show>
+                            <Show when={!fileSlotIdError() && fileSlotIdCollision()}>
+                              <p class="text-amber-600 text-[10px]">{fileSlotIdCollision()}</p>
+                            </Show>
+                          </div>
+                          <div class="space-y-1.5">
+                            <label for={`fileslotlabel-${field().id}`} class="block text-xs text-slate-600">
+                              文件槽显示名 (fileSlotLabel)
+                            </label>
+                            <input
+                              id={`fileslotlabel-${field().id}`}
+                              type="text"
+                              value={field().fileSlotLabel ?? ""}
+                              onInput={(e) => updateField(field().id, { fileSlotLabel: e.currentTarget.value || undefined })}
+                              placeholder="如: 合同文件"
+                              class="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-md bg-white text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+                            />
+                          </div>
                         </Show>
                       </div>
                     </Show>

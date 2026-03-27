@@ -22,23 +22,25 @@ interface PromptEditorProps {
 }
 
 /**
- * Resolve a variable key (nodeId.outputId) to its display name (nodeLabel.outputName).
+ * Resolve a variable key (nodeId.segmentKey) to its display name (nodeLabel.outputName).
+ * Looks up by segmentKey first, then falls back to output.id match.
  * Falls back to the raw key if the node/output can't be found.
  */
 function resolveVarDisplayName(varKey: string, upstreamNodes: FlowNodeData[]): string {
   const dotIndex = varKey.indexOf(".");
   if (dotIndex < 0) return varKey;
   const nodeId = varKey.slice(0, dotIndex);
-  const outputId = varKey.slice(dotIndex + 1);
+  const outputKey = varKey.slice(dotIndex + 1);
   const node = upstreamNodes.find((n) => n.id === nodeId);
   if (!node) return varKey;
   const outputs = node.data.outputs as OutputDef[];
-  const output = outputs.find((o) => o.id === outputId);
-  if (!output) return `${node.data.label}.${outputId}`;
+  // Look up by segmentKey first, then by id for backward compatibility
+  const output = outputs.find((o) => o.segmentKey === outputKey) ?? outputs.find((o) => o.id === outputKey);
+  if (!output) return `${node.data.label}.${outputKey}`;
   return `${node.data.label}.${output.name}`;
 }
 
-/** Resolve which node type owns this variable key (nodeId.outputId) */
+/** Resolve which node type owns this variable key (nodeId.segmentKey) */
 function resolveNodeType(varKey: string, upstreamNodes: FlowNodeData[]): string {
   const dotIndex = varKey.indexOf(".");
   if (dotIndex < 0) return "system";
@@ -126,6 +128,11 @@ export default function PromptEditor(props: PromptEditorProps) {
   let isUpdatingFromProp = false;
   let blurTimer: ReturnType<typeof setTimeout> | undefined;
 
+  /** Convert a VariableRef to the storage key (nodeId.segmentKey) used in {{...}} */
+  function refToStorageKey(ref: VariableRef): string {
+    return `${ref.nodeId}.${ref.outputId}`;
+  }
+
   // Update DOM when value prop changes externally (e.g. after optimize)
   // We use a simple comparison — only update if serialized content differs
   function syncEditorFromProp() {
@@ -207,7 +214,9 @@ export default function PromptEditor(props: PromptEditorProps) {
         e.preventDefault();
         const item = items[highlightedIndex()];
         if (item) {
-          insertVariable(item.key);
+          // Use segmentKey for storage, fall back to output.id
+          const storageKey = `${item.node.id}.${item.output.segmentKey || item.output.id}`;
+          insertVariable(storageKey);
         }
         return;
       }
@@ -348,7 +357,11 @@ export default function PromptEditor(props: PromptEditorProps) {
           <VariablePicker
             upstreamNodes={props.upstreamNodes}
             highlightedIndex={highlightedIndex()}
-            onSelect={(name) => insertVariable(name)}
+            onSelect={(_name, ref) => {
+              if (ref) {
+                insertVariable(refToStorageKey(ref));
+              }
+            }}
             onClose={() => setShowPicker(false)}
           />
         </Show>

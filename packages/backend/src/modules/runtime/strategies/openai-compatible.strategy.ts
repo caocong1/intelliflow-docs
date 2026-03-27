@@ -6,17 +6,25 @@ export class OpenAICompatibleStrategy implements ModelCallStrategy {
   async execute({
     model,
     resolvedPrompt,
+    resolvedSystemPrompt,
     sendEvent,
   }: {
     model: ModelCallInput;
     resolvedPrompt: string;
+    resolvedSystemPrompt?: string;
     sendEvent: (event: SSEEvent) => void;
   }): Promise<ModelCallResult> {
     let fullContent = "";
 
+    const messages: Array<{ role: string; content: string }> = [];
+    if (resolvedSystemPrompt) {
+      messages.push({ role: "system", content: resolvedSystemPrompt });
+    }
+    messages.push({ role: "user", content: resolvedPrompt });
+
     const body: Record<string, unknown> = {
       model: model.modelId,
-      messages: [{ role: "user", content: resolvedPrompt }],
+      messages,
       stream: true,
     };
 
@@ -39,7 +47,7 @@ export class OpenAICompatibleStrategy implements ModelCallStrategy {
       method: "POST",
       headers,
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(600000),
     });
 
     if (!response.ok) {

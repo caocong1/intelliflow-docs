@@ -6,10 +6,12 @@ export class ClaudeAgentSDKStrategy implements ModelCallStrategy {
   async execute({
     model,
     resolvedPrompt,
+    resolvedSystemPrompt,
     sendEvent,
   }: {
     model: ModelCallInput;
     resolvedPrompt: string;
+    resolvedSystemPrompt?: string;
     sendEvent: (event: SSEEvent) => void;
   }): Promise<ModelCallResult> {
     let fullContent = "";
@@ -17,7 +19,7 @@ export class ClaudeAgentSDKStrategy implements ModelCallStrategy {
     const agentMode = model.agentMode ?? "simple_chat";
 
     if (agentMode === "autonomous_agent") {
-      return this.executeAutonomous({ model, resolvedPrompt, sendEvent });
+      return this.executeAutonomous({ model, resolvedPrompt, resolvedSystemPrompt, sendEvent });
     }
 
     // Simple chat mode: use Anthropic Messages API with streaming
@@ -35,8 +37,9 @@ export class ClaudeAgentSDKStrategy implements ModelCallStrategy {
         stream: true,
         ...(model.temperature != null && { temperature: model.temperature }),
         ...(model.topP != null && { top_p: model.topP }),
+        ...(resolvedSystemPrompt && { system: resolvedSystemPrompt }),
       }),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(600000),
     });
 
     if (!response.ok) {
@@ -95,10 +98,12 @@ export class ClaudeAgentSDKStrategy implements ModelCallStrategy {
   private async executeAutonomous({
     model,
     resolvedPrompt,
+    resolvedSystemPrompt,
     sendEvent,
   }: {
     model: ModelCallInput;
     resolvedPrompt: string;
+    resolvedSystemPrompt?: string;
     sendEvent: (event: SSEEvent) => void;
   }): Promise<ModelCallResult> {
     // Dynamic import to avoid loading SDK when not needed
@@ -109,8 +114,13 @@ export class ClaudeAgentSDKStrategy implements ModelCallStrategy {
     const maxTurns = model.agentMaxTurns ?? 15;
     const maxBudgetUsd = model.agentMaxBudgetUsd ? Number.parseFloat(model.agentMaxBudgetUsd) : 2.0;
 
+    // Prepend system prompt if present
+    const fullPrompt = resolvedSystemPrompt
+      ? `${resolvedSystemPrompt}\n\n${resolvedPrompt}`
+      : resolvedPrompt;
+
     for await (const msg of query({
-      prompt: resolvedPrompt,
+      prompt: fullPrompt,
       options: {
         allowedTools: allowedTools,
         disallowedTools: ["Bash"],

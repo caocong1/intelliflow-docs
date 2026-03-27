@@ -267,6 +267,7 @@ export const modelCallLogs = pgTable("model_call_logs", {
   callSource: callSourceEnum("call_source").default("runtime").notNull(),
   // Prompt
   promptTemplate: text("prompt_template"),
+  systemPrompt: text("system_prompt"),
   resolvedPrompt: text("resolved_prompt"),
   variableMapping: jsonb("variable_mapping"),
   temperature: real("temperature"),

@@ -167,7 +167,17 @@ export interface ModelCallConfig {
   /** @deprecated Use modelIds instead. Kept for backward compatibility. */
   modelId?: string | null;
   promptTemplate: string;
+  /** Optional system prompt template for AI persona/role */
+  systemPromptTemplate?: string;
   inputRefs: VariableRef[];
+  /** Output format declaration */
+  outputFormat?: "text" | "json" | "markdown";
+  /** JSON Schema for validation (only when outputFormat=json) */
+  jsonSchema?: object;
+  /** Description displayed to user during execution */
+  stepDescription?: string;
+  /** Named artifact definitions for multi-segment output */
+  namedOutputs?: NamedOutputDef[];
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
@@ -391,14 +401,23 @@ export interface DesensitizeRuleDesc {
   description: string;
 }
 
+/** Named output definition for model call nodes */
+export interface NamedOutputDef {
+  id: string;       // segmentKey, e.g. "blueprint"
+  name: string;     // display name, e.g. "投标蓝图"
+  format: "text" | "json" | "markdown";
+  jsonSchema?: object;  // per-artifact JSON Schema
+}
+
 /** Model call output for a single model */
 export interface ModelOutput {
   modelId: string;
   modelDisplayName: string;
   content: string;
-  status: "pending" | "streaming" | "completed" | "failed";
+  status: "pending" | "streaming" | "completed" | "failed" | "format_error";
   errorMessage?: string;
   tokenCount?: number;
+  formatErrors?: string[];
 }
 
 /** SSE event types for model streaming */

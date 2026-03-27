@@ -31,6 +31,7 @@ export interface ModelCallStrategy {
   execute(params: {
     model: ModelCallInput;
     resolvedPrompt: string;
+    resolvedSystemPrompt?: string;
     sendEvent: (event: SSEEvent) => void;
   }): Promise<ModelCallResult>;
 }

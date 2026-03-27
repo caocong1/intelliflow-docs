@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T03:07:00.000Z"
+last_updated: "2026-03-27T03:14:00.157Z"
 progress:
   total_phases: 26
   completed_phases: 22
   total_plans: 76
-  completed_plans: 74
+  completed_plans: 75
 ---
 
 # Project State
@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 23 in progress — Output Path Grammar + File Slots + Export ContentMapping, plan 01 complete
+**Current focus:** Phase 23 in progress — Output Path Grammar + File Slots + Export ContentMapping, plan 02 complete
 
 ## Current Position
 
 Phase: 23 of 26 (Output Path Grammar + File Slots + Export ContentMapping)
-Plan: 1 of 3
+Plan: 2 of 3
 Status: In Progress
-Last activity: 2026-03-27 — Completed 23-01 (foundation types + derive-outputs + schema + validation)
+Last activity: 2026-03-27 — Completed 23-02 (backend runtime: resolveRef + fileSlots + export contentMapping)
 
 Progress: [███████████████████░] 97%
 
@@ -66,6 +66,7 @@ Progress: [███████████████████░] 97%
 | Phase 22-02 P02 | 5min | 2 tasks | 3 files |
 | Phase 22-03 P03 | 3min | 2 tasks | 3 files |
 | Phase 23-01 P01 | 3min | 2 tasks | 5 files |
+| Phase 23 P02 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,9 @@ Recent decisions affecting current work:
 - [23-01]: segmentKey optional on OutputDef for backward compatibility; validation uses o.segmentKey || o.id fallback
 - [23-01]: File slots with fileSlotId generate fileslot-prefixed OutputDef; merged file-upload output kept for backward compat
 - [23-01]: desensitize/restore segmentKey derived from src.outputId for consistent upstream reference
+- [23-02]: resolveRef 6-level priority chain: fieldsByKey -> fields -> fileSlots -> namedOutputs -> models -> direct property
+- [23-02]: Failed contentMapping refs skipped with console.warn (not errors), per user constraint
+- [23-02]: Empty contentMapping falls through to existing upstream-scan logic for backward compatibility
 
 ### Roadmap Evolution
 
@@ -150,5 +154,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 23-01-PLAN.md (foundation types + derive-outputs + schema + validation)
+Stopped at: Completed 23-02-PLAN.md (backend runtime: resolveRef + fileSlots + export contentMapping)
 Resume file: None

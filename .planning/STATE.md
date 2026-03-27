@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T03:14:00.157Z"
+last_updated: "2026-03-27T04:16:37Z"
 progress:
   total_phases: 26
   completed_phases: 22
   total_plans: 76
-  completed_plans: 75
+  completed_plans: 76
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 23 of 26 (Output Path Grammar + File Slots + Export ContentMapping)
-Plan: 2 of 3
+Phase: 24 of 26 (Structured Output + Named Artifacts + Field References)
+Plan: 1 of 4
 Status: In Progress
-Last activity: 2026-03-27 — Completed 23-02 (backend runtime: resolveRef + fileSlots + export contentMapping)
+Last activity: 2026-03-27 — Completed 24-01 (structured output validation, named artifact parsing, field references)
 
 Progress: [███████████████████░] 97%
 
@@ -67,6 +67,7 @@ Progress: [███████████████████░] 97%
 | Phase 22-03 P03 | 3min | 2 tasks | 3 files |
 | Phase 23-01 P01 | 3min | 2 tasks | 5 files |
 | Phase 23 P02 | 3min | 2 tasks | 3 files |
+| Phase 24 P01 | 7min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,10 @@ Recent decisions affecting current work:
 - [23-02]: resolveRef 6-level priority chain: fieldsByKey -> fields -> fileSlots -> namedOutputs -> models -> direct property
 - [23-02]: Failed contentMapping refs skipped with console.warn (not errors), per user constraint
 - [23-02]: Empty contentMapping falls through to existing upstream-scan logic for backward compatibility
+- [24-01]: resolveFieldPath uses recursive descent with [*] array traversal returning JSON.stringify of mapped results
+- [24-01]: Named output parsing falls back to _default artifact when delimiter markers not found
+- [24-01]: AI fix endpoint streams repair via SSE and auto-validates fixed output
+- [24-01]: Prompt injection order: desensitize rules > jsonSchema > namedOutputs delimiters
 
 ### Roadmap Evolution
 
@@ -154,5 +159,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 23-02-PLAN.md (backend runtime: resolveRef + fileSlots + export contentMapping)
+Stopped at: Completed 24-01-PLAN.md (structured output validation, named artifact parsing, field references)
 Resume file: None

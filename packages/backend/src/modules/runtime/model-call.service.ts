@@ -50,6 +50,14 @@ export async function resolvePromptTemplate(
         value = fields[fieldKey] ?? fields[outputId];
       }
     }
+    // Fallback: check fieldsByKey (machineKey-indexed dual view)
+    if (value === undefined || value === null) {
+      const fieldsByKey = od.fieldsByKey as Record<string, unknown> | undefined;
+      if (fieldsByKey) {
+        value = fieldsByKey[outputId];
+      }
+    }
+
     if (value === undefined || value === null) return _match;
     const resolvedValue = typeof value === "string" ? value : JSON.stringify(value);
     mapping[`{{${varName}}}`] = resolvedValue;

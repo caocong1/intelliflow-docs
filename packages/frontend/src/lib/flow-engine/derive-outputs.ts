@@ -9,9 +9,10 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
     case "input_transform": {
       const outputs: OutputDef[] = [];
       for (const field of config.formFields) {
-        if (field.type === "text" || field.type === "textarea") {
+        if (field.type !== "file") {
+          const segmentKey = field.machineKey || field.id;
           outputs.push({
-            id: `${nodeId}-field-${field.id}`,
+            id: `${nodeId}-field-${segmentKey}`,
             name: field.label || "未命名",
             description: `用户输入项: ${field.label}`,
           });

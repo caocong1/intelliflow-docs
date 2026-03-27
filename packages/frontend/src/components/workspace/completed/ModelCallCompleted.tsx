@@ -1,7 +1,8 @@
-import type { ModelCallConfig, NodeConfig, NodeExecution } from "@intelliflow/shared";
+import type { ModelCallConfig, NamedOutputDef, NodeConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal } from "solid-js";
 import { formatDuration, formatShortTime } from "../../../lib/format-utils";
 import { renderMarkdown } from "../../../lib/render-markdown";
+import NamedOutputCard from "../nodes/NamedOutputCard";
 
 interface ModelOutput {
   content: string;
@@ -29,6 +30,8 @@ export default function ModelCallCompleted(props: Props) {
       models?: Record<string, ModelOutput>;
       selectedContent?: string;
       selectedModelId?: string;
+      namedOutputs?: Record<string, { content: string; format: string; modelId: string }>;
+      fallbackWarning?: boolean;
     } | null;
 
   const modelEntries = () => {
@@ -43,6 +46,17 @@ export default function ModelCallCompleted(props: Props) {
     if (selectedKey && od()?.models?.[selectedKey]) return selectedKey;
     return entries[0]?.key ?? "";
   };
+
+  const hasNamedOutputs = () => {
+    const no = od()?.namedOutputs;
+    return no !== undefined && no !== null && Object.keys(no).length > 0;
+  };
+
+  const namedOutputDefs = (): NamedOutputDef[] => {
+    return (cfg() as ModelCallConfig | undefined)?.namedOutputs ?? [];
+  };
+
+  const fallbackWarning = () => od()?.fallbackWarning ?? false;
 
   const [viewMode, setViewMode] = createSignal<"markdown" | "source">("markdown");
   const [selectedModelId, setSelectedModelId] = createSignal(initialModelId());
@@ -266,6 +280,14 @@ export default function ModelCallCompleted(props: Props) {
                       选中
                     </span>
                   </Show>
+                  <Show when={model.status === "format_error"}>
+                    <span
+                      class="text-[9px] px-1.5 py-0.5 rounded font-bold"
+                      style={{ background: "rgba(239,68,68,0.3)", color: "#fca5a5" }}
+                    >
+                      格式错误
+                    </span>
+                  </Show>
                 </button>
               )}
             </For>
@@ -275,16 +297,72 @@ export default function ModelCallCompleted(props: Props) {
 
       {/* Content area */}
       <div class="flex-1 overflow-y-auto">
-        <div class="max-w-4xl mx-auto px-12 py-10">
-          <Show
-            when={viewMode() === "markdown"}
-            fallback={
-              <pre class="text-sm font-mono text-[#464555] whitespace-pre-wrap leading-relaxed bg-[#f7f9fb] rounded-xl p-6 overflow-x-auto">
-                {content() || "(无内容)"}
-              </pre>
-            }
-          >
-            <div class="prose-editorial">{renderMarkdown(content())}</div>
+        <div class="max-w-4xl mx-auto px-12 py-10 space-y-4">
+          {/* Fallback warning */}
+          <Show when={fallbackWarning()}>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
+              <svg class="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+              </svg>
+              <span class="text-sm text-amber-700">模型未按预期格式输出，已合并为单个产物</span>
+            </div>
+          </Show>
+
+          {/* Named output cards mode */}
+          <Show when={hasNamedOutputs()}>
+            <div class="space-y-3">
+              <Show when={modelEntries().length > 1}>
+                {/* Multi-model: show cards for active model tab */}
+                <For each={Object.entries(od()?.namedOutputs ?? {}).filter(([_, v]) => v.modelId === selectedModelId())}>
+                  {([artifactId, artifact]) => {
+                    const def = namedOutputDefs().find((d) => d.id === artifactId);
+                    return (
+                      <NamedOutputCard
+                        artifactId={artifactId}
+                        artifactName={def?.name ?? artifactId}
+                        content={artifact.content}
+                        format={artifact.format}
+                        modelId={artifact.modelId}
+                        readonly={true}
+                      />
+                    );
+                  }}
+                </For>
+              </Show>
+
+              <Show when={modelEntries().length <= 1}>
+                {/* Single model: show all named output cards */}
+                <For each={Object.entries(od()?.namedOutputs ?? {})}>
+                  {([artifactId, artifact]) => {
+                    const def = namedOutputDefs().find((d) => d.id === artifactId);
+                    return (
+                      <NamedOutputCard
+                        artifactId={artifactId}
+                        artifactName={def?.name ?? artifactId}
+                        content={artifact.content}
+                        format={artifact.format}
+                        modelId={artifact.modelId}
+                        readonly={true}
+                      />
+                    );
+                  }}
+                </For>
+              </Show>
+            </div>
+          </Show>
+
+          {/* Standard content (when no named outputs) */}
+          <Show when={!hasNamedOutputs()}>
+            <Show
+              when={viewMode() === "markdown"}
+              fallback={
+                <pre class="text-sm font-mono text-[#464555] whitespace-pre-wrap leading-relaxed bg-[#f7f9fb] rounded-xl p-6 overflow-x-auto">
+                  {content() || "(无内容)"}
+                </pre>
+              }
+            >
+              <div class="prose-editorial">{renderMarkdown(content())}</div>
+            </Show>
           </Show>
         </div>
       </div>

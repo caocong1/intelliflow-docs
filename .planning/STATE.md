@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T03:02:43.606Z"
+last_updated: "2026-03-27T03:07:00.000Z"
 progress:
   total_phases: 26
   completed_phases: 22
   total_plans: 76
-  completed_plans: 73
+  completed_plans: 74
 ---
 
 # Project State
@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 22 in progress — Bug fixes and FormFieldDef type extension, plan 03 complete
+**Current focus:** Phase 23 in progress — Output Path Grammar + File Slots + Export ContentMapping, plan 01 complete
 
 ## Current Position
 
-Phase: 22 of 26 (Bug Fixes + Form Field Type Extension)
-Plan: 3 of 3
+Phase: 23 of 26 (Output Path Grammar + File Slots + Export ContentMapping)
+Plan: 1 of 3
 Status: In Progress
-Last activity: 2026-03-27 — Completed 22-03 (fieldsByKey dual-view + runtime validation + machineKey derive-outputs)
+Last activity: 2026-03-27 — Completed 23-01 (foundation types + derive-outputs + schema + validation)
 
 Progress: [███████████████████░] 97%
 
@@ -65,6 +65,7 @@ Progress: [███████████████████░] 97%
 | Phase 22-01 P01 | 2min | 2 tasks | 3 files |
 | Phase 22-02 P02 | 5min | 2 tasks | 3 files |
 | Phase 22-03 P03 | 3min | 2 tasks | 3 files |
+| Phase 23-01 P01 | 3min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,9 @@ Recent decisions affecting current work:
 - [22-03]: Workflow config loaded via workflowId JOIN (not workflowSnapshot) matching existing codebase pattern
 - [22-03]: Variable resolution order: direct outputData key -> fields[UUID] -> fieldsByKey[machineKey]
 - [22-03]: Validation errors collected and thrown as single AppError(400) with all field errors joined
+- [23-01]: segmentKey optional on OutputDef for backward compatibility; validation uses o.segmentKey || o.id fallback
+- [23-01]: File slots with fileSlotId generate fileslot-prefixed OutputDef; merged file-upload output kept for backward compat
+- [23-01]: desensitize/restore segmentKey derived from src.outputId for consistent upstream reference
 
 ### Roadmap Evolution
 
@@ -146,5 +150,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 22-03-PLAN.md (fieldsByKey dual-view + runtime validation + machineKey derive-outputs)
+Stopped at: Completed 23-01-PLAN.md (foundation types + derive-outputs + schema + validation)
 Resume file: None

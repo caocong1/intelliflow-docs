@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T02:55:28Z"
+last_updated: "2026-03-27T03:02:43.606Z"
 progress:
   total_phases: 26
-  completed_phases: 21
-  total_plans: 70
-  completed_plans: 70
+  completed_phases: 22
+  total_plans: 76
+  completed_plans: 73
 ---
 
 # Project State

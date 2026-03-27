@@ -99,6 +99,10 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
 
   const selectedModelIds = () => props.config.modelIds ?? [];
 
+  // System Prompt collapse state
+  const [systemPromptExpanded, setSystemPromptExpanded] = createSignal(false);
+  const hasSystemPrompt = () => props.config.systemPromptTemplate !== undefined;
+
   function toggleModel(modelId: string, displayName?: string) {
     const current = selectedModelIds();
     const isRemoving = current.includes(modelId);
@@ -250,9 +254,55 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
         </label>
       </div>
 
-      {/* Prompt Editor */}
+      {/* System Prompt — collapsible */}
       <div class="border-t border-slate-100 pt-3">
-        <p class="text-sm font-medium text-gray-700 mb-1">提示词模板</p>
+        <Show when={hasSystemPrompt()} fallback={
+          <button
+            type="button"
+            class="text-xs text-purple-600 hover:text-purple-800 font-medium cursor-pointer"
+            onClick={() => {
+              props.onChange({ ...props.config, systemPromptTemplate: "" });
+              setSystemPromptExpanded(true);
+            }}
+          >
+            + 添加 System Prompt
+          </button>
+        }>
+          {/* Header with expand/collapse toggle */}
+          <div class="flex items-center justify-between mb-1">
+            <button type="button" class="flex items-center gap-1 cursor-pointer" onClick={() => setSystemPromptExpanded(!systemPromptExpanded())}>
+              <span class="text-xs text-gray-500">{systemPromptExpanded() ? "▼" : "▶"}</span>
+              <span class="text-sm font-medium text-gray-700">System Prompt</span>
+            </button>
+            <button type="button" class="text-xs text-red-400 hover:text-red-600 cursor-pointer" onClick={() => {
+              props.onChange({ ...props.config, systemPromptTemplate: undefined });
+              setSystemPromptExpanded(false);
+            }}>移除</button>
+          </div>
+          {/* Collapsed summary */}
+          <Show when={!systemPromptExpanded()}>
+            <p class="text-xs text-gray-400 truncate pl-4">
+              {(props.config.systemPromptTemplate ?? "").slice(0, 50) || "(空)"}
+              {(props.config.systemPromptTemplate ?? "").length > 50 ? "..." : ""}
+            </p>
+          </Show>
+          {/* Expanded editor */}
+          <Show when={systemPromptExpanded()}>
+            <PromptEditor
+              value={props.config.systemPromptTemplate ?? ""}
+              availableVariables={availableVariables()}
+              upstreamNodes={props.upstreamNodes}
+              onChange={(v) => props.onChange({ ...props.config, systemPromptTemplate: v })}
+            />
+          </Show>
+        </Show>
+      </div>
+
+      {/* User Prompt Editor */}
+      <div class="border-t border-slate-100 pt-3">
+        <p class="text-sm font-medium text-gray-700 mb-1">
+          {hasSystemPrompt() ? "User Prompt" : "提示词模板"}
+        </p>
         <PromptEditor
           value={props.config.promptTemplate}
           availableVariables={availableVariables()}

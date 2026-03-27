@@ -8,6 +8,7 @@ interface ModelCallLogEntry {
   modelId: string | null;
   modelName: string | null;
   promptTemplate: string | null;
+  systemPrompt: string | null;
   resolvedPrompt: string | null;
   variableMapping: Record<string, string> | null;
   temperature: number | null;
@@ -52,6 +53,8 @@ export default function ModelCallLogs() {
   const [page, setPage] = createSignal(1);
   const [loading, setLoading] = createSignal(false);
   const [expandedId, setExpandedId] = createSignal<string | null>(null);
+  const [systemPromptOpen, setSystemPromptOpen] = createSignal<string | null>(null);
+  const [userPromptOpen, setUserPromptOpen] = createSignal<string | null>(null);
   const limit = 20;
 
   // Filters
@@ -253,13 +256,45 @@ export default function ModelCallLogs() {
                         <tr class="bg-gray-50 border-b border-gray-200">
                           <td colSpan={6} class="px-4 py-4">
                             <div class="space-y-4 text-sm">
-                              {/* Resolved prompt */}
+                              {/* System Prompt section — only when present */}
+                              <Show when={log.systemPrompt}>
+                                <div>
+                                  <button type="button" class="flex items-center gap-1 font-medium text-gray-700 mb-1 cursor-pointer"
+                                    onClick={() => setSystemPromptOpen(systemPromptOpen() === log.id ? null : log.id)}>
+                                    <span class="text-xs text-gray-500">{systemPromptOpen() === log.id ? "▼" : "▶"}</span>
+                                    <h4 class="text-sm">System Prompt</h4>
+                                  </button>
+                                  <Show when={systemPromptOpen() === log.id}>
+                                    <pre class="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-600 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                      {log.systemPrompt}
+                                    </pre>
+                                  </Show>
+                                  <Show when={systemPromptOpen() !== log.id}>
+                                    <p class="text-xs text-gray-400 truncate pl-4">
+                                      {(log.systemPrompt ?? "").slice(0, 80)}...
+                                    </p>
+                                  </Show>
+                                </div>
+                              </Show>
+
+                              {/* User Prompt section — always show when present */}
                               <Show when={log.resolvedPrompt}>
                                 <div>
-                                  <h4 class="font-medium text-gray-700 mb-1">完整提示词</h4>
-                                  <pre class="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-600 whitespace-pre-wrap max-h-48 overflow-y-auto">
-                                    {log.resolvedPrompt}
-                                  </pre>
+                                  <button type="button" class="flex items-center gap-1 font-medium text-gray-700 mb-1 cursor-pointer"
+                                    onClick={() => setUserPromptOpen(userPromptOpen() === log.id ? null : log.id)}>
+                                    <span class="text-xs text-gray-500">{userPromptOpen() === log.id ? "▼" : "▶"}</span>
+                                    <h4 class="text-sm">{log.systemPrompt ? "User Prompt" : "完整提示词"}</h4>
+                                  </button>
+                                  <Show when={userPromptOpen() === log.id}>
+                                    <pre class="bg-white border border-gray-200 rounded-lg p-3 text-xs text-gray-600 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                                      {log.resolvedPrompt}
+                                    </pre>
+                                  </Show>
+                                  <Show when={userPromptOpen() !== log.id}>
+                                    <p class="text-xs text-gray-400 truncate pl-4">
+                                      {(log.resolvedPrompt ?? "").slice(0, 80)}...
+                                    </p>
+                                  </Show>
                                 </div>
                               </Show>
 

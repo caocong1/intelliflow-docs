@@ -63,6 +63,7 @@ Progress: [███████████████████░] 97%
 | Phase 21-02 P02 | 3min | 2 tasks | 5 files |
 | Phase 21-03 P03 | 5min | 3 tasks | 2 files |
 | Phase 22-01 P01 | 2min | 2 tasks | 3 files |
+| Phase 22-02 P02 | 5min | 2 tasks | 3 files |
 | Phase 22-03 P03 | 3min | 2 tasks | 3 files |
 
 ## Accumulated Context
@@ -115,6 +116,9 @@ Recent decisions affecting current work:
 - [22-01]: FormFieldType extracted as named type alias for reuse across packages
 - [22-01]: machineKey regex enforces identifier-style naming (no leading digits)
 - [22-01]: Comma restriction on select options supports comma-joined multiselect storage
+- [22-02]: Multiselect rendered as checkbox group (not native select multiple) for better UX
+- [22-02]: Validation uses fieldErrors signal with per-field tracking, cleared on input change
+- [22-02]: Default value "today" resolved at runtime via createEffect for date/datetime fields
 - [22-03]: Workflow config loaded via workflowId JOIN (not workflowSnapshot) matching existing codebase pattern
 - [22-03]: Variable resolution order: direct outputData key -> fields[UUID] -> fieldsByKey[machineKey]
 - [22-03]: Validation errors collected and thrown as single AppError(400) with all field errors joined

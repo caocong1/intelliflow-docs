@@ -56,7 +56,12 @@ v1.0 MVP (Phases 1-16) — SHIPPED 2026-03-25
 3. New database tables (`background_tasks`, `user_favorites`, `user_recent_access`) exist and are migratable (`notifications` table deferred to Phase 18 alongside notification feature design)
 4. `pg_trgm` extension is enabled and GIN trigram indexes exist on document/project name and description columns
 5. `callSourceEnum` includes `inline_edit` value for Phase 21 AI editing audit trail
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+
+- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
+- [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
 ### Phase 18: Background Execution + Notifications
 
@@ -72,7 +77,12 @@ v1.0 MVP (Phases 1-16) — SHIPPED 2026-03-25
 5. When a background task fails, the notification includes the failure reason and the user can retry the generation
 6. Per-user concurrent background task limit enforced (e.g., max 3) as interim guard against unlimited API consumption (quotas deferred to v2)
 7. On server startup, orphaned tasks stuck in `running` status are detected and marked as failed with appropriate notification
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+
+- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
+- [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
 ### Phase 19: Statistics & Audit Dashboard
 
@@ -87,7 +97,12 @@ v1.0 MVP (Phases 1-16) — SHIPPED 2026-03-25
 4. Admin can view per-workflow usage statistics: usage count, user distribution, document count, and trend over time
 5. Admin can filter all statistics by department, project, document type, and workflow as cross-dimension analysis
 6. All statistics panels support custom date range selection and time granularity switching (day/week/month)
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+
+- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
+- [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
 ### Phase 20: Search + Favorites + Recent Access
 
@@ -240,7 +255,12 @@ Plans:
 6. Both prompt templates support `{{variable}}` interpolation and desensitize rule injection
 7. Frontend config panel shows two text areas (System Prompt / User Prompt) for model call nodes
 8. Model call logs record system and user messages separately
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+
+- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
+- [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
 ### Phase 26: Conditional Node Execution
 
@@ -257,5 +277,10 @@ Plans:
 6. "返回修改上游" triggers `rollbackToNode()` to the earliest stepOrder among all sourceRef.nodeId values
 7. After rollback and re-advance, blocked node is re-evaluated; condition no longer met → proceeds normally
 8. Background execution stops pipeline on blocked node and sends notification
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+
+- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
+- [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T04:28:49.709Z"
+last_updated: "2026-03-27T04:45:38.685Z"
 progress:
   total_phases: 26
   completed_phases: 24
-  total_plans: 83
-  completed_plans: 80
+  total_plans: 86
+  completed_plans: 81
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 23 complete — Output Path Grammar + File Slots + Export ContentMapping, all 3 plans done
+**Current focus:** Phase 25 in progress — Export Table Rendering + System Prompt Separation
 
 ## Current Position
 
-Phase: 24 of 26 (Structured Output + Named Artifacts + Field References)
-Plan: 4 of 4
+Phase: 25 of 26 (Export Table Rendering + System Prompt Separation)
+Plan: 1 of 3
 Status: In Progress
-Last activity: 2026-03-27 — Completed 24-04 (tree-based field picker and multi-level fieldPath highlighting)
+Last activity: 2026-03-27 — Phase 25-01 executed: Word/PDF state-machine parser for tables, lists, code blocks
 
-Progress: [███████████████████░] 97%
+Progress: [███████████████████░] 96%
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: [███████████████████░] 97%
 | Phase 24 P02 | 5min | 2 tasks | 3 files |
 | Phase 24 P04 | 6min | 2 tasks | 2 files |
 | Phase 24 P03 | 7min | 2 tasks | 3 files |
+| Phase 25 P01 | 3 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -145,6 +146,8 @@ Recent decisions affecting current work:
 - [24-04]: Schema tree recursion limited to 5 levels; $ref stops recursion without resolution
 - [24-04]: Long fieldPath display abbreviated with full path in tooltip; parseVarKey handles both dot and bracket separators
 - [Phase 24]: Used textarea for named output editing instead of InlineEditor for card simplicity
+- [Phase 25]: Word/PDF export uses NORMAL/IN_TABLE/IN_CODE_BLOCK state machine for consistent multi-line Markdown parsing
+- [Phase 25]: Business-formal table styling: full borders (#999999), bold+gray header (#E8E8E8), alternating rows (#F5F5F5)
 
 ### Roadmap Evolution
 
@@ -169,5 +172,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 24-04-PLAN.md (tree-based field picker and multi-level fieldPath highlighting)
+Stopped at: Phase 25-01 executed — Word/PDF state-machine parser for tables, lists, code blocks. Plans 02-03 remain.
 Resume file: None

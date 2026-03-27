@@ -59,7 +59,7 @@ v1.0 MVP (Phases 1-16) — SHIPPED 2026-03-25
 **Plans**: 3 plans
 Plans:
 
-- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [x] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
 - [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
 - [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
@@ -80,7 +80,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 
-- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [x] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
 - [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
 - [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
@@ -100,7 +100,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 
-- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [x] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
 - [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
 - [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
@@ -258,7 +258,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 
-- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
+- [x] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
 - [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
 - [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 

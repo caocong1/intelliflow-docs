@@ -1,5 +1,5 @@
-import type { VariableRef, OutputDef } from "@intelliflow/shared";
-import { Show, createSignal, createEffect } from "solid-js";
+import type { OutputDef, VariableRef } from "@intelliflow/shared";
+import { Show, createEffect, createSignal } from "solid-js";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
 import PromptOptimizeDialog from "./PromptOptimizeDialog";
 import VariablePicker, { buildPickerItems } from "./VariablePicker";
@@ -22,22 +22,86 @@ interface PromptEditorProps {
 }
 
 /**
- * Resolve a variable key (nodeId.segmentKey) to its display name (nodeLabel.outputName).
- * Looks up by segmentKey first, then falls back to output.id match.
+ * Parse a variable key into its components: nodeId, segmentKey, and optional fieldPath.
+ * Supports: "nodeId.segmentKey" and "nodeId.segmentKey.field.path[0].nested"
+ */
+function parseVarKey(varKey: string): { nodeId: string; segmentKey: string; fieldPath: string } {
+  const firstDot = varKey.indexOf(".");
+  if (firstDot < 0) return { nodeId: varKey, segmentKey: "", fieldPath: "" };
+  const nodeId = varKey.slice(0, firstDot);
+  const rest = varKey.slice(firstDot + 1);
+  // Second dot separates segmentKey from fieldPath
+  const secondDot = rest.indexOf(".");
+  // Also check for bracket notation directly after segmentKey (e.g. "output[0].name")
+  const bracketIndex = rest.indexOf("[");
+  // Find the earliest separator (dot or bracket)
+  let splitAt = -1;
+  if (secondDot >= 0 && bracketIndex >= 0) {
+    splitAt = Math.min(secondDot, bracketIndex);
+  } else if (secondDot >= 0) {
+    splitAt = secondDot;
+  } else if (bracketIndex >= 0) {
+    splitAt = bracketIndex;
+  }
+
+  if (splitAt < 0) {
+    return { nodeId, segmentKey: rest, fieldPath: "" };
+  }
+  const segmentKey = rest.slice(0, splitAt);
+  // For dot separator, skip the dot; for bracket, keep it
+  const fieldPath = rest[splitAt] === "." ? rest.slice(splitAt + 1) : rest.slice(splitAt);
+  return { nodeId, segmentKey, fieldPath };
+}
+
+/**
+ * Resolve a variable key to its display name.
+ * Supports multi-level fieldPath: "nodeId.segmentKey.field.path" -> "nodeLabel.outputName.field.path"
  * Falls back to the raw key if the node/output can't be found.
  */
 function resolveVarDisplayName(varKey: string, upstreamNodes: FlowNodeData[]): string {
-  const dotIndex = varKey.indexOf(".");
-  if (dotIndex < 0) return varKey;
-  const nodeId = varKey.slice(0, dotIndex);
-  const outputKey = varKey.slice(dotIndex + 1);
+  const { nodeId, segmentKey, fieldPath } = parseVarKey(varKey);
+  if (!segmentKey) return varKey;
+
   const node = upstreamNodes.find((n) => n.id === nodeId);
   if (!node) return varKey;
   const outputs = node.data.outputs as OutputDef[];
   // Look up by segmentKey first, then by id for backward compatibility
-  const output = outputs.find((o) => o.segmentKey === outputKey) ?? outputs.find((o) => o.id === outputKey);
-  if (!output) return `${node.data.label}.${outputKey}`;
-  return `${node.data.label}.${output.name}`;
+  const output =
+    outputs.find((o) => o.segmentKey === segmentKey) ?? outputs.find((o) => o.id === segmentKey);
+  const baseName = output
+    ? `${node.data.label}.${output.name}`
+    : `${node.data.label}.${segmentKey}`;
+
+  if (!fieldPath) return baseName;
+  // For long paths, abbreviate: "nodeLabel.output...leafField"
+  const fullDisplay = `${baseName}.${fieldPath}`;
+  if (fullDisplay.length > 35) {
+    const lastDot = fieldPath.lastIndexOf(".");
+    const lastBracket = fieldPath.lastIndexOf("].");
+    const leafStart = Math.max(lastDot, lastBracket >= 0 ? lastBracket + 1 : -1);
+    const leaf = leafStart >= 0 ? fieldPath.slice(leafStart + 1) : fieldPath;
+    return `${baseName}...${leaf}`;
+  }
+  return fullDisplay;
+}
+
+/**
+ * Resolve a variable key to its full (non-abbreviated) display name.
+ * Used for tooltips when the abbreviated display name is truncated.
+ */
+function resolveVarFullDisplayName(varKey: string, upstreamNodes: FlowNodeData[]): string {
+  const { nodeId, segmentKey, fieldPath } = parseVarKey(varKey);
+  if (!segmentKey) return varKey;
+
+  const node = upstreamNodes.find((n) => n.id === nodeId);
+  if (!node) return varKey;
+  const outputs = node.data.outputs as OutputDef[];
+  const output =
+    outputs.find((o) => o.segmentKey === segmentKey) ?? outputs.find((o) => o.id === segmentKey);
+  const baseName = output
+    ? `${node.data.label}.${output.name}`
+    : `${node.data.label}.${segmentKey}`;
+  return fieldPath ? `${baseName}.${fieldPath}` : baseName;
 }
 
 /** Resolve which node type owns this variable key (nodeId.segmentKey) */
@@ -69,8 +133,12 @@ function buildEditorHTML(template: string, upstreamNodes: FlowNodeData[]): strin
     const nodeType = resolveNodeType(varKey, upstreamNodes);
     const tagClasses = NODE_TYPE_TAG_CLASSES[nodeType] ?? NODE_TYPE_TAG_CLASSES.system;
     const displayName = resolveVarDisplayName(varKey, upstreamNodes);
+    // For multi-level paths, add tooltip with full path when display is abbreviated
+    const fullDisplayName = resolveVarFullDisplayName(varKey, upstreamNodes);
+    const tooltipAttr =
+      fullDisplayName !== displayName ? ` title="${escapeAttr(fullDisplayName)}"` : "";
     // data-var stores the stable ID key for serialization; text shows human-readable name
-    result += `<span contenteditable="false" data-var="${escapeAttr(varKey)}" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border mx-0.5 cursor-default select-none ${tagClasses}">${escapeHtml(displayName)}</span>`;
+    result += `<span contenteditable="false" data-var="${escapeAttr(varKey)}"${tooltipAttr} class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border mx-0.5 cursor-default select-none ${tagClasses}">${escapeHtml(displayName)}</span>`;
     lastIndex = match.index + match[0].length;
     match = regex.exec(template);
   }
@@ -128,9 +196,10 @@ export default function PromptEditor(props: PromptEditorProps) {
   let isUpdatingFromProp = false;
   let blurTimer: ReturnType<typeof setTimeout> | undefined;
 
-  /** Convert a VariableRef to the storage key (nodeId.segmentKey) used in {{...}} */
+  /** Convert a VariableRef to the storage key used in {{...}}. Includes fieldPath if present. */
   function refToStorageKey(ref: VariableRef): string {
-    return `${ref.nodeId}.${ref.outputId}`;
+    const base = `${ref.nodeId}.${ref.outputId}`;
+    return ref.fieldPath ? `${base}.${ref.fieldPath}` : base;
   }
 
   // Update DOM when value prop changes externally (e.g. after optimize)
@@ -290,11 +359,15 @@ export default function PromptEditor(props: PromptEditorProps) {
       const nodeType = resolveNodeType(variableName, props.upstreamNodes);
       const tagClasses = NODE_TYPE_TAG_CLASSES[nodeType] ?? NODE_TYPE_TAG_CLASSES.system;
       const displayName = resolveVarDisplayName(variableName, props.upstreamNodes);
+      const fullDisplayName = resolveVarFullDisplayName(variableName, props.upstreamNodes);
       const span = document.createElement("span");
       span.contentEditable = "false";
       span.dataset.var = variableName;
       span.className = `inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border mx-0.5 cursor-default select-none ${tagClasses}`;
       span.textContent = displayName;
+      if (fullDisplayName !== displayName) {
+        span.title = fullDisplayName;
+      }
       range.insertNode(span);
 
       // Move cursor after the span

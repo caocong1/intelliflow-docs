@@ -8,8 +8,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lint": "^6.9.5",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.40.0",
     "@solidjs/router": "^0.15.3",
     "@wecom/jssdk": "^2.3.4",
+    "codemirror": "^6.0.2",
     "diff-match-patch": "^1.0.5",
     "echarts": "^6.0.0",
     "solid-js": "^1.9.5"

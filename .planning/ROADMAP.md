@@ -262,7 +262,7 @@ Plans:
 - [x] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
 - [x] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
-### Phase 26: Conditional Node Execution
+### Phase 26: Conditional Node Execution (completed 2026-03-27)
 
 **Goal**: Enable nodes to be automatically skipped or blocked based on upstream output values
 **Depends on**: Phase 24
@@ -282,4 +282,4 @@ Plans:
 
 - [x] 26-01-PLAN.md — Shared types + DB migration + conditions service + runtime integration
 - [x] 26-02-PLAN.md — Frontend ExecutionRuleEditor component + ConfigPanel integration
-- [ ] 26-03-PLAN.md — Frontend blocked/skip display + rollback interaction
+- [x] 26-03-PLAN.md — Frontend blocked/skip display + rollback interaction

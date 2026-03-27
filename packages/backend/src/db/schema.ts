@@ -204,6 +204,7 @@ export const nodeExecutionStatusEnum = pgEnum("node_execution_status", [
   "completed",
   "skipped",
   "failed",
+  "blocked",
 ]);
 
 export const nodeExecutions = pgTable("node_executions", {

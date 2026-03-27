@@ -112,6 +112,20 @@ export interface VariableRef {
   fieldPath?: string;     // for nested JSON field access (Phase 24 use)
 }
 
+/** Condition for conditional node execution */
+export interface NodeCondition {
+  sourceRef: VariableRef;
+  operator: "equals" | "not_equals" | "exists" | "not_exists" | "contains";
+  value?: string;
+}
+
+/** Execution rule for conditional node skip/block */
+export interface NodeExecutionRule {
+  action: "skip" | "block";
+  conditions: NodeCondition[];
+  logic: "and" | "or";
+}
+
 /** Form field type union */
 export type FormFieldType = "text" | "textarea" | "file" | "number" | "date" | "datetime" | "select" | "multiselect";
 
@@ -146,6 +160,7 @@ export interface InputTransformConfig {
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
+  executionRule?: NodeExecutionRule;
 }
 
 export interface DesensitizeConfig {
@@ -156,6 +171,7 @@ export interface DesensitizeConfig {
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
+  executionRule?: NodeExecutionRule;
 }
 
 export interface ModelCallConfig {
@@ -181,6 +197,7 @@ export interface ModelCallConfig {
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
+  executionRule?: NodeExecutionRule;
 }
 
 export interface RestoreConfig {
@@ -190,6 +207,7 @@ export interface RestoreConfig {
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
+  executionRule?: NodeExecutionRule;
 }
 
 export interface ExportConfig {
@@ -203,6 +221,7 @@ export interface ExportConfig {
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
+  executionRule?: NodeExecutionRule;
 }
 
 export type NodeConfig = InputTransformConfig | DesensitizeConfig | ModelCallConfig | RestoreConfig | ExportConfig;
@@ -360,7 +379,7 @@ export interface VersionDiffResult {
 // ─── Phase 5: Document Creation Runtime types ────────────────────────────────
 
 /** Node execution status */
-export type NodeExecutionStatus = "pending" | "in_progress" | "completed" | "skipped" | "failed";
+export type NodeExecutionStatus = "pending" | "in_progress" | "completed" | "skipped" | "failed" | "blocked";
 
 /** Per-node execution record within a document */
 export interface NodeExecution {

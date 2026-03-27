@@ -10,6 +10,7 @@ import type {
 import type { FlowNodeData, FlowEdgeData } from "../../../lib/flow-engine/types";
 import { deriveOutputs } from "../../../lib/flow-engine/derive-outputs";
 import RuntimeSettings from "./RuntimeSettings";
+import ExecutionRuleEditor from "./ExecutionRuleEditor";
 import InputTransformConfigPanel from "./InputTransformConfig";
 import DesensitizeConfigPanel from "./DesensitizeConfig";
 import RestoreConfigPanel from "./RestoreConfig";
@@ -195,6 +196,20 @@ export default function ConfigPanel(props: ConfigPanelProps) {
                 <RuntimeSettings
                   config={nodeConfig() as unknown as NodeConfig}
                   onChange={handleRuntimeChange}
+                />
+              </Show>
+
+              {/* Execution conditions — applicable to all 5 node types */}
+              <Show when={nodeConfig()}>
+                <ExecutionRuleEditor
+                  rule={(nodeConfig() as any)?.executionRule}
+                  upstreamNodes={upstreamNodes()}
+                  edges={props.edges}
+                  currentNodeId={props.selectedNode!.id}
+                  onChange={(rule) => {
+                    const current = nodeConfig() as Record<string, unknown>;
+                    handleConfigChange({ ...current, executionRule: rule });
+                  }}
                 />
               </Show>
 

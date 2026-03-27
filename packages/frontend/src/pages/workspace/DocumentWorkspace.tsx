@@ -6,6 +6,7 @@ import type {
   ModelCallConfig,
   NodeConfig,
   NodeExecution,
+  NodeExecutionRule,
   RestoreConfig,
 } from "@intelliflow/shared";
 import { A, useParams } from "@solidjs/router";
@@ -38,6 +39,7 @@ import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
 import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
 import ModelCallExecutor from "../../components/workspace/nodes/ModelCallExecutor";
 import RestoreExecutor from "../../components/workspace/nodes/RestoreExecutor";
+import BlockedNodeCard from "../../components/workspace/nodes/BlockedNodeCard";
 import { formatDuration, formatFileSize } from "../../lib/format-utils";
 import { renderMarkdown } from "../../lib/render-markdown";
 
@@ -316,6 +318,50 @@ export default function DocumentWorkspace() {
     if (!s) return false;
     return s.nodes.some((n) => n.status === "failed");
   });
+
+  /** Check if any node is blocked by a conditional execution rule */
+  const hasBlockedNodes = createMemo(() => {
+    const s = state();
+    if (!s) return false;
+    return s.nodes.some((n) => n.status === "blocked");
+  });
+
+  /**
+   * Roll back to the earliest upstream source node referenced by the blocked node's
+   * executionRule.conditions. Target is computed here (not in BlockedNodeCard) by
+   * looking up the workflowNodes config, finding executionRule.conditions, extracting
+   * all sourceRef.nodeId values, and selecting the earliest by stepOrder.
+   */
+  async function handleBlockedRollback(blockedNodeId: string) {
+    const s = state();
+    if (!s) return;
+
+    const wfNode = s.workflowNodes.find((wn) => wn.id === blockedNodeId);
+    const executionRule = (wfNode?.config as unknown as Record<string, unknown>)?.executionRule as
+      | NodeExecutionRule
+      | undefined;
+
+    if (!executionRule?.conditions?.length) return;
+
+    const sourceNodeIds = executionRule.conditions.map((c) => c.sourceRef.nodeId);
+
+    const sourceExecs = s.nodes
+      .filter((n) => sourceNodeIds.includes(n.nodeId))
+      .sort((a, b) => a.stepOrder - b.stepOrder);
+
+    const targetNodeId = sourceExecs[0]?.nodeId;
+    if (!targetNodeId) return;
+
+    const token = localStorage.getItem("auth_token");
+    const res = await fetch(`/api/runtime/${params.documentId}/rollback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ targetNodeId }),
+    });
+    if (res.ok) {
+      fetchRuntimeState();
+    }
+  }
 
   /** Extract the main text content from node outputData based on node type */
   function getNodeOutputText(node: NodeExecution): string {
@@ -982,6 +1028,13 @@ export default function DocumentWorkspace() {
                                     </svg>
                                   </div>
                                 </Match>
+                                <Match when={node.status === "blocked"}>
+                                  <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                    </svg>
+                                  </div>
+                                </Match>
                               </Switch>
 
                               {/* Node info */}
@@ -1012,6 +1065,11 @@ export default function DocumentWorkspace() {
                                     {node.errorMessage}
                                   </p>
                                 </Show>
+                                <Show when={node.status === "blocked" && (node.outputData as Record<string, unknown>)?.blockReason}>
+                                  <p class="text-xs mt-1" style={{ color: "#dc2626" }}>
+                                    条件阻断：{(node.outputData as Record<string, unknown>).blockReason as string}
+                                  </p>
+                                </Show>
                               </div>
                             </div>
                           </div>
@@ -1020,8 +1078,22 @@ export default function DocumentWorkspace() {
                     </div>
                   </Match>
 
+                  {/* Blocked node — condition triggered, show block card with rollback */}
+                  <Match when={viewMode() === "current" && hasBlockedNodes() && !isGenerating()}>
+                    <div class="space-y-6">
+                      <For each={s().nodes.filter((n) => n.status === "blocked")}>
+                        {(node) => (
+                          <BlockedNodeCard
+                            node={node}
+                            onRollback={() => handleBlockedRollback(node.nodeId)}
+                          />
+                        )}
+                      </For>
+                    </div>
+                  </Match>
+
                   {/* Current in-progress node (manual step-by-step mode) */}
-                  <Match when={viewMode() === "current" && !readOnly() && !isGenerating() && !hasFailedNodes() ? currentNode() : undefined}>
+                  <Match when={viewMode() === "current" && !readOnly() && !isGenerating() && !hasFailedNodes() && !hasBlockedNodes() ? currentNode() : undefined}>
                     {(curNode) => (
                       <div class="space-y-6">
                         {/* Node executor -- route by nodeType with real config */}

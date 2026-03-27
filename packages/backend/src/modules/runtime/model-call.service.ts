@@ -14,8 +14,70 @@ export interface ResolvedPromptResult {
 }
 
 /**
- * Resolve a prompt template by replacing {{nodeId.outputId}} with upstream output data
+ * Resolve a single variable reference against upstream node outputs.
+ * Uses a 6-level priority chain for segmentKey-based lookup:
+ * 1. fieldsByKey[segmentKey] — machineKey lookup
+ * 2. fields[segmentKey] — UUID fallback
+ * 3. fileSlots[segmentKey] — file slot (.text)
+ * 4. namedOutputs[segmentKey] — named outputs (.content, Phase 24 stub)
+ * 5. models[segmentKey] — model output (.content)
+ * 6. od[segmentKey] — direct property (text, confirmedAt, etc.)
+ */
+export function resolveRef(
+  ref: { nodeId: string; outputId: string; fieldPath?: string },
+  nodeExecs: Array<{ nodeId: string; outputData: Record<string, unknown> | null }>,
+): string | undefined {
+  const exec = nodeExecs.find((ne) => ne.nodeId === ref.nodeId);
+  if (!exec?.outputData) return undefined;
+
+  const od = exec.outputData as Record<string, unknown>;
+  const segmentKey = ref.outputId;
+
+  // 1. fieldsByKey (machineKey lookup)
+  const fieldsByKey = od.fieldsByKey as Record<string, unknown> | undefined;
+  if (fieldsByKey?.[segmentKey] !== undefined && fieldsByKey[segmentKey] !== null) {
+    const v = fieldsByKey[segmentKey];
+    return typeof v === "string" ? v : JSON.stringify(v);
+  }
+
+  // 2. fields (UUID fallback)
+  const fields = od.fields as Record<string, unknown> | undefined;
+  if (fields?.[segmentKey] !== undefined && fields[segmentKey] !== null) {
+    const v = fields[segmentKey];
+    return typeof v === "string" ? v : JSON.stringify(v);
+  }
+
+  // 3. fileSlots (file slot — returns .text)
+  const fileSlots = od.fileSlots as Record<string, { text?: string }> | undefined;
+  if (fileSlots?.[segmentKey]) {
+    return fileSlots[segmentKey].text;
+  }
+
+  // 4. namedOutputs (Phase 24 stub — returns .content)
+  const namedOutputs = od.namedOutputs as Record<string, { content?: string }> | undefined;
+  if (namedOutputs?.[segmentKey]) {
+    return namedOutputs[segmentKey].content;
+  }
+
+  // 5. models (model output — returns .content)
+  const modelsMap = od.models as Record<string, { content?: string }> | undefined;
+  if (modelsMap?.[segmentKey]) {
+    return modelsMap[segmentKey].content;
+  }
+
+  // 6. Direct property (text, confirmedAt, selectedContent, etc.)
+  if (od[segmentKey] !== undefined && od[segmentKey] !== null) {
+    const v = od[segmentKey];
+    return typeof v === "string" ? v : JSON.stringify(v);
+  }
+
+  return undefined;
+}
+
+/**
+ * Resolve a prompt template by replacing {{nodeId.segmentKey}} with upstream output data
  * and appending desensitize rules if present.
+ * Delegates variable lookup to resolveRef() for each match.
  */
 export async function resolvePromptTemplate(
   template: string,
@@ -26,42 +88,19 @@ export async function resolvePromptTemplate(
   let resolved = template;
   const mapping: Record<string, string> = {};
 
-  // Replace {{nodeId.outputId}} with upstream node output values
+  // Replace {{nodeId.segmentKey}} with upstream node output values
   resolved = resolved.replace(/\{\{([^}]+)\}\}/g, (_match, varName: string) => {
     const dotIndex = varName.indexOf(".");
     if (dotIndex < 0) return _match;
 
     const nodeId = varName.slice(0, dotIndex).trim();
-    const outputId = varName.slice(dotIndex + 1).trim();
+    const segmentKey = varName.slice(dotIndex + 1).trim();
 
-    // Find matching node execution by nodeId
-    const exec = nodeExecs.find((ne) => ne.nodeId === nodeId);
-    if (!exec?.outputData) return _match;
+    const value = resolveRef({ nodeId, outputId: segmentKey }, nodeExecs);
+    if (value === undefined) return _match;
 
-    // Extract value from outputData — check direct key first, then nested fields
-    const od = exec.outputData as Record<string, unknown>;
-    let value = od[outputId];
-    if (value === undefined || value === null) {
-      // Try inside "fields" object (input_transform stores form data under fields.{fieldId})
-      const fields = od.fields as Record<string, unknown> | undefined;
-      if (fields) {
-        // outputId may be like "n1-field-f1", extract the field key after last "-"
-        const fieldKey = outputId.replace(/^.*-field-/, "");
-        value = fields[fieldKey] ?? fields[outputId];
-      }
-    }
-    // Fallback: check fieldsByKey (machineKey-indexed dual view)
-    if (value === undefined || value === null) {
-      const fieldsByKey = od.fieldsByKey as Record<string, unknown> | undefined;
-      if (fieldsByKey) {
-        value = fieldsByKey[outputId];
-      }
-    }
-
-    if (value === undefined || value === null) return _match;
-    const resolvedValue = typeof value === "string" ? value : JSON.stringify(value);
-    mapping[`{{${varName}}}`] = resolvedValue;
-    return resolvedValue;
+    mapping[`{{${varName}}}`] = value;
+    return value;
   });
 
   // Append desensitize rule descriptions if present

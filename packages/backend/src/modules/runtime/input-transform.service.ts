@@ -184,7 +184,7 @@ export interface ConfirmInputTransformParams {
   documentId: string;
   nodeExecutionId: string;
   formData: Record<string, string>;
-  fileOutputs: Array<{ fileId: string; name: string; parsedText: string }>;
+  fileOutputs: Array<{ fileId: string; name: string; parsedText: string; slotId?: string }>;
   userId: string;
 }
 
@@ -240,6 +240,9 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
     }
   }
 
+  // Build fileSlots: group file outputs by their associated fileSlotId
+  const fileSlots = buildFileSlots(fileOutputs, formFields);
+
   // Build combined text for downstream nodes (must be computed before outputData)
   const textParts: string[] = [];
   for (const [key, value] of Object.entries(formData)) {
@@ -259,6 +262,7 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
       name: f.name,
       parsedText: f.parsedText,
     })),
+    fileSlots,
     text: combinedText,
     confirmedAt: new Date().toISOString(),
   };
@@ -283,4 +287,41 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
     .returning();
 
   return updated;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Build fileSlots: group file outputs by their associated fileSlotId.
+ * For each slot, aggregate concatenated parsedText and file info.
+ */
+function buildFileSlots(
+  fileOutputs: Array<{ fileId: string; name: string; parsedText: string; slotId?: string }>,
+  formFields: FormFieldDef[],
+): Record<string, { text: string; files: Array<{ fileId: string; name: string }> }> {
+  const slots: Record<string, { text: string; files: Array<{ fileId: string; name: string }> }> = {};
+
+  // Build a set of valid fileSlotIds from form field definitions
+  const slotIdSet = new Set<string>();
+  for (const field of formFields) {
+    if (field.fileSlotId) {
+      slotIdSet.add(field.fileSlotId);
+    }
+  }
+
+  // Group files by slotId
+  for (const file of fileOutputs) {
+    const slotId = file.slotId;
+    if (!slotId || !slotIdSet.has(slotId)) continue;
+
+    if (!slots[slotId]) {
+      slots[slotId] = { text: "", files: [] };
+    }
+    slots[slotId].files.push({ fileId: file.fileId, name: file.name });
+    if (file.parsedText) {
+      slots[slotId].text += (slots[slotId].text ? "\n\n" : "") + file.parsedText;
+    }
+  }
+
+  return slots;
 }

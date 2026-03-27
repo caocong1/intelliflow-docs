@@ -64,7 +64,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(statisticsRoutes)
   .use(searchRoutes)
   .use(userActivityRoutes)
-  .listen({ port: 3001, hostname: "0.0.0.0" });
+  .listen({ port: 4001, hostname: "0.0.0.0" });
 
 // Detect and clean up orphaned background tasks from previous server runs
 detectOrphanTasks()

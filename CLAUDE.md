@@ -36,6 +36,13 @@ docs/
 3. **代码规范**：使用 Biome 进行代码格式化和 lint，不使用 ESLint/Prettier
 4. **认证方案**：Bearer Token + localStorage，不使用 JWT 或 Cookie Session
 
+## 服务端口（重要）
+
+**禁止混淆前后端端口：**
+- **4000** — Frontend (Vite dev server)，配置文件：`packages/frontend/vite.config.ts`
+- **4001** — Backend (Elysia API)，配置文件：`packages/backend/src/index.ts`
+- Frontend 通过 Vite proxy（`/api` → `http://127.0.0.1:4001`）访问后端，无需前端跨域配置
+
 ## 需求文档阅读指引
 
 - **只看最终版**：`docs/requirements/v4-current.md` 是唯一有效的需求文档

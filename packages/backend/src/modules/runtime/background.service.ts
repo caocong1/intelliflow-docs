@@ -28,7 +28,7 @@ import { evaluateExecutionRule } from "./conditions.service";
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getBaseUrl(): string {
-  return process.env.APP_BASE_URL || "http://localhost:3000";
+  return process.env.APP_BASE_URL || "http://localhost:4000";
 }
 
 function formatDuration(ms: number): string {

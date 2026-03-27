@@ -2,7 +2,7 @@
 
 ## What This Is
 
-面向公司内部多部门使用的 AI 文档生成平台。用户通过 5 种基础节点（输入转换、信息脱敏、模型调用、信息恢复、文件导出）自由编排文档生成流程，驱动多模型并行生成、对比、迭代，快速产出高质量文档。目标用户包括售前/商务、产品经理、技术人员、项目经理和管理层。
+面向公司内部多部门使用的 AI 文档生成平台。用户通过 5 种基础节点（输入转换、信息脱敏、模型调用、信息恢复、文件导出）自由编排文档生成流程，驱动多模型并行生成、对比、迭代，快速产出高质量文档。支持后台生成通知、统计审计、全局搜索、AI 辅助编辑，以及结构化输出、条件执行等高级节点能力。
 
 ## Core Value
 
@@ -10,11 +10,11 @@
 
 ## Current State
 
-**Shipped:** v1.0 MVP (2026-03-25)
-**Codebase:** Bun monorepo, 146 TypeScript files, ~31,100 LOC
+**Shipped:** v1.2 节点能力增强 (2026-03-27)
+**Codebase:** Bun monorepo, ~42,889 LOC TypeScript
 **Tech stack:** Bun + ElysiaJS + Drizzle ORM + PostgreSQL 18 + SolidJS + Tailwind CSS v4
 
-v1.0 delivers the complete MVP: user auth, admin configuration (providers, models, document types), visual workflow editor with 5 node types, project/document management with version history, and full document creation runtime with SSE streaming, multi-model comparison, desensitize/restore, and export. 82/82 active requirements satisfied across 16 phases.
+v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, project/document management, full document creation runtime. v1.1 adds operational features: background execution + notifications, statistics dashboard, global search/favorites, AI inline editing. v1.2 enhances node capabilities: output path grammar (segmentKey), file slots, structured output (JSON Schema + named artifacts), Word table rendering, system prompt separation, conditional execution (skip/block).
 
 ## Requirements
 
@@ -38,30 +38,16 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 - **AIED-01~06**: AI 辅助内联编辑（浮动工具栏、差异预览、安全约束） — v1.1
 - **DEBT-01**: DTYPE-04 文档关联守卫 — v1.1
 - **NODE-23~31**: 扩展 FormFieldDef 8 种字段类型、machineKey、fieldsByKey 双视图 — v1.1
+- **OPATH-01~03**: 输出路径规范（segmentKey canonical form）、resolveRef() 6 级优先链、文件槽位语义 — v1.2
+- **SOUT-01**: 结构化输出（JSON Schema + ajv 校验）、命名产物解析、fieldPath 深度访问 — v1.2
+- **EXPORT-01**: Word/PDF 导出表格渲染、有序/嵌套列表、代码块 — v1.2
+- **SPROMPT-01**: System/User Prompt 分离、双提示词解析、策略路由 — v1.2
+- **COND-01**: 条件执行（skip/block 规则）、executionRule 配置、阻断回滚 — v1.2
+- **CMAP-01**: 导出 contentMapping 运行时生效（resolveContent + getExportPreview） — v1.2
 
-### Active (v1.2 — 节点能力增强)
+### Active
 
-> **设计文档**：`docs/design/flow-node-capability-analysis.md` — 包含所有缺口的现状证据、类型定义、路径规范、实现边界和验收标准。**GSD 规划和执行时必须参考此文档。**
-
-- [ ] Phase 23: 输出路径规范（segmentKey canonical form + resolveRef() 统一解析）
-- [ ] Phase 24: 模型调用结构化输出 + 多产物命名（outputFormat/namedOutputs/JSON 校验）
-- [ ] Phase 22-01: 后台执行 Bug 修复（file_export 枚举不匹配 + autoAdvance 语义缺失） ✓
-- [ ] Phase 22-02: 输入转换表单字段类型扩展（number/date/select/multiselect） ✓
-- [ ] Phase 25: 导出 Word 表格渲染（Markdown AST → docx Table）✓
-- [ ] Phase 25: System/User Prompt 分离（systemPromptTemplate）✓
-- [ ] Phase 26: 条件执行能力（NodeExecutionRule + blocked 状态）✓
-
-> **设计文档**：`docs/design/flow-node-capability-analysis.md` — 包含所有缺口的现状证据、类型定义、路径规范、实现边界和验收标准。**GSD 规划和执行时必须参考此文档。**
-
-- [ ] 后台执行 Bug 修复（file_export 枚举不匹配 + autoAdvance 语义缺失）
-- [ ] 输入转换表单字段类型扩展（number/date/select/multiselect + machineKey）
-- [ ] 输出路径规范（segmentKey canonical form + resolveRef() 统一解析）
-- [ ] 文件槽位语义（fileSlotId + fileSlots 聚合视图）
-- [ ] 导出 contentMapping 生效（resolveContent + getExportPreview 同步修复）
-- [ ] 模型调用结构化输出 + 多产物命名（outputFormat/namedOutputs/JSON 校验）
-- [ ] 导出 Word 表格渲染（Markdown AST → docx Table）
-- [ ] System/User Prompt 分离（systemPromptTemplate）
-- [ ] 条件执行能力（NodeExecutionRule + blocked 状态）
+> Next milestone not yet defined. Run `/gsd:new-milestone` to start planning.
 
 ### Future
 
@@ -123,16 +109,12 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 | Multiplexed SSE stream for multi-model | 所有模型共享一个连接，modelId 标记事件 | Good |
 | fetch+ReadableStream (非 EventSource) | 支持 Authorization header | Good |
 | RECV-03 cancel AI generation 延迟到 v2 | 复杂度高，v1 优先跑通核心流程 | Deferred |
-
-## Current Milestone: v1.2 节点能力增强
-
-**Goal:** 完善节点能力（字段类型扩展、输出路径规范、结构化输出、Word 表格渲染、System Prompt 分离、条件执行）。
-
-**Target features:**
-- Phase 23: 输出路径规范（segmentKey）+ 文件槽位 + export contentMapping 生效
-- Phase 24: 结构化输出（JSON Schema）+ 多产物命名 + fieldPath 解析
-- Phase 25: Word 表格渲染 + System/User Prompt 分离 ✓
-- Phase 26: 条件执行（skip/block）✓
+| segmentKey canonical form for output paths | 统一变量引用格式，消除 id/key 歧义 | Good |
+| resolveRef() 6-level priority chain | fieldsByKey→fields→fileSlots→namedOutputs→models→direct，覆盖所有引用场景 | Good |
+| CodeMirror 6 for JSON Schema editor | 语法高亮+lint，比 textarea 更好的编辑体验 | Good |
+| State-machine Markdown parser for Word export | NORMAL/IN_TABLE/IN_CODE_BLOCK 状态机，一致的多行解析 | Good |
+| System prompt clean (no desensitize rules) | 系统提示词保持干净，脱敏规则只注入用户提示词 | Good |
+| Conditional execution with depth guard (50 max) | Skip 递归需要上限防止无限循环 | Good |
 
 ## Milestone Plan
 
@@ -140,8 +122,8 @@ v1.0 delivers the complete MVP: user auth, admin configuration (providers, model
 |-----------|------|------|
 | v1.0 MVP | 认证+管理+流程编排+项目文档+运行时 | Shipped 2026-03-25 |
 | v1.1 运营增强与智能编辑 | 后台生成+通知、统计审计、全局搜索、AI编辑 | Shipped 2026-03-27 |
-| v1.2 节点能力增强 | 字段扩展、输出规范、结构化输出、Word表格、System Prompt、条件执行 | Active |
-| v2.0 | 批注、文档导入/复制、条件路由、人工审核节点等 | Future |
+| v1.2 节点能力增强 | 输出规范、结构化输出、Word表格、System Prompt、条件执行 | Shipped 2026-03-27 |
+| v2.0 | 批注、文档导入/复制、配额管理、条件路由、人工审核节点等 | Future |
 
 ---
-*Last updated: 2026-03-27 after v1.1 shipped — v1.2 milestone started*
+*Last updated: 2026-03-27 after v1.2 milestone*

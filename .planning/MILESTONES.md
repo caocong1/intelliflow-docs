@@ -1,5 +1,25 @@
 # Milestones
 
+## v1.2 节点能力增强 (Shipped: 2026-03-27)
+
+**Phases completed:** 4 phases (23-26), 14 plans
+**Timeline:** 1 day (2026-03-27, ~4.5 hours)
+**Lines changed:** +4,318 / -345 across 37 files
+**Codebase:** ~42,889 LOC TypeScript
+**Requirements:** 9/9 v1.2 requirements satisfied (per design doc `flow-node-capability-analysis.md`)
+
+**Key accomplishments:**
+- Phase 23: Output path grammar (segmentKey canonical form), resolveRef() 6-level priority chain, file slot semantics, export contentMapping runtime
+- Phase 24: Structured output with JSON Schema validation (ajv), named artifact delimiter parsing, fieldPath deep access, CodeMirror 6 editor, revalidate/AI-fix endpoints
+- Phase 25: State-machine Markdown parser for Word/PDF export (tables, nested lists, code blocks), System/User prompt separation with dual resolution
+- Phase 26: Conditional node execution (skip/block rules), ExecutionRuleEditor with smart suggestions, blocked node rollback
+
+**Archives:**
+- [v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
+- [v1.2-REQUIREMENTS.md](milestones/v1.2-REQUIREMENTS.md)
+
+---
+
 ## v1.1 运营增强与智能编辑 (Shipped: 2026-03-27)
 
 **Phases completed:** 11 phases (17-21 + 22), 47 plans

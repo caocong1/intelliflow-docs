@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 21 complete — AI-Assisted Inline Editing done, ready for Phase 22
+**Current focus:** Phase 22 in progress — Bug fixes and FormFieldDef type extension, plan 01 complete
 
 ## Current Position
 
-Phase: 21 of 26 (AI-Assisted Inline Editing)
-Plan: 3 of 3
-Status: Phase 21 Complete
-Last activity: 2026-03-26 — Completed 21-03 (InlineEditor integration with AI editing)
+Phase: 22 of 26 (Bug Fixes + Form Field Type Extension)
+Plan: 1 of 3
+Status: In Progress
+Last activity: 2026-03-27 — Completed 22-01 (Bug fixes + FormFieldDef type extension)
 
-Progress: [███████████████████░] 95%
+Progress: [███████████████████░] 97%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [███████████████████░] 95%
 | Phase 21-01 P01 | 3min | 2 tasks | 3 files |
 | Phase 21-02 P02 | 3min | 2 tasks | 5 files |
 | Phase 21-03 P03 | 5min | 3 tasks | 2 files |
+| Phase 22-01 P01 | 2min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,9 @@ Recent decisions affecting current work:
 - [21-03]: IIFE guards with null returns instead of non-null assertions for Biome lint compliance in SolidJS JSX
 - [21-03]: Models fetched via raw fetch /api/models on mount (fire-and-forget, non-blocking)
 - [21-03]: validSelectedModelId memo auto-corrects model selection when security filtering changes available models
+- [22-01]: FormFieldType extracted as named type alias for reuse across packages
+- [22-01]: machineKey regex enforces identifier-style naming (no leading digits)
+- [22-01]: Comma restriction on select options supports comma-joined multiselect storage
 
 ### Roadmap Evolution
 
@@ -133,6 +137,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: Completed 21-03-PLAN.md (InlineEditor integration — Phase 21 complete)
+Last session: 2026-03-27
+Stopped at: Completed 22-01-PLAN.md (Bug fixes + FormFieldDef type extension)
 Resume file: None

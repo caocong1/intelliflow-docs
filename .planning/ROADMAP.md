@@ -195,7 +195,12 @@ Plans:
 7. `export.service.ts::resolveContent()` and `getExportPreview()` both use `contentMapping` from node config via `loadNodeConfig()`
 8. Export with contentMapping referencing 3 upstream outputs produces file with all 3 segments in order
 9. `VariablePicker` and `PromptEditor` use segmentKey format; `validation.ts` checks segmentKey cross-type uniqueness within a node
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+
+- [ ] 23-01-PLAN.md — Shared types (segmentKey, fileSlot) + derive-outputs + DB migration + validation
+- [ ] 23-02-PLAN.md — Backend runtime: resolveRef, confirmInputTransform fieldsByKey/fileSlots, export contentMapping
+- [ ] 23-03-PLAN.md — Frontend: config panels, file slot executor, VariablePicker, ExportConfig contentMapping
 
 ### Phase 24: Structured Output + Named Artifacts + Field References
 

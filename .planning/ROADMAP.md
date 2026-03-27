@@ -172,7 +172,12 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 6. Backend validates new field types (number range, date format, select value in options)
 7. `outputData` stores values in both `fields` (by UUID) and `fieldsByKey` (by machineKey) dual-view
 8. Downstream nodes can reference new field values via `{{nodeId.machineKey}}`
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+
+- 22-01-PLAN.md — Bug fixes + shared types extension + backend validation
+- 22-02-PLAN.md — Frontend config panel + executor controls + validation
+- 22-03-PLAN.md — Backend fieldsByKey dual-view + variable resolution + derive-outputs
 
 ### Phase 23: Output Path Grammar + File Slots + Export ContentMapping
 

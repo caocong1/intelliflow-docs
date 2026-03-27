@@ -19,7 +19,21 @@ const statusBadge: Record<
   pending: { label: "待执行", variant: "info" },
   skipped: { label: "已跳过", variant: "warning" },
   failed: { label: "失败", variant: "error" },
+  blocked: { label: "已阻断", variant: "error" },
 };
+
+/** Get the badge for a node, with conditional skip differentiation */
+function getNodeBadge(node: NodeExecution) {
+  const base = statusBadge[node.status] ?? statusBadge.pending;
+  if (node.status === "skipped") {
+    const skipType = (node.outputData as Record<string, unknown> | null)?.skipType;
+    if (skipType === "conditional") {
+      return { label: "条件跳过", variant: "warning" as const };
+    }
+    return { label: "用户跳过", variant: "warning" as const };
+  }
+  return base;
+}
 
 function formatTime(iso: string | null): string {
   if (!iso) return "-";
@@ -32,7 +46,7 @@ function formatJson(data: Record<string, unknown> | null): string {
 }
 
 export default function NodeHistoryPanel(props: NodeHistoryPanelProps) {
-  const badge = () => statusBadge[props.node.status] ?? statusBadge.pending;
+  const badge = () => getNodeBadge(props.node);
 
   // Execution round selector state
   const [selectedRound, setSelectedRound] = createSignal(props.node.executionRound ?? 1);
@@ -122,8 +136,8 @@ export default function NodeHistoryPanel(props: NodeHistoryPanelProps) {
           <div class="flex items-center gap-2">
             <span class="text-xs font-medium text-[#464555]">状态:</span>
             <Badge
-              label={(statusBadge[displayedNode().status] ?? statusBadge.pending).label}
-              variant={(statusBadge[displayedNode().status] ?? statusBadge.pending).variant}
+              label={getNodeBadge(displayedNode()).label}
+              variant={getNodeBadge(displayedNode()).variant}
             />
           </div>
 

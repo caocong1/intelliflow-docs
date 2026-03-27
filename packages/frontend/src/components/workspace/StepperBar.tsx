@@ -67,7 +67,7 @@ function getCircleStyle(
 ): { bg: string; color: string; ring?: string } {
   if (status === "completed") return { bg: "#22c55e", color: "#ffffff" };
   if (status === "skipped") return { bg: "#f59e0b", color: "#ffffff" };
-  if (status === "failed") return { bg: "#ef4444", color: "#ffffff" };
+  if (status === "failed" || status === "blocked") return { bg: "#ef4444", color: "#ffffff" };
   if (isActive || status === "in_progress")
     return { bg: "#4f46e5", color: "#ffffff", ring: "0 0 0 4px rgba(99,102,241,0.2)" };
   return { bg: "#e6e8ea", color: "#464555" };
@@ -75,6 +75,7 @@ function getCircleStyle(
 
 function getLineStyle(status: string, _nextStatus: string): string {
   if (status === "completed" || status === "skipped") return "#22c55e";
+  if (status === "blocked") return "#ef4444";
   if (status === "in_progress") return "#c7c4d8";
   return "#e0e3e5";
 }
@@ -139,6 +140,13 @@ export default function StepperBar(props: StepperBarProps) {
                 >
                   {node.nodeLabel}
                 </span>
+
+                {/* Status label for blocked nodes */}
+                <Show when={node.status === "blocked"}>
+                  <span class="text-[10px] text-center font-medium" style={{ color: "#dc2626" }}>
+                    (已阻断)
+                  </span>
+                </Show>
 
                 {/* Node type badge */}
                 <span class="mt-0.5 text-[10px] text-center" style={{ color: "#464555" }}>

@@ -259,8 +259,8 @@ Plans:
 Plans:
 
 - [x] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
-- [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
-- [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
+- [x] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
+- [x] 25-03-PLAN.md — Frontend system prompt: config panel + log display
 
 ### Phase 26: Conditional Node Execution
 

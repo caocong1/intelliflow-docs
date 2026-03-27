@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T04:45:35Z"
+last_updated: "2026-03-27T12:50:00Z"
 progress:
   total_phases: 26
   completed_phases: 25
   total_plans: 86
-  completed_plans: 83
+  completed_plans: 86
 ---
 
 # Project State
@@ -18,16 +18,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 25 in progress — Export Table Rendering + System Prompt Separation
+**Current focus:** Phase 25 complete — Export Table Rendering + System Prompt Separation done; Phase 26 (Conditional Node Execution) is next
 
 ## Current Position
 
 Phase: 25 of 26 (Export Table Rendering + System Prompt Separation)
-Plan: 2 of 3
-Status: In Progress
-Last activity: 2026-03-27 — Phase 25-02 executed: Backend system prompt support (types, strategies, service, routes, DB migration)
+Plan: 3 of 3
+Status: COMPLETE
+Last activity: 2026-03-27 — Phase 25-03 executed: System prompt frontend UI (config panel + log display)
 
-Progress: [███████████████████░] 96%
+### Phase 25 Summary
+- **25-01**: State-machine markdown parser in export.service.ts — tables (docx/PDFKit), ordered/nested lists, fenced code blocks
+- **25-02**: System prompt backend pipeline — types, strategy interface, dual resolution, DB column + migration, service/routes/log API
+- **25-03**: System prompt frontend UI — collapsible config editor, dual prompt log display, backward compatible
+
+Progress: [████████████████████] 100%
 
 ## Performance Metrics
 
@@ -72,8 +77,9 @@ Progress: [███████████████████░] 96%
 | Phase 24 P02 | 5min | 2 tasks | 3 files |
 | Phase 24 P04 | 6min | 2 tasks | 2 files |
 | Phase 24 P03 | 7min | 2 tasks | 3 files |
-| Phase 25 P01 | 3 | 2 tasks | 1 files |
+| Phase 25 P01 | 3min | 2 tasks | 1 files |
 | Phase 25 P02 | 4min | 2 tasks | 9 files |
+| Phase 25 P03 | 5min | 2 tasks | 2 files |
 
 ## Accumulated Context
 

@@ -1,5 +1,5 @@
 import type { FormFieldDef, InputTransformConfig, NodeExecution } from "@intelliflow/shared";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 
 interface UploadedFile {
   fileId: string;
@@ -55,6 +55,7 @@ export default function InputTransformExecutor(props: Props) {
   }
 
   const [formData, setFormData] = createSignal<Record<string, string>>(initialFields);
+  const [fieldErrors, setFieldErrors] = createSignal<Record<string, string>>({});
   const [files, setFiles] = createSignal<UploadedFile[]>(
     (existingOutput?.files ?? []).map((f) => ({
       fileId: f.fileId,
@@ -70,6 +71,30 @@ export default function InputTransformExecutor(props: Props) {
   );
   const [dragOver, setDragOver] = createSignal(false);
   const [confirmError, setConfirmError] = createSignal<string | null>(null);
+
+  // Initialize default values for fields that have defaultValue/defaultValues
+  createEffect(() => {
+    const fields = props.config?.formFields ?? [];
+    const current = formData();
+    const updates: Record<string, string> = {};
+    for (const field of fields) {
+      // Only set defaults if no existing value
+      if (current[field.id]) continue;
+
+      if (field.type === "date" && field.defaultValue === "today") {
+        updates[field.id] = new Date().toISOString().slice(0, 10);
+      } else if (field.type === "datetime" && field.defaultValue === "today") {
+        updates[field.id] = new Date().toISOString().slice(0, 16);
+      } else if (field.type === "select" && field.defaultValue) {
+        updates[field.id] = field.defaultValue;
+      } else if (field.type === "multiselect" && field.defaultValues && field.defaultValues.length > 0) {
+        updates[field.id] = field.defaultValues.join(",");
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      setFormData((prev) => ({ ...prev, ...updates }));
+    }
+  });
 
   // Debounced draft save
   let draftTimer: ReturnType<typeof setTimeout> | undefined;
@@ -93,7 +118,71 @@ export default function InputTransformExecutor(props: Props) {
 
   function handleFieldChange(fieldId: string, value: string) {
     setFormData((prev) => ({ ...prev, [fieldId]: value }));
+    // Clear error on change
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next[fieldId];
+      return next;
+    });
     scheduleDraftSave();
+  }
+
+  function validateField(field: FormFieldDef, value: string): string | null {
+    if (field.required && !value?.trim()) {
+      return "此字段为必填项";
+    }
+    if (!value) return null;
+
+    switch (field.type) {
+      case "number":
+        if (Number.isNaN(Number(value))) return "请输入有效的数字";
+        break;
+      case "date":
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "请输入有效的日期";
+        break;
+      case "datetime":
+        if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return "请输入有效的日期时间";
+        break;
+      case "select":
+        if (field.options && !field.options.includes(value)) return "请选择有效的选项";
+        break;
+      case "multiselect": {
+        if (field.options) {
+          const vals = value.split(",").filter(Boolean);
+          for (const v of vals) {
+            if (!field.options.includes(v)) return `"${v}" 不是有效的选项`;
+          }
+        }
+        break;
+      }
+    }
+    return null;
+  }
+
+  function handleBlur(field: FormFieldDef) {
+    const value = formData()[field.id] ?? "";
+    const error = validateField(field, value);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (error) {
+        next[field.id] = error;
+      } else {
+        delete next[field.id];
+      }
+      return next;
+    });
+  }
+
+  function validateAllFields(): boolean {
+    const errors: Record<string, string> = {};
+    for (const field of props.config?.formFields ?? []) {
+      if (field.type === "file") continue;
+      const value = formData()[field.id] ?? "";
+      const error = validateField(field, value);
+      if (error) errors[field.id] = error;
+    }
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
   }
 
   function handleParsedTextEdit(fileId: string, newText: string) {
@@ -208,17 +297,15 @@ export default function InputTransformExecutor(props: Props) {
   }
 
   async function handleConfirm() {
-    // Validate required fields
-    const data = formData();
-    for (const field of props.config?.formFields ?? []) {
-      if (field.required && !data[field.id]?.trim()) {
-        setConfirmError(`"${field.label}" 为必填项`);
-        return;
-      }
+    // Validate all fields first
+    if (!validateAllFields()) {
+      setConfirmError("请修正表单中的错误后再提交");
+      return;
     }
 
     setConfirmError(null);
 
+    const data = formData();
     const fileOutputs = files()
       .filter((f) => !f.uploading && !f.error)
       .map((f) => ({
@@ -276,48 +363,179 @@ export default function InputTransformExecutor(props: Props) {
   function renderField(field: FormFieldDef, isWide: boolean) {
     const inputClass =
       "w-full bg-white px-4 py-3 border border-[rgba(199,196,216,0.35)] rounded-xl text-sm text-[#191c1e] placeholder-[#9fa0a8] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] disabled:bg-[#f7f9fb] disabled:text-[#9fa0a8] transition-all";
+    const errorInputClass =
+      "w-full bg-white px-4 py-3 border border-red-500 rounded-xl text-sm text-[#191c1e] placeholder-[#9fa0a8] focus:outline-none focus:ring-2 focus:ring-red-300 focus:border-red-500 disabled:bg-[#f7f9fb] disabled:text-[#9fa0a8] transition-all";
+    const hasError = () => !!fieldErrors()[field.id];
+    const currentInputClass = () => (hasError() ? errorInputClass : inputClass);
 
-    if (field.type === "textarea" || isWide) {
-      if (field.type === "textarea") {
-        return (
-          <div class="col-span-2 space-y-1.5">
-            <label for={`field-${field.id}`} class="block text-sm font-medium text-[#191c1e]">
-              {field.label}
-              <Show when={field.required}>
-                <span class="text-red-500 ml-0.5">*</span>
-              </Show>
-            </label>
-            <textarea
-              id={`field-${field.id}`}
-              value={formData()[field.id] ?? ""}
-              onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
-              disabled={props.readOnly}
-              rows={4}
-              class={`${inputClass} resize-y`}
-              placeholder={`请输入${field.label}`}
-            />
-          </div>
-        );
-      }
+    const labelEl = (
+      <label for={`field-${field.id}`} class="block text-sm font-medium text-[#191c1e]">
+        {field.label}
+        <Show when={field.required}>
+          <span class="text-red-500 ml-0.5">*</span>
+        </Show>
+      </label>
+    );
+
+    const errorEl = (
+      <Show when={fieldErrors()[field.id]}>
+        <p class="text-red-500 text-xs mt-1">{fieldErrors()[field.id]}</p>
+      </Show>
+    );
+
+    // Textarea
+    if (field.type === "textarea") {
+      return (
+        <div class="col-span-2 space-y-1.5">
+          {labelEl}
+          <textarea
+            id={`field-${field.id}`}
+            value={formData()[field.id] ?? ""}
+            onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
+            onBlur={() => handleBlur(field)}
+            disabled={props.readOnly}
+            rows={4}
+            class={`${currentInputClass()} resize-y`}
+            placeholder={`请输入${field.label}`}
+          />
+          {errorEl}
+        </div>
+      );
     }
 
+    // Number
+    if (field.type === "number") {
+      return (
+        <div class="space-y-1.5">
+          {labelEl}
+          <input
+            id={`field-${field.id}`}
+            type="number"
+            value={formData()[field.id] ?? ""}
+            onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
+            onBlur={() => handleBlur(field)}
+            disabled={props.readOnly}
+            class={currentInputClass()}
+            placeholder={`请输入${field.label}`}
+          />
+          {errorEl}
+        </div>
+      );
+    }
+
+    // Date
+    if (field.type === "date") {
+      return (
+        <div class="space-y-1.5">
+          {labelEl}
+          <input
+            id={`field-${field.id}`}
+            type="date"
+            value={formData()[field.id] ?? ""}
+            onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
+            onBlur={() => handleBlur(field)}
+            disabled={props.readOnly}
+            class={currentInputClass()}
+          />
+          {errorEl}
+        </div>
+      );
+    }
+
+    // Datetime
+    if (field.type === "datetime") {
+      return (
+        <div class="space-y-1.5">
+          {labelEl}
+          <input
+            id={`field-${field.id}`}
+            type="datetime-local"
+            value={formData()[field.id] ?? ""}
+            onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
+            onBlur={() => handleBlur(field)}
+            disabled={props.readOnly}
+            class={currentInputClass()}
+          />
+          {errorEl}
+        </div>
+      );
+    }
+
+    // Select
+    if (field.type === "select") {
+      return (
+        <div class="space-y-1.5">
+          {labelEl}
+          <select
+            id={`field-${field.id}`}
+            value={formData()[field.id] ?? ""}
+            onChange={(e) => handleFieldChange(field.id, e.currentTarget.value)}
+            onBlur={() => handleBlur(field)}
+            disabled={props.readOnly}
+            class={currentInputClass()}
+          >
+            <option value="">请选择...</option>
+            <For each={field.options ?? []}>
+              {(opt) => <option value={opt}>{opt}</option>}
+            </For>
+          </select>
+          {errorEl}
+        </div>
+      );
+    }
+
+    // Multiselect (checkbox group)
+    if (field.type === "multiselect") {
+      const selectedValues = () => (formData()[field.id] ?? "").split(",").filter(Boolean);
+
+      function toggleMultiValue(optValue: string) {
+        const current = selectedValues();
+        const next = current.includes(optValue)
+          ? current.filter((v) => v !== optValue)
+          : [...current, optValue];
+        handleFieldChange(field.id, next.join(","));
+      }
+
+      return (
+        <div class={`space-y-1.5 ${isWide ? "col-span-2" : ""}`}>
+          {labelEl}
+          <div class={`flex flex-wrap gap-2 px-4 py-3 border rounded-xl bg-white transition-all ${hasError() ? "border-red-500" : "border-[rgba(199,196,216,0.35)]"}`}>
+            <For each={field.options ?? []}>
+              {(opt) => (
+                <label class="flex items-center gap-1.5 text-sm text-[#191c1e] cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={selectedValues().includes(opt)}
+                    onChange={() => toggleMultiValue(opt)}
+                    onBlur={() => handleBlur(field)}
+                    disabled={props.readOnly}
+                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  {opt}
+                </label>
+              )}
+            </For>
+          </div>
+          {errorEl}
+        </div>
+      );
+    }
+
+    // Default: text
     return (
       <div class="space-y-1.5">
-        <label for={`field-${field.id}`} class="block text-sm font-medium text-[#191c1e]">
-          {field.label}
-          <Show when={field.required}>
-            <span class="text-red-500 ml-0.5">*</span>
-          </Show>
-        </label>
+        {labelEl}
         <input
           id={`field-${field.id}`}
           type="text"
           value={formData()[field.id] ?? ""}
           onInput={(e) => handleFieldChange(field.id, e.currentTarget.value)}
+          onBlur={() => handleBlur(field)}
           disabled={props.readOnly}
-          class={inputClass}
+          class={currentInputClass()}
           placeholder={`请输入${field.label}`}
         />
+        {errorEl}
       </div>
     );
   }
@@ -395,7 +613,7 @@ export default function InputTransformExecutor(props: Props) {
             </h3>
             <div class="grid grid-cols-2 gap-4">
               <For each={textFields()}>
-                {(field) => renderField(field, field.type === "textarea")}
+                {(field) => renderField(field, field.type === "textarea" || field.type === "multiselect")}
               </For>
             </div>
           </div>

@@ -54,7 +54,7 @@ export default function InputTransformCompleted(props: Props) {
     const fieldDefs = config()?.formFields ?? [];
     return Object.entries(od.fields).map(([key, value]) => {
       const def = fieldDefs.find((f: { id: string; label: string }) => f.id === key);
-      return { label: def?.label ?? key, value };
+      return { label: def?.label ?? key, value, type: (def as { type?: string } | undefined)?.type ?? "text" };
     });
   };
 
@@ -124,9 +124,21 @@ export default function InputTransformCompleted(props: Props) {
                     <span class="text-sm text-[#464555] w-[160px] flex-shrink-0">
                       {entry.label}
                     </span>
-                    <span class="text-sm text-[#191c1e] font-medium whitespace-pre-wrap">
-                      {entry.value}
-                    </span>
+                    {entry.type === "multiselect" && entry.value ? (
+                      <div class="flex flex-wrap gap-1">
+                        <For each={entry.value.split(",").filter(Boolean)}>
+                          {(tag) => (
+                            <span class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs">
+                              {tag}
+                            </span>
+                          )}
+                        </For>
+                      </div>
+                    ) : (
+                      <span class="text-sm text-[#191c1e] font-medium whitespace-pre-wrap">
+                        {entry.value}
+                      </span>
+                    )}
                   </div>
                 )}
               </For>

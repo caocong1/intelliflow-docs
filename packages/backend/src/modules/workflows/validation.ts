@@ -311,6 +311,47 @@ export function validateWorkflow(
           severity: "warning",
         });
       }
+
+      // Validate namedOutputs
+      const NAMED_OUTPUT_ID_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+      if (node.config.namedOutputs && node.config.namedOutputs.length > 0) {
+        const seenNamedIds = new Set<string>();
+        for (const no of node.config.namedOutputs) {
+          if (!NAMED_OUTPUT_ID_REGEX.test(no.id)) {
+            errors.push({
+              nodeId: node.id,
+              field: "namedOutputs",
+              message: `【模型调用】节点 "${node.label}" 的命名产物 ID "${no.id}" 格式不合法，只允许英文字母、数字和下划线，且不能以数字开头`,
+              severity: "error",
+            });
+          }
+          if (seenNamedIds.has(no.id)) {
+            errors.push({
+              nodeId: node.id,
+              field: "namedOutputs",
+              message: `【模型调用】节点 "${node.label}" 的命名产物 ID "${no.id}" 重复`,
+              severity: "error",
+            });
+          }
+          seenNamedIds.add(no.id);
+        }
+      }
+
+      // Validate jsonSchema when outputFormat is json
+      if (node.config.outputFormat === "json" && node.config.jsonSchema !== undefined) {
+        if (
+          node.config.jsonSchema === null ||
+          typeof node.config.jsonSchema !== "object" ||
+          Array.isArray(node.config.jsonSchema)
+        ) {
+          errors.push({
+            nodeId: node.id,
+            field: "jsonSchema",
+            message: `【模型调用】节点 "${node.label}" 的 JSON Schema 必须是一个有效的对象`,
+            severity: "error",
+          });
+        }
+      }
     }
 
     if (node.config.type === "export") {
@@ -338,6 +379,19 @@ export function validateWorkflow(
         });
       } else {
         segmentKeys.set(sk, o.id);
+      }
+    }
+
+    // Also check namedOutputs IDs against existing segmentKeys
+    if (node.config.type === "model_call" && node.config.namedOutputs) {
+      for (const no of node.config.namedOutputs) {
+        if (segmentKeys.has(no.id)) {
+          errors.push({
+            nodeId: node.id,
+            message: `节点 "${node.label}" 中命名产物 "${no.id}" 与已有标识符冲突`,
+            severity: "error",
+          });
+        }
       }
     }
   }

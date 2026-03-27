@@ -45,6 +45,14 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
     }
 
     case "model_call":
+      if (config.namedOutputs && config.namedOutputs.length > 0) {
+        return config.namedOutputs.map((no) => ({
+          id: `${nodeId}-namedoutput-${no.id}`,
+          name: no.name,
+          description: `命名产物: ${no.name}`,
+          segmentKey: no.id,
+        }));
+      }
       return config.modelIds.map((modelId) => ({
         id: `${nodeId}-model-${modelId}`,
         name: config.modelNames?.[modelId] ?? modelId,

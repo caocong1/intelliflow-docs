@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: 节点能力增强
-status: in_progress
-last_updated: "2026-03-27T06:55:00Z"
+milestone: v1.1
+milestone_name: 运营增强与智能编辑
+status: unknown
+last_updated: "2026-03-27T07:16:35.610Z"
 progress:
-  total_phases: 4
-  completed_phases: 2
-  total_plans: 13
-  completed_plans: 13
+  total_phases: 26
+  completed_phases: 26
+  total_plans: 87
+  completed_plans: 87
 ---
 
 # Project State

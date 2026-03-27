@@ -173,7 +173,7 @@ Phase 17 first (foundation). Then Phases 18, 19, 20 can proceed in parallel (all
 | 20. Search + Favorites + Recent Access        | v1.1      | 3/3            | Complete    | 2026-03-26 |
 | 21. AI-Assisted Inline Editing                | v1.1      | 3/3            | Complete    | 2026-03-27 |
 | 22. Bug Fixes + Form Field Type Extension    | v1.1      | 3/3            | Complete    | 2026-03-27 |
-| 23. Output Path Grammar + File Slots          | v1.2      | 0/3            | Pending     | —         |
+| 23. Output Path Grammar + File Slots          | v1.2      | Complete    | 2026-03-27 | —         |
 | 24. Structured Output + Named Artifacts       | v1.2      | 0/4            | Pending     | —         |
 | 25. Word Table Rendering + System Prompt      | v1.2      | 3/3            | Complete    | 2026-03-27 |
 | 26. Conditional Node Execution                | v1.2      | 4/4            | Complete    | 2026-03-27 |

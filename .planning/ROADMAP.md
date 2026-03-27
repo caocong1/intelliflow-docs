@@ -281,5 +281,5 @@ Plans:
 Plans:
 
 - [x] 26-01-PLAN.md — Shared types + DB migration + conditions service + runtime integration
-- [ ] 26-02-PLAN.md — Frontend ExecutionRuleEditor component + ConfigPanel integration
+- [x] 26-02-PLAN.md — Frontend ExecutionRuleEditor component + ConfigPanel integration
 - [ ] 26-03-PLAN.md — Frontend blocked/skip display + rollback interaction

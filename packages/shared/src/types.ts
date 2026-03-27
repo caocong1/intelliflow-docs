@@ -110,16 +110,27 @@ export interface VariableRef {
   variableName: string;
 }
 
+/** Form field type union */
+export type FormFieldType = "text" | "textarea" | "file" | "number" | "date" | "datetime" | "select" | "multiselect";
+
 /** Form field definition for input transform node */
 export interface FormFieldDef {
   id: string;
   label: string;
-  type: "text" | "textarea" | "file";
+  type: FormFieldType;
   required: boolean;
+  /** Stable machine-readable identifier, format: /^[a-zA-Z_][a-zA-Z0-9_]*$/ */
+  machineKey?: string;
   /** File upload: how many files allowed */
   fileCountMode?: "single" | "unlimited";
   /** When set, restrict to these file extensions (e.g. [".pdf", ".doc,.docx"]) */
   acceptedFileTypes?: string[];
+  /** Option list for select/multiselect fields */
+  options?: string[];
+  /** Single default value for text/number/date/datetime/select */
+  defaultValue?: string;
+  /** Multiple default values for multiselect */
+  defaultValues?: string[];
 }
 
 /** Node config discriminated union */

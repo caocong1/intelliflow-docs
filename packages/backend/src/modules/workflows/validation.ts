@@ -182,6 +182,84 @@ export function validateWorkflow(
           });
         }
       }
+
+      // Validate machineKey format, uniqueness, and select/multiselect options
+      const MACHINE_KEY_REGEX = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+      const seenMachineKeys = new Set<string>();
+
+      for (const field of fields) {
+        // machineKey format validation
+        if (field.machineKey) {
+          if (!MACHINE_KEY_REGEX.test(field.machineKey)) {
+            errors.push({
+              nodeId: node.id,
+              field: "formFields",
+              message: `字段 "${field.label}" 的 machineKey "${field.machineKey}" 格式不合法，只允许英文字母、数字和下划线，且不能以数字开头`,
+              severity: "error",
+            });
+          }
+          // machineKey uniqueness
+          if (seenMachineKeys.has(field.machineKey)) {
+            errors.push({
+              nodeId: node.id,
+              field: "formFields",
+              message: `字段 "${field.label}" 的 machineKey "${field.machineKey}" 与其他字段重复`,
+              severity: "error",
+            });
+          }
+          seenMachineKeys.add(field.machineKey);
+        }
+
+        // select/multiselect options validation
+        if (field.type === "select" || field.type === "multiselect") {
+          if (!field.options || field.options.length === 0) {
+            errors.push({
+              nodeId: node.id,
+              field: "formFields",
+              message: `字段 "${field.label}" 需要至少一个选项`,
+              severity: "error",
+            });
+          } else {
+            // No commas in option text
+            for (const opt of field.options) {
+              if (opt.includes(",")) {
+                errors.push({
+                  nodeId: node.id,
+                  field: "formFields",
+                  message: `字段 "${field.label}" 的选项不能包含逗号`,
+                  severity: "error",
+                });
+                break;
+              }
+            }
+
+            // Default value must be in options
+            if (field.type === "select" && field.defaultValue) {
+              if (!field.options.includes(field.defaultValue)) {
+                errors.push({
+                  nodeId: node.id,
+                  field: "formFields",
+                  message: `字段 "${field.label}" 的默认值不在选项列表中`,
+                  severity: "error",
+                });
+              }
+            }
+            if (field.type === "multiselect" && field.defaultValues) {
+              for (const dv of field.defaultValues) {
+                if (!field.options.includes(dv)) {
+                  errors.push({
+                    nodeId: node.id,
+                    field: "formFields",
+                    message: `字段 "${field.label}" 的默认值不在选项列表中`,
+                    severity: "error",
+                  });
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     if (node.config.type === "desensitize") {

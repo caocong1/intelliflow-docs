@@ -18,7 +18,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 从输入到多模型并行生成、对比迭代、脱敏恢复、最终导出
-**Current focus:** Phase 23 in progress — Output Path Grammar + File Slots + Export ContentMapping, plan 02 complete
+**Current focus:** Phase 23 complete — Output Path Grammar + File Slots + Export ContentMapping, all 3 plans done
 
 ## Current Position
 

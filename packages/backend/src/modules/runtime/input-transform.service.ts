@@ -2,8 +2,10 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { join, extname } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "../../db";
-import { nodeExecutions } from "../../db/schema";
+import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { getUploadPath, insertDocumentFile } from "../files/files.service";
+import type { FormFieldDef, WorkflowNodeDef } from "@intelliflow/shared";
+import { AppError } from "../../common/errors";
 
 // ─── File parsing ────────────────────────────────────────────────────────────
 
@@ -132,6 +134,50 @@ export async function handleFileUpload(
   };
 }
 
+// ─── Field validation ────────────────────────────────────────────────────────
+
+/**
+ * Validate a field value against its type definition.
+ * Returns an error message string or null if valid.
+ */
+function validateFieldValue(field: FormFieldDef, value: string | undefined): string | null {
+  const v = value ?? "";
+
+  if (field.required && (!v || v.trim() === "")) {
+    return `${field.label}: 字段必填`;
+  }
+
+  // Skip further validation if value is empty and not required
+  if (!v) return null;
+
+  switch (field.type) {
+    case "number":
+      if (Number.isNaN(Number(v))) return `${field.label}: 数字格式不合法`;
+      break;
+    case "date":
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${field.label}: 日期格式不合法`;
+      break;
+    case "datetime":
+      if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(v))
+        return `${field.label}: 日期时间格式不合法`;
+      break;
+    case "select":
+      if (field.options && !field.options.includes(v)) return `${field.label}: 选项值不合法`;
+      break;
+    case "multiselect": {
+      if (field.options) {
+        const values = v.split(",").map((s) => s.trim());
+        for (const sv of values) {
+          if (!field.options.includes(sv)) return `${field.label}: 选项值不合法 (${sv})`;
+        }
+      }
+      break;
+    }
+  }
+
+  return null;
+}
+
 // ─── Confirm input transform ─────────────────────────────────────────────────
 
 export interface ConfirmInputTransformParams {
@@ -151,6 +197,49 @@ export interface ConfirmInputTransformParams {
 export async function confirmInputTransform(params: ConfirmInputTransformParams) {
   const { documentId, nodeExecutionId, formData, fileOutputs, userId } = params;
 
+  // Load workflow node config to access formFields with machineKey
+  const [nodeExec] = await db
+    .select({ nodeId: nodeExecutions.nodeId })
+    .from(nodeExecutions)
+    .where(eq(nodeExecutions.id, nodeExecutionId))
+    .limit(1);
+
+  let formFields: FormFieldDef[] = [];
+  if (nodeExec) {
+    const [doc] = await db
+      .select({ nodes: workflows.nodes })
+      .from(documents)
+      .innerJoin(workflows, eq(documents.workflowId, workflows.id))
+      .where(eq(documents.id, documentId))
+      .limit(1);
+
+    if (doc) {
+      const wfNodes = doc.nodes as WorkflowNodeDef[];
+      const nodeDef = wfNodes.find((n) => n.id === nodeExec.nodeId);
+      const cfg = nodeDef?.config;
+      formFields = cfg && "formFields" in cfg ? (cfg as { formFields: FormFieldDef[] }).formFields : [];
+    }
+  }
+
+  // Validate field values against their type definitions
+  const errors: string[] = [];
+  for (const field of formFields) {
+    if (field.type === "file") continue; // files validated separately
+    const err = validateFieldValue(field, formData[field.id]);
+    if (err) errors.push(err);
+  }
+  if (errors.length > 0) {
+    throw new AppError(`表单验证失败: ${errors.join("; ")}`, 400);
+  }
+
+  // Build fieldsByKey dual-view map (machineKey -> value)
+  const fieldsByKey: Record<string, string> = {};
+  for (const field of formFields) {
+    if (field.machineKey && formData[field.id] !== undefined) {
+      fieldsByKey[field.machineKey] = formData[field.id];
+    }
+  }
+
   // Build combined text for downstream nodes (must be computed before outputData)
   const textParts: string[] = [];
   for (const [key, value] of Object.entries(formData)) {
@@ -164,6 +253,7 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
   // Build output data structure
   const outputData = {
     fields: formData,
+    fieldsByKey,
     files: fileOutputs.map((f) => ({
       fileId: f.fileId,
       name: f.name,

@@ -105,10 +105,10 @@ export default function DocumentWorkspace() {
 
   onCleanup(() => clearTimeout(saveTimeout));
 
-  /** Check if any node is still running or pending (generation active) */
+  /** Check if any node is actively executing (generation active) */
   function isGenerationActive(runtimeState: DocumentRuntimeState): boolean {
     return runtimeState.nodes.some(
-      (n) => n.status === "in_progress" || n.status === "pending",
+      (n) => n.status === "in_progress",
     );
   }
 

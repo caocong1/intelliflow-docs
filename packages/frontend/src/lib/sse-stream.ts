@@ -1,6 +1,9 @@
 /**
  * Shared SSE streaming utility extracted from ModelCallExecutor pattern.
  * Provides a reusable function for consuming Server-Sent Events from the backend.
+ *
+ * Uses XMLHttpRequest with onprogress for reliable chunked streaming through
+ * dev proxies. Fetch + ReadableStream can stall in some proxy configurations.
  */
 
 export interface SSEEvent {
@@ -19,91 +22,102 @@ export interface SSEStreamOptions {
   signal: AbortSignal;
 }
 
+function parseSSEChunks(
+  raw: string,
+  callbacks: Pick<SSEStreamOptions, "onDelta" | "onComplete" | "onError">,
+) {
+  const chunks = raw.split("\n\n");
+  for (const chunk of chunks) {
+    for (const line of chunk.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const dataStr = trimmed.slice(5).trim();
+      try {
+        const event = JSON.parse(dataStr) as SSEEvent;
+        switch (event.type) {
+          case "delta":
+            callbacks.onDelta(event.modelId, event.data);
+            break;
+          case "complete":
+            callbacks.onComplete(event.modelId, event.data);
+            break;
+          case "error":
+            callbacks.onError(event.modelId, event.data);
+            break;
+          // "status" events are informational, no callback needed
+        }
+      } catch {
+        // Skip unparseable data lines
+      }
+    }
+  }
+}
+
 /**
  * Stream SSE events from a backend endpoint.
  *
- * Follows the exact pattern from ModelCallExecutor.tsx:
- * - Gets auth token from localStorage
- * - Uses fetch with Authorization header and abort signal
- * - POST method: includes Content-Type application/json and stringified body
- * - Reads response body with ReadableStream reader
- * - Splits buffer on "\n\n", parses "data:" lines as JSON SSEEvent objects
- * - Calls appropriate callback based on event.type
- * - Handles AbortError silently
+ * Uses XHR with onprogress to reliably receive chunked data through dev proxies.
+ * Falls back gracefully when the full response arrives at once (proxy buffering).
  */
-export async function streamSSE(options: SSEStreamOptions): Promise<void> {
+export function streamSSE(options: SSEStreamOptions): Promise<void> {
   const { url, method = "GET", body, onDelta, onComplete, onError, signal } = options;
   const token = localStorage.getItem("auth_token");
 
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-  if (method === "POST") {
-    headers["Content-Type"] = "application/json";
-  }
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    let processedLength = 0;
 
-  try {
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: method === "POST" && body !== undefined ? JSON.stringify(body) : undefined,
-      signal,
-    });
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      try {
-        const parsed = JSON.parse(text);
-        throw new Error(parsed.error ?? `HTTP ${response.status}`);
-      } catch {
-        throw new Error(`HTTP ${response.status}: ${text.slice(0, 200)}`);
-      }
+    xhr.open(method, url, true);
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
+    if (method === "POST") {
+      xhr.setRequestHeader("Content-Type", "application/json");
     }
 
-    if (!response.body) throw new Error("No response body");
+    // Handle abort signal
+    const onAbort = () => {
+      xhr.abort();
+      resolve();
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
+    xhr.onprogress = () => {
+      const newData = xhr.responseText.slice(processedLength);
+      if (!newData) return;
+      processedLength = xhr.responseText.length;
+      parseSSEChunks(newData, { onDelta, onComplete, onError });
+    };
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const chunks = buffer.split("\n\n");
-      buffer = chunks.pop() ?? "";
-
-      for (const chunk of chunks) {
-        for (const line of chunk.split("\n")) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const dataStr = trimmed.slice(5).trim();
-
-          try {
-            const event = JSON.parse(dataStr) as SSEEvent;
-            switch (event.type) {
-              case "delta":
-                onDelta(event.modelId, event.data);
-                break;
-              case "complete":
-                onComplete(event.modelId, event.data);
-                break;
-              case "error":
-                onError(event.modelId, event.data);
-                break;
-              // "status" events are informational, no callback needed
-            }
-          } catch {
-            // Skip unparseable data lines
-          }
+    xhr.onload = () => {
+      signal.removeEventListener("abort", onAbort);
+      if (xhr.status >= 400) {
+        try {
+          const parsed = JSON.parse(xhr.responseText);
+          reject(new Error(parsed.error ?? `HTTP ${xhr.status}`));
+        } catch {
+          reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText.slice(0, 200)}`));
         }
+        return;
       }
-    }
-  } catch (err: unknown) {
-    // Handle AbortError silently -- this is expected when user cancels
-    if (err instanceof DOMException && err.name === "AbortError") return;
-    throw err;
-  }
+      // Process any remaining data not caught by onprogress
+      const remaining = xhr.responseText.slice(processedLength);
+      if (remaining) {
+        parseSSEChunks(remaining, { onDelta, onComplete, onError });
+      }
+      resolve();
+    };
+
+    xhr.onerror = () => {
+      signal.removeEventListener("abort", onAbort);
+      reject(new Error("网络请求失败"));
+    };
+
+    xhr.onabort = () => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    };
+
+    xhr.send(method === "POST" && body !== undefined ? JSON.stringify(body) : undefined);
+  });
 }

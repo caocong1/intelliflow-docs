@@ -4,7 +4,8 @@ import { and, asc, eq, gt, max, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { createVersionSnapshot } from "../versions/versions.service";
-import type { DocumentRuntimeState, InputSource, NodeExecution, WorkflowEdgeDef, WorkflowNodeDef } from "@intelliflow/shared";
+import { evaluateExecutionRule } from "./conditions.service";
+import type { DocumentRuntimeState, InputSource, NodeExecution, WorkflowEdgeDef, WorkflowNodeDef, NodeConfig } from "@intelliflow/shared";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -164,7 +165,12 @@ export async function advanceNode(
   documentId: string,
   nodeExecutionId: string,
   userId: string,
+  depth: number = 0,
 ): Promise<DocumentRuntimeState> {
+  // Prevent infinite loops from misconfigured conditions
+  if (depth > 50) {
+    throw new Error("advanceNode recursion depth exceeded 50 — possible circular condition configuration");
+  }
   const now = new Date();
 
   // Complete current node
@@ -276,6 +282,65 @@ export async function advanceNode(
       }
     }
 
+    // ── Conditional node execution: evaluate executionRule before entering node ──
+    const nextNodeDef = wfData?.nodes.find((n: WorkflowNodeDef) => n.id === nextNode.nodeId);
+    const executionRule = (nextNodeDef?.config as NodeConfig | undefined)?.executionRule;
+
+    if (executionRule) {
+      // Query fresh node executions for condition evaluation
+      const freshExecs = await db
+        .select()
+        .from(nodeExecutions)
+        .where(
+          and(
+            eq(nodeExecutions.documentId, documentId),
+            eq(nodeExecutions.isCurrent, true),
+          ),
+        )
+        .orderBy(asc(nodeExecutions.stepOrder));
+
+      const { triggered, reason } = evaluateExecutionRule(
+        executionRule,
+        freshExecs.map((e) => ({ nodeId: e.nodeId, outputData: e.outputData as Record<string, unknown> | null })),
+      );
+
+      if (triggered) {
+        if (executionRule.action === "skip") {
+          // Mark as skipped with conditional skip metadata
+          await db
+            .update(nodeExecutions)
+            .set({
+              status: "skipped",
+              outputData: { skipReason: reason, skipType: "conditional" },
+              completedAt: now,
+              updatedAt: now,
+            })
+            .where(eq(nodeExecutions.id, nextNode.id));
+
+          // Recursively advance to find the real next node
+          return advanceNode(documentId, nextNode.id, userId, (depth ?? 0) + 1);
+        } else if (executionRule.action === "block") {
+          // Mark as blocked — document stops here, frontend sees blocked node
+          await db
+            .update(nodeExecutions)
+            .set({
+              status: "blocked",
+              outputData: { blockReason: reason, blockType: "conditional" },
+              updatedAt: now,
+            })
+            .where(eq(nodeExecutions.id, nextNode.id));
+
+          const executions = await db
+            .select()
+            .from(nodeExecutions)
+            .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
+            .orderBy(asc(nodeExecutions.stepOrder));
+          return buildRuntimeState(documentId, executions);
+        }
+      }
+    }
+
+    // ── Normal case: set node to in_progress ──
     await db
       .update(nodeExecutions)
       .set({
@@ -297,7 +362,7 @@ export async function advanceNode(
           .where(eq(nodeExecutions.id, nextNode.id));
 
         // Recursively advance to find the real next node
-        return advanceNode(documentId, nextNode.id, userId);
+        return advanceNode(documentId, nextNode.id, userId, depth + 1);
       }
     }
   } else {

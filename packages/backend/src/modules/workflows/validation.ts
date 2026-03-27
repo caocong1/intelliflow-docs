@@ -1,4 +1,4 @@
-import type { WorkflowEdgeDef, WorkflowNodeDef, WorkflowValidationError } from "@intelliflow/shared";
+import type { NodeExecutionRule, WorkflowEdgeDef, WorkflowNodeDef, WorkflowValidationError } from "@intelliflow/shared";
 
 /**
  * Validate a workflow graph.
@@ -539,6 +539,109 @@ export function validateWorkflow(
           message: `节点 "${node.label}" 的输入来源 "${src.displayName}" 引用了不存在的输出`,
           severity: "error",
         });
+      }
+    }
+  }
+
+  // ── Rule 12: Validate executionRule on each node ──────────────────────────────
+  // Build upstream reachability for condition sourceRef validation
+  function getUpstreamIdsForCondition(startId: string): Set<string> {
+    const visited = new Set<string>();
+    const stack = [startId];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (current === undefined) break;
+      for (const edge of edges) {
+        if (edge.target === current && !visited.has(edge.source)) {
+          visited.add(edge.source);
+          stack.push(edge.source);
+        }
+      }
+    }
+    return visited;
+  }
+
+  for (const node of nodes) {
+    const config = node.config as { executionRule?: NodeExecutionRule };
+    const rule = config.executionRule;
+    if (!rule) continue;
+
+    // action must be "skip" or "block"
+    if (rule.action !== "skip" && rule.action !== "block") {
+      errors.push({
+        nodeId: node.id,
+        field: "executionRule.action",
+        message: `节点 "${node.label}" 的执行条件动作必须是 "skip" 或 "block"`,
+        severity: "error",
+      });
+    }
+
+    // logic must be "and" or "or"
+    if (rule.logic !== "and" && rule.logic !== "or") {
+      errors.push({
+        nodeId: node.id,
+        field: "executionRule.logic",
+        message: `节点 "${node.label}" 的执行条件逻辑必须是 "and" 或 "or"`,
+        severity: "error",
+      });
+    }
+
+    // conditions must be non-empty array
+    if (!rule.conditions || rule.conditions.length === 0) {
+      errors.push({
+        nodeId: node.id,
+        field: "executionRule.conditions",
+        message: `节点 "${node.label}" 的执行条件至少需要一个条件`,
+        severity: "error",
+      });
+    } else {
+      // Validate each condition
+      const upstreamIds = getUpstreamIdsForCondition(node.id);
+
+      for (const cond of rule.conditions) {
+        // sourceRef.nodeId must exist in workflow nodes
+        const sourceNode = nodeMap.get(cond.sourceRef.nodeId);
+        if (!sourceNode) {
+          errors.push({
+            nodeId: node.id,
+            field: "executionRule.conditions",
+            message: `节点 "${node.label}" 的执行条件引用了不存在的上游节点`,
+            severity: "error",
+          });
+        } else {
+          // sourceRef.nodeId must be upstream of the current node
+          if (!upstreamIds.has(cond.sourceRef.nodeId)) {
+            errors.push({
+              nodeId: node.id,
+              field: "executionRule.conditions",
+              message: `节点 "${node.label}" 的执行条件引用了不在上游路径的节点 "${sourceNode.label}"`,
+              severity: "error",
+            });
+          }
+        }
+
+        // When operator is equals/not_equals/contains, value must be non-empty
+        if (
+          (cond.operator === "equals" || cond.operator === "not_equals" || cond.operator === "contains") &&
+          !cond.value
+        ) {
+          errors.push({
+            nodeId: node.id,
+            field: "executionRule.conditions",
+            message: `节点 "${node.label}" 的执行条件使用了 "${cond.operator}" 运算符但未提供比较值`,
+            severity: "error",
+          });
+        }
+
+        // When operator is exists/not_exists, value should be absent or empty (warn but don't block)
+        if ((cond.operator === "exists" || cond.operator === "not_exists") && cond.value) {
+          errors.push({
+            nodeId: node.id,
+            field: "executionRule.conditions",
+            message: `节点 "${node.label}" 的执行条件使用了 "${cond.operator}" 运算符但提供了值（将被忽略）`,
+            severity: "warning",
+          });
+        }
       }
     }
   }

@@ -12,6 +12,7 @@ import type {
   DesensitizeConfig,
   ExportConfig,
   ModelCallConfig,
+  NodeConfig,
   RestoreConfig,
   WorkflowNodeDef,
 } from "@intelliflow/shared";
@@ -22,6 +23,7 @@ import { executeRestore } from "./restore.service";
 import { generateExport } from "./export.service";
 import { createNotification } from "../notifications/notifications.service";
 import { sendTextCardMessage } from "../wecom/wecom.service";
+import { evaluateExecutionRule } from "./conditions.service";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -240,6 +242,83 @@ export async function executeDocumentPipeline(
           .set({ progress, updatedAt: new Date() })
           .where(eq(backgroundTasks.id, task.id));
         continue;
+      }
+
+      // ── Conditional node execution: evaluate executionRule before entering node ──
+      const executionRule = (nodeDef.config as NodeConfig).executionRule;
+      if (executionRule) {
+        // Query fresh node executions from DB for condition evaluation
+        const freshExecs = await db
+          .select()
+          .from(nodeExecutions)
+          .where(
+            and(
+              eq(nodeExecutions.documentId, documentId),
+              eq(nodeExecutions.isCurrent, true),
+            ),
+          )
+          .orderBy(asc(nodeExecutions.stepOrder));
+
+        const { triggered, reason } = evaluateExecutionRule(
+          executionRule,
+          freshExecs.map((e) => ({ nodeId: e.nodeId, outputData: e.outputData as Record<string, unknown> | null })),
+        );
+
+        if (triggered) {
+          const condNow = new Date();
+          if (executionRule.action === "skip") {
+            // Mark as skipped with conditional skip metadata
+            await db
+              .update(nodeExecutions)
+              .set({
+                status: "skipped",
+                outputData: { skipReason: reason, skipType: "conditional" },
+                completedAt: condNow,
+                updatedAt: condNow,
+              })
+              .where(eq(nodeExecutions.id, exec.id));
+            // Update progress and continue to next node
+            const progress = Math.round(((i + 1) / totalNodes) * 100);
+            await db
+              .update(backgroundTasks)
+              .set({ progress, updatedAt: condNow })
+              .where(eq(backgroundTasks.id, task.id));
+            continue;
+          } else if (executionRule.action === "block") {
+            // Mark as blocked
+            await db
+              .update(nodeExecutions)
+              .set({
+                status: "blocked",
+                outputData: { blockReason: reason, blockType: "conditional" },
+                updatedAt: condNow,
+              })
+              .where(eq(nodeExecutions.id, exec.id));
+
+            // Mark background task as failed with descriptive message
+            const errorSummary = `条件阻断：节点「${nodeDef.label}」- ${reason}`;
+            await db
+              .update(backgroundTasks)
+              .set({
+                status: "failed",
+                errorMessage: errorSummary.slice(0, 2000),
+                updatedAt: condNow,
+              })
+              .where(eq(backgroundTasks.id, task.id));
+
+            // Mark document as failed
+            await db
+              .update(documents)
+              .set({ status: "failed", updatedAt: condNow })
+              .where(eq(documents.id, documentId));
+
+            // Send failure notification
+            await notifyFailure(userId, documentId, errorSummary);
+
+            // Stop pipeline
+            return;
+          }
+        }
       }
 
       // Update node to in_progress

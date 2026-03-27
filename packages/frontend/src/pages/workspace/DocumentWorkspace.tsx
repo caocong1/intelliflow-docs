@@ -352,11 +352,15 @@ export default function DocumentWorkspace() {
     const targetNodeId = sourceExecs[0]?.nodeId;
     if (!targetNodeId) return;
 
+    const targetExec = s.nodes.find((n) => n.nodeId === targetNodeId);
+    const targetStepOrder = targetExec?.stepOrder;
+    if (!targetStepOrder) return;
+
     const token = localStorage.getItem("auth_token");
     const res = await fetch(`/api/runtime/${params.documentId}/rollback`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ targetNodeId }),
+      body: JSON.stringify({ targetStepOrder }),
     });
     if (res.ok) {
       fetchRuntimeState();

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T04:45:38.685Z"
+last_updated: "2026-03-27T04:45:35Z"
 progress:
   total_phases: 26
-  completed_phases: 24
+  completed_phases: 25
   total_plans: 86
-  completed_plans: 81
+  completed_plans: 83
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 25 of 26 (Export Table Rendering + System Prompt Separation)
-Plan: 1 of 3
+Plan: 2 of 3
 Status: In Progress
-Last activity: 2026-03-27 — Phase 25-01 executed: Word/PDF state-machine parser for tables, lists, code blocks
+Last activity: 2026-03-27 — Phase 25-02 executed: Backend system prompt support (types, strategies, service, routes, DB migration)
 
 Progress: [███████████████████░] 96%
 
@@ -73,6 +73,7 @@ Progress: [███████████████████░] 96%
 | Phase 24 P04 | 6min | 2 tasks | 2 files |
 | Phase 24 P03 | 7min | 2 tasks | 3 files |
 | Phase 25 P01 | 3 | 2 tasks | 1 files |
+| Phase 25 P02 | 4min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,7 @@ Recent decisions affecting current work:
 - [Phase 24]: Used textarea for named output editing instead of InlineEditor for card simplicity
 - [Phase 25]: Word/PDF export uses NORMAL/IN_TABLE/IN_CODE_BLOCK state machine for consistent multi-line Markdown parsing
 - [Phase 25]: Business-formal table styling: full borders (#999999), bold+gray header (#E8E8E8), alternating rows (#F5F5F5)
+- [25-02]: System prompt uses empty desensitize rules (stays clean); Claude autonomous prepends to prompt string (no separate system param)
 
 ### Roadmap Evolution
 

@@ -280,7 +280,6 @@ Plans:
 **Plans**: 3 plans
 Plans:
 
-- [ ] 25-01-PLAN.md — Word/PDF export: tables, ordered lists, nested lists, code blocks
-- [ ] 25-02-PLAN.md — Backend system prompt: types, strategies, service, routes, DB migration
-- [ ] 25-03-PLAN.md — Frontend system prompt: config panel + log display
-
+- [ ] 26-01-PLAN.md — Shared types + DB migration + conditions service + runtime integration
+- [ ] 26-02-PLAN.md — Frontend ExecutionRuleEditor component + ConfigPanel integration
+- [ ] 26-03-PLAN.md — Frontend blocked/skip display + rollback interaction

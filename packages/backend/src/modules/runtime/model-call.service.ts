@@ -1,9 +1,10 @@
 import { asc, eq, and, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import { desensitizeMappings, modelCallLogs, models, nodeExecutions, providers, documents, workflows } from "../../db/schema";
-import type { DesensitizeRuleDesc, ModelOutput, NodeExecution, SSEEvent, WorkflowNodeDef } from "@intelliflow/shared";
+import type { DesensitizeRuleDesc, ModelCallConfig, ModelOutput, NamedOutputDef, NodeExecution, SSEEvent, WorkflowNodeDef } from "@intelliflow/shared";
 import { getStrategy } from "./strategies";
 import type { ModelCallInput } from "./strategies";
+import Ajv from "ajv";
 
 // ─── Prompt Resolution ──────────────────────────────────────────────────────
 
@@ -11,6 +12,59 @@ import type { ModelCallInput } from "./strategies";
 export interface ResolvedPromptResult {
   resolved: string;
   mapping: Record<string, string>;
+}
+
+/**
+ * Resolve a deep field path on a parsed JSON value.
+ * Supports dot-separated keys, bracket[N] numeric indices, and [*] array traversal.
+ * Examples: "items[0].name", "clauses[*].title", "nested.deep.key"
+ */
+export function resolveFieldPath(obj: unknown, fieldPath: string): string | undefined {
+  // Parse fieldPath into segments: "items[0].name" -> ["items", 0, "name"], "a[*].b" -> ["a", "*", "b"]
+  const segments: Array<string | number> = [];
+  const tokenRegex = /([^.\[\]]+)|\[(\d+)\]|\[\*\]/g;
+  let match: RegExpExecArray | null;
+  match = tokenRegex.exec(fieldPath);
+  while (match !== null) {
+    if (match[1] !== undefined) {
+      segments.push(match[1]);
+    } else if (match[2] !== undefined) {
+      segments.push(Number(match[2]));
+    } else {
+      segments.push("*");
+    }
+    match = tokenRegex.exec(fieldPath);
+  }
+
+  function resolve(current: unknown, segIdx: number): unknown {
+    if (current === undefined || current === null || segIdx >= segments.length) {
+      return current;
+    }
+
+    const seg = segments[segIdx];
+
+    if (seg === "*") {
+      if (!Array.isArray(current)) return undefined;
+      const results = current.map((item) => resolve(item, segIdx + 1));
+      return results;
+    }
+
+    if (typeof seg === "number") {
+      if (!Array.isArray(current)) return undefined;
+      return resolve(current[seg], segIdx + 1);
+    }
+
+    if (typeof current === "object" && current !== null) {
+      return resolve((current as Record<string, unknown>)[seg], segIdx + 1);
+    }
+
+    return undefined;
+  }
+
+  const result = resolve(obj, 0);
+  if (result === undefined || result === null) return undefined;
+  if (typeof result === "string") return result;
+  return JSON.stringify(result);
 }
 
 /**
@@ -53,22 +107,52 @@ export function resolveRef(
     return fileSlots[segmentKey].text;
   }
 
-  // 4. namedOutputs (Phase 24 stub — returns .content)
+  // 4. namedOutputs (returns .content, supports fieldPath for JSON access)
   const namedOutputs = od.namedOutputs as Record<string, { content?: string }> | undefined;
   if (namedOutputs?.[segmentKey]) {
-    return namedOutputs[segmentKey].content;
+    const baseContent = namedOutputs[segmentKey].content;
+    if (ref.fieldPath && baseContent) {
+      try {
+        const parsed = JSON.parse(baseContent);
+        return resolveFieldPath(parsed, ref.fieldPath);
+      } catch {
+        console.warn(`resolveRef: failed to parse namedOutput "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`);
+        return undefined;
+      }
+    }
+    return baseContent;
   }
 
-  // 5. models (model output — returns .content)
+  // 5. models (model output — returns .content, supports fieldPath for JSON access)
   const modelsMap = od.models as Record<string, { content?: string }> | undefined;
   if (modelsMap?.[segmentKey]) {
-    return modelsMap[segmentKey].content;
+    const baseContent = modelsMap[segmentKey].content;
+    if (ref.fieldPath && baseContent) {
+      try {
+        const parsed = JSON.parse(baseContent);
+        return resolveFieldPath(parsed, ref.fieldPath);
+      } catch {
+        console.warn(`resolveRef: failed to parse model output "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`);
+        return undefined;
+      }
+    }
+    return baseContent;
   }
 
   // 6. Direct property (text, confirmedAt, selectedContent, etc.)
   if (od[segmentKey] !== undefined && od[segmentKey] !== null) {
     const v = od[segmentKey];
-    return typeof v === "string" ? v : JSON.stringify(v);
+    const baseValue = typeof v === "string" ? v : JSON.stringify(v);
+    if (ref.fieldPath) {
+      try {
+        const parsed = JSON.parse(baseValue);
+        return resolveFieldPath(parsed, ref.fieldPath);
+      } catch {
+        console.warn(`resolveRef: failed to parse property "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`);
+        return undefined;
+      }
+    }
+    return baseValue;
   }
 
   return undefined;
@@ -84,19 +168,36 @@ export async function resolvePromptTemplate(
   documentId: string,
   nodeExecs: Array<{ nodeId: string; nodeLabel: string; outputData: Record<string, unknown> | null }>,
   desensitizeRules: DesensitizeRuleDesc[],
+  config?: ModelCallConfig,
 ): Promise<ResolvedPromptResult> {
   let resolved = template;
   const mapping: Record<string, string> = {};
 
-  // Replace {{nodeId.segmentKey}} with upstream node output values
+  // Replace {{nodeId.segmentKey}} or {{nodeId.segmentKey.field.path}} with upstream node output values
   resolved = resolved.replace(/\{\{([^}]+)\}\}/g, (_match, varName: string) => {
     const dotIndex = varName.indexOf(".");
     if (dotIndex < 0) return _match;
 
     const nodeId = varName.slice(0, dotIndex).trim();
-    const segmentKey = varName.slice(dotIndex + 1).trim();
+    const rest = varName.slice(dotIndex + 1).trim();
 
-    const value = resolveRef({ nodeId, outputId: segmentKey }, nodeExecs);
+    // Parse segmentKey and optional fieldPath
+    // segmentKey is the first segment, remaining segments form fieldPath
+    // But segmentKey could contain bracket notation like "items[0]", so we split on first plain dot
+    const secondDotIndex = rest.indexOf(".");
+    let segmentKey: string;
+    let fieldPath: string | undefined;
+
+    if (secondDotIndex >= 0) {
+      // Check if there's a fieldPath portion after segmentKey
+      segmentKey = rest.slice(0, secondDotIndex);
+      fieldPath = rest.slice(secondDotIndex + 1);
+    } else {
+      segmentKey = rest;
+      fieldPath = undefined;
+    }
+
+    const value = resolveRef({ nodeId, outputId: segmentKey, fieldPath }, nodeExecs);
     if (value === undefined) return _match;
 
     mapping[`{{${varName}}}`] = value;
@@ -111,7 +212,102 @@ export async function resolvePromptTemplate(
     resolved += `\n\n注意：以下文本中包含已脱敏的占位符，请保留这些占位符不要修改：\n${rulesText}`;
   }
 
+  // Inject JSON Schema instruction when configured
+  if (config?.jsonSchema) {
+    resolved += `\n\n请严格按照以下 JSON Schema 格式输出：\n\`\`\`json\n${JSON.stringify(config.jsonSchema, null, 2)}\n\`\`\``;
+  }
+
+  // Inject named output delimiter format when configured
+  if (config?.namedOutputs?.length) {
+    const format = config.namedOutputs
+      .map((o) => `===OUTPUT:${o.id}===\n[${o.name}内容]\n===END:${o.id}===`)
+      .join("\n\n");
+    resolved += `\n\n请按以下格式分段输出，每个产物用指定分隔符包裹：\n${format}`;
+  }
+
   return { resolved, mapping };
+}
+
+// ─── JSON Validation & Named Output Parsing ─────────────────────────────────
+
+/**
+ * Validate model output content against format and optional JSON Schema.
+ * Layer 1: JSON.parse syntax check
+ * Layer 2: ajv schema validation (if jsonSchema provided)
+ */
+export function validateModelOutput(
+  content: string,
+  config: ModelCallConfig,
+): { status: "completed" | "format_error"; errors?: string[] } {
+  if (config.outputFormat !== "json") {
+    return { status: "completed" };
+  }
+
+  // Layer 1: JSON syntax check
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { status: "format_error", errors: [`JSON 语法错误: ${message}`] };
+  }
+
+  // Layer 2: JSON Schema validation
+  if (config.jsonSchema) {
+    const ajv = new Ajv({ allErrors: true });
+    const validate = ajv.compile(config.jsonSchema);
+    const valid = validate(parsed);
+    if (!valid && validate.errors) {
+      const schemaErrors = validate.errors.map(
+        (e) => `${e.instancePath || "/"}: ${e.message ?? "unknown error"}`,
+      );
+      return { status: "format_error", errors: schemaErrors };
+    }
+  }
+
+  return { status: "completed" };
+}
+
+/**
+ * Parse named output delimiters from raw model content.
+ * Expected format: ===OUTPUT:id===\n...content...\n===END:id===
+ * Falls back to storing entire content as _default when delimiters not found.
+ */
+export function parseNamedOutputs(
+  rawContent: string,
+  expectedDefs: NamedOutputDef[],
+): {
+  namedOutputs: Record<string, { content: string; format: string }>;
+  fallback: boolean;
+} {
+  const expectedIds = expectedDefs.map((d) => d.id);
+  const formatMap = new Map(expectedDefs.map((d) => [d.id, d.format]));
+  const result: Record<string, { content: string; format: string }> = {};
+
+  const regex = /===OUTPUT:(\w+)===\n?([\s\S]*?)===END:\1===/g;
+  let match: RegExpExecArray | null;
+  match = regex.exec(rawContent);
+  while (match !== null) {
+    const id = match[1];
+    const content = match[2].trim();
+    result[id] = {
+      content,
+      format: formatMap.get(id) ?? "text",
+    };
+    match = regex.exec(rawContent);
+  }
+
+  // Check if all expected IDs were found
+  const allFound = expectedIds.every((id) => id in result);
+  if (allFound) {
+    return { namedOutputs: result, fallback: false };
+  }
+
+  // Fallback: store entire content as _default
+  return {
+    namedOutputs: { _default: { content: rawContent, format: "text" } },
+    fallback: true,
+  };
 }
 
 // ─── Model Execution ────────────────────────────────────────────────────────
@@ -127,6 +323,7 @@ export async function executeModelCall(
   promptTemplate?: string,
   variableMapping?: Record<string, string>,
   userId?: string,
+  config?: ModelCallConfig,
 ): Promise<ReadableStream<Uint8Array>> {
   // Look up all models + providers
   const modelRows = await db
@@ -296,20 +493,47 @@ export async function executeModelCall(
       for (const result of results) {
         if (result.status === "fulfilled") {
           const r = result.value;
+          let modelStatus: ModelOutput["status"] = r.status;
+          let formatErrors: string[] | undefined;
+
+          // Validate JSON output if configured
+          if (r.status === "completed" && config?.outputFormat === "json") {
+            const validation = validateModelOutput(r.content, config);
+            if (validation.status === "format_error") {
+              modelStatus = "format_error";
+              formatErrors = validation.errors;
+            }
+          }
+
           finalModels[r.modelId] = {
             modelId: r.modelId,
             modelDisplayName: requestedModels.find((m) => m.id === r.modelId)?.displayName ?? "",
             content: r.content,
-            status: r.status,
+            status: modelStatus,
             errorMessage: "errorMessage" in r ? r.errorMessage : undefined,
+            formatErrors,
           };
+        }
+      }
+
+      // Parse named outputs if configured
+      const outputDataPayload: Record<string, unknown> = { models: finalModels };
+      if (config?.namedOutputs?.length) {
+        // Use the first completed model's content for named output parsing
+        const firstCompleted = Object.values(finalModels).find((m) => m.status === "completed" || m.status === "format_error");
+        if (firstCompleted) {
+          const parsed = parseNamedOutputs(firstCompleted.content, config.namedOutputs);
+          outputDataPayload.namedOutputs = parsed.namedOutputs;
+          if (parsed.fallback) {
+            outputDataPayload.fallbackWarning = true;
+          }
         }
       }
 
       await db
         .update(nodeExecutions)
         .set({
-          outputData: { models: finalModels },
+          outputData: outputDataPayload,
           updatedAt: new Date(),
         })
         .where(eq(nodeExecutions.id, nodeExecutionId));
@@ -357,6 +581,7 @@ export async function executeModelCallBackground(
       outputData: e.outputData as Record<string, unknown> | null,
     })),
     desensitizeRules,
+    mcConfig,
   );
 
   // Look up all models + providers
@@ -485,15 +710,28 @@ export async function executeModelCallBackground(
   for (const result of results) {
     if (result.status === "fulfilled") {
       const r = result.value;
+      let modelStatus: ModelOutput["status"] = r.status;
+      let formatErrors: string[] | undefined;
+
+      // Validate JSON output if configured
+      if (r.status === "completed" && mcConfig.outputFormat === "json") {
+        const validation = validateModelOutput(r.content, mcConfig);
+        if (validation.status === "format_error") {
+          modelStatus = "format_error";
+          formatErrors = validation.errors;
+        }
+      }
+
       finalModels[r.modelId] = {
         modelId: r.modelId,
         modelDisplayName: r.displayName,
         content: r.content,
-        status: r.status,
+        status: modelStatus,
         errorMessage: "errorMessage" in r ? r.errorMessage : undefined,
+        formatErrors,
       };
 
-      if (r.status === "completed" && !firstCompletedModelId) {
+      if ((modelStatus === "completed" || modelStatus === "format_error") && !firstCompletedModelId) {
         firstCompletedModelId = r.modelId;
       }
     }
@@ -512,10 +750,24 @@ export async function executeModelCallBackground(
   // Auto-select first completed model output
   const selectedContent = finalModels[firstCompletedModelId]?.content ?? "";
 
+  // Parse named outputs if configured
+  const bgOutputData: Record<string, unknown> = {
+    models: finalModels,
+    selectedContent,
+    text: selectedContent,
+  };
+  if (mcConfig.namedOutputs?.length) {
+    const parsed = parseNamedOutputs(selectedContent, mcConfig.namedOutputs);
+    bgOutputData.namedOutputs = parsed.namedOutputs;
+    if (parsed.fallback) {
+      bgOutputData.fallbackWarning = true;
+    }
+  }
+
   await db
     .update(nodeExecutions)
     .set({
-      outputData: { models: finalModels, selectedContent, text: selectedContent },
+      outputData: bgOutputData,
       selectedOutputKey: firstCompletedModelId,
       completedAt: new Date(),
       updatedAt: new Date(),

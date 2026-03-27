@@ -325,11 +325,28 @@ export function validateWorkflow(
     }
   }
 
+  // ── Rule 11: segmentKey cross-type uniqueness within a node ─────────────────
+  for (const node of nodes) {
+    const segmentKeys = new Map<string, string>();
+    for (const o of node.outputs) {
+      const sk = o.segmentKey || o.id;
+      if (segmentKeys.has(sk)) {
+        errors.push({
+          nodeId: node.id,
+          message: `节点 "${node.label}" 中存在重复的标识符 "${sk}"`,
+          severity: "error",
+        });
+      } else {
+        segmentKeys.set(sk, o.id);
+      }
+    }
+  }
+
   // ── Rule 7: Broken variable references (nodeId or outputId no longer exists) ─
   const outputIdSet = new Set<string>();
   for (const n of nodes) {
     for (const o of n.outputs) {
-      outputIdSet.add(`${n.id}.${o.id}`);
+      outputIdSet.add(`${n.id}.${o.segmentKey || o.id}`);
     }
   }
 

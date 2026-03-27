@@ -298,6 +298,7 @@ export const documentFiles = pgTable("document_files", {
   createdBy: uuid("created_by")
     .notNull()
     .references(() => users.id),
+  slotId: varchar("slot_id", { length: 100 }),  // nullable, links to FormFieldDef.fileSlotId
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: 运营增强与智能编辑
 status: unknown
-last_updated: "2026-03-27T04:16:37Z"
+last_updated: "2026-03-27T04:21:00.155Z"
 progress:
   total_phases: 26
-  completed_phases: 22
-  total_plans: 76
-  completed_plans: 76
+  completed_phases: 23
+  total_plans: 83
+  completed_plans: 77
 ---
 
 # Project State
@@ -68,6 +68,7 @@ Progress: [███████████████████░] 97%
 | Phase 23-01 P01 | 3min | 2 tasks | 5 files |
 | Phase 23 P02 | 3min | 2 tasks | 3 files |
 | Phase 24 P01 | 7min | 2 tasks | 5 files |
+| Phase 23 P03 | 5min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,8 @@ Recent decisions affecting current work:
 - [24-01]: Named output parsing falls back to _default artifact when delimiter markers not found
 - [24-01]: AI fix endpoint streams repair via SSE and auto-validates fixed output
 - [24-01]: Prompt injection order: desensitize rules > jsonSchema > namedOutputs delimiters
+- [Phase 23]: Cross-type collision detection checks machineKey vs fileSlotId across all fields in same node
+- [Phase 23]: HTML5 native drag events for contentMapping reorder; VariablePicker uses segmentKey for outputId with output.name for display
 
 ### Roadmap Evolution
 

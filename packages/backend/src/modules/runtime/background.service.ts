@@ -226,6 +226,22 @@ export async function executeDocumentPipeline(
         throw new Error(`Workflow node definition not found for nodeId: ${exec.nodeId}`);
       }
 
+      // Auto-skip nodes with skippable + autoAdvance config
+      if (nodeDef.config.skippable === true && nodeDef.config.autoAdvance === true) {
+        const skipNow = new Date();
+        await db
+          .update(nodeExecutions)
+          .set({ status: "skipped", completedAt: skipNow, updatedAt: skipNow })
+          .where(eq(nodeExecutions.id, exec.id));
+        // Update progress
+        const progress = Math.round(((i + 1) / totalNodes) * 100);
+        await db
+          .update(backgroundTasks)
+          .set({ progress, updatedAt: new Date() })
+          .where(eq(backgroundTasks.id, task.id));
+        continue;
+      }
+
       // Update node to in_progress
       const nodeStart = new Date();
       await db
@@ -256,7 +272,7 @@ export async function executeDocumentPipeline(
           break;
         }
 
-        case "file_export": {
+        case "export": {
           const exportConfig = nodeDef.config as ExportConfig;
           const format = exportConfig.formats?.[0] ?? exportConfig.format ?? "markdown";
           const dateStr = new Date().toISOString().slice(0, 10);

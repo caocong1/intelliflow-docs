@@ -94,6 +94,7 @@ export interface OutputDef {
   id: string;
   name: string;
   description?: string;
+  segmentKey?: string;  // canonical path identifier for variable resolution
 }
 
 /** Explicit input source reference for desensitize/restore nodes */
@@ -106,8 +107,9 @@ export interface InputSource {
 /** Variable reference in prompt templates */
 export interface VariableRef {
   nodeId: string;
-  outputId: string;
+  outputId: string;       // stores segmentKey (not OutputDef.id)
   variableName: string;
+  fieldPath?: string;     // for nested JSON field access (Phase 24 use)
 }
 
 /** Form field type union */
@@ -131,6 +133,10 @@ export interface FormFieldDef {
   defaultValue?: string;
   /** Multiple default values for multiselect */
   defaultValues?: string[];
+  /** File slot identifier for variable path */
+  fileSlotId?: string;
+  /** Display name for file slot card */
+  fileSlotLabel?: string;
 }
 
 /** Node config discriminated union */

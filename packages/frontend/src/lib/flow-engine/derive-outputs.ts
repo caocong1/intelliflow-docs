@@ -49,7 +49,7 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
         return config.namedOutputs.map((no) => ({
           id: `${nodeId}-namedoutput-${no.id}`,
           name: no.name,
-          description: `命名产物: ${no.name}`,
+          description: `输出项: ${no.name}`,
           segmentKey: no.id,
         }));
       }

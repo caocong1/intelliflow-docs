@@ -84,7 +84,12 @@ export interface ConnectivityTestResult {
 // ─── Workflow types ───────────────────────────────────────────────────────────
 
 /** The 5 workflow node types */
-export type WorkflowNodeType = "input_transform" | "desensitize" | "model_call" | "restore" | "export";
+export type WorkflowNodeType =
+  | "input_transform"
+  | "desensitize"
+  | "model_call"
+  | "restore"
+  | "export";
 
 /** Workflow status */
 export type WorkflowStatus = "draft" | "active" | "disabled";
@@ -94,7 +99,7 @@ export interface OutputDef {
   id: string;
   name: string;
   description?: string;
-  segmentKey?: string;  // canonical path identifier for variable resolution
+  segmentKey?: string; // canonical path identifier for variable resolution
 }
 
 /** Explicit input source reference for desensitize/restore nodes */
@@ -107,9 +112,9 @@ export interface InputSource {
 /** Variable reference in prompt templates */
 export interface VariableRef {
   nodeId: string;
-  outputId: string;       // stores segmentKey (not OutputDef.id)
+  outputId: string; // stores segmentKey (not OutputDef.id)
   variableName: string;
-  fieldPath?: string;     // for nested JSON field access (Phase 24 use)
+  fieldPath?: string; // for nested JSON field access (Phase 24 use)
 }
 
 /** Condition for conditional node execution */
@@ -127,7 +132,15 @@ export interface NodeExecutionRule {
 }
 
 /** Form field type union */
-export type FormFieldType = "text" | "textarea" | "file" | "number" | "date" | "datetime" | "select" | "multiselect";
+export type FormFieldType =
+  | "text"
+  | "textarea"
+  | "file"
+  | "number"
+  | "date"
+  | "datetime"
+  | "select"
+  | "multiselect";
 
 /** Form field definition for input transform node */
 export interface FormFieldDef {
@@ -224,7 +237,12 @@ export interface ExportConfig {
   executionRule?: NodeExecutionRule;
 }
 
-export type NodeConfig = InputTransformConfig | DesensitizeConfig | ModelCallConfig | RestoreConfig | ExportConfig;
+export type NodeConfig =
+  | InputTransformConfig
+  | DesensitizeConfig
+  | ModelCallConfig
+  | RestoreConfig
+  | ExportConfig;
 
 /** A node instance in a workflow */
 export interface WorkflowNodeDef {
@@ -379,7 +397,13 @@ export interface VersionDiffResult {
 // ─── Phase 5: Document Creation Runtime types ────────────────────────────────
 
 /** Node execution status */
-export type NodeExecutionStatus = "pending" | "in_progress" | "completed" | "skipped" | "failed" | "blocked";
+export type NodeExecutionStatus =
+  | "pending"
+  | "in_progress"
+  | "completed"
+  | "skipped"
+  | "failed"
+  | "blocked";
 
 /** Per-node execution record within a document */
 export interface NodeExecution {
@@ -420,12 +444,22 @@ export interface DesensitizeRuleDesc {
   description: string;
 }
 
+/** Simple field definition for normal-mode JSON outputs (flat atomic types only) */
+export interface SimpleFieldDef {
+  name: string; // field name, must match /^[a-zA-Z_]\w*$/
+  type: "string" | "number" | "boolean";
+  description?: string;
+  required?: boolean;
+}
+
 /** Named output definition for model call nodes */
 export interface NamedOutputDef {
-  id: string;       // segmentKey, e.g. "blueprint"
-  name: string;     // display name, e.g. "投标蓝图"
+  id: string; // segmentKey, e.g. "blueprint"
+  name: string; // display name, e.g. "投标蓝图"
   format: "text" | "json" | "markdown";
-  jsonSchema?: object;  // per-artifact JSON Schema
+  jsonSchema?: object; // per-artifact JSON Schema
+  simpleFields?: SimpleFieldDef[]; // normal-mode field definitions (source of truth for UI)
+  outputPrompt?: string; // per-output prompt (merged with main prompt by backend)
 }
 
 /** Model call output for a single model */

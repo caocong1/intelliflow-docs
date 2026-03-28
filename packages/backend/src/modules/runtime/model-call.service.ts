@@ -1,10 +1,26 @@
-import { asc, eq, and, inArray } from "drizzle-orm";
+import type {
+  DesensitizeRuleDesc,
+  ModelCallConfig,
+  ModelOutput,
+  NamedOutputDef,
+  NodeExecution,
+  SSEEvent,
+  WorkflowNodeDef,
+} from "@intelliflow/shared";
+import Ajv from "ajv";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "../../db";
-import { desensitizeMappings, modelCallLogs, models, nodeExecutions, providers, documents, workflows } from "../../db/schema";
-import type { DesensitizeRuleDesc, ModelCallConfig, ModelOutput, NamedOutputDef, NodeExecution, SSEEvent, WorkflowNodeDef } from "@intelliflow/shared";
+import {
+  desensitizeMappings,
+  documents,
+  modelCallLogs,
+  models,
+  nodeExecutions,
+  providers,
+  workflows,
+} from "../../db/schema";
 import { getStrategy } from "./strategies";
 import type { ModelCallInput } from "./strategies";
-import Ajv from "ajv";
 
 // ─── Prompt Resolution ──────────────────────────────────────────────────────
 
@@ -116,7 +132,9 @@ export function resolveRef(
         const parsed = JSON.parse(baseContent);
         return resolveFieldPath(parsed, ref.fieldPath);
       } catch {
-        console.warn(`resolveRef: failed to parse namedOutput "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`);
+        console.warn(
+          `resolveRef: failed to parse namedOutput "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`,
+        );
         return undefined;
       }
     }
@@ -132,7 +150,9 @@ export function resolveRef(
         const parsed = JSON.parse(baseContent);
         return resolveFieldPath(parsed, ref.fieldPath);
       } catch {
-        console.warn(`resolveRef: failed to parse model output "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`);
+        console.warn(
+          `resolveRef: failed to parse model output "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`,
+        );
         return undefined;
       }
     }
@@ -148,7 +168,9 @@ export function resolveRef(
         const parsed = JSON.parse(baseValue);
         return resolveFieldPath(parsed, ref.fieldPath);
       } catch {
-        console.warn(`resolveRef: failed to parse property "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`);
+        console.warn(
+          `resolveRef: failed to parse property "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`,
+        );
         return undefined;
       }
     }
@@ -166,7 +188,11 @@ export function resolveRef(
 export async function resolvePromptTemplate(
   template: string,
   documentId: string,
-  nodeExecs: Array<{ nodeId: string; nodeLabel: string; outputData: Record<string, unknown> | null }>,
+  nodeExecs: Array<{
+    nodeId: string;
+    nodeLabel: string;
+    outputData: Record<string, unknown> | null;
+  }>,
   desensitizeRules: DesensitizeRuleDesc[],
   config?: ModelCallConfig,
 ): Promise<ResolvedPromptResult> {
@@ -220,9 +246,34 @@ export async function resolvePromptTemplate(
   // Inject named output delimiter format when configured
   if (config?.namedOutputs?.length) {
     const format = config.namedOutputs
-      .map((o) => `===OUTPUT:${o.id}===\n[${o.name}内容]\n===END:${o.id}===`)
+      .map((o) => {
+        const parts: string[] = [];
+
+        // 1. Per-output prompt (simple mode: user-written output-specific instructions)
+        if (o.outputPrompt?.trim()) {
+          parts.push(o.outputPrompt.trim());
+        }
+
+        // 2. JSON field structure description (when simpleFields are defined)
+        if (o.format === "json" && o.simpleFields?.length) {
+          const fieldLines = o.simpleFields
+            .map(
+              (f) =>
+                `- ${f.name} (${f.type}, ${f.required ? "必填" : "可选"})${f.description ? `: ${f.description}` : ""}`,
+            )
+            .join("\n");
+          parts.push(`请输出 JSON 对象，包含以下字段：\n${fieldLines}`);
+        }
+
+        // 3. Fallback placeholder (no prompt and no field description)
+        if (parts.length === 0) {
+          parts.push(`[${o.name}内容]`);
+        }
+
+        return `===OUTPUT:${o.id}===\n${parts.join("\n\n")}\n===END:${o.id}===`;
+      })
       .join("\n\n");
-    resolved += `\n\n请按以下格式分段输出，每个产物用指定分隔符包裹：\n${format}`;
+    resolved += `\n\n---\n以下是各产物的具体要求和输出格式，请按指定分隔符包裹每个产物的输出：\n\n${format}`;
   }
 
   return { resolved, mapping };
@@ -488,7 +539,12 @@ export async function executeModelCall(
               errorMessage,
             });
 
-            return { modelId: model.id, content: fullContent, status: "failed" as const, errorMessage };
+            return {
+              modelId: model.id,
+              content: fullContent,
+              status: "failed" as const,
+              errorMessage,
+            };
           }
         }),
       );
@@ -525,7 +581,9 @@ export async function executeModelCall(
       const outputDataPayload: Record<string, unknown> = { models: finalModels };
       if (config?.namedOutputs?.length) {
         // Use the first completed model's content for named output parsing
-        const firstCompleted = Object.values(finalModels).find((m) => m.status === "completed" || m.status === "format_error");
+        const firstCompleted = Object.values(finalModels).find(
+          (m) => m.status === "completed" || m.status === "format_error",
+        );
         if (firstCompleted) {
           const parsed = parseNamedOutputs(firstCompleted.content, config.namedOutputs);
           outputDataPayload.namedOutputs = parsed.namedOutputs;
@@ -566,9 +624,8 @@ export async function executeModelCallBackground(
   }
 
   const mcConfig = config as import("@intelliflow/shared").ModelCallConfig;
-  const modelIds = mcConfig.modelIds.length > 0
-    ? mcConfig.modelIds
-    : mcConfig.modelId ? [mcConfig.modelId] : [];
+  const modelIds =
+    mcConfig.modelIds.length > 0 ? mcConfig.modelIds : mcConfig.modelId ? [mcConfig.modelId] : [];
 
   if (modelIds.length === 0) {
     throw new Error("No models configured for model_call node");
@@ -600,7 +657,7 @@ export async function executeModelCallBackground(
         nodeLabel: e.nodeLabel,
         outputData: e.outputData as Record<string, unknown> | null,
       })),
-      [],  // No desensitize rules — system prompt stays clean
+      [], // No desensitize rules — system prompt stays clean
     );
     resolvedSystemPrompt = resolved;
   }
@@ -755,7 +812,10 @@ export async function executeModelCallBackground(
         formatErrors,
       };
 
-      if ((modelStatus === "completed" || modelStatus === "format_error") && !firstCompletedModelId) {
+      if (
+        (modelStatus === "completed" || modelStatus === "format_error") &&
+        !firstCompletedModelId
+      ) {
         firstCompletedModelId = r.modelId;
       }
     }
@@ -765,7 +825,9 @@ export async function executeModelCallBackground(
   if (!firstCompletedModelId) {
     // All models failed — collect error messages
     const errors = results
-      .map((r) => r.status === "fulfilled" && r.value.status === "failed" ? r.value.errorMessage : null)
+      .map((r) =>
+        r.status === "fulfilled" && r.value.status === "failed" ? r.value.errorMessage : null,
+      )
       .filter(Boolean)
       .join("; ");
     throw new Error(`All model calls failed: ${errors}`);
@@ -1080,10 +1142,7 @@ export async function getUpstreamDesensitizeRules(
     .select({ id: nodeExecutions.id })
     .from(nodeExecutions)
     .where(
-      and(
-        eq(nodeExecutions.documentId, documentId),
-        eq(nodeExecutions.nodeType, "desensitize"),
-      ),
+      and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.nodeType, "desensitize")),
     );
 
   if (desensitizeExecs.length === 0) return [];

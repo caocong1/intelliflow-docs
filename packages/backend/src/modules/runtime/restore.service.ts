@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { db } from "../../db";
 import { desensitizeMappings, nodeExecutions } from "../../db/schema";
 import type { NodeExecution, RestoreConfig } from "@intelliflow/shared";
@@ -41,7 +41,51 @@ export async function executeRestore(
   if (!exec) throw new Error("Node execution not found");
 
   const inputData = exec.inputData as Record<string, unknown> | null;
-  const originalText = (inputData?.text as string) ?? "";
+  // Only use inputData.text when restore has explicit inputSources.
+  // When no inputSources (whitelist mode), always collect from upstream namedOutputs.
+  const hasExplicitInputSources = config.inputSources && config.inputSources.length > 0;
+  let originalText = hasExplicitInputSources ? ((inputData?.text as string) ?? "") : "";
+
+  // When no explicit input text, collect exportable upstream namedOutputs via whitelist
+  if (!originalText) {
+    const EXPORTABLE_OUTPUTS: Record<string, Set<string>> = {
+      node_techresp: new Set(["form_fills"]),
+      node_solution: new Set([
+        "group1_delivery", "group2_implementation", "group3_service",
+        "group4_training", "group5_quality", "group6_construction", "group7_extras",
+      ]),
+    };
+
+    const upstreamExecs = await db.select()
+      .from(nodeExecutions)
+      .where(and(
+        eq(nodeExecutions.documentId, documentId),
+        eq(nodeExecutions.isCurrent, true),
+        eq(nodeExecutions.status, "completed"),
+      ))
+      .orderBy(asc(nodeExecutions.stepOrder));
+
+    const currentExec = upstreamExecs.find(e => e.id === nodeExecutionId);
+    const parts: string[] = [];
+
+    for (const ue of upstreamExecs) {
+      if (currentExec && ue.stepOrder >= currentExec.stepOrder) break;
+
+      const allowedOutputs = EXPORTABLE_OUTPUTS[ue.nodeId];
+      if (!allowedOutputs) continue;
+
+      const od = ue.outputData as Record<string, unknown> | null;
+      if (!od?.namedOutputs) continue;
+
+      const namedOutputs = od.namedOutputs as Record<string, { content: string; format: string }>;
+      for (const [key, val] of Object.entries(namedOutputs)) {
+        if (allowedOutputs.has(key) && val?.content && typeof val.content === "string") {
+          parts.push(val.content);
+        }
+      }
+    }
+    originalText = parts.join("\n\n");
+  }
 
   if (!originalText) {
     throw new Error("No input text found for restore node");

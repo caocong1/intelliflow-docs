@@ -125,6 +125,11 @@ async function resolveContent(
       return output.restoredContent;
     }
 
+    // Check for restoredText (restore node output key)
+    if (output.restoredText && typeof output.restoredText === "string") {
+      return output.restoredText;
+    }
+
     // Check for content field
     if (output.content && typeof output.content === "string") {
       return output.content;

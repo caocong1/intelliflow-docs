@@ -383,9 +383,11 @@ export function validateWorkflow(
     }
 
     // Also check namedOutputs IDs against existing segmentKeys
+    // Skip outputs derived from namedOutputs themselves (id contains "-namedoutput-")
     if (node.config.type === "model_call" && node.config.namedOutputs) {
       for (const no of node.config.namedOutputs) {
-        if (segmentKeys.has(no.id)) {
+        const existingId = segmentKeys.get(no.id);
+        if (existingId && !existingId.includes("-namedoutput-")) {
           errors.push({
             nodeId: node.id,
             message: `节点 "${node.label}" 中命名产物 "${no.id}" 与已有标识符冲突`,

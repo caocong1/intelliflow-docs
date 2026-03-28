@@ -1,4 +1,4 @@
-import { Show, Switch, Match, For } from "solid-js";
+import { Show, Switch, Match, For, createSignal, onMount, onCleanup } from "solid-js";
 import type {
   NodeConfig,
   InputTransformConfig,
@@ -41,6 +41,22 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   export: "border-red-500",
 };
 
+const PANEL_MIN_WIDTH = 320;
+const PANEL_MAX_WIDTH = 640;
+const PANEL_DEFAULT_WIDTH = 420;
+const PANEL_WIDTH_KEY = "intelliflow:config-panel-width";
+
+function loadPanelWidth(): number {
+  try {
+    const saved = localStorage.getItem(PANEL_WIDTH_KEY);
+    if (saved) {
+      const w = Number(saved);
+      if (w >= PANEL_MIN_WIDTH && w <= PANEL_MAX_WIDTH) return w;
+    }
+  } catch {}
+  return PANEL_DEFAULT_WIDTH;
+}
+
 interface ConfigPanelProps {
   selectedNode: FlowNodeData | null;
   allNodes: FlowNodeData[];
@@ -69,6 +85,41 @@ function getUpstreamNodeIds(nodeId: string, edges: FlowEdgeData[]): Set<string> 
 
 export default function ConfigPanel(props: ConfigPanelProps) {
   const isOpen = () => props.selectedNode !== null;
+
+  // --- Resizable width ---
+  const [panelWidth, setPanelWidth] = createSignal(loadPanelWidth());
+  const [isDragging, setIsDragging] = createSignal(false);
+
+  function onDragStart(e: MouseEvent) {
+    e.preventDefault();
+    setIsDragging(true);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }
+
+  function onDragMove(e: MouseEvent) {
+    if (!isDragging()) return;
+    const newWidth = window.innerWidth - e.clientX;
+    const clamped = Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, newWidth));
+    setPanelWidth(clamped);
+  }
+
+  function onDragEnd() {
+    if (!isDragging()) return;
+    setIsDragging(false);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    try { localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidth())); } catch {}
+  }
+
+  onMount(() => {
+    window.addEventListener("mousemove", onDragMove);
+    window.addEventListener("mouseup", onDragEnd);
+  });
+  onCleanup(() => {
+    window.removeEventListener("mousemove", onDragMove);
+    window.removeEventListener("mouseup", onDragEnd);
+  });
 
   const upstreamNodes = () => {
     if (!props.selectedNode) return [];
@@ -109,10 +160,20 @@ export default function ConfigPanel(props: ConfigPanelProps) {
 
   return (
     <div
-      class={`flex-shrink-0 bg-white border-l border-slate-200 flex flex-col transition-all duration-200 overflow-hidden ${
-        isOpen() ? "w-80" : "w-0"
+      class={`flex-shrink-0 bg-white border-l border-slate-200 flex flex-col overflow-hidden relative ${
+        isOpen() ? "" : "w-0"
       }`}
+      style={isOpen() ? { width: `${panelWidth()}px`, transition: isDragging() ? "none" : "width 200ms" } : { transition: "width 200ms" }}
     >
+      {/* Drag handle */}
+      <Show when={isOpen()}>
+        <div
+          class={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-10 transition-colors ${
+            isDragging() ? "bg-indigo-400" : "bg-transparent hover:bg-indigo-300"
+          }`}
+          onMouseDown={onDragStart}
+        />
+      </Show>
       <Show when={props.selectedNode}>
         {(node) => (
           <>

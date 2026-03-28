@@ -54,9 +54,19 @@ export function createAutosave(
     }, delay);
   }
 
+  /** Force an immediate save (skip debounce). Used by manual save button. */
+  function flush(snapshot: FlowSnapshot) {
+    if (timer) clearTimeout(timer);
+    if (inflight) {
+      queued = snapshot;
+      return;
+    }
+    doSave(snapshot);
+  }
+
   function dispose() {
     if (timer) clearTimeout(timer);
   }
 
-  return { trigger, status, lastSavedAt, dispose };
+  return { trigger, flush, status, lastSavedAt, dispose };
 }

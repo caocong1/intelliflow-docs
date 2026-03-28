@@ -114,7 +114,20 @@ export default function WorkflowEditor() {
     setValidationStatus("unvalidated");
   });
 
+  // Ctrl+S manual save shortcut
+  function handleGlobalKeyDown(e: KeyboardEvent) {
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+      e.preventDefault();
+      autosave.flush(store.getSnapshot());
+    }
+  }
+
+  onMount(() => {
+    window.addEventListener("keydown", handleGlobalKeyDown);
+  });
+
   onCleanup(() => {
+    window.removeEventListener("keydown", handleGlobalKeyDown);
     autosave.dispose();
   });
 
@@ -161,12 +174,33 @@ export default function WorkflowEditor() {
 
       store.applySnapshot({ nodes: flowNodes, edges: flowEdges });
 
+      // Restore viewport from localStorage
+      try {
+        const saved = localStorage.getItem(`workflow-viewport-${params.id}`);
+        if (saved) {
+          const vp = JSON.parse(saved);
+          if (typeof vp.x === "number" && typeof vp.y === "number" && typeof vp.zoom === "number") {
+            store.setViewport(vp);
+          }
+        }
+      } catch {
+        // ignore corrupted localStorage
+      }
+
       // Initialize undo/redo with loaded state
       undoRedo = createUndoRedo({ nodes: flowNodes, edges: flowEdges });
     } catch {
       showToast("网络错误，请稍后重试", "error");
     } finally {
       setLoading(false);
+    }
+  });
+
+  // Persist viewport to localStorage on change (only after initial load)
+  createEffect(() => {
+    const vp = store.viewport();
+    if (!loading()) {
+      localStorage.setItem(`workflow-viewport-${params.id}`, JSON.stringify(vp));
     }
   });
 
@@ -487,7 +521,10 @@ export default function WorkflowEditor() {
           <input
             type="text"
             value={workflowName()}
-            onInput={(e) => setWorkflowName(e.currentTarget.value)}
+            onInput={(e) => {
+              setWorkflowName(e.currentTarget.value);
+              autosave.trigger(store.getSnapshot());
+            }}
             class="text-sm font-semibold text-slate-900 bg-transparent border-none outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1.5 py-1 min-w-[200px] max-w-[400px]"
             placeholder="工作流名称"
           />
@@ -521,6 +558,21 @@ export default function WorkflowEditor() {
               <span class="text-red-600">保存失败</span>
             </Show>
           </div>
+
+          {/* Manual save button */}
+          <button
+            type="button"
+            onClick={() => autosave.flush(store.getSnapshot())}
+            disabled={loading() || autosave.status() === "saving"}
+            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            title="手动保存 (Ctrl+S)"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+              <title>保存</title>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+            </svg>
+            保存
+          </button>
 
           <div class="w-px h-5 bg-slate-200" />
 

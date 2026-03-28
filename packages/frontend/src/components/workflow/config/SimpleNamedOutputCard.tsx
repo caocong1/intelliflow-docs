@@ -88,7 +88,7 @@ export default function SimpleNamedOutputCard(props: SimpleNamedOutputCardProps)
             value={props.output.name}
             onInput={(e) => props.onChange({ name: e.currentTarget.value })}
             placeholder="产物名称，如 投标蓝图"
-            class="w-full px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400"
+            class="w-full h-7 px-2 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-400"
           />
         </div>
 
@@ -104,7 +104,7 @@ export default function SimpleNamedOutputCard(props: SimpleNamedOutputCardProps)
             }
             props.onChange(patch);
           }}
-          class="px-2 py-1 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-400"
+          class="h-7 px-2 text-xs border border-slate-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-purple-400"
         >
           <option value="text">文本</option>
           <option value="json">JSON</option>
@@ -113,7 +113,7 @@ export default function SimpleNamedOutputCard(props: SimpleNamedOutputCardProps)
 
         {/* Read-only ID badge */}
         <span
-          class="px-1.5 py-1 text-xs font-mono text-slate-500 bg-slate-100 rounded select-all"
+          class="h-7 px-1.5 text-xs font-mono text-slate-500 bg-slate-100 rounded select-all inline-flex items-center"
           title="系统引用 ID，创建后不可修改"
         >
           ID: {props.output.id}

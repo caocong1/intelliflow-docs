@@ -8,6 +8,8 @@ import {
   listTemplates,
   setDefault,
   updateTemplate,
+  uploadTemplate,
+  validateThemeConfig,
 } from "./ppt-templates.service";
 
 export const pptTemplateRoutes = new Elysia({ prefix: "/ppt-templates" })
@@ -124,4 +126,92 @@ export const pptTemplateRoutes = new Elysia({ prefix: "/ppt-templates" })
       }
     },
     { params: t.Object({ id: t.String() }) },
+  )
+
+  // ─── Upload native .pptx template ──────────────────────────────────────────
+
+  .post(
+    "/upload",
+    async ({ body, user, set }) => {
+      try {
+        const result = await uploadTemplate({
+          file: body.file,
+          name: body.name,
+          description: body.description,
+          createdBy: user?.id,
+        });
+        set.status = 201;
+        return result;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        const errorMap: Record<string, { status: number; error: string }> = {
+          INVALID_FILE_TYPE: { status: 400, error: "仅支持 .pptx 文件" },
+          FILE_TOO_LARGE: { status: 400, error: "文件大小不能超过 50MB" },
+          NO_PLACEHOLDERS: {
+            status: 400,
+            error: "模板中未检测到 {{XXX}} 占位符，无法动态填充内容",
+          },
+          MISSING_TITLE_PLACEHOLDER: {
+            status: 400,
+            error: "模板中缺少含 {{TITLE}} 的 layout",
+          },
+          MISSING_BODY_PLACEHOLDER: {
+            status: 400,
+            error: "模板中缺少含 {{BODY}} 的 layout",
+          },
+        };
+        const mapped = errorMap[message];
+        if (mapped) {
+          set.status = mapped.status;
+          return { error: mapped.error };
+        }
+        throw err;
+      }
+    },
+    {
+      body: t.Object({
+        file: t.File({
+          maxSize: "50m",
+          type: [
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          ],
+        }),
+        name: t.String({ minLength: 1, maxLength: 100 }),
+        description: t.Optional(t.String({ maxLength: 500 })),
+      }),
+    },
+  )
+
+  // ─── Create code theme template ────────────────────────────────────────────
+
+  .post(
+    "/create-theme",
+    async ({ body, user, set }) => {
+      const validation = validateThemeConfig(body.themeConfig);
+      if (!validation.valid) {
+        set.status = 400;
+        return { error: "themeConfig 校验失败", details: validation.errors };
+      }
+
+      const template = await createTemplate({
+        name: body.name,
+        description: body.description,
+        type: "code_theme",
+        aspectRatio: body.aspectRatio,
+        themeConfig: body.themeConfig,
+        createdBy: user?.id,
+      });
+      set.status = 201;
+      return template;
+    },
+    {
+      body: t.Object({
+        name: t.String({ minLength: 1, maxLength: 100 }),
+        description: t.Optional(t.String({ maxLength: 500 })),
+        aspectRatio: t.Optional(
+          t.Union([t.Literal("16:9"), t.Literal("4:3")]),
+        ),
+        themeConfig: t.Any(),
+      }),
+    },
   );

@@ -720,6 +720,7 @@ async function generatePdfBuffer(content: string): Promise<Buffer> {
 // ─── PPT helpers ────────────────────────────────────────────────────────────
 
 import PptxGenJS from "pptxgenjs";
+import { validateSlidePresentation } from "./slide-schema";
 
 // Slide schema types
 interface TitleSlide {
@@ -1010,19 +1011,30 @@ export function markdownToSlides(content: string): Slide[] {
   return slides;
 }
 
-/** Path A: Try to parse structured slide JSON */
+/** Path A: Try to parse structured slide JSON with ajv schema validation gate */
 export function tryParseSlideJson(content: string): SlidePresentation | null {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(content);
-    if (!parsed || !Array.isArray(parsed.slides) || parsed.slides.length === 0) return null;
-    // Validate each slide has a layout field
-    for (const slide of parsed.slides) {
-      if (!slide || typeof slide.layout !== "string") return null;
-    }
-    return parsed as SlidePresentation;
+    parsed = JSON.parse(content);
   } catch {
     return null;
   }
+
+  if (!parsed || typeof parsed !== "object") return null;
+  const obj = parsed as Record<string, unknown>;
+  if (!Array.isArray(obj.slides) || obj.slides.length === 0) return null;
+
+  // Schema validation gate: reject half-valid JSON to avoid render-time crashes
+  const result = validateSlidePresentation(parsed);
+  if (!result.valid) {
+    console.warn(
+      "Slide JSON schema validation failed, falling back to Path B (Markdown):",
+      result.errors,
+    );
+    return null;
+  }
+
+  return parsed as SlidePresentation;
 }
 
 /** Render Slide array to PPTX buffer using PptxGenJS */

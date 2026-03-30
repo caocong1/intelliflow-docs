@@ -1,7 +1,21 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createSignal, createResource } from "solid-js";
 import type { ExportConfig, VariableRef, OutputDef } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
 import VariablePicker from "../prompt/VariablePicker";
+
+interface PptTemplate {
+  id: string;
+  name: string;
+  type: "code_theme" | "native_pptx";
+  description: string | null;
+}
+
+async function fetchPptTemplates(): Promise<PptTemplate[]> {
+  const res = await fetch("/api/ppt-templates?isActive=true&limit=100");
+  if (!res.ok) return [];
+  const json = await res.json();
+  return json.data ?? [];
+}
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
 
@@ -23,8 +37,12 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
   const [showPicker, setShowPicker] = createSignal(false);
   const [dragIndex, setDragIndex] = createSignal<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = createSignal<number | null>(null);
+  const [pptTemplates] = createResource(fetchPptTemplates);
 
   const mapping = () => props.config.contentMapping ?? [];
+  const formats = () => props.config.formats ?? [];
+  const hasPptx = () => formats().includes("pptx");
+  const hasDocFormat = () => formats().includes("word") || formats().includes("pdf");
 
   function addMapping(ref: VariableRef) {
     // Avoid duplicates
@@ -123,21 +141,75 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
         )}
       </div>
 
-      {/* Template Selector */}
-      <div class="border-t border-slate-100 pt-3">
-        <label for="export-template" class="block text-sm font-medium text-gray-700 mb-1">文档模板</label>
-        <select
-          id="export-template"
-          value={props.config.templateId ?? ""}
-          onChange={(e) =>
-            props.onChange({ ...props.config, templateId: e.currentTarget.value || null })
-          }
-          class="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
-        >
-          <option value="">默认模板</option>
-        </select>
-        <p class="text-xs text-slate-400 mt-1">模板系统将在后续版本中支持</p>
-      </div>
+      {/* Template Bindings — dynamic per selected formats */}
+      <Show when={hasDocFormat() || hasPptx()}>
+        <div class="border-t border-slate-100 pt-3 space-y-3">
+          <h4 class="text-xs font-semibold text-gray-700 uppercase tracking-wide">模板配置</h4>
+
+          {/* Word/PDF template (legacy templateId compat) */}
+          <Show when={hasDocFormat()}>
+            <div>
+              <label for="export-template-doc" class="block text-xs font-medium text-gray-600 mb-1">文档模板（Word/PDF）</label>
+              <select
+                id="export-template-doc"
+                value={props.config.templateBindings?.word ?? props.config.templateId ?? ""}
+                onChange={(e) => {
+                  const val = e.currentTarget.value || undefined;
+                  const bindings = { ...props.config.templateBindings };
+                  if (val) {
+                    bindings.word = val;
+                    if (formats().includes("pdf")) bindings.pdf = val;
+                  } else {
+                    delete bindings.word;
+                    delete bindings.pdf;
+                  }
+                  props.onChange({ ...props.config, templateBindings: bindings });
+                }}
+                class="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+              >
+                <option value="">默认模板</option>
+              </select>
+            </div>
+          </Show>
+
+          {/* PPT template dropdown */}
+          <Show when={hasPptx()}>
+            <div>
+              <label for="export-template-pptx" class="block text-xs font-medium text-gray-600 mb-1">PPT 模板</label>
+              <select
+                id="export-template-pptx"
+                value={props.config.templateBindings?.pptx ?? ""}
+                onChange={(e) => {
+                  const val = e.currentTarget.value || undefined;
+                  const bindings = { ...props.config.templateBindings };
+                  if (val) {
+                    bindings.pptx = val;
+                  } else {
+                    delete bindings.pptx;
+                  }
+                  props.onChange({ ...props.config, templateBindings: bindings });
+                }}
+                class="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
+              >
+                <option value="">默认主题</option>
+                <Show when={pptTemplates.loading}>
+                  <option disabled>加载中…</option>
+                </Show>
+                <For each={pptTemplates() ?? []}>
+                  {(tpl) => (
+                    <option value={tpl.id}>
+                      {tpl.name}{tpl.type === "native_pptx" ? "（品牌模板）" : "（主题）"}
+                    </option>
+                  )}
+                </For>
+              </select>
+              <Show when={pptTemplates.error}>
+                <p class="text-xs text-amber-600 mt-1">PPT 模板加载失败，将使用默认主题</p>
+              </Show>
+            </div>
+          </Show>
+        </div>
+      </Show>
 
       {/* Content Mapping with VariablePicker + drag reorder */}
       <div class="border-t border-slate-100 pt-3">

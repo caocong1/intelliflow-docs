@@ -22,6 +22,7 @@ import { db } from "../../db";
 import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { getExportPath, insertDocumentFile } from "../files/files.service";
 import { resolveRef } from "./model-call.service";
+import { getTemplate as getPptTemplate } from "../ppt-templates/ppt-templates.service";
 import type { ExportConfig, VariableRef, WorkflowNodeDef } from "@intelliflow/shared";
 
 // ─── Node config loader ─────────────────────────────────────────────────────
@@ -786,6 +787,32 @@ const PPT_THEME = {
   },
 };
 
+type PptTheme = typeof PPT_THEME;
+
+/** Build an effective theme by merging a template's themeConfig over defaults */
+function buildThemeFromConfig(themeConfig: Record<string, unknown>): PptTheme {
+  const theme = structuredClone(PPT_THEME);
+
+  if (themeConfig.colors && typeof themeConfig.colors === "object") {
+    const colors = themeConfig.colors as Record<string, string>;
+    for (const key of Object.keys(theme.colors) as (keyof typeof theme.colors)[]) {
+      if (colors[key]) {
+        theme.colors[key] = colors[key].replace(/^#/, "");
+      }
+    }
+  }
+
+  if (themeConfig.fonts && typeof themeConfig.fonts === "object") {
+    const fonts = themeConfig.fonts as Record<string, { face?: string; size?: number }>;
+    for (const key of Object.keys(theme.fonts) as (keyof typeof theme.fonts)[]) {
+      if (fonts[key]?.face) theme.fonts[key].face = fonts[key].face!;
+      if (fonts[key]?.size) theme.fonts[key].size = fonts[key].size!;
+    }
+  }
+
+  return theme;
+}
+
 const MAX_TITLE_CHARS = 60;
 const MAX_BULLETS_PER_SLIDE = 8;
 const MAX_BULLET_CHARS = 120;
@@ -999,7 +1026,7 @@ export function tryParseSlideJson(content: string): SlidePresentation | null {
 }
 
 /** Render Slide array to PPTX buffer using PptxGenJS */
-async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
+async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME): Promise<Buffer> {
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE"; // 13.33 x 7.5 inches (16:9)
 
@@ -1008,14 +1035,14 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
 
     switch (slide.layout) {
       case "title": {
-        pptSlide.background = { color: PPT_THEME.colors.primary };
+        pptSlide.background = { color: theme.colors.primary };
         pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
           x: 0.75,
           y: 2.0,
           w: 11.8,
           h: 1.5,
-          fontSize: PPT_THEME.fonts.title.size,
-          fontFace: PPT_THEME.fonts.title.face,
+          fontSize: theme.fonts.title.size,
+          fontFace: theme.fonts.title.face,
           bold: true,
           color: "FFFFFF",
           align: "center",
@@ -1027,8 +1054,8 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
             y: 3.8,
             w: 11.8,
             h: 1.0,
-            fontSize: PPT_THEME.fonts.subtitle.size,
-            fontFace: PPT_THEME.fonts.subtitle.face,
+            fontSize: theme.fonts.subtitle.size,
+            fontFace: theme.fonts.subtitle.face,
             color: "CBD5E1",
             align: "center",
             valign: "middle",
@@ -1044,9 +1071,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           w: 11.8,
           h: 0.8,
           fontSize: 24,
-          fontFace: PPT_THEME.fonts.title.face,
+          fontFace: theme.fonts.title.face,
           bold: true,
-          color: PPT_THEME.colors.text,
+          color: theme.colors.text,
         });
         const bulletRows = slide.bullets.map((b) => {
           const isBold = b.startsWith("**") && b.endsWith("**");
@@ -1054,9 +1081,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           return {
             text: truncate(text, MAX_BULLET_CHARS),
             options: {
-              fontSize: PPT_THEME.fonts.body.size,
-              fontFace: PPT_THEME.fonts.body.face,
-              color: PPT_THEME.colors.text,
+              fontSize: theme.fonts.body.size,
+              fontFace: theme.fonts.body.face,
+              color: theme.colors.text,
               bold: isBold,
               bullet: true as const,
               paraSpaceAfter: 6,
@@ -1081,9 +1108,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           w: 11.8,
           h: 0.8,
           fontSize: 24,
-          fontFace: PPT_THEME.fonts.title.face,
+          fontFace: theme.fonts.title.face,
           bold: true,
-          color: PPT_THEME.colors.text,
+          color: theme.colors.text,
         });
         // Left column
         const leftTitle = slide.left.title ? `${slide.left.title}\n` : "";
@@ -1093,9 +1120,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           y: 1.5,
           w: 5.5,
           h: 5.0,
-          fontSize: PPT_THEME.fonts.body.size,
-          fontFace: PPT_THEME.fonts.body.face,
-          color: PPT_THEME.colors.text,
+          fontSize: theme.fonts.body.size,
+          fontFace: theme.fonts.body.face,
+          color: theme.colors.text,
           valign: "top",
           autoFit: true,
         });
@@ -1107,9 +1134,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           y: 1.5,
           w: 5.5,
           h: 5.0,
-          fontSize: PPT_THEME.fonts.body.size,
-          fontFace: PPT_THEME.fonts.body.face,
-          color: PPT_THEME.colors.text,
+          fontSize: theme.fonts.body.size,
+          fontFace: theme.fonts.body.face,
+          color: theme.colors.text,
           valign: "top",
           autoFit: true,
         });
@@ -1123,9 +1150,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           w: 11.8,
           h: 0.8,
           fontSize: 24,
-          fontFace: PPT_THEME.fonts.title.face,
+          fontFace: theme.fonts.title.face,
           bold: true,
-          color: PPT_THEME.colors.text,
+          color: theme.colors.text,
         });
         const colW = 11.0 / Math.max(slide.headers.length, 1);
         const headerRow = slide.headers.map((h) => ({
@@ -1133,9 +1160,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           options: {
             bold: true as const,
             fontSize: 11,
-            fontFace: PPT_THEME.fonts.body.face,
-            fill: { color: PPT_THEME.colors.tableHeader },
-            color: PPT_THEME.colors.text,
+            fontFace: theme.fonts.body.face,
+            fill: { color: theme.colors.tableHeader },
+            color: theme.colors.text,
             align: "left" as const,
             valign: "middle" as const,
           },
@@ -1145,9 +1172,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
             text: truncate(cell, MAX_CELL_CHARS),
             options: {
               fontSize: 10,
-              fontFace: PPT_THEME.fonts.body.face,
-              fill: rowIdx % 2 === 1 ? { color: PPT_THEME.colors.tableStripe } : undefined,
-              color: PPT_THEME.colors.text,
+              fontFace: theme.fonts.body.face,
+              fill: rowIdx % 2 === 1 ? { color: theme.colors.tableStripe } : undefined,
+              color: theme.colors.text,
               align: "left" as const,
               valign: "middle" as const,
             },
@@ -1171,9 +1198,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           w: 11.8,
           h: 0.8,
           fontSize: 24,
-          fontFace: PPT_THEME.fonts.title.face,
+          fontFace: theme.fonts.title.face,
           bold: true,
-          color: PPT_THEME.colors.text,
+          color: theme.colors.text,
         });
         // Placeholder for image
         pptSlide.addShape("rect" as PptxGenJS.ShapeType, {
@@ -1189,9 +1216,9 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
           y: 3.5,
           w: 9.0,
           h: 1.0,
-          fontSize: PPT_THEME.fonts.caption.size,
-          fontFace: PPT_THEME.fonts.caption.face,
-          color: PPT_THEME.colors.textLight,
+          fontSize: theme.fonts.caption.size,
+          fontFace: theme.fonts.caption.face,
+          color: theme.colors.textLight,
           align: "center",
           valign: "middle",
         });
@@ -1214,8 +1241,72 @@ async function renderSlidesToPptx(slides: Slide[]): Promise<Buffer> {
   return Buffer.from(output as ArrayBuffer);
 }
 
-/** Generate PPT buffer from content (tries JSON path A, falls back to Markdown path B) */
-async function generatePptBuffer(content: string): Promise<Buffer> {
+/** Generate PPT buffer from content, optionally applying a PPT template */
+async function generatePptBuffer(content: string, templateId?: string | null): Promise<Buffer> {
+  // Try to load a PPT template if specified
+  if (templateId) {
+    try {
+      const template = await getPptTemplate(templateId);
+
+      if (template.type === "native_pptx" && template.templateFilePath) {
+        // native_pptx: use pptx-automizer to load template and replace placeholders
+        const { default: AutomizerCls, modify: mod } = await import("pptx-automizer");
+        const templateBuffer = await readFile(template.templateFilePath);
+        const automizer = new AutomizerCls({ templateDir: "", outputDir: "" });
+        automizer.loadRoot(templateBuffer);
+
+        const structured = tryParseSlideJson(content);
+        const slides = structured ? structured.slides : markdownToSlides(content);
+
+        // For each slide, copy template slide 1 and replace {{TITLE}}/{{BODY}} placeholders
+        for (const slide of slides) {
+          const title = "title" in slide ? slide.title : "";
+          let body = "";
+          if (slide.layout === "content") {
+            body = slide.bullets.join("\n");
+          } else if (slide.layout === "two_column") {
+            body = [...slide.left.bullets, ...slide.right.bullets].join("\n");
+          } else if (slide.layout === "table") {
+            body = [slide.headers.join(" | "), ...slide.rows.map((r) => r.join(" | "))].join("\n");
+          } else if (slide.layout === "title") {
+            body = ("subtitle" in slide && slide.subtitle) || "";
+          }
+
+          const replaceTitle = mod.replaceText({ replace: "TITLE", by: { text: title } });
+          const replaceBody = mod.replaceText({ replace: "BODY", by: { text: body } });
+
+          automizer.addSlide("root", 1, (slideMod) => {
+            slideMod.modifyElement("{{TITLE}}", replaceTitle);
+            slideMod.modifyElement("{{BODY}}", replaceBody);
+          });
+        }
+
+        // Write to a temp file and read back as buffer
+        const tmpPath = join(getExportPath("_tmp"), `automizer-${Date.now()}.pptx`);
+        await mkdir(join(getExportPath("_tmp")), { recursive: true });
+        await automizer.write(tmpPath);
+        const output = await readFile(tmpPath);
+        // Clean up temp file (best-effort)
+        import("node:fs/promises").then((fs) => fs.unlink(tmpPath).catch(() => {}));
+        return output;
+      }
+
+      if (template.type === "code_theme" && template.themeConfig) {
+        // code_theme: merge themeConfig colors/fonts over PPT_THEME defaults
+        const theme = buildThemeFromConfig(template.themeConfig as Record<string, unknown>);
+        const structured = tryParseSlideJson(content);
+        const slides = structured ? structured.slides : markdownToSlides(content);
+        return renderSlidesToPptx(slides, theme);
+      }
+    } catch (err) {
+      console.warn(
+        `[export] Failed to load PPT template ${templateId}, falling back to default theme:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  // Default: no template or fallback after load failure
   const structured = tryParseSlideJson(content);
   const slides = structured ? structured.slides : markdownToSlides(content);
   return renderSlidesToPptx(slides);
@@ -1255,7 +1346,8 @@ export async function generateExport(
       break;
     }
     case "pptx": {
-      buffer = await generatePptBuffer(content);
+      const pptxTemplateId = config?.templateBindings?.pptx ?? config?.templateId ?? null;
+      buffer = await generatePptBuffer(content, pptxTemplateId);
       mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
       break;
     }

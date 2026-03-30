@@ -259,6 +259,24 @@ const Sidebar: Component = () => {
             </svg>
             模型调用日志
           </A>
+          <A href="/admin/ppt-templates" class={linkClass("/admin/ppt-templates")}>
+            <svg
+              class="w-4 h-4 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
+              <title>PPT 模板</title>
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+              />
+            </svg>
+            PPT 模板
+          </A>
           <A href="/admin/workflows" class={linkClass("/admin/workflows")}>
             <svg
               class="w-4 h-4 flex-shrink-0"

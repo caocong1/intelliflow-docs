@@ -14,6 +14,7 @@ import UserManagement from "./pages/admin/UserManagement";
 import WorkflowManagement from "./pages/admin/WorkflowManagement";
 import WorkflowEditor from "./pages/admin/WorkflowEditor";
 import ModelCallLogs from "./pages/admin/ModelCallLogs";
+import PptTemplateManagement from "./pages/admin/PptTemplateManagement";
 import StatsDashboard from "./pages/admin/StatsDashboard";
 import ProjectList from "./pages/projects/ProjectList";
 import ProjectHome from "./pages/projects/ProjectHome";
@@ -114,6 +115,14 @@ const App: Component = () => {
           component={() => (
             <AdminRoute>
               <StatsDashboard />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/ppt-templates"
+          component={() => (
+            <AdminRoute>
+              <PptTemplateManagement />
             </AdminRoute>
           )}
         />

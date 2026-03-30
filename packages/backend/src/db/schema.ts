@@ -360,6 +360,26 @@ export const notificationTypeEnum = pgEnum("notification_type", [
   "generation_failed",
 ]);
 
+// ─── PPT Templates ──────────────────────────────────────────────────────────
+
+export const pptTemplateTypeEnum = pgEnum("ppt_template_type", ["code_theme", "native_pptx"]);
+
+export const pptTemplates = pgTable("ppt_templates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: varchar("description", { length: 500 }),
+  type: pptTemplateTypeEnum("type").notNull(),
+  aspectRatio: varchar("aspect_ratio", { length: 10 }).default("16:9"),
+  themeConfig: jsonb("theme_config"),
+  templateFilePath: varchar("template_file_path", { length: 500 }),
+  availableLayouts: jsonb("available_layouts").$type<string[]>(),
+  isActive: boolean("is_active").default(true).notNull(),
+  isDefault: boolean("is_default").default(false).notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const notifications = pgTable("notifications", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")

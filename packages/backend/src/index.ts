@@ -24,6 +24,7 @@ import { detectOrphanTasks } from "./modules/runtime/background.service";
 import { notificationRoutes } from "./modules/notifications/notifications.routes";
 import { wecomAuthRoutes, wecomAdminRoutes, invitationPublicRoutes, invitationRoutes } from "./modules/wecom/wecom.routes";
 import { statisticsRoutes } from "./modules/statistics/statistics.routes";
+import { pptTemplateRoutes } from "./modules/ppt-templates/ppt-templates.routes";
 import { searchRoutes } from "./modules/search/search.routes";
 import { userActivityRoutes } from "./modules/user-activity/user-activity.routes";
 import { workflowAdminRoutes, workflowReadRoutes } from "./modules/workflows/workflows.routes";
@@ -64,6 +65,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(statisticsRoutes)
   .use(searchRoutes)
   .use(userActivityRoutes)
+  .use(pptTemplateRoutes)
   .listen({ port: 14001, hostname: "0.0.0.0" });
 
 // Detect and clean up orphaned background tasks from previous server runs

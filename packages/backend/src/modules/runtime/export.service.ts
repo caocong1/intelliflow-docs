@@ -721,7 +721,7 @@ async function generatePdfBuffer(content: string): Promise<Buffer> {
 export async function generateExport(
   documentId: string,
   nodeExecutionId: string,
-  format: "word" | "pdf" | "markdown",
+  format: "word" | "pdf" | "markdown" | "pptx",
   filename: string,
   userId: string,
 ): Promise<{ filename: string; storagePath: string; fileSize: number; format: string }> {

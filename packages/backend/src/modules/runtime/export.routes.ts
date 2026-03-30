@@ -60,7 +60,7 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
     {
       params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
       body: t.Object({
-        format: t.Union([t.Literal("word"), t.Literal("pdf"), t.Literal("markdown")]),
+        format: t.Union([t.Literal("word"), t.Literal("pdf"), t.Literal("markdown"), t.Literal("pptx")]),
         filename: t.String(),
       }),
     },

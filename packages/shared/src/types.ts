@@ -226,10 +226,13 @@ export interface RestoreConfig {
 export interface ExportConfig {
   type: "export";
   /** Allowed export formats (multi-select in config, user picks one at runtime) */
-  formats: Array<"word" | "pdf" | "markdown">;
+  formats: Array<"word" | "pdf" | "markdown" | "pptx">;
   /** @deprecated Use formats instead */
-  format?: "word" | "pdf" | "markdown";
-  templateId: string | null;
+  format?: "word" | "pdf" | "markdown" | "pptx";
+  /** @deprecated Use templateBindings instead */
+  templateId?: string | null;
+  /** Per-format template binding. Key = format, value = template ID */
+  templateBindings?: Partial<Record<"word" | "pdf" | "pptx", string>>;
   contentMapping: VariableRef[];
   autoAdvance?: boolean;
   allowEdit?: boolean;

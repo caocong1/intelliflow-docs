@@ -19,7 +19,8 @@
     "mammoth": "^1.12.0",
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.18.0",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "pptxgenjs": "^4.0.1"
   },
   "devDependencies": {
     "@types/bun": "^1.2.5",

@@ -12,18 +12,21 @@ const FORMAT_LABELS: Record<string, string> = {
   word: "Word 文档",
   pdf: "PDF 文件",
   markdown: "Markdown 文件",
+  pptx: "PPT 演示文稿",
 };
 
 const FORMAT_ICONS: Record<string, string> = {
   word: "W",
   pdf: "P",
   markdown: "M",
+  pptx: "S",
 };
 
 const FORMAT_COLORS: Record<string, string> = {
   word: "bg-blue-100 text-blue-600",
   pdf: "bg-red-100 text-red-600",
   markdown: "bg-indigo-100 text-indigo-600",
+  pptx: "bg-orange-100 text-orange-600",
 };
 
 export default function ExportCompleted(props: Props) {

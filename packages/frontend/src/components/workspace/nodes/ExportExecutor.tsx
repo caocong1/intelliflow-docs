@@ -2,24 +2,27 @@ import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { api } from "../../../api/client";
 
-type ExportFormat = "word" | "pdf" | "markdown";
+type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
 
 const FORMAT_LABELS: Record<ExportFormat, string> = {
   word: "Word 文档",
   pdf: "PDF 文件",
   markdown: "Markdown 文件",
+  pptx: "PPT 演示文稿",
 };
 
 const FORMAT_EXTENSIONS: Record<ExportFormat, string> = {
   word: ".docx",
   pdf: ".pdf",
   markdown: ".md",
+  pptx: ".pptx",
 };
 
 const FORMAT_ICONS: Record<ExportFormat, string> = {
   word: "W",
   pdf: "P",
   markdown: "M",
+  pptx: "S",
 };
 
 interface Props {

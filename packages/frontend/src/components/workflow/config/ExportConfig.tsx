@@ -3,12 +3,13 @@ import type { ExportConfig, VariableRef, OutputDef } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
 import VariablePicker from "../prompt/VariablePicker";
 
-type ExportFormat = "word" | "pdf" | "markdown";
+type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
 
 const FORMAT_OPTIONS: { value: ExportFormat; label: string; desc: string }[] = [
   { value: "word", label: "Word", desc: ".docx 格式，适合正式文档" },
   { value: "pdf", label: "PDF", desc: ".pdf 格式，适合固定版式" },
   { value: "markdown", label: "Markdown", desc: ".md 格式，适合技术文档" },
+  { value: "pptx", label: "PPT", desc: ".pptx 格式，适合演示汇报" },
 ];
 
 interface ExportConfigProps {

@@ -11,7 +11,10 @@ interface PptTemplate {
 }
 
 async function fetchPptTemplates(): Promise<PptTemplate[]> {
-  const res = await fetch("/api/ppt-templates?isActive=true&limit=100");
+  const token = localStorage.getItem("auth_token");
+  const res = await fetch("/api/ppt-templates?isActive=true&limit=100", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
   if (!res.ok) return [];
   const json = await res.json();
   return json.data ?? [];

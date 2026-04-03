@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
+import { sanitizeFilename, assertWithinRoot } from "../../common/sanitize";
 import {
   Document,
   Packer,
@@ -197,6 +198,14 @@ function parseInlineFormatting(text: string): TextRun[] {
   return runs;
 }
 
+/** Strip markdown inline formatting markers for plain-text contexts (PDF, PPTX) */
+function stripMarkdownInline(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/\*(.+?)\*/g, "$1")
+    .replace(/`(.+?)`/g, "$1");
+}
+
 function parseMarkdownTable(lines: string[]): { headers: string[]; rows: string[][] } {
   // Filter out separator row and empty lines
   const nonSeparator = lines.filter((l) => !/^\|[\s\-:|]+\|$/.test(l.trim()));
@@ -322,7 +331,7 @@ function parseMarkdownToElements(content: string): Element[] {
 
       elements.push(
         new Paragraph({
-          children: [new TextRun({ text: orderedMatch[3] })],
+          children: parseInlineFormatting(orderedMatch[3]),
           numbering: { reference: "ordered-list", level },
         }),
       );
@@ -339,7 +348,7 @@ function parseMarkdownToElements(content: string): Element[] {
 
       elements.push(
         new Paragraph({
-          children: [new TextRun({ text: nestedBulletMatch[2] })],
+          children: parseInlineFormatting(nestedBulletMatch[2]),
           bullet: { level },
         }),
       );
@@ -350,7 +359,7 @@ function parseMarkdownToElements(content: string): Element[] {
     if (line.startsWith("- ") || line.startsWith("* ")) {
       elements.push(
         new Paragraph({
-          children: [new TextRun({ text: line.slice(2) })],
+          children: parseInlineFormatting(line.slice(2)),
           bullet: { level: 0 },
         }),
       );
@@ -1089,7 +1098,7 @@ async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME):
         });
         const bulletRows = slide.bullets.map((b) => {
           const isBold = b.startsWith("**") && b.endsWith("**");
-          const text = isBold ? b.slice(2, -2) : b;
+          const text = isBold ? b.slice(2, -2) : stripMarkdownInline(b);
           return {
             text: truncate(text, MAX_BULLET_CHARS),
             options: {
@@ -1125,8 +1134,8 @@ async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME):
           color: theme.colors.text,
         });
         // Left column
-        const leftTitle = slide.left.title ? `${slide.left.title}\n` : "";
-        const leftBullets = slide.left.bullets.map((b) => `• ${truncate(b, 80)}`).join("\n");
+        const leftTitle = slide.left.title ? `${stripMarkdownInline(slide.left.title)}\n` : "";
+        const leftBullets = slide.left.bullets.map((b) => `• ${truncate(stripMarkdownInline(b), 80)}`).join("\n");
         pptSlide.addText(leftTitle + leftBullets, {
           x: 0.75,
           y: 1.5,
@@ -1139,8 +1148,8 @@ async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME):
           autoFit: true,
         });
         // Right column
-        const rightTitle = slide.right.title ? `${slide.right.title}\n` : "";
-        const rightBullets = slide.right.bullets.map((b) => `• ${truncate(b, 80)}`).join("\n");
+        const rightTitle = slide.right.title ? `${stripMarkdownInline(slide.right.title)}\n` : "";
+        const rightBullets = slide.right.bullets.map((b) => `• ${truncate(stripMarkdownInline(b), 80)}`).join("\n");
         pptSlide.addText(rightTitle + rightBullets, {
           x: 6.75,
           y: 1.5,
@@ -1168,7 +1177,7 @@ async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME):
         });
         const colW = 11.0 / Math.max(slide.headers.length, 1);
         const headerRow = slide.headers.map((h) => ({
-          text: truncate(h, MAX_CELL_CHARS),
+          text: truncate(stripMarkdownInline(h), MAX_CELL_CHARS),
           options: {
             bold: true as const,
             fontSize: 11,
@@ -1181,7 +1190,7 @@ async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME):
         }));
         const dataRows = slide.rows.map((row, rowIdx) =>
           row.map((cell) => ({
-            text: truncate(cell, MAX_CELL_CHARS),
+            text: truncate(stripMarkdownInline(cell), MAX_CELL_CHARS),
             options: {
               fontSize: 10,
               fontFace: theme.fonts.body.face,
@@ -1369,8 +1378,9 @@ export async function generateExport(
   const exportDir = getExportPath(documentId);
   await mkdir(exportDir, { recursive: true });
 
-  // Save file
-  const storagePath = join(exportDir, filename);
+  // Save file — sanitize to prevent path traversal in filename
+  const safeFilename = sanitizeFilename(filename);
+  const storagePath = join(exportDir, safeFilename);
   await writeFile(storagePath, buffer);
 
   const fileSize = buffer.length;
@@ -1433,8 +1443,11 @@ export async function downloadExport(
   const filename = output.filename as string;
   const format = output.format as string;
 
+  // assertWithinRoot prevents serving files outside export directory
+  const validatedPath = assertWithinRoot(getExportPath(documentId), storagePath);
+
   try {
-    const buffer = await readFile(storagePath);
+    const buffer = await readFile(validatedPath);
 
     let mimeType = "application/octet-stream";
     if (format === "word") {

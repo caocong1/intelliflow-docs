@@ -10,11 +10,11 @@
 
 ## Current State
 
-**Shipped:** v1.2 节点能力增强 (2026-03-27)
-**Codebase:** Bun monorepo, ~42,889 LOC TypeScript
+**Shipped:** v1.3 安全与契约修复（部分）(2026-04-03)
+**Codebase:** Bun monorepo, ~44,800 LOC TypeScript
 **Tech stack:** Bun + ElysiaJS + Drizzle ORM + PostgreSQL 18 + SolidJS + Tailwind CSS v4
 
-v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, project/document management, full document creation runtime. v1.1 adds operational features: background execution + notifications, statistics dashboard, global search/favorites, AI inline editing. v1.2 enhances node capabilities: output path grammar (segmentKey), file slots, structured output (JSON Schema + named artifacts), Word table rendering, system prompt separation, conditional execution (skip/block).
+v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, project/document management, full document creation runtime. v1.1 adds operational features: background execution + notifications, statistics dashboard, global search/favorites, AI inline editing. v1.2 enhances node capabilities: output path grammar (segmentKey), file slots, structured output (JSON Schema + named artifacts), Word table rendering, system prompt separation, conditional execution (skip/block). v1.3 hardens the platform for production: creator-or-owner write authorization on all runtime routes, path traversal defense with sanitizeFilename/assertWithinRoot, XSS protection via DOMPurify sanitization on all innerHTML render paths.
 
 ## Requirements
 
@@ -44,17 +44,16 @@ v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, proj
 - **SPROMPT-01**: System/User Prompt 分离、双提示词解析、策略路由 — v1.2
 - **COND-01**: 条件执行（skip/block 规则）、executionRule 配置、阻断回滚 — v1.2
 - **CMAP-01**: 导出 contentMapping 运行时生效（resolveContent + getExportPreview） — v1.2
+- **PERM-01~05**: 写操作权限控制 — v1.3 (creator-or-owner 模型)
+- **XSS-01~04**: XSS 防护（DOMPurify 净化所有 innerHTML） — v1.3
 
 ### Active
 
-#### v1.3 Security & Contract Fix Sprint
+#### v1.4 质量与测试
 
-- [ ] 权限模型：基于角色的写操作权限控制（canEditDocument），覆盖所有运行时路由
-- [ ] 文件安全：路径穿越防护、文件名净化、上传路径验证、下载路径校验
-- [ ] XSS 防护：DOMPurify 净化 innerHTML，重点修复 render-markdown.tsx
 - [ ] TypeScript 收口：集中 `as any` Eden Treaty 类型转换到 typed API wrappers
 - [ ] 契约修复：DocumentStatus 补齐 "failed"、OutputId JSDoc 文档化
-- [ ] 测试覆盖：文件净化、XSS 防护、状态契约测试
+- [ ] 测试覆盖：sanitizeFilename/assertWithinRoot 路径穿越测试、DOMPurify XSS 防护测试、DocumentStatus 契约测试
 
 ### Future
 
@@ -122,6 +121,11 @@ v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, proj
 | State-machine Markdown parser for Word export | NORMAL/IN_TABLE/IN_CODE_BLOCK 状态机，一致的多行解析 | Good |
 | System prompt clean (no desensitize rules) | 系统提示词保持干净，脱敏规则只注入用户提示词 | Good |
 | Conditional execution with depth guard (50 max) | Skip 递归需要上限防止无限循环 | Good |
+| canEditDocument() creator-or-owner policy | owner/creator 有写权限，member 仅读权限；HTTP 方法不足以判断权限（GET /execute 写） | Good |
+| Server-controlled storagePath for file uploads | POST /files 忽略客户端 storagePath，服务端生成 uuid+sanitizedName | Good |
+| assertWithinRoot() on read + sanitizeFilename() on write | Defense in depth: 写入前净化文件名，读取前校验路径前缀 | Good |
+| DOMPurify direct (not isomorphic-dompurify) | SolidJS browser-only app，不需要 jsdom SSR 支持 | Good |
+| Conservative allowlist in DOMPurify | 19 tags + 4 attributes，远比黑名单安全 | Good |
 
 ## Milestone Plan
 
@@ -130,8 +134,9 @@ v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, proj
 | v1.0 MVP | 认证+管理+流程编排+项目文档+运行时 | Shipped 2026-03-25 |
 | v1.1 运营增强与智能编辑 | 后台生成+通知、统计审计、全局搜索、AI编辑 | Shipped 2026-03-27 |
 | v1.2 节点能力增强 | 输出规范、结构化输出、Word表格、System Prompt、条件执行 | Shipped 2026-03-27 |
-| v1.3 安全与契约修复 | 权限收紧+文件安全+XSS+TypeScript+契约修复+测试 | Active |
+| v1.3 安全与契约修复（部分） | 权限收紧（已完成）、XSS 防护（已完成）、文件安全+TSQL+契约+测试（待 v1.4） | Shipped 2026-04-03 |
+| v1.4 质量与测试 | TypeScript 收口+契约修复+测试覆盖 | Planned |
 | v2.0 | 批注、文档导入/复制、配额管理、条件路由、人工审核节点等 | Future |
 
 ---
-*Last updated: 2026-04-03 after v1.3 milestone started*
+*Last updated: 2026-04-04 after v1.3 milestone partial completion*

@@ -1,5 +1,30 @@
 # Milestones
 
+## v1.3 安全与契约修复（部分） (Shipped: 2026-04-03)
+
+**Phases completed:** 3 phases (27-29), 12 plans
+**Timeline:** 1 day (2026-04-03)
+**Lines changed:** +1,913 / -214 across 35 files
+**Git range:** 878ba6a → 41ac825 (33 commits)
+**Requirements:** 9/28 complete (PERM-01~05, XSS-01~04); 14 deferred to v1.4
+
+**Key accomplishments:**
+- Phase 27: `canEditDocument()` authorization helper + creator-or-owner guards on all runtime write routes (init, advance, rollback, skip, draft, start-background, export-generate)
+- Phase 28: `sanitizeFilename()` + `assertWithinRoot()` security utilities; server-controlled storage paths; membership guards on POST/GET /files
+- Phase 29: DOMPurify XSS sanitization utility with conservative allowlist; sanitizeHtml() applied to render-markdown.tsx (6 innerHTML), InlineEditor, ExportExecutor, PromptEditor
+
+**Archives:**
+- [v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md)
+- [v1.3-REQUIREMENTS.md](milestones/v1.3-REQUIREMENTS.md)
+
+**Known Gaps (deferred to v1.4):**
+- FSEC-01~08: File security utilities implemented but 8 FSEC requirements not formally verified
+- TSQL-01~04: TypeScript typed wrappers (0/? plans)
+- CONT-01~04: Contract fixes (DocumentStatus "failed", JSDoc) (0/? plans)
+- TEST-01~03: Automated tests (0/? plans)
+
+---
+
 ## v1.2 节点能力增强 (Shipped: 2026-03-27)
 
 **Phases completed:** 4 phases (23-26), 14 plans

@@ -1,13 +1,13 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.3
-milestone_name: 安全与契约修复
+milestone: v1.4
+milestone_name: 质量与测试
 status: unknown
-last_updated: "2026-04-03T15:11:10.574Z"
+last_updated: "2026-04-04"
 progress:
-  total_phases: 25
-  completed_phases: 25
-  total_plans: 86
+  total_phases: 31
+  completed_phases: 29
+  total_plans: 98
   completed_plans: 86
 ---
 
@@ -15,19 +15,18 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-03)
+See: .planning/PROJECT.md (updated 2026-04-04)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 安全加固确保生产环境无权限越权、路径穿越、XSS 注入风险
-**Current focus:** Phase 30 — TypeScript Quality + Contract Fixes
+**Current focus:** Planning next milestone (v1.4 质量与测试)
 
 ## Current Position
 
-Phase: 29 (XSS Defense) — COMPLETE
-Plan: 4/4 (29-01 complete; DOMPurify + sanitizeHtml foundation, 29-02 complete; render-markdown sanitized, 29-03 complete; InlineEditor sanitized, 29-04 complete; ExportExecutor + PromptEditor sanitized)
-Status: 29-04 complete — Phase 29 XSS Defense fully complete (4/4 plans, XSS-01 through XSS-04 all satisfied)
-Last activity: 2026-04-03 -- Phase 29 plan 04 complete (ExportExecutor + PromptEditor sanitizeHtml, d11887a)
+v1.3 milestone partially shipped (3/5 phases): Phases 27-29 complete (Permission Security, File Security, XSS Defense)
+v1.4 planned: Phase 30 (TypeScript Quality + Contract Fixes), Phase 31 (Test Coverage)
+Last activity: 2026-04-04 — v1.3 partial milestone completion
 
-Progress: [██░░░░░░░░] 30% (v1.3)
+Progress: [███████░░░] 70% (v1.3 partial)
 
 ## Accumulated Context
 
@@ -42,13 +41,14 @@ See PROJECT.md Key Decisions table.
 - PERM-01: canEditDocument(documentId, userId) — leftJoin projectMembers on role='owner' in join condition; creator-or-owner policy
 - [Phase 28-file-security]: Server-controlled storagePath: join(getUploadPath(documentId), uuid + sanitizeFilename(originalName)) — client body no longer accepts storagePath
 - [Phase 28-file-security]: isDocumentProjectMember guard on both POST and GET /files endpoints
+- v1.3 partial: Phase 30-31 deferred to v1.4 (FSEC utilities implemented but not formally tested/verified)
 
 ### Roadmap Evolution
 
 v1.0: 5 core phases grew to 16 with gap-closure phases. 50 plans, 82 requirements.
-v1.1: 6 phases (17-22), 25 requirements. Schema foundation first, then parallel feature tracks, AI editing last.
-v1.2: 4 phases (23-26), 14 plans. Output path grammar, structured output, Word tables, system prompt, conditional execution.
-v1.3: 5 phases (27-31), 28 requirements. Permission -> File Security -> XSS -> Quality/Contract -> Tests.
+v1.1: 6 phases (17-22), 25 requirements.
+v1.2: 4 phases (23-26), 14 plans.
+v1.3: 5 phases (27-31), 28 requirements. Phase 27-29 shipped 2026-04-03; Phase 30-31 deferred to v1.4.
 
 ### Pending Todos
 
@@ -60,6 +60,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-03
-Stopped at: Completed 29-04 — Phase 29 XSS Defense fully complete (all 4 plans, XSS-01 through XSS-04 satisfied, d11887a)
+Last session: 2026-04-04
+Stopped at: v1.3 partial milestone completion (Phases 27-29 shipped; Phase 30-31 deferred to v1.4)
 Resume file: None

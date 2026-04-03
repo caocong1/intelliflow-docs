@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 安全加固确保生产环境无权限越权、路径穿越、XSS 注入风险
-**Current focus:** Phase 28 — file-security
+**Current focus:** Phase 29 — XSS Defense
 
 ## Current Position
 
-Phase: 28 (file-security) — COMPLETE
-Plan: 4 of 4 (28-01 through 28-04 complete)
-Status: Phase 28 complete — all file path traversal defenses implemented (sanitizeFilename at all write points, assertWithinRoot at all read points); FSEC-01 through FSEC-08 all complete
-Last activity: 2026-04-03 -- Phase 28 plan 04 complete (export.service.ts path traversal defense, 6c9f813)
+Phase: 29 (XSS Defense) — IN PROGRESS
+Plan: 1 of ~4 (29-01 complete; DOMPurify + sanitizeHtml foundation)
+Status: 29-01 complete — dompurify installed, sanitize.ts created with conservative allowlist
+Last activity: 2026-04-03 -- Phase 29 plan 01 complete (DOMPurify XSS sanitization foundation, dac94ab)
 
-Progress: [█░░░░░░░░░] 20% (v1.3)
+Progress: [██░░░░░░░░] 30% (v1.3)
 
 ## Accumulated Context
 

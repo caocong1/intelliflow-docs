@@ -226,3 +226,24 @@ export async function isDocumentProjectMember(documentId: string, userId: string
 
   return rows.length > 0;
 }
+
+export async function canEditDocument(documentId: string, userId: string): Promise<boolean> {
+  const rows = await db
+    .select({
+      createdBy: documents.createdBy,
+      ownerMembershipId: projectMembers.id,
+    })
+    .from(documents)
+    .leftJoin(projectMembers, and(
+      eq(projectMembers.projectId, documents.projectId),
+      eq(projectMembers.userId, userId),
+      eq(projectMembers.role, "owner"),
+    ))
+    .where(eq(documents.id, documentId))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) return false;
+
+  return row.createdBy === userId || row.ownerMembershipId !== null;
+}

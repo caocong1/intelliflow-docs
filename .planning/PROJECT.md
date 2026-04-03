@@ -47,7 +47,14 @@ v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, proj
 
 ### Active
 
-> Next milestone not yet defined. Run `/gsd:new-milestone` to start planning.
+#### v1.3 Security & Contract Fix Sprint
+
+- [ ] 权限模型：基于角色的写操作权限控制（canEditDocument），覆盖所有运行时路由
+- [ ] 文件安全：路径穿越防护、文件名净化、上传路径验证、下载路径校验
+- [ ] XSS 防护：DOMPurify 净化 innerHTML，重点修复 render-markdown.tsx
+- [ ] TypeScript 收口：集中 `as any` Eden Treaty 类型转换到 typed API wrappers
+- [ ] 契约修复：DocumentStatus 补齐 "failed"、OutputId JSDoc 文档化
+- [ ] 测试覆盖：文件净化、XSS 防护、状态契约测试
 
 ### Future
 
@@ -123,7 +130,8 @@ v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, proj
 | v1.0 MVP | 认证+管理+流程编排+项目文档+运行时 | Shipped 2026-03-25 |
 | v1.1 运营增强与智能编辑 | 后台生成+通知、统计审计、全局搜索、AI编辑 | Shipped 2026-03-27 |
 | v1.2 节点能力增强 | 输出规范、结构化输出、Word表格、System Prompt、条件执行 | Shipped 2026-03-27 |
+| v1.3 安全与契约修复 | 权限收紧+文件安全+XSS+TypeScript+契约修复+测试 | Active |
 | v2.0 | 批注、文档导入/复制、配额管理、条件路由、人工审核节点等 | Future |
 
 ---
-*Last updated: 2026-03-27 after v1.2 milestone*
+*Last updated: 2026-04-03 after v1.3 milestone started*

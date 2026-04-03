@@ -76,40 +76,40 @@ Deferred to v2+. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PERM-01 | — | Pending |
-| PERM-02 | — | Pending |
-| PERM-03 | — | Pending |
-| PERM-04 | — | Pending |
-| PERM-05 | — | Pending |
-| FSEC-01 | — | Pending |
-| FSEC-02 | — | Pending |
-| FSEC-03 | — | Pending |
-| FSEC-04 | — | Pending |
-| FSEC-05 | — | Pending |
-| FSEC-06 | — | Pending |
-| FSEC-07 | — | Pending |
-| FSEC-08 | — | Pending |
-| XSS-01 | — | Pending |
-| XSS-02 | — | Pending |
-| XSS-03 | — | Pending |
-| XSS-04 | — | Pending |
-| TSQL-01 | — | Pending |
-| TSQL-02 | — | Pending |
-| TSQL-03 | — | Pending |
-| TSQL-04 | — | Pending |
-| CONT-01 | — | Pending |
-| CONT-02 | — | Pending |
-| CONT-03 | — | Pending |
-| CONT-04 | — | Pending |
-| TEST-01 | — | Pending |
-| TEST-02 | — | Pending |
-| TEST-03 | — | Pending |
+| PERM-01 | Phase 27 | Pending |
+| PERM-02 | Phase 27 | Pending |
+| PERM-03 | Phase 27 | Pending |
+| PERM-04 | Phase 27 | Pending |
+| PERM-05 | Phase 27 | Pending |
+| FSEC-01 | Phase 28 | Pending |
+| FSEC-02 | Phase 28 | Pending |
+| FSEC-03 | Phase 28 | Pending |
+| FSEC-04 | Phase 28 | Pending |
+| FSEC-05 | Phase 28 | Pending |
+| FSEC-06 | Phase 28 | Pending |
+| FSEC-07 | Phase 28 | Pending |
+| FSEC-08 | Phase 28 | Pending |
+| XSS-01 | Phase 29 | Pending |
+| XSS-02 | Phase 29 | Pending |
+| XSS-03 | Phase 29 | Pending |
+| XSS-04 | Phase 29 | Pending |
+| TSQL-01 | Phase 30 | Pending |
+| TSQL-02 | Phase 30 | Pending |
+| TSQL-03 | Phase 30 | Pending |
+| TSQL-04 | Phase 30 | Pending |
+| CONT-01 | Phase 30 | Pending |
+| CONT-02 | Phase 30 | Pending |
+| CONT-03 | Phase 30 | Pending |
+| CONT-04 | Phase 30 | Pending |
+| TEST-01 | Phase 31 | Pending |
+| TEST-02 | Phase 31 | Pending |
+| TEST-03 | Phase 31 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 28 total
-- Mapped to phases: 0
-- Unmapped: 28 ⚠️
+- Mapped to phases: 28
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-03*
-*Last updated: 2026-04-03 after initial definition*
+*Last updated: 2026-04-03 after roadmap creation*

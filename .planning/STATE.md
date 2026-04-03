@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: 安全与契约修复
 status: unknown
-last_updated: "2026-04-03T08:35:31.405Z"
+last_updated: "2026-04-03T08:35:53Z"
 progress:
   total_phases: 24
   completed_phases: 23
@@ -61,5 +61,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-03
-Stopped at: Completed 28-02 — file upload and listing security (server paths + membership gates)
+Stopped at: Completed 28-03 — input-transform.service.ts path traversal defense (sanitizeFilename on handleFileUpload)
 Resume file: None

@@ -1,6 +1,7 @@
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { api } from "../../../api/client";
+import { sanitizeHtml } from "../../../lib/sanitize";
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
 
@@ -81,27 +82,7 @@ export default function ExportExecutor(props: Props) {
   } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
 
-  // Check if already exported (read-only or re-visit)
-  const existingOutput = () => {
-    const out = props.nodeExecution.outputData as Record<string, unknown> | null;
-    if (out?.filename && out?.format && out?.fileSize) {
-      return {
-        filename: out.filename as string,
-        format: out.format as string,
-        fileSize: out.fileSize as number,
-      };
-    }
-    return null;
-  };
-
   onMount(async () => {
-    const existing = existingOutput();
-    if (existing) {
-      setExportResult(existing);
-      setPreviewLoading(false);
-      return;
-    }
-
     try {
       const res = await (api.api.runtime as any)[props.documentId].export[
         props.nodeExecution.id
@@ -126,6 +107,7 @@ export default function ExportExecutor(props: Props) {
     const currentName = filename();
     const baseName = currentName.replace(/\.[^.]+$/, "");
     setFilename(`${baseName}${FORMAT_EXTENSIONS[newFormat]}`);
+    setExportResult(null);
   }
 
   async function handleExport() {
@@ -206,41 +188,6 @@ export default function ExportExecutor(props: Props) {
       .replace(/\n{2,}/g, '<div class="my-3"></div>');
   }
 
-  // ─── Read-only mode (already exported) ──────────────────────────────────
-
-  if (props.readOnly && existingOutput()) {
-    const result = existingOutput()!;
-    return (
-      <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] p-6">
-        <div class="flex items-center gap-2 mb-4">
-          <div class="w-1 h-4 bg-[#4f46e5] rounded-full" />
-          <h2 class="text-sm font-medium text-[#191c1e]">导出完成</h2>
-        </div>
-        <div class="flex items-center gap-4 p-4 bg-[#f7f9fb] rounded-xl">
-          <div class="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 text-lg font-bold">
-            {FORMAT_ICONS[result.format as ExportFormat] ?? "F"}
-          </div>
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-[#191c1e] truncate">{result.filename}</p>
-            <p class="text-xs text-[#464555]">
-              {FORMAT_LABELS[result.format as ExportFormat] ?? result.format.toUpperCase()} &middot;{" "}
-              {formatFileSize(result.fileSize)}
-            </p>
-          </div>
-          <button
-            type="button"
-            class="px-4 py-2 text-sm font-medium text-[#4f46e5] bg-[#e2dfff] rounded-xl hover:bg-[#d4d0ff] transition-colors"
-            onClick={triggerDownload}
-          >
-            重新下载
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Active export mode ─────────────────────────────────────────────────
-
   return (
     <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
       {/* Header */}
@@ -295,7 +242,6 @@ export default function ExportExecutor(props: Props) {
                       : "bg-[#f7f9fb] text-[#464555] border-[rgba(199,196,216,0.3)] hover:bg-[#eeebff] hover:border-[#c3c0ff]"
                   }`}
                   onClick={() => handleFormatChange(fmt)}
-                  disabled={!!exportResult()}
                 >
                   {FORMAT_LABELS[fmt]}
                 </button>
@@ -313,7 +259,6 @@ export default function ExportExecutor(props: Props) {
               class="flex-1 px-3 py-2 text-sm border border-[rgba(199,196,216,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] bg-[#f7f9fb] text-[#191c1e] placeholder:text-[rgba(70,69,85,0.4)]"
               value={filename()}
               onInput={(e) => setFilename(e.currentTarget.value)}
-              disabled={!!exportResult()}
               placeholder="请输入文件名..."
             />
             <span class="text-xs text-[#464555] opacity-60 whitespace-nowrap">
@@ -346,7 +291,7 @@ export default function ExportExecutor(props: Props) {
         <Show when={!previewLoading() && previewContent()}>
           <div
             class="prose prose-sm max-w-none max-h-96 overflow-y-auto p-4 bg-[#f7f9fb] rounded-xl border border-[rgba(199,196,216,0.15)] text-sm leading-relaxed"
-            innerHTML={renderMarkdown(previewContent())}
+            innerHTML={sanitizeHtml(renderMarkdown(previewContent()))}
           />
         </Show>
 
@@ -393,34 +338,32 @@ export default function ExportExecutor(props: Props) {
       </Show>
 
       {/* Action buttons */}
-      <Show when={!exportResult()}>
-        <div class="px-6 py-4 flex justify-end">
-          <button
-            type="button"
-            class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-            disabled={exporting() || previewLoading() || !filename()}
-            onClick={handleExport}
-          >
-            <Show when={!exporting()}>
-              <svg
-                class="w-4 h-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                />
-              </svg>
-            </Show>
-            {exporting() ? "正在生成..." : "下载文件"}
-          </button>
-        </div>
-      </Show>
+      <div class="px-6 py-4 flex justify-end">
+        <button
+          type="button"
+          class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+          disabled={exporting() || previewLoading() || !filename()}
+          onClick={handleExport}
+        >
+          <Show when={!exporting()}>
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+              />
+            </svg>
+          </Show>
+          {exporting() ? "正在生成..." : "下载文件"}
+        </button>
+      </div>
     </div>
   );
 }

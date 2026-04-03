@@ -1,6 +1,7 @@
 import type { OutputDef, VariableRef } from "@intelliflow/shared";
 import { Show, createEffect, createSignal } from "solid-js";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
+import { sanitizeHtml } from "../../../lib/sanitize";
 import PromptOptimizeDialog from "./PromptOptimizeDialog";
 import VariablePicker, { buildPickerItems } from "./VariablePicker";
 
@@ -209,7 +210,7 @@ export default function PromptEditor(props: PromptEditorProps) {
     const current = serializeEditorContent(editorRef);
     if (current !== props.value) {
       isUpdatingFromProp = true;
-      const html = buildEditorHTML(props.value, props.upstreamNodes);
+      const html = sanitizeHtml(buildEditorHTML(props.value, props.upstreamNodes));
       editorRef.innerHTML = html;
       // Move cursor to end
       const sel = window.getSelection();
@@ -394,7 +395,7 @@ export default function PromptEditor(props: PromptEditorProps) {
   // Initialize editor content on mount
   function initEditor(el: HTMLDivElement) {
     editorRef = el;
-    el.innerHTML = buildEditorHTML(props.value, props.upstreamNodes);
+    el.innerHTML = sanitizeHtml(buildEditorHTML(props.value, props.upstreamNodes));
   }
 
   // Reactively sync editor when value or upstream node outputs change

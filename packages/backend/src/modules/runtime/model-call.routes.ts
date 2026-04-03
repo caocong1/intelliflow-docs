@@ -1,6 +1,6 @@
 import Elysia, { t } from "elysia";
 import { requireAuth } from "../auth/auth.guard";
-import { isDocumentProjectMember } from "../versions/versions.service";
+import { isDocumentProjectMember, canEditDocument } from "../versions/versions.service";
 import {
   executeModelCall,
   getModelCallConfig,
@@ -27,10 +27,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .get(
     "/:documentId/model-call/:nodeExecutionId/execute",
     async ({ params, user, set }) => {
-      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
-      if (!isMember) {
+      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!canEdit) {
         set.status = 403;
-        return { error: "仅项目成员可访问运行时" };
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
       }
 
       try {
@@ -119,10 +119,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .get(
     "/:documentId/model-call/:nodeExecutionId/retry/:modelId",
     async ({ params, user, set }) => {
-      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
-      if (!isMember) {
+      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!canEdit) {
         set.status = 403;
-        return { error: "仅项目成员可访问运行时" };
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
       }
 
       try {
@@ -199,10 +199,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .post(
     "/:documentId/model-call/:nodeExecutionId/select",
     async ({ params, body, user, set }) => {
-      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
-      if (!isMember) {
+      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!canEdit) {
         set.status = 403;
-        return { error: "仅项目成员可访问运行时" };
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
       }
 
       try {
@@ -261,10 +261,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .post(
     "/:documentId/model-call/:nodeExecutionId/models/:modelId/revalidate",
     async ({ params, body, user, set }) => {
-      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
-      if (!isMember) {
+      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!canEdit) {
         set.status = 403;
-        return { error: "仅项目成员可访问运行时" };
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
       }
 
       try {
@@ -337,10 +337,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .post(
     "/:documentId/model-call/:nodeExecutionId/models/:modelId/ai-fix",
     async ({ params, user, set }) => {
-      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
-      if (!isMember) {
+      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!canEdit) {
         set.status = 403;
-        return { error: "仅项目成员可访问运行时" };
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
       }
 
       try {

@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v1.3
+milestone_name: 安全与契约修复
+status: executing
+stopped_at: Completed Phase 27 Plan 01 — canEditDocument helper ready
+last_updated: "2026-04-03T08:10:00Z"
+last_activity: 2026-04-03 -- Phase 27 Plan 1 completed; Plan 2 of 4 ready
+progress:
+  total_phases: 5
+  completed_phases: 0
+  total_plans: 4
+  completed_plans: 1
+  percent: 0
+---
+
 # Project State
 
 ## Project Reference
@@ -5,14 +21,14 @@
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 安全加固确保生产环境无权限越权、路径穿越、XSS 注入风险
-**Current focus:** Phase 27 - Permission Security
+**Current focus:** Phase 27 — permission-security
 
 ## Current Position
 
-Phase: 27 (1 of 5 in v1.3) — Permission Security
-Plan: 0 of ? in current phase
-Status: Ready to plan
-Last activity: 2026-04-03 — Roadmap created for v1.3 Security & Contract Fix Sprint
+Phase: 27 (permission-security) — EXECUTING
+Plan: 2 of 4
+Status: Executing Phase 27
+Last activity: 2026-04-03 -- Phase 27 Plan 1 completed; Plan 2 ready
 
 Progress: [░░░░░░░░░░] 0% (v1.3)
 
@@ -26,6 +42,7 @@ See PROJECT.md Key Decisions table.
 - v1.3 roadmap: PERM and FSEC split into separate phases (authorization vs file path safety)
 - v1.3 roadmap: TSQL and CONT merged (both low-risk code quality)
 - v1.3 roadmap: TEST phase depends on phases 28-30 (validates those fixes)
+- PERM-01: canEditDocument(documentId, userId) — leftJoin projectMembers on role='owner' in join condition; creator-or-owner policy
 
 ### Roadmap Evolution
 

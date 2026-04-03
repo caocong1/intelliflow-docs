@@ -9,7 +9,7 @@ Requirements for security & contract fix sprint. Each maps to roadmap phases.
 
 ### Permission Security
 
-- [ ] **PERM-01**: canEditDocument() 权限函数 — owner/creator 可写操作，普通成员仅只读
+- [x] **PERM-01**: canEditDocument() 权限函数 — owner/creator 可写操作，普通成员仅只读
 - [ ] **PERM-02**: runtime.routes.ts 所有写端点改用 canEditDocument()（init、advance、rollback、skip、save draft、start-background）
 - [ ] **PERM-03**: 所有子路由写端点改用 canEditDocument()（desensitize、model-call、restore、inline-edit、input-transform）
 - [ ] **PERM-04**: export generate 端点改用 canEditDocument()
@@ -76,7 +76,7 @@ Deferred to v2+. Tracked but not in current roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PERM-01 | Phase 27 | Pending |
+| PERM-01 | Phase 27 | Complete |
 | PERM-02 | Phase 27 | Pending |
 | PERM-03 | Phase 27 | Pending |
 | PERM-04 | Phase 27 | Pending |

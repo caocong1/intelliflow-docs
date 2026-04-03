@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: 安全与契约修复
 status: unknown
-last_updated: "2026-04-03T08:19:24.204Z"
+last_updated: "2026-04-03T08:35:31.405Z"
 progress:
-  total_phases: 23
+  total_phases: 24
   completed_phases: 23
-  total_plans: 78
-  completed_plans: 78
+  total_plans: 82
+  completed_plans: 81
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 ## Current Position
 
 Phase: 28 (file-security) — IN PROGRESS
-Plan: 1 of 4 (28-01 complete)
-Status: Phase 28 plan 01 complete; sanitize.ts created with sanitizeFilename() and assertWithinRoot()
-Last activity: 2026-04-03 -- Phase 28 plan 01 complete (sanitize.ts committed)
+Plan: 3 of 4 (28-01, 28-02, 28-03 complete)
+Status: Phase 28 plan 03 complete; sanitizeFilename applied to handleFileUpload disk writes; output.txt and buildFileSlots safety documented
+Last activity: 2026-04-03 -- Phase 28 plan 03 complete (input-transform.service.ts sanitized, d6b0b9f)
 
 Progress: [░░░░░░░░░░] 0% (v1.3)
 
@@ -40,6 +40,8 @@ See PROJECT.md Key Decisions table.
 - v1.3 roadmap: TSQL and CONT merged (both low-risk code quality)
 - v1.3 roadmap: TEST phase depends on phases 28-30 (validates those fixes)
 - PERM-01: canEditDocument(documentId, userId) — leftJoin projectMembers on role='owner' in join condition; creator-or-owner policy
+- [Phase 28-file-security]: Server-controlled storagePath: join(getUploadPath(documentId), uuid + sanitizeFilename(originalName)) — client body no longer accepts storagePath
+- [Phase 28-file-security]: isDocumentProjectMember guard on both POST and GET /files endpoints
 
 ### Roadmap Evolution
 
@@ -59,5 +61,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-03
-Stopped at: Roadmap created, ready to plan Phase 27
+Stopped at: Completed 28-02 — file upload and listing security (server paths + membership gates)
 Resume file: None

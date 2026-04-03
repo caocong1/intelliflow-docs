@@ -1,6 +1,6 @@
 import Elysia, { t } from "elysia";
 import { requireAuth } from "../auth/auth.guard";
-import { isDocumentProjectMember } from "../versions/versions.service";
+import { isDocumentProjectMember, canEditDocument } from "../versions/versions.service";
 import {
   buildInlineEditPrompt,
   executeInlineEdit,
@@ -17,10 +17,10 @@ export const inlineEditRoutes = new Elysia({ prefix: "/runtime" })
   .post(
     "/:documentId/inline-edit/:nodeExecutionId/stream",
     async ({ params, body, user, set }) => {
-      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
-      if (!isMember) {
+      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!canEdit) {
         set.status = 403;
-        return { error: "仅项目成员可访问运行时" };
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
       }
 
       try {

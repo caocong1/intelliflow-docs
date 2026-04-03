@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 ## Current Position
 
 Phase: 29 (XSS Defense) — IN PROGRESS
-Plan: 1 of ~4 (29-01 complete; DOMPurify + sanitizeHtml foundation)
-Status: 29-01 complete — dompurify installed, sanitize.ts created with conservative allowlist
-Last activity: 2026-04-03 -- Phase 29 plan 01 complete (DOMPurify XSS sanitization foundation, dac94ab)
+Plan: 2 of ~4 (29-01 complete; DOMPurify + sanitizeHtml foundation, 29-02 complete; render-markdown sanitized)
+Status: 29-02 complete — all 6 innerHTML in render-markdown.tsx wrapped with sanitizeHtml(), XSS-03 satisfied
+Last activity: 2026-04-03 -- Phase 29 plan 02 complete (render-markdown XSS sanitization, 09662c3)
 
 Progress: [██░░░░░░░░] 30% (v1.3)
 

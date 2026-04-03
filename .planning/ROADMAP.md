@@ -84,23 +84,25 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 **Goal**: No file operation can read, write, or serve files outside designated directories, and all user-supplied filenames are sanitized before use
 **Depends on**: Phase 27
 **Requirements**: FSEC-01, FSEC-02, FSEC-03, FSEC-04, FSEC-05, FSEC-06, FSEC-07, FSEC-08
+**Status**: Complete (4/4 plans) — all path traversal defenses implemented
 **Success Criteria** (what must be TRUE):
   1. A file upload with a crafted filename containing "../", null bytes, or leading dots results in a sanitized filename stored on disk (no path traversal possible)
   2. The POST /files endpoint ignores any client-supplied storagePath and generates the path server-side; unauthorized users receive a 403
   3. The GET /files endpoint rejects requests from users who are not members of the document's project
   4. Export download rejects requests where the stored path has been tampered to point outside the export directory
   5. Input-transform and export services write files using sanitized filenames regardless of original user input
-**Plans**: TBD
+**Plans**: 4/4 complete
 
 ### Phase 29: XSS Defense
 **Goal**: All dynamically rendered HTML content is sanitized through DOMPurify before insertion into the DOM, eliminating stored and reflected XSS vectors
 **Depends on**: Phase 28
 **Requirements**: XSS-01, XSS-02, XSS-03, XSS-04
+**Status**: In Progress (1/? plans) — DOMPurify foundation + sanitizeHtml utility complete
 **Success Criteria** (what must be TRUE):
   1. Markdown content containing `<script>` tags, `onerror` handlers, or `javascript:` URLs renders without executing any script when displayed in render-markdown views
   2. The InlineEditor, ExportExecutor, and PromptEditor components strip malicious HTML attributes and tags from any dynamically set innerHTML
   3. A sanitizeHtml() utility function is available and all innerHTML assignments route through it
-**Plans**: TBD
+**Plans**: 1/? complete (29-01 done)
 
 ### Phase 30: TypeScript Quality + Contract Fixes
 **Goal**: All runtime API calls use typed wrappers instead of `as any` casts, and shared type contracts accurately reflect actual backend behavior

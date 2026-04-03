@@ -61,7 +61,7 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 
 **Milestone Goal:** Harden the platform for production: close permission gaps, prevent file path traversal, eliminate XSS vectors, tighten TypeScript contracts, and validate fixes with tests.
 
-- [ ] **Phase 27: Permission Security** - Role-based write access control across all runtime routes
+- [x] **Phase 27: Permission Security** - Role-based write access control across all runtime routes (completed 2026-04-03)
 - [ ] **Phase 28: File Security** - Path traversal defense and filename sanitization for all file operations
 - [ ] **Phase 29: XSS Defense** - DOMPurify integration to sanitize all innerHTML usage
 - [ ] **Phase 30: TypeScript Quality + Contract Fixes** - Typed API wrappers and shared type corrections
@@ -156,7 +156,7 @@ Phases execute in numeric order: 27 -> 28 -> 29 -> 30 -> 31
 | 24. Structured Output + Named Artifacts | v1.2 | 4/4 | Complete | 2026-03-27 |
 | 25. Word Table Rendering + System Prompt | v1.2 | 3/3 | Complete | 2026-03-27 |
 | 26. Conditional Node Execution | v1.2 | 4/4 | Complete | 2026-03-27 |
-| 27. Permission Security | 3/4 | In Progress | - |
+| 27. Permission Security | 3/4 | Complete    | 2026-04-03 |
 | 28. File Security | v1.3 | 0/? | Not started | - |
 | 29. XSS Defense | v1.3 | 0/? | Not started | - |
 | 30. TypeScript Quality + Contract Fixes | v1.3 | 0/? | Not started | - |

@@ -30,8 +30,8 @@ Requirements for security & contract fix sprint. Each maps to roadmap phases.
 
 - [x] **XSS-01**: 安装 DOMPurify 并配置 allowlist（标签+属性白名单）
 - [x] **XSS-02**: 新建 sanitizeHtml() 工具函数封装 DOMPurify
-- [ ] **XSS-03**: render-markdown.tsx 6 处 innerHTML 包裹 sanitizeHtml()（CRITICAL）
-- [ ] **XSS-04**: InlineEditor、ExportExecutor、PromptEditor innerHTML 包裹 sanitizeHtml()（defense-in-depth）
+- [x] **XSS-03**: render-markdown.tsx 6 处 innerHTML 包裹 sanitizeHtml()（CRITICAL）
+- [x] **XSS-04**: InlineEditor、ExportExecutor、PromptEditor innerHTML 包裹 sanitizeHtml()（defense-in-depth）
 
 ### TypeScript Quality
 
@@ -91,8 +91,8 @@ Deferred to v2+. Tracked but not in current roadmap.
 | FSEC-08 | Phase 28 | Pending |
 | XSS-01 | Phase 29 | Complete |
 | XSS-02 | Phase 29 | Complete |
-| XSS-03 | Phase 29 | Pending |
-| XSS-04 | Phase 29 | Pending |
+| XSS-03 | Phase 29 | Complete |
+| XSS-04 | Phase 29 | Complete |
 | TSQL-01 | Phase 30 | Pending |
 | TSQL-02 | Phase 30 | Pending |
 | TSQL-03 | Phase 30 | Pending |

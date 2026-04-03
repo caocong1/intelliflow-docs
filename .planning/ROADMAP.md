@@ -63,7 +63,7 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 
 - [x] **Phase 27: Permission Security** - Role-based write access control across all runtime routes (completed 2026-04-03)
 - [x] **Phase 28: File Security** - Path traversal defense and filename sanitization for all file operations (completed 2026-04-03)
-- [ ] **Phase 29: XSS Defense** - DOMPurify integration to sanitize all innerHTML usage
+- [x] **Phase 29: XSS Defense** - DOMPurify integration to sanitize all innerHTML usage (completed 2026-04-03)
 - [ ] **Phase 30: TypeScript Quality + Contract Fixes** - Typed API wrappers and shared type corrections
 - [ ] **Phase 31: Test Coverage** - Automated tests validating security and contract fixes
 
@@ -97,12 +97,12 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 **Goal**: All dynamically rendered HTML content is sanitized through DOMPurify before insertion into the DOM, eliminating stored and reflected XSS vectors
 **Depends on**: Phase 28
 **Requirements**: XSS-01, XSS-02, XSS-03, XSS-04
-**Status**: In Progress (2/? plans) — DOMPurify foundation + render-markdown.tsx sanitized
+**Status**: Complete (4/4 plans) — DOMPurify foundation + render-markdown.tsx sanitized + InlineEditor sanitized + ExportExecutor + PromptEditor sanitized
 **Success Criteria** (what must be TRUE):
   1. Markdown content containing `<script>` tags, `onerror` handlers, or `javascript:` URLs renders without executing any script when displayed in render-markdown views
   2. The InlineEditor, ExportExecutor, and PromptEditor components strip malicious HTML attributes and tags from any dynamically set innerHTML
   3. A sanitizeHtml() utility function is available and all innerHTML assignments route through it
-**Plans**: 2/? complete (29-01 done, 29-02 done)
+**Plans**: 4/4 complete (29-01 done, 29-02 done, 29-03 done, 29-04 done)
 
 ### Phase 30: TypeScript Quality + Contract Fixes
 **Goal**: All runtime API calls use typed wrappers instead of `as any` casts, and shared type contracts accurately reflect actual backend behavior
@@ -160,6 +160,6 @@ Phases execute in numeric order: 27 -> 28 -> 29 -> 30 -> 31
 | 26. Conditional Node Execution | v1.2 | 4/4 | Complete | 2026-03-27 |
 | 27. Permission Security | v1.3 | 4/4 | Complete    | 2026-04-03 |
 | 28. File Security | v1.3 | Complete | 2026-04-03 | - |
-| 29. XSS Defense | v1.3 | 2/4 | In Progress | - |
+| 29. XSS Defense | 4/4 | Complete   | 2026-04-03 | - |
 | 30. TypeScript Quality + Contract Fixes | v1.3 | 0/? | Not started | - |
 | 31. Test Coverage | v1.3 | 0/? | Not started | - |

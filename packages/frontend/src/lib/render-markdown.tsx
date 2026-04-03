@@ -1,4 +1,5 @@
 import { For, Match, Switch } from "solid-js";
+import { sanitizeHtml } from "./sanitize";
 
 /** Simple markdown to HTML: headers, bold, italic, lists, paragraphs */
 export function renderMarkdown(text: string) {
@@ -50,7 +51,7 @@ export function renderMarkdown(text: string) {
             fallback={
               <p
                 class="text-sm text-[#191c1e] leading-relaxed"
-                innerHTML={inlineFormat(el.content)}
+                innerHTML={sanitizeHtml(inlineFormat(el.content))}
               />
             }
           >
@@ -58,32 +59,32 @@ export function renderMarkdown(text: string) {
               {/* biome-ignore lint/a11y/useHeadingContent: content injected via innerHTML */}
               <h1
                 class="text-xl font-bold text-[#191c1e] mt-4 mb-2"
-                innerHTML={inlineFormat(el.content)}
+                innerHTML={sanitizeHtml(inlineFormat(el.content))}
               />
             </Match>
             <Match when={el.type === "header" && el.level === 2}>
               {/* biome-ignore lint/a11y/useHeadingContent: content injected via innerHTML */}
               <h2
                 class="text-lg font-semibold text-[#191c1e] mt-3 mb-1.5"
-                innerHTML={inlineFormat(el.content)}
+                innerHTML={sanitizeHtml(inlineFormat(el.content))}
               />
             </Match>
             <Match when={el.type === "header" && (el.level ?? 3) >= 3}>
               {/* biome-ignore lint/a11y/useHeadingContent: content injected via innerHTML */}
               <h3
                 class="text-base font-medium text-[#191c1e] mt-2 mb-1"
-                innerHTML={inlineFormat(el.content)}
+                innerHTML={sanitizeHtml(inlineFormat(el.content))}
               />
             </Match>
             <Match when={el.type === "li"}>
               <div class="flex gap-2 ml-4 text-sm text-[#191c1e]">
                 <span class="text-[#464555] select-none">-</span>
-                <span innerHTML={inlineFormat(el.content)} />
+                <span innerHTML={sanitizeHtml(inlineFormat(el.content))} />
               </div>
             </Match>
             <Match when={el.type === "oli"}>
               <div class="flex gap-2 ml-4 text-sm text-[#191c1e]">
-                <span innerHTML={inlineFormat(el.content)} />
+                <span innerHTML={sanitizeHtml(inlineFormat(el.content))} />
               </div>
             </Match>
             <Match when={el.type === "br"}>

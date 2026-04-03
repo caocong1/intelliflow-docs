@@ -8,6 +8,9 @@
 
 import DOMPurify from "dompurify";
 
+// DOMPurify is a factory — call it to get an instance with sanitize(), setConfig(), etc.
+const purify = DOMPurify();
+
 /**
  * Conservative allowlist of markdown-friendly HTML tags.
  * Covers all tags used in render-markdown.tsx, InlineEditor.tsx,
@@ -32,7 +35,7 @@ const ALLOWED_ATTR = [
 // Configure DOMPurify with the conservative allowlist once at module load.
 // RETURN_TRUSTED_TYPE: false returns plain strings (not TrustedHTML),
 // compatible with SolidJS innerHTML prop.
-DOMPurify.setConfig({
+purify.setConfig({
   ALLOWED_TAGS,
   ALLOWED_ATTR,
   ALLOW_DATA_ATTR: false,
@@ -52,5 +55,5 @@ DOMPurify.setConfig({
  * sanitize('<a href="javascript:alert(1)">click</a>')  // strips href value
  */
 export function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, { RETURN_TRUSTED_TYPE: false });
+  return purify.sanitize(html, { RETURN_TRUSTED_TYPE: false });
 }

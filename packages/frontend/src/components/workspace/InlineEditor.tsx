@@ -2,6 +2,7 @@ import { Show, createMemo, createSignal } from "solid-js";
 import type { NodeExecution } from "@intelliflow/shared";
 import { showToast } from "../ui/Toast";
 import { streamSSE } from "../../lib/sse-stream";
+import { sanitizeHtml } from "../../lib/sanitize";
 import { useTextSelection } from "./useTextSelection";
 import AIEditToolbar from "./AIEditToolbar";
 import AIEditDiffPreview from "./AIEditDiffPreview";
@@ -282,7 +283,7 @@ export default function InlineEditor(props: Props) {
   if (props.readOnly) {
     return (
       <div class="border border-[rgba(199,196,216,0.3)] rounded-xl p-4 min-h-[200px] max-h-[60vh] overflow-y-auto bg-[#f7f9fb] shadow-[0_4px_16px_rgba(25,28,30,0.04)]">
-        <div class="prose prose-sm max-w-none" innerHTML={markdownToHtml(localContent())} />
+        <div class="prose prose-sm max-w-none" innerHTML={sanitizeHtml(markdownToHtml(localContent()))} />
       </div>
     );
   }
@@ -444,7 +445,7 @@ export default function InlineEditor(props: Props) {
         {/* Preview */}
         <Show when={viewMode() !== "edit"}>
           <div class="p-4 min-h-[200px] max-h-[60vh] overflow-y-auto bg-white">
-            <div class="prose prose-sm max-w-none" innerHTML={markdownToHtml(localContent())} />
+            <div class="prose prose-sm max-w-none" innerHTML={sanitizeHtml(markdownToHtml(localContent()))} />
           </div>
         </Show>
       </div>

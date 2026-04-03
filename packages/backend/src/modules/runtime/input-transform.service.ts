@@ -6,6 +6,7 @@ import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { getUploadPath, insertDocumentFile } from "../files/files.service";
 import type { FormFieldDef, WorkflowNodeDef } from "@intelliflow/shared";
 import { AppError } from "../../common/errors";
+import { sanitizeFilename } from "../../common/sanitize";
 
 // ─── File parsing ────────────────────────────────────────────────────────────
 
@@ -106,8 +107,8 @@ export async function handleFileUpload(
   const uploadDir = join(getUploadPath(documentId), nodeExecutionId);
   await mkdir(uploadDir, { recursive: true });
 
-  // Write file to disk
-  const filePath = join(uploadDir, file.name);
+  // Write file to disk (sanitize to prevent path traversal)
+  const filePath = join(uploadDir, sanitizeFilename(file.name));
   const arrayBuffer = await file.arrayBuffer();
   await writeFile(filePath, Buffer.from(arrayBuffer));
 
@@ -268,6 +269,7 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
   };
 
   // Write combined output to step directory
+  // safely written: "output.txt" is a server-controlled constant — no user input reaches the path
   const outputDir = join(getUploadPath(documentId), nodeExecutionId);
   await mkdir(outputDir, { recursive: true });
   await writeFile(join(outputDir, "output.txt"), combinedText, "utf-8");
@@ -317,6 +319,7 @@ function buildFileSlots(
     if (!slots[slotId]) {
       slots[slotId] = { text: "", files: [] };
     }
+    // file.name used only as DB value (display name) — not written to disk here
     slots[slotId].files.push({ fileId: file.fileId, name: file.name });
     if (file.parsedText) {
       slots[slotId].text += (slots[slotId].text ? "\n\n" : "") + file.parsedText;

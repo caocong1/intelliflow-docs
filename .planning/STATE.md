@@ -18,14 +18,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 安全加固确保生产环境无权限越权、路径穿越、XSS 注入风险
-**Current focus:** Phase 27 — permission-security
+**Current focus:** Phase 28 — file-security
 
 ## Current Position
 
-Phase: 27 (permission-security) — EXECUTING
-Plan: 3 of 4 (Plan 04 not started)
-Status: Executing Phase 27
-Last activity: 2026-04-03 -- Phase 27 Plan 03 completed; all runtime subroute mutations guarded with canEditDocument
+Phase: 28 (file-security) — IN PROGRESS
+Plan: 1 of 4 (28-01 complete)
+Status: Phase 28 plan 01 complete; sanitize.ts created with sanitizeFilename() and assertWithinRoot()
+Last activity: 2026-04-03 -- Phase 28 plan 01 complete (sanitize.ts committed)
 
 Progress: [░░░░░░░░░░] 0% (v1.3)
 

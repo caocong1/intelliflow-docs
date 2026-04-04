@@ -70,7 +70,7 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 ### v1.4 质量与测试 (Planned)
 
 - [x] Phase 30: TypeScript Quality + Contract Fixes (completed 2026-04-04)
-- [ ] Phase 31: Test Coverage
+- [x] Phase 31: Test Coverage (2/3 plans)
 
 ## Phase Details
 
@@ -129,4 +129,4 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 | 28. File Security | v1.3 | 4/4 | Complete | 2026-04-03 |
 | 29. XSS Defense | v1.3 | 4/4 | Complete | 2026-04-03 |
 | 30. TypeScript Quality + Contract Fixes | 2/2 | Complete    | 2026-04-04 | 2026-04-04 |
-| 31. Test Coverage | v1.4 | 0/? | Not started | — |
+| 31. Test Coverage | 2/3 | In Progress|  | — |

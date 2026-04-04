@@ -10,7 +10,7 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 - **v1.1 运营增强与智能编辑** — Phases 17-22 (shipped 2026-03-27) | [details](milestones/v1.1-ROADMAP.md)
 - **v1.2 节点能力增强** — Phases 23-26 (shipped 2026-03-27) | [details](milestones/v1.2-ROADMAP.md)
 - **v1.3 安全与契约修复（部分）** — Phases 27-29 (shipped 2026-04-03) | [details](milestones/v1.3-ROADMAP.md)
-- **v1.4 质量与测试** — Phases 30-31 (planned)
+- **v1.4 质量与测试** — Phases 30-31 (in progress, 2/2 shipped 2026-04-04)
 
 ## Phases
 
@@ -70,7 +70,7 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 ### v1.4 质量与测试 (Planned)
 
 - [x] Phase 30: TypeScript Quality + Contract Fixes (completed 2026-04-04)
-- [x] Phase 31: Test Coverage (2/3 plans)
+- [x] Phase 31: Test Coverage (3/3 plans) — completed 2026-04-04
 
 ## Phase Details
 
@@ -128,5 +128,5 @@ IntelliFlow delivers an AI document generation platform where users orchestrate 
 | 27. Permission Security | v1.3 | 4/4 | Complete | 2026-04-03 |
 | 28. File Security | v1.3 | 4/4 | Complete | 2026-04-03 |
 | 29. XSS Defense | v1.3 | 4/4 | Complete | 2026-04-03 |
-| 30. TypeScript Quality + Contract Fixes | 2/2 | Complete    | 2026-04-04 | 2026-04-04 |
-| 31. Test Coverage | 2/3 | In Progress|  | — |
+| 30. TypeScript Quality + Contract Fixes | v1.4 | 2/2 | Complete | 2026-04-04 |
+| 31. Test Coverage | v1.4 | 3/3 | Complete | 2026-04-04 |

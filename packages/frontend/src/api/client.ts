@@ -69,24 +69,113 @@ export async function getMyTasks(opts?: { limit?: number; offset?: number }) {
   return res.json();
 }
 
-/** Start background document generation — fires and forgets, backend runs pipeline async */
+import type { DocumentRuntimeState, VersionDiffResult } from "@intelliflow/shared";
+
+/** Eden Treaty response wrapper type */
+type EdenResponse<T = unknown> = { data: T } | { error: string };
+
+/** Runtime route object returned by Eden Treaty for /runtime/:documentId/* endpoints */
+interface RuntimeRoute {
+  get: () => Promise<EdenResponse<DocumentRuntimeState>>;
+  init: { post: (body?: unknown) => Promise<EdenResponse<DocumentRuntimeState>> };
+  rollback: { post: (body: { targetStepOrder: number }) => Promise<EdenResponse<DocumentRuntimeState>> };
+  advance: Record<string, { post: (body?: unknown) => Promise<EdenResponse<DocumentRuntimeState>> }>;
+  skip: Record<string, { post: (body?: unknown) => Promise<EdenResponse<DocumentRuntimeState>> }>;
+  export: Record<string, { preview: { get: () => Promise<EdenResponse<{ content: string; defaultFilename: string }>> }; generate: { post: (body: unknown) => Promise<EdenResponse<{ filename: string; format: string; fileSize: number; storagePath: string }>> } }>;
+  "start-background": { post: (body?: unknown) => Promise<EdenResponse<{ status: string }>> };
+}
+
+/** Helper to access a runtime route by documentId */
+function runtimeOf(documentId: string): RuntimeRoute {
+  return (api.api.runtime as unknown as Record<string, RuntimeRoute>)[documentId];
+}
+
+/** GET /runtime/:documentId → DocumentRuntimeState | null */
+export async function getRuntimeState(documentId: string): Promise<DocumentRuntimeState | null> {
+  const res = await runtimeOf(documentId).get();
+  if ("data" in res) return res.data;
+  return null;
+}
+
+/** POST /runtime/:documentId/init → DocumentRuntimeState | null */
+export async function initRuntime(documentId: string): Promise<DocumentRuntimeState | null> {
+  const res = await runtimeOf(documentId).init.post();
+  if ("data" in res) return res.data;
+  return null;
+}
+
+/** POST /runtime/:documentId/start-background → { status: string } | null */
 export async function startBackgroundExecution(
   documentId: string,
 ): Promise<{ status: string } | null> {
-  const res = await (api.api.runtime as Record<string, unknown> as any)[documentId][
-    "start-background"
-  ].post();
-  if (res.data && !("error" in res.data)) {
-    return res.data as { status: string };
+  const res = await runtimeOf(documentId)["start-background"].post();
+  if ("data" in res) return res.data;
+  return null;
+}
+
+/** POST /runtime/:documentId/advance/:nodeExecutionId → DocumentRuntimeState | null */
+export async function advanceNode(
+  documentId: string,
+  nodeExecutionId: string,
+): Promise<DocumentRuntimeState | null> {
+  const res = await runtimeOf(documentId).advance[nodeExecutionId].post();
+  if ("data" in res) return res.data;
+  return null;
+}
+
+/** POST /runtime/:documentId/skip/:nodeExecutionId → DocumentRuntimeState | null */
+export async function skipNode(
+  documentId: string,
+  nodeExecutionId: string,
+): Promise<DocumentRuntimeState | null> {
+  const res = await runtimeOf(documentId).skip[nodeExecutionId].post();
+  if ("data" in res) return res.data;
+  return null;
+}
+
+/** POST /runtime/:documentId/rollback → DocumentRuntimeState | null */
+export async function rollbackNode(
+  documentId: string,
+  targetStepOrder: number,
+): Promise<DocumentRuntimeState | null> {
+  const res = await runtimeOf(documentId).rollback.post({ targetStepOrder });
+  if ("data" in res) return res.data;
+  return null;
+}
+
+/** GET /runtime/:documentId/export/:nodeExecutionId/preview → { content, defaultFilename } | null */
+export async function getExportPreview(
+  documentId: string,
+  nodeExecutionId: string,
+): Promise<{ content: string; defaultFilename: string } | null> {
+  const res = await runtimeOf(documentId).export[nodeExecutionId].preview.get();
+  if ("data" in res) return res.data;
+  return null;
+}
+
+/** POST /runtime/:documentId/export/:nodeExecutionId/generate → export result | null */
+export async function generateExport(
+  documentId: string,
+  nodeExecutionId: string,
+  format: string,
+  filename: string,
+): Promise<{ filename: string; format: string; fileSize: number; storagePath: string } | null> {
+  const res = await runtimeOf(documentId).export[nodeExecutionId].generate.post({ format, filename });
+  if ("data" in res) return res.data;
+  return null;
+}
+
+/** GET /versions/:id/diff?idB=… → VersionDiffResult | null */
+export async function getVersionDiff(
+  versionAId: string,
+  versionBId: string,
+): Promise<VersionDiffResult | null> {
+  const res = await api.api.versions({ id: versionAId }).diff({ idB: versionBId }).get();
+  if (res.data && "versionA" in res.data) {
+    return res.data as VersionDiffResult;
   }
   return null;
 }
 
-/** Fetch current document runtime state (for polling) */
-export async function fetchDocumentRuntimeState(documentId: string): Promise<unknown | null> {
-  const res = await (api.api.runtime as Record<string, unknown> as any)[documentId].get();
-  if (res.data && !("error" in res.data)) {
-    return res.data;
-  }
-  return null;
-}
+/** Alias for backward compatibility */
+export { getRuntimeState as fetchDocumentRuntimeState };

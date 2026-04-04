@@ -49,9 +49,9 @@ Requirements for security & contract fix sprint. Each maps to roadmap phases.
 
 ### Test Coverage
 
-- [ ] **TEST-01**: sanitize.test.ts — 路径穿越、null bytes、正常文件名、assertWithinRoot 越界测试
-- [ ] **TEST-02**: sanitize-html.test.ts — script 标签剥离、onerror 剥离、安全标签保留
-- [ ] **TEST-03**: document-status.test.ts — "failed" 是合法 DocumentStatus、filter 接受 failed 参数
+- [ ] **TEST-01**: sanitize.test.ts — 路径穿越、null bytes、正常文件名、assertWithinRoot 越界测试 (plan: 31-01)
+- [ ] **TEST-02**: sanitize-html.test.ts — script 标签剥离、onerror 剥离、安全标签保留 (plan: 31-02)
+- [x] **TEST-03**: document-status.test.ts — "failed" 是合法 DocumentStatus、filter 接受 failed 参数 (plan: 31-03)
 
 ## Future Requirements
 
@@ -101,9 +101,9 @@ Deferred to v2+. Tracked but not in current roadmap.
 | CONT-02 | Phase 30 | Complete |
 | CONT-03 | Phase 30 | Complete |
 | CONT-04 | Phase 30 | Complete |
-| TEST-01 | Phase 31 | Pending |
-| TEST-02 | Phase 31 | Pending |
-| TEST-03 | Phase 31 | Pending |
+| TEST-01 | Phase 31 | Pending (plan: 31-01) |
+| TEST-02 | Phase 31 | Pending (plan: 31-02) |
+| TEST-03 | Phase 31 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 28 total

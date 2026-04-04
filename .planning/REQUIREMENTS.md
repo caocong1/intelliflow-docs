@@ -42,10 +42,10 @@ Requirements for security & contract fix sprint. Each maps to roadmap phases.
 
 ### Contract Fixes
 
-- [ ] **CONT-01**: shared types DocumentStatus 补齐 "failed"
-- [ ] **CONT-02**: 后端 documents.service.ts filter 接受 status=failed
-- [ ] **CONT-03**: InputSource.outputId + VariableRef.outputId 添加 JSDoc
-- [ ] **CONT-04**: validation.ts 添加 outputId 比对逻辑注释
+- [x] **CONT-01**: shared types DocumentStatus 补齐 "failed"
+- [x] **CONT-02**: 后端 documents.service.ts filter 接受 status=failed
+- [x] **CONT-03**: InputSource.outputId + VariableRef.outputId 添加 JSDoc
+- [x] **CONT-04**: validation.ts 添加 outputId 比对逻辑注释
 
 ### Test Coverage
 
@@ -97,10 +97,10 @@ Deferred to v2+. Tracked but not in current roadmap.
 | TSQL-02 | Phase 30 | Pending |
 | TSQL-03 | Phase 30 | Pending |
 | TSQL-04 | Phase 30 | Pending |
-| CONT-01 | Phase 30 | Pending |
-| CONT-02 | Phase 30 | Pending |
-| CONT-03 | Phase 30 | Pending |
-| CONT-04 | Phase 30 | Pending |
+| CONT-01 | Phase 30 | Complete |
+| CONT-02 | Phase 30 | Complete |
+| CONT-03 | Phase 30 | Complete |
+| CONT-04 | Phase 30 | Complete |
 | TEST-01 | Phase 31 | Pending |
 | TEST-02 | Phase 31 | Pending |
 | TEST-03 | Phase 31 | Pending |
@@ -112,4 +112,4 @@ Deferred to v2+. Tracked but not in current roadmap.
 
 ---
 *Requirements defined: 2026-04-03*
-*Last updated: 2026-04-03 after roadmap creation*
+*Last updated: 2026-04-04 after Phase 30-02 completion*

@@ -22,7 +22,15 @@ import {
   onCleanup,
   onMount,
 } from "solid-js";
-import { api } from "../../api/client";
+import {
+  advanceNode,
+  api,
+  getRuntimeState,
+  initRuntime,
+  rollbackNode,
+  skipNode,
+  startBackgroundExecution,
+} from "../../api/client";
 import FavoriteButton from "../../components/favorites/FavoriteButton";
 import { checkFavorites, recordAccess } from "../../lib/api/user-activity";
 import ActionBar from "../../components/workspace/ActionBar";
@@ -111,21 +119,27 @@ export default function DocumentWorkspace() {
    *  Excludes user-input nodes (input_transform, desensitize) at the current step
    *  since those require manual interaction, not background generation. */
   function isGenerationActive(runtimeState: DocumentRuntimeState): boolean {
-    const userInputTypes = new Set(["input_transform", "desensitize"]);
     const currentIdx = runtimeState.currentNodeIndex;
-    return runtimeState.nodes.some(
-      (n, i) =>
-        n.status === "in_progress" &&
-        !(i === currentIdx && userInputTypes.has(n.nodeType)),
-    );
+    return runtimeState.nodes.some((n, i) => {
+      if (n.status !== "in_progress") return false;
+      if (i !== currentIdx) return true; // non-current in_progress = background work
+      // Current node: check if it's waiting for user interaction
+      if (n.nodeType === "input_transform" || n.nodeType === "desensitize") return false;
+      if (n.nodeType === "export" || n.nodeType === "restore") return false;
+      if (n.nodeType === "model_call") {
+        // model_call with final output = waiting for user review/edit, not generating
+        const od = n.outputData as Record<string, unknown> | null;
+        return !(od?.text || od?.selectedContent);
+      }
+      return true;
+    });
   }
 
   /** Fetch current runtime state from backend (used for polling and state recovery) */
   async function fetchRuntimeState() {
     try {
-      const res = await (api.api.runtime as any)[params.documentId].get();
-      if (res.data && !("error" in res.data)) {
-        const runtimeState = res.data as unknown as DocumentRuntimeState;
+      const runtimeState = await getRuntimeState(params.documentId);
+      if (runtimeState && !("error" in runtimeState)) {
         const wasGenerating = isGenerating();
         setState(runtimeState);
 
@@ -136,7 +150,7 @@ export default function DocumentWorkspace() {
           // Detect state transition: generation just finished
           if (wasGenerating) {
             const hasFailed = runtimeState.nodes.some((n) => n.status === "failed");
-            const docUrl = `/projects/${(runtimeState as any).projectId ?? ""}/documents/${params.documentId}/workspace`;
+            const docUrl = `/projects/${runtimeState.projectId ?? ""}/documents/${params.documentId}/workspace`;
             if (hasFailed) {
               showToast("文档生成失败", "error", {
                 label: "查看详情",
@@ -157,11 +171,11 @@ export default function DocumentWorkspace() {
   }
 
   /** Start background execution — fires and forgets, then starts polling */
-  async function startBackgroundExecution() {
+  async function handleStartBackground() {
     setActionLoading(true);
     try {
-      const res = await (api.api.runtime as any)[params.documentId]["start-background"].post();
-      if (res.data && !("error" in res.data)) {
+      const res = await startBackgroundExecution(params.documentId);
+      if (res && !("error" in res)) {
         setIsGenerating(true);
         setCountdown(WORKSPACE_POLL_INTERVAL);
         // Immediately fetch to get the latest state
@@ -176,7 +190,7 @@ export default function DocumentWorkspace() {
 
   /** Retry failed generation — restart background execution from failed node */
   async function handleRetryGeneration() {
-    await startBackgroundExecution();
+    await handleStartBackground();
   }
 
   /** Manual refresh — immediately poll and reset countdown */
@@ -252,9 +266,9 @@ export default function DocumentWorkspace() {
     })();
 
     try {
-      const res = await (api.api.runtime as any)[params.documentId].init.post();
-      if (res.data && !("error" in res.data)) {
-        const runtimeState = res.data as unknown as DocumentRuntimeState;
+      const result = await initRuntime(params.documentId);
+      if (result && !("error" in result)) {
+        const runtimeState = result;
         setState(runtimeState);
 
         // State recovery on refresh: set currentNodeIndex to first non-completed node
@@ -271,7 +285,7 @@ export default function DocumentWorkspace() {
           setCountdown(WORKSPACE_POLL_INTERVAL);
         }
       } else {
-        setError((res.data as any)?.error ?? "加载工作台失败");
+        setError(result && "error" in result ? result.error : "加载工作台失败");
       }
     } catch {
       setError("加载失败，请重试");
@@ -449,13 +463,13 @@ export default function DocumentWorkspace() {
     try {
       // For input_transform nodes, advance first to complete them before background execution
       if (node.nodeType === "input_transform" && node.status !== "completed") {
-        const advRes = await (api.api.runtime as any)[params.documentId].advance[node.id].post();
-        if (advRes.data && !("error" in advRes.data)) {
-          setState(advRes.data as unknown as DocumentRuntimeState);
+        const result = await advanceNode(params.documentId, node.id);
+        if (result && !("error" in result)) {
+          setState(result);
         }
       }
       // Use background execution: submit to backend and start polling
-      await startBackgroundExecution();
+      await handleStartBackground();
       setViewMode("current");
     } catch {
       // ignore
@@ -470,9 +484,9 @@ export default function DocumentWorkspace() {
     setActionLoading(true);
     setShowInlineEditor(false);
     try {
-      const res = await (api.api.runtime as any)[params.documentId].skip[node.id].post();
-      if (res.data && !("error" in res.data)) {
-        setState(res.data as unknown as DocumentRuntimeState);
+      const result = await skipNode(params.documentId, node.id);
+      if (result && !("error" in result)) {
+        setState(result);
         setViewMode("current");
       }
     } catch {
@@ -482,18 +496,19 @@ export default function DocumentWorkspace() {
     }
   }
 
-  async function handleRollback(targetStepOrder: number) {
+  async function handleRollback(targetStepOrder: number, autoExecute = false) {
     setActionLoading(true);
     setShowRollbackDialog(false);
     setShowReexecDialog(null);
     setShowInlineEditor(false);
     try {
-      const res = await (api.api.runtime as any)[params.documentId].rollback.post({
-        targetStepOrder,
-      });
-      if (res.data && !("error" in res.data)) {
-        setState(res.data as unknown as DocumentRuntimeState);
+      const result = await rollbackNode(params.documentId, targetStepOrder);
+      if (result && !("error" in result)) {
+        setState(result);
         setViewMode("current");
+        if (autoExecute) {
+          await handleStartBackground();
+        }
       }
     } catch {
       // ignore
@@ -624,8 +639,7 @@ export default function DocumentWorkspace() {
 
   const backHref = () => {
     const s = state();
-    const projectId = s ? (s as unknown as Record<string, unknown>).projectId : undefined;
-    if (projectId) return `/projects/${projectId}`;
+    if (s?.projectId) return `/projects/${s.projectId}`;
     return "/projects";
   };
 
@@ -704,7 +718,7 @@ export default function DocumentWorkspace() {
                         d="M15 19l-7-7 7-7"
                       />
                     </svg>
-                    返回项目
+                    返回文档列表
                   </A>
                   <AutoSaveIndicator status={saveStatus()} />
                 </div>
@@ -869,6 +883,10 @@ export default function DocumentWorkspace() {
                           onFullscreen={(content, title) =>
                             setFullscreenContent({ content, title })
                           }
+                          onReexecute={() => {
+                            const idx = s().nodes.findIndex((n) => n.id === viewed().id);
+                            if (idx >= 0) setShowReexecDialog(idx);
+                          }}
                         />
                       </div>
                     )}
@@ -971,7 +989,10 @@ export default function DocumentWorkspace() {
                                     expandedCompletedNode() === node.id ? null : node.id,
                                   )
                                 }
-                                onReexecute={() => {}}
+                                onReexecute={() => {
+                                  const idx = s().nodes.findIndex((n) => n.id === node.id);
+                                  if (idx >= 0) setShowReexecDialog(idx);
+                                }}
                                 onFullscreen={(content, title) =>
                                   setFullscreenContent({ content, title })
                                 }
@@ -1166,8 +1187,6 @@ export default function DocumentWorkspace() {
                       const totalDuration = () =>
                         formatDuration(nodes[0]?.startedAt, nodes[nodes.length - 1]?.completedAt);
                       const exportNode = () => nodes.find((n) => n.nodeType === "export");
-                      const exportData = () =>
-                        exportNode()?.outputData as Record<string, unknown> | null;
                       const modelCallNode = () =>
                         [...nodes].reverse().find((n) => n.nodeType === "model_call");
                       const modelCallData = () =>
@@ -1176,46 +1195,6 @@ export default function DocumentWorkspace() {
                         (modelCallData()?.selectedContent as string) ??
                         (modelCallData()?.text as string) ??
                         "";
-
-                      const FORMAT_ICONS: Record<string, string> = {
-                        word: "W",
-                        pdf: "P",
-                        markdown: "M",
-                      };
-                      const FORMAT_LABELS: Record<string, string> = {
-                        word: "Word 文档",
-                        pdf: "PDF 文件",
-                        markdown: "Markdown 文件",
-                      };
-
-                      async function triggerDownload() {
-                        const eNode = exportNode();
-                        if (!eNode) return;
-                        const url = `/api/runtime/${params.documentId}/export/${eNode.id}/download`;
-                        const token = localStorage.getItem("auth_token");
-                        const res = await fetch(url, {
-                          headers: token ? { Authorization: `Bearer ${token}` } : {},
-                        });
-                        if (!res.ok) return;
-                        const blob = await res.blob();
-                        const blobUrl = URL.createObjectURL(blob);
-                        const link = document.createElement("a");
-                        link.href = blobUrl;
-                        link.download = (exportData()?.filename as string) || "export";
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(blobUrl);
-                      }
-
-                      function copyFullText() {
-                        const text = selectedContent();
-                        if (!text) return;
-                        navigator.clipboard.writeText(text).then(() => {
-                          setCopiedFullText(true);
-                          setTimeout(() => setCopiedFullText(false), 2000);
-                        });
-                      }
 
                       return (
                         <div class="space-y-8">
@@ -1278,90 +1257,31 @@ export default function DocumentWorkspace() {
                                 </svg>
                                 节点数 {nodes.length}/{nodes.length}
                               </div>
-                              <Show when={exportData()?.format}>
-                                <div class="bg-[#f2f4f6] px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium text-[#191c1e]">
-                                  <svg
-                                    class="w-4 h-4 text-[#464555]"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    stroke-width="2"
-                                    aria-hidden="true"
-                                  >
-                                    <path
-                                      stroke-linecap="round"
-                                      stroke-linejoin="round"
-                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                                    />
-                                  </svg>
-                                  导出格式{" "}
-                                  {FORMAT_LABELS[exportData()?.format as string] ??
-                                    (exportData()?.format as string)?.toUpperCase() ??
-                                    ""}
-                                </div>
-                              </Show>
                             </div>
 
                             {/* Divider */}
                             <div class="h-px bg-[rgba(199,196,216,0.2)] mb-6" />
 
-                            {/* Export file card */}
-                            <Show when={exportData()}>
-                              <div class="bg-[#f7f9fb] p-5 rounded-xl flex items-center justify-between">
-                                <div class="flex items-center gap-4">
-                                  <div
-                                    class="w-12 h-12 rounded-lg bg-[#4f46e5] flex items-center justify-center text-white font-black text-xl flex-shrink-0"
-                                    style={{ "box-shadow": "0 4px 12px rgba(79,70,229,0.2)" }}
-                                  >
-                                    {FORMAT_ICONS[(exportData()?.format as string) ?? "markdown"] ??
-                                      "F"}
-                                  </div>
-                                  <div>
-                                    <h4 class="font-bold text-[#191c1e]">
-                                      {exportData()?.filename as string}
-                                    </h4>
-                                    <p class="text-xs text-[#464555]">
-                                      {FORMAT_LABELS[(exportData()?.format as string) ?? ""] ?? ""}{" "}
-                                      · {formatFileSize((exportData()?.fileSize as number) ?? 0)}
-                                    </p>
-                                  </div>
-                                </div>
+                            {/* Export hint — click stepper to access export */}
+                            <Show when={exportNode()}>
+                              <button
+                                type="button"
+                                class="w-full bg-[#f7f9fb] p-4 rounded-xl flex items-center justify-between hover:bg-[#eeebff] transition-colors group"
+                                onClick={() => {
+                                  const idx = nodes.findIndex((n) => n.nodeType === "export");
+                                  if (idx >= 0) handleStepperClick(idx);
+                                }}
+                              >
                                 <div class="flex items-center gap-3">
-                                  <button
-                                    type="button"
-                                    class="bg-[#e0e3e5] px-5 py-2.5 rounded-lg text-sm font-bold text-[#464555] hover:bg-[#d8dadc] transition-colors"
-                                    onClick={copyFullText}
-                                  >
-                                    {copiedFullText() ? "已复制" : "复制全文"}
-                                  </button>
-                                  <button
-                                    type="button"
-                                    class="px-6 py-2.5 rounded-lg text-sm font-bold text-white transition-all flex items-center gap-2"
-                                    style={{
-                                      background:
-                                        "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)",
-                                      "box-shadow": "0 4px 12px rgba(79,70,229,0.2)",
-                                    }}
-                                    onClick={triggerDownload}
-                                  >
-                                    <svg
-                                      class="w-4 h-4"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
-                                      stroke-width="2"
-                                      aria-hidden="true"
-                                    >
-                                      <path
-                                        stroke-linecap="round"
-                                        stroke-linejoin="round"
-                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                                      />
-                                    </svg>
-                                    下载文件
-                                  </button>
+                                  <svg class="w-5 h-5 text-[#4f46e5]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                  </svg>
+                                  <span class="text-sm font-medium text-[#191c1e]">选择格式并导出文档</span>
                                 </div>
-                              </div>
+                                <svg class="w-4 h-4 text-[#464555] group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
+                              </button>
                             </Show>
                           </section>
 
@@ -1499,7 +1419,7 @@ export default function DocumentWorkspace() {
             </div>
 
             {/* Bottom action bar (fixed, via ActionBar component) */}
-            <Show when={!readOnly() && currentNode()}>
+            <Show when={!readOnly() && currentNode() && viewMode() === "current" && currentNode()?.nodeType !== "export"}>
               <ActionBar
                 loading={actionLoading()}
                 canSkip={currentNode()?.nodeType !== "export"}
@@ -1611,7 +1531,7 @@ export default function DocumentWorkspace() {
                       onClick={() => {
                         const idx = showReexecDialog();
                         if (idx !== null) {
-                          handleRollback(s().nodes[idx].stepOrder);
+                          handleRollback(s().nodes[idx].stepOrder, true);
                         }
                       }}
                     >

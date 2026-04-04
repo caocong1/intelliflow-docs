@@ -35,10 +35,10 @@ Requirements for security & contract fix sprint. Each maps to roadmap phases.
 
 ### TypeScript Quality
 
-- [ ] **TSQL-01**: 扩展 client.ts typed wrappers 覆盖所有 runtime API 调用
-- [ ] **TSQL-02**: DocumentWorkspace.tsx 8 处 `as any` 替换为 wrapper 调用
-- [ ] **TSQL-03**: ExportExecutor.tsx 4 处 `as any` 替换为 wrapper 调用
-- [ ] **TSQL-04**: VersionHistory.tsx 1 处 `as any` 替换为 wrapper 调用
+- [x] **TSQL-01**: 扩展 client.ts typed wrappers 覆盖所有 runtime API 调用
+- [x] **TSQL-02**: DocumentWorkspace.tsx 8 处 `as any` 替换为 wrapper 调用
+- [x] **TSQL-03**: ExportExecutor.tsx 4 处 `as any` 替换为 wrapper 调用
+- [x] **TSQL-04**: VersionHistory.tsx 1 处 `as any` 替换为 wrapper 调用
 
 ### Contract Fixes
 
@@ -93,10 +93,10 @@ Deferred to v2+. Tracked but not in current roadmap.
 | XSS-02 | Phase 29 | Complete |
 | XSS-03 | Phase 29 | Complete |
 | XSS-04 | Phase 29 | Complete |
-| TSQL-01 | Phase 30 | Pending |
-| TSQL-02 | Phase 30 | Pending |
-| TSQL-03 | Phase 30 | Pending |
-| TSQL-04 | Phase 30 | Pending |
+| TSQL-01 | Phase 30 | Complete |
+| TSQL-02 | Phase 30 | Complete |
+| TSQL-03 | Phase 30 | Complete |
+| TSQL-04 | Phase 30 | Complete |
 | CONT-01 | Phase 30 | Complete |
 | CONT-02 | Phase 30 | Complete |
 | CONT-03 | Phase 30 | Complete |

@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: 质量与测试
-status: active
-last_updated: "2026-04-04"
+status: unknown
+last_updated: "2026-04-04T07:11:57.240Z"
 progress:
-  total_phases: 31
-  completed_phases: 29
-  total_plans: 98
-  completed_plans: 87
+  total_phases: 26
+  completed_phases: 26
+  total_plans: 88
+  completed_plans: 88
 ---
 
 # Project State
@@ -42,6 +42,7 @@ See PROJECT.md Key Decisions table.
 - [Phase 28-file-security]: Server-controlled storagePath: join(getUploadPath(documentId), uuid + sanitizeFilename(originalName)) — client body no longer accepts storagePath
 - [Phase 28-file-security]: isDocumentProjectMember guard on both POST and GET /files endpoints
 - v1.3 partial: Phase 30-31 deferred to v1.4 (FSEC utilities implemented but not formally tested/verified)
+- [Phase 30]: Eden Treaty typed wrappers: RuntimeRoute interface + EdenResponse union + WrapperResult pattern
 
 ### Roadmap Evolution
 

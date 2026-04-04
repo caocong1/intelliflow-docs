@@ -306,7 +306,7 @@ export type ProjectRole = "owner" | "participant";
 export type DocumentVisibility = "self" | "project" | "specific";
 
 /** Document lifecycle status */
-export type DocumentStatus = "draft" | "in_progress" | "completed";
+export type DocumentStatus = "draft" | "in_progress" | "completed" | "failed";
 
 /** Project entity */
 export interface Project extends BaseEntity {
@@ -509,6 +509,7 @@ export interface ModelCallLog {
 /** Document runtime state (full workspace state for frontend) */
 export interface DocumentRuntimeState {
   documentId: string;
+  projectId: string | null;
   workflowName: string;
   currentNodeIndex: number;
   nodes: NodeExecution[];

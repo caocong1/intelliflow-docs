@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: 质量与测试
-status: in_progress
-last_updated: "2026-04-04T17:55:00.000Z"
+status: unknown
+last_updated: "2026-04-04T09:59:36.379Z"
 progress:
-  total_phases: 32
-  completed_phases: 32
-  total_plans: 93
-  completed_plans: 93
+  total_phases: 27
+  completed_phases: 27
+  total_plans: 91
+  completed_plans: 91
 ---
 
 # Project State

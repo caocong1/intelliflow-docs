@@ -105,6 +105,8 @@ export interface OutputDef {
 /** Explicit input source reference for desensitize/restore nodes */
 export interface InputSource {
   sourceNodeId: string;
+  /** References the upstream node's OutputDef.segmentKey (canonical path identifier),
+   * not OutputDef.id. Used by desensitize/restore nodes to declare input dependencies. */
   outputId: string;
   displayName: string; // auto-filled from upstream output name
 }
@@ -112,7 +114,9 @@ export interface InputSource {
 /** Variable reference in prompt templates */
 export interface VariableRef {
   nodeId: string;
-  outputId: string; // stores segmentKey (not OutputDef.id)
+  /** Stores OutputDef.segmentKey (not OutputDef.id).
+   * Used in prompt templates for variable substitution (e.g., ${nodeId.outputId.fieldPath}). */
+  outputId: string;
   variableName: string;
   fieldPath?: string; // for nested JSON field access (Phase 24 use)
 }

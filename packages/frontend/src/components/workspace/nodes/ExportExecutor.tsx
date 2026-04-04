@@ -1,6 +1,6 @@
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal, onMount } from "solid-js";
-import { api } from "../../../api/client";
+import { api, generateExport, getExportPreview } from "../../../api/client";
 import { sanitizeHtml } from "../../../lib/sanitize";
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
@@ -84,16 +84,12 @@ export default function ExportExecutor(props: Props) {
 
   onMount(async () => {
     try {
-      const res = await (api.api.runtime as any)[props.documentId].export[
-        props.nodeExecution.id
-      ].preview.get();
-
-      if (res.data && !("error" in res.data)) {
-        const data = res.data as { content: string; defaultFilename: string };
-        setPreviewContent(data.content);
-        setFilename(`${data.defaultFilename}${FORMAT_EXTENSIONS[format()]}`);
+      const result = await getExportPreview(props.documentId, props.nodeExecution.id);
+      if (result && !("error" in result)) {
+        setPreviewContent(result.content);
+        setFilename(`${result.defaultFilename}${FORMAT_EXTENSIONS[format()]}`);
       } else {
-        setError((res.data as any)?.error ?? "预览加载失败");
+        setError(result && "error" in result ? result.error : "预览加载失败");
       }
     } catch {
       setError("预览加载失败");
@@ -115,28 +111,22 @@ export default function ExportExecutor(props: Props) {
     setError(null);
 
     try {
-      const res = await (api.api.runtime as any)[props.documentId].export[
-        props.nodeExecution.id
-      ].generate.post({
-        format: format(),
-        filename: filename(),
-      });
+      const result = await generateExport(
+        props.documentId,
+        props.nodeExecution.id,
+        format(),
+        filename(),
+      );
 
-      if (res.data && !("error" in res.data)) {
-        const data = res.data as {
-          filename: string;
-          format: string;
-          fileSize: number;
-          storagePath: string;
-        };
+      if (result && !("error" in result)) {
         setExportResult({
-          filename: data.filename,
-          format: data.format,
-          fileSize: data.fileSize,
+          filename: result.filename,
+          format: result.format,
+          fileSize: result.fileSize,
         });
         triggerDownload();
       } else {
-        setError((res.data as any)?.error ?? "导出失败，请重试");
+        setError(result && "error" in result ? result.error : "导出失败，请重试");
       }
     } catch {
       setError("导出失败，请重试");

@@ -80,8 +80,8 @@ export async function listDocuments(
   }
 
   // Status filter
-  if (params.status && ["draft", "in_progress", "completed"].includes(params.status)) {
-    conditions.push(eq(documents.status, params.status as "draft" | "in_progress" | "completed"));
+  if (params.status && ["draft", "in_progress", "completed", "failed"].includes(params.status)) {
+    conditions.push(eq(documents.status, params.status as "draft" | "in_progress" | "completed" | "failed"));
   }
 
   // Visibility filter: owner sees all, others see filtered

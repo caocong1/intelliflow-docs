@@ -1,6 +1,6 @@
 import { A, useParams } from "@solidjs/router";
 import { createSignal, For, onMount, Show } from "solid-js";
-import { api } from "../../api/client";
+import { api, getVersionDiff } from "../../api/client";
 import Timeline from "../../components/ui/Timeline";
 import type { TimelineItem } from "../../components/ui/Timeline";
 import VersionDiff from "../../components/documents/VersionDiff";
@@ -98,9 +98,9 @@ export default function VersionHistory() {
   async function loadDiff(idA: string, idB: string) {
     setDiffLoading(true);
     try {
-      const res = await (api.api.versions as any)({ id: idA }).diff({ idB }).get();
-      if (res.data && "versionA" in res.data) {
-        setDiffResult(res.data as unknown as VersionDiffResult);
+      const result = await getVersionDiff(idA, idB);
+      if (result) {
+        setDiffResult(result);
       }
     } catch {
       // Error loading diff

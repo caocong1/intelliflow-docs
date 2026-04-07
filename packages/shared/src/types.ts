@@ -519,3 +519,41 @@ export interface DocumentRuntimeState {
   nodes: NodeExecution[];
   workflowNodes: WorkflowNodeDef[];
 }
+
+// ─── Desensitize specific types ────────────────────────────────────────────
+
+/** 脱敏检测到的敏感信息项（前后端共用） */
+export interface DetectedSensitiveItem {
+  original: string;
+  placeholder: string;
+  sensitiveType: string;
+  description: string;
+  startIndex: number;
+  endIndex: number;
+}
+
+/** 前端审核阶段的条目（增加 checked 状态） */
+export interface DesensitizeReviewItem extends DetectedSensitiveItem {
+  checked: boolean;
+}
+
+/** 审核摘要条目（不含 original，安全存储在 outputData） */
+export interface DesensitizeReviewSummaryItem {
+  placeholder: string;
+  sensitiveType: string;
+  checked: boolean;
+}
+
+/** 脱敏节点的最终输出数据结构 */
+export interface DesensitizeOutputData {
+  text: string;
+  mappingCount: number;
+  detectedItems: DesensitizeReviewSummaryItem[];
+}
+
+/** 检测阶段临时状态（confirm 后被完整覆盖） */
+export interface DesensitizeDetectState {
+  _detectPhase: "detecting" | "detected" | "failed";
+  _detectedItems?: DetectedSensitiveItem[];
+  _detectError?: string;
+}

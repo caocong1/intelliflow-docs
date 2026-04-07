@@ -54,29 +54,93 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
         return { error: "仅文档创建者或项目负责人可执行此操作" };
       }
 
-      try {
-        const config = await getDesensitizeConfig(params.nodeExecutionId);
-        if (!config) {
-          set.status = 404;
-          return { error: "未找到脱敏节点配置" };
-        }
-
-        const items = await detectSensitiveInfo(
-          body.text,
-          config.localModelId,
-          config.categories,
-        );
-
-        return { items };
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : String(err);
-        set.status = 400;
-        return { error: message };
+      const config = await getDesensitizeConfig(params.nodeExecutionId);
+      if (!config) {
+        set.status = 404;
+        return { error: "未找到脱敏节点配置" };
       }
+
+      // Mark as detecting
+      const now = new Date();
+      await db
+        .update(nodeExecutions)
+        .set({ outputData: { _detectPhase: "detecting" }, updatedAt: now })
+        .where(eq(nodeExecutions.id, params.nodeExecutionId));
+
+      // Fire-and-forget: run detection in background to avoid gateway timeout
+      detectSensitiveInfo(body.text, config.localModelId, config.categories)
+        .then(async (items) => {
+          await db
+            .update(nodeExecutions)
+            .set({
+              outputData: { _detectPhase: "detected", _detectedItems: items },
+              updatedAt: new Date(),
+            })
+            .where(eq(nodeExecutions.id, params.nodeExecutionId));
+        })
+        .catch(async (err: unknown) => {
+          const message = err instanceof Error ? err.message : String(err);
+          await db
+            .update(nodeExecutions)
+            .set({
+              outputData: { _detectPhase: "failed", _detectError: message },
+              updatedAt: new Date(),
+            })
+            .where(eq(nodeExecutions.id, params.nodeExecutionId));
+        });
+
+      return { status: "detecting" };
     },
     {
       params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
       body: t.Object({ text: t.String() }),
+    },
+  )
+
+  // ─── Poll detection status ─────────────────────────────────────────────────
+
+  .get(
+    "/:documentId/desensitize/:nodeExecutionId/detect-status",
+    async ({ params, user, set }) => {
+      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
+      if (!isMember) {
+        set.status = 403;
+        return { error: "仅项目成员可访问运行时" };
+      }
+
+      const [exec] = await db
+        .select({
+          outputData: nodeExecutions.outputData,
+          nodeStatus: nodeExecutions.status,
+          errorMessage: nodeExecutions.errorMessage,
+        })
+        .from(nodeExecutions)
+        .where(eq(nodeExecutions.id, params.nodeExecutionId))
+        .limit(1);
+
+      if (!exec) {
+        set.status = 404;
+        return { error: "节点执行不存在" };
+      }
+
+      // Node marked as failed by pipeline — surface immediately
+      if (exec.nodeStatus === "failed") {
+        return { status: "failed", error: exec.errorMessage ?? "节点执行失败" };
+      }
+
+      const output = exec.outputData as Record<string, unknown> | null;
+      const phase = output?._detectPhase as string | undefined;
+
+      if (phase === "detected") {
+        return { status: "detected", items: output?._detectedItems ?? [] };
+      }
+      if (phase === "failed") {
+        return { status: "failed", error: output?._detectError ?? "检测失败" };
+      }
+      return { status: phase ?? "unknown" };
+    },
+    {
+      params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
     },
   )
 
@@ -98,6 +162,7 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
           body.items as Array<{ original: string; placeholder: string; sensitiveType: string }>,
           body.sanitizedText,
           user!.id,
+          body.reviewSummary,
         );
 
         return nodeExecution;
@@ -118,6 +183,11 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
           }),
         ),
         sanitizedText: t.String(),
+        reviewSummary: t.Optional(t.Array(t.Object({
+          placeholder: t.String(),
+          sensitiveType: t.String(),
+          checked: t.Boolean(),
+        }))),
       }),
     },
   )

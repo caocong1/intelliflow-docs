@@ -1,16 +1,8 @@
-import type { DesensitizeConfig, InputSource, NodeExecution } from "@intelliflow/shared";
-import { For, Show, createSignal, onMount } from "solid-js";
+import type { DesensitizeConfig, DesensitizeReviewItem, NodeExecution } from "@intelliflow/shared";
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { api } from "../../../api/client";
-
-interface DetectedItem {
-  original: string;
-  placeholder: string;
-  sensitiveType: string;
-  description: string;
-  startIndex: number;
-  endIndex: number;
-  checked: boolean;
-}
+import HighlightedText from "../shared/HighlightedText";
+import { getTypeLabel, maskOriginal, typeBadgeClass } from "../shared/desensitize-utils";
 
 interface ManualAddForm {
   original: string;
@@ -28,8 +20,8 @@ interface Props {
 type Phase = "detect" | "review" | "confirmed";
 
 // Group items by sensitiveType for collapsible category sections
-function groupByType(items: DetectedItem[]): Record<string, DetectedItem[]> {
-  const groups: Record<string, DetectedItem[]> = {};
+function groupByType(items: DesensitizeReviewItem[]): Record<string, DesensitizeReviewItem[]> {
+  const groups: Record<string, DesensitizeReviewItem[]> = {};
   for (const item of items) {
     if (!groups[item.sensitiveType]) groups[item.sensitiveType] = [];
     groups[item.sensitiveType].push(item);
@@ -48,11 +40,14 @@ export default function DesensitizeExecutor(props: Props) {
   const sourceEntries = () => {
     const input = props.nodeExecution.inputData as Record<string, unknown> | null;
     if (isMultiSource(input)) {
-      return Object.entries(input.sources).map(([outputId, data]) => ({
-        outputId,
-        displayName: data.displayName,
-        text: data.text,
-      }));
+      return Object.entries(input.sources)
+        .map(([outputId, data]) => ({
+          outputId,
+          displayName: data.displayName,
+          text: data.text,
+          sourceType: (data as Record<string, unknown>).sourceType as "text" | "file" | undefined,
+        }))
+        .filter((s) => s.text?.trim());
     }
     return [];
   };
@@ -64,6 +59,10 @@ export default function DesensitizeExecutor(props: Props) {
     if (output && (output.text || output.sources)) {
       return "confirmed";
     }
+    // Restore review phase if detection was completed but not yet confirmed
+    if (output && output._detectPhase === "detected" && Array.isArray(output._detectedItems)) {
+      return "review";
+    }
     return "detect";
   };
 
@@ -73,7 +72,7 @@ export default function DesensitizeExecutor(props: Props) {
       ? (sourceEntries()[0]?.text ?? "")
       : (((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? ""),
   );
-  const [items, setItems] = createSignal<DetectedItem[]>([]);
+  const [items, setItems] = createSignal<DesensitizeReviewItem[]>([]);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [showManualAdd, setShowManualAdd] = createSignal(false);
@@ -84,14 +83,24 @@ export default function DesensitizeExecutor(props: Props) {
   const [selectedItemIndex, setSelectedItemIndex] = createSignal<number | null>(null);
   const [collapsedTypes, setCollapsedTypes] = createSignal<Set<string>>(new Set());
 
-  // Auto-detect on mount when in detect phase with input text
+  // Auto-detect on mount, or restore cached detection results
   onMount(() => {
-    if (phase() === "detect" && inputText().trim() && !props.readOnly) {
+    if (phase() === "review") {
+      // Restore cached detection items from backend outputData
+      const output = props.nodeExecution.outputData as Record<string, unknown> | null;
+      const cached = output?._detectedItems as DesensitizeReviewItem[] | undefined;
+      if (cached?.length) {
+        setItems(cached.map((item) => ({ ...item, checked: true })));
+      }
+    } else if (phase() === "detect" && inputText().trim() && !props.readOnly) {
       handleDetect();
     }
   });
 
-  // ─── Phase 1: Detection ───────────────────────────────────────────────────
+  // ─── Phase 1: Detection (async with polling) ──────────────────────────────
+
+  let detectPollTimer: ReturnType<typeof setInterval> | undefined;
+  onCleanup(() => { if (detectPollTimer) clearInterval(detectPollTimer); });
 
   async function handleDetect() {
     const text = inputText();
@@ -104,6 +113,7 @@ export default function DesensitizeExecutor(props: Props) {
     setError(null);
 
     try {
+      // Start async detection (returns immediately)
       const runtimeApi = api.api.runtime as unknown as Record<
         string,
         Record<
@@ -116,21 +126,63 @@ export default function DesensitizeExecutor(props: Props) {
       ].detect.post({ text });
 
       const data = res.data as Record<string, unknown> | null;
-      if (data && !("error" in data)) {
-        const detected = (data as unknown as { items: DetectedItem[] }).items.map(
-          (item: DetectedItem) => ({ ...item, checked: true }),
-        );
-        setItems(detected);
-        setPhase("review");
-      } else {
-        const errMsg = data?.error;
-        setError(typeof errMsg === "string" ? errMsg : "检测失败，请重试");
+      if (data && "error" in data) {
+        setError(typeof data.error === "string" ? data.error : "检测失败，请重试");
+        setLoading(false);
+        return;
       }
+
+      // Poll for detection results
+      pollDetectStatus();
     } catch {
       setError("检测失败，请重试");
-    } finally {
       setLoading(false);
     }
+  }
+
+  function pollDetectStatus() {
+    if (detectPollTimer) clearInterval(detectPollTimer);
+
+    const statusApi = api.api.runtime as unknown as Record<
+      string,
+      Record<
+        string,
+        Record<string, Record<string, { get: () => Promise<{ data: unknown }> }>>
+      >
+    >;
+
+    detectPollTimer = setInterval(async () => {
+      try {
+        const res = await statusApi[props.documentId].desensitize[
+          props.nodeExecution.id
+        ]["detect-status"].get();
+
+        const data = res.data as Record<string, unknown> | null;
+        if (!data) return;
+
+        if (data.status === "detected") {
+          clearInterval(detectPollTimer);
+          detectPollTimer = undefined;
+          const detected = (data.items as DesensitizeReviewItem[]).map(
+            (item: DesensitizeReviewItem) => ({ ...item, checked: true }),
+          );
+          setItems(detected);
+          setPhase("review");
+          setLoading(false);
+        } else if (data.status === "failed") {
+          clearInterval(detectPollTimer);
+          detectPollTimer = undefined;
+          setError(typeof data.error === "string" ? data.error : "检测失败，请重试");
+          setLoading(false);
+        }
+        // status === "detecting" → keep polling
+      } catch {
+        clearInterval(detectPollTimer);
+        detectPollTimer = undefined;
+        setError("检测状态查询失败，请重试");
+        setLoading(false);
+      }
+    }, 2000);
   }
 
   // ─── Phase 2: Review helpers ──────────────────────────────────────────────
@@ -156,15 +208,16 @@ export default function DesensitizeExecutor(props: Props) {
 
     const text = inputText();
     const startIndex = text.indexOf(form.original);
-    const checkedOfType = items().filter(
-      (it) => it.sensitiveType === form.sensitiveType && it.checked,
-    ).length;
-    const count = checkedOfType + 1;
+    // Count ALL items of same type (including unchecked) to avoid duplicate placeholders
+    const sameType = items().filter((it) => it.sensitiveType === form.sensitiveType);
+    let maxN = 0;
+    for (const item of sameType) {
+      const match = item.placeholder.match(/_(\d+)\]$/);
+      if (match) maxN = Math.max(maxN, Number.parseInt(match[1], 10));
+    }
+    const placeholder = `[${form.sensitiveType.toUpperCase()}_${maxN + 1}]`;
 
-    // System-defined placeholder format: [TYPE_N]
-    const placeholder = `[${form.sensitiveType.toUpperCase()}_${count}]`;
-
-    const newItem: DetectedItem = {
+    const newItem: DesensitizeReviewItem = {
       original: form.original,
       placeholder,
       sensitiveType: form.sensitiveType,
@@ -218,12 +271,16 @@ export default function DesensitizeExecutor(props: Props) {
           sensitiveType: it.sensitiveType,
         })),
         sanitizedText,
+        reviewSummary: items().map((it) => ({
+          placeholder: it.placeholder,
+          sensitiveType: it.sensitiveType,
+          checked: it.checked,
+        })),
       });
 
       const data = res.data as Record<string, unknown> | null;
       if (data && !("error" in data)) {
         setPhase("confirmed");
-        props.onDraftSave({ text: sanitizedText, mappingCount: confirmed.length });
       } else {
         const errMsg = data?.error;
         setError(typeof errMsg === "string" ? errMsg : "确认失败，请重试");
@@ -289,42 +346,6 @@ export default function DesensitizeExecutor(props: Props) {
         )}
       </For>
     );
-  }
-
-  // ─── Type label / badge ───────────────────────────────────────────────────
-
-  const typeLabels: Record<string, string> = {
-    person_name: "姓名",
-    phone_number: "手机号",
-    email: "邮箱",
-    id_number: "身份证号",
-    bank_card: "银行卡号",
-    company_name: "公司名",
-    address: "地址",
-  };
-
-  // Surface-tone pills per design system — no hard colored badges
-  function typeBadgeClass(type: string): string {
-    const map: Record<string, string> = {
-      person_name: "bg-indigo-50 text-indigo-700",
-      phone_number: "bg-emerald-50 text-emerald-700",
-      email: "bg-violet-50 text-violet-700",
-      id_number: "bg-rose-50 text-rose-700",
-      bank_card: "bg-amber-50 text-amber-700",
-      company_name: "bg-teal-50 text-teal-700",
-      address: "bg-pink-50 text-pink-700",
-    };
-    return map[type] ?? "bg-[#f7f9fb] text-[#464555]";
-  }
-
-  function getTypeLabel(type: string): string {
-    return typeLabels[type] ?? type;
-  }
-
-  function maskOriginal(text: string): string {
-    if (text.length <= 2) return text;
-    const visible = Math.max(1, Math.floor(text.length / 3));
-    return text.slice(0, visible) + "*".repeat(text.length - visible * 2) + text.slice(-visible);
   }
 
   // ─── Read-only / confirmed mode ────────────────────────────────────────────
@@ -466,23 +487,26 @@ export default function DesensitizeExecutor(props: Props) {
 
           {/* Multi-source tab bar */}
           <Show when={multiSource() && sourceEntries().length > 1}>
-            <div class="flex gap-1 bg-[#f7f9fb] rounded-xl p-1">
+            <div class="flex flex-wrap gap-1 bg-[#f7f9fb] rounded-xl p-1.5 items-center">
+              <span class="text-xs text-[#9fa0a8] pl-2 pr-1">输入来源：</span>
               <For each={sourceEntries()}>
                 {(src, index) => (
                   <button
                     type="button"
-                    class={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                    class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
                       activeSourceIndex() === index()
                         ? "bg-white text-[#191c1e] shadow-sm"
                         : "text-[#9fa0a8] hover:text-[#464555]"
                     }`}
                     onClick={() => {
+                      if (activeSourceIndex() === index()) return;
                       setActiveSourceIndex(index());
                       setInputText(src.text);
-                      // Reset to detect phase for this source
+                      // Reset and re-detect for this source
                       if (phase() !== "confirmed") {
                         setPhase("detect");
                         setItems([]);
+                        handleDetect();
                       }
                     }}
                   >
@@ -503,10 +527,24 @@ export default function DesensitizeExecutor(props: Props) {
           {/* ── Phase 1: Detection (auto-triggered) ── */}
           <Show when={phase() === "detect"}>
             <Show when={loading()}>
-              {/* Status banner: scanning */}
-              <div class="bg-[#fff7ed] rounded-xl px-4 py-3 flex items-center gap-3">
-                <div class="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                <span class="text-sm text-amber-700 font-medium">正在扫描敏感信息...</span>
+              {/* Scanning animation: pulse shield + progress */}
+              <div class="bg-[#fff7ed] rounded-xl px-5 py-4 space-y-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center animate-pulse flex-shrink-0">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg>
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <span class="text-sm text-amber-800 font-semibold">正在扫描敏感信息...</span>
+                    <p class="text-xs text-amber-600 mt-0.5">
+                      检测类别：{props.config.categories.map((c) => c.name).join("、")}
+                    </p>
+                  </div>
+                </div>
+                <div class="h-1 bg-amber-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-amber-500 rounded-full animate-pulse" style={{ width: "75%" }} />
+                </div>
               </div>
             </Show>
             <Show when={!loading()}>
@@ -549,6 +587,28 @@ export default function DesensitizeExecutor(props: Props) {
               </button>
             </div>
 
+            {/* Stats cards */}
+            {(() => {
+              const checkedCount = createMemo(() => items().filter((it) => it.checked).length);
+              const skippedCount = createMemo(() => items().filter((it) => !it.checked).length);
+              return (
+                <div class="grid grid-cols-3 gap-3">
+                  <div class="rounded-xl px-4 py-3 bg-[#f7f9fb]">
+                    <p class="text-[10px] font-medium text-[#777587] uppercase tracking-wide mb-1">检测总数</p>
+                    <p class="text-2xl font-bold text-[#191c1e]">{items().length}</p>
+                  </div>
+                  <div class="rounded-xl px-4 py-3 bg-emerald-50">
+                    <p class="text-[10px] font-medium text-emerald-600 uppercase tracking-wide mb-1">已选脱敏</p>
+                    <p class="text-2xl font-bold text-emerald-700">{checkedCount()}</p>
+                  </div>
+                  <div class="rounded-xl px-4 py-3 bg-slate-50">
+                    <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">已跳过</p>
+                    <p class="text-2xl font-bold text-slate-600">{skippedCount()}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
               {/* Left panel: highlighted text */}
               <div class="space-y-3">
@@ -565,7 +625,7 @@ export default function DesensitizeExecutor(props: Props) {
                   脱敏预览
                 </h3>
                 <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#464555] whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
-                  {getSanitizedPreview()}
+                  <HighlightedText text={getSanitizedPreview()} />
                 </div>
               </div>
 
@@ -651,6 +711,22 @@ export default function DesensitizeExecutor(props: Props) {
                               <span class="text-xs text-[#9fa0a8]">
                                 ({checkedCount()}/{typeItems.length} 项)
                               </span>
+                              {/* Select all / deselect all */}
+                              <button
+                                type="button"
+                                class="text-[10px] text-[#4f46e5] hover:text-[#3525cd] font-medium ml-1"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const allChecked = typeItems.every((it) => it.checked);
+                                  setItems((prev) =>
+                                    prev.map((it) =>
+                                      it.sensitiveType === type ? { ...it, checked: !allChecked } : it,
+                                    ),
+                                  );
+                                }}
+                              >
+                                {typeItems.every((it) => it.checked) ? "全不选" : "全选"}
+                              </button>
                             </div>
                             <svg
                               aria-hidden="true"
@@ -686,13 +762,6 @@ export default function DesensitizeExecutor(props: Props) {
                                           setSelectedItemIndex(index());
                                       }}
                                     >
-                                      <input
-                                        type="checkbox"
-                                        checked={item.checked}
-                                        onChange={() => toggleItem(index())}
-                                        class="w-4 h-4 rounded border-[rgba(199,196,216,0.6)] text-[#4f46e5] focus:ring-[#c3c0ff] flex-shrink-0"
-                                        aria-label={`${item.checked ? "取消脱敏" : "确认脱敏"}: ${maskOriginal(item.original)}`}
-                                      />
                                       {/* original with line-through → masked replacement */}
                                       <div class="flex-1 min-w-0 flex items-center gap-2 text-sm">
                                         <span class="font-mono text-red-400 line-through truncate">
@@ -716,7 +785,7 @@ export default function DesensitizeExecutor(props: Props) {
                                         }`}
                                       >
                                         <span
-                                          class={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                                          class={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
                                             item.checked ? "translate-x-4" : "translate-x-0.5"
                                           }`}
                                         />

@@ -5,7 +5,7 @@ import { db } from "../../db";
 import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { createVersionSnapshot } from "../versions/versions.service";
 import { evaluateExecutionRule } from "./conditions.service";
-import type { DocumentRuntimeState, InputSource, NodeExecution, WorkflowEdgeDef, WorkflowNodeDef, NodeConfig } from "@intelliflow/shared";
+import type { DocumentRuntimeState, InputSource, InputTransformConfig, NodeExecution, WorkflowEdgeDef, WorkflowNodeDef, NodeConfig } from "@intelliflow/shared";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -256,32 +256,78 @@ export async function advanceNode(
       ) {
         // Build multi-source inputData from upstream node's outputData
         const upstreamOutput = completedNode.outputData as Record<string, unknown> | null;
-        const sources: Record<string, { displayName: string; text: string }> = {};
+        const sources: Record<string, { displayName: string; text: string; sourceType?: "text" | "file"; fileId?: string; fileName?: string }> = {};
 
         for (const src of inputSources) {
-          // Try to find the text content from upstream outputData
-          let text = "";
-          if (upstreamOutput) {
-            // Check if upstream has sources structure (another desensitize/restore)
-            const upstreamSources = upstreamOutput.sources as Record<string, { text?: string; desensitizedText?: string; restoredText?: string }> | undefined;
-            if (upstreamSources?.[src.outputId]) {
-              const s = upstreamSources[src.outputId];
-              text = s.restoredText ?? s.desensitizedText ?? s.text ?? "";
-            } else {
-              // Try field-level lookup: strip "{nodeId}-field-" prefix from outputId to get fields key
-              // e.g. "n1-field-f1" -> "f1", then look up upstreamOutput.fields["f1"]
-              const fieldKeyMatch = src.outputId.match(/^.+-field-(.+)$/);
-              const fieldKey = fieldKeyMatch?.[1];
-              const fields = upstreamOutput.fields as Record<string, string> | undefined;
-              if (fieldKey && fields?.[fieldKey]) {
-                text = fields[fieldKey];
-              } else {
-                // Fall back to combined text or model output content
-                text = (upstreamOutput.text as string) ?? (upstreamOutput.content as string) ?? "";
+          if (!upstreamOutput) continue;
+
+          // Check if upstream has sources structure (another desensitize/restore)
+          const upstreamSources = upstreamOutput.sources as Record<string, { text?: string; desensitizedText?: string; restoredText?: string }> | undefined;
+          if (upstreamSources?.[src.outputId]) {
+            const s = upstreamSources[src.outputId];
+            const text = s.restoredText ?? s.desensitizedText ?? s.text ?? "";
+            if (text) sources[src.outputId] = { displayName: src.displayName, text };
+            continue;
+          }
+
+          // Try field-level lookup: strip "{nodeId}-field-" prefix from outputId to get fields key
+          const fieldKeyMatch = src.outputId.match(/^.+-field-(.+)$/);
+          const fieldKey = fieldKeyMatch?.[1];
+          const fields = upstreamOutput.fields as Record<string, string> | undefined;
+
+          // Text field — single source
+          if (fieldKey && fields?.[fieldKey]) {
+            sources[src.outputId] = { displayName: src.displayName, text: fields[fieldKey], sourceType: "text" };
+            continue;
+          }
+
+          // File field — detect via upstream node config + split per file
+          if (fieldKey) {
+            const sourceNodeDef = wfData!.nodes.find((n: WorkflowNodeDef) => n.id === src.sourceNodeId);
+            if (sourceNodeDef?.config.type === "input_transform") {
+              const formFields = (sourceNodeDef.config as InputTransformConfig).formFields;
+              const field = formFields.find((f) => f.id === fieldKey);
+              const fileSlots = upstreamOutput.fileSlots as Record<string, { text?: string; files?: Array<{ fileId: string; name: string }> }> | undefined;
+              const allFiles = upstreamOutput.files as Array<{ fileId: string; name: string; parsedText: string }> | undefined;
+
+              if (field?.type === "file" && field.fileSlotId && fileSlots?.[field.fileSlotId]) {
+                const slot = fileSlots[field.fileSlotId];
+                const slotFiles = slot.files ?? [];
+
+                if (slotFiles.length > 1 && allFiles) {
+                  // Multi-file: split into per-file sources
+                  for (const sf of slotFiles) {
+                    const fileData = allFiles.find((f) => f.fileId === sf.fileId);
+                    const fileText = fileData?.parsedText ?? "";
+                    if (fileText) {
+                      sources[`${src.outputId}::file::${sf.fileId}`] = {
+                        displayName: sf.name,
+                        text: fileText,
+                        sourceType: "file",
+                        fileId: sf.fileId,
+                        fileName: sf.name,
+                      };
+                    }
+                  }
+                } else if (slot.text) {
+                  // Single file
+                  const singleFile = slotFiles[0];
+                  sources[src.outputId] = {
+                    displayName: src.displayName,
+                    text: slot.text,
+                    sourceType: "file",
+                    fileId: singleFile?.fileId,
+                    fileName: singleFile?.name,
+                  };
+                }
+                continue;
               }
             }
           }
-          sources[src.outputId] = { displayName: src.displayName, text };
+
+          // Fallback to combined text
+          const fallback = (upstreamOutput.text as string) ?? (upstreamOutput.content as string) ?? "";
+          if (fallback) sources[src.outputId] = { displayName: src.displayName, text: fallback };
         }
 
         nextInputData = { sources };
@@ -431,6 +477,7 @@ export async function rollbackToNode(
   }
 
   // Create new execution rows with incremented round
+  // Preserve inputData so re-executed nodes still have their upstream input
   const newValues = toRollback.map((row, index) => ({
     documentId,
     nodeId: row.nodeId,
@@ -440,6 +487,7 @@ export async function rollbackToNode(
     stepOrder: row.stepOrder,
     executionRound: newRound,
     isCurrent: true,
+    inputData: row.inputData,
     startedAt: index === 0 ? now : null,
   }));
 
@@ -565,7 +613,7 @@ async function buildRuntimeState(
 ): Promise<DocumentRuntimeState> {
   // Get workflow name and nodes
   const docRows = await db
-    .select({ workflowName: workflows.name, nodes: workflows.nodes })
+    .select({ workflowName: workflows.name, nodes: workflows.nodes, projectId: documents.projectId })
     .from(documents)
     .innerJoin(workflows, eq(documents.workflowId, workflows.id))
     .where(eq(documents.id, documentId))
@@ -573,6 +621,7 @@ async function buildRuntimeState(
 
   const workflowName = docRows[0]?.workflowName ?? "Unknown";
   const workflowNodes = (docRows[0]?.nodes as WorkflowNodeDef[]) ?? [];
+  const projectId = docRows[0]?.projectId ?? null;
 
   // Filter to only current executions
   const currentExecutions = executions.filter((e) => e.isCurrent);
@@ -588,6 +637,7 @@ async function buildRuntimeState(
 
   return {
     documentId,
+    projectId,
     workflowName,
     currentNodeIndex,
     nodes: currentExecutions.map(toNodeExecution),

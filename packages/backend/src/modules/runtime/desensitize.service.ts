@@ -1,18 +1,7 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "../../db";
 import { desensitizeMappings, models, nodeExecutions, providers } from "../../db/schema";
-import type { DesensitizeRuleDesc, NodeExecution } from "@intelliflow/shared";
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-export interface DetectedSensitiveItem {
-  original: string;
-  placeholder: string;
-  sensitiveType: string;
-  description: string;
-  startIndex: number;
-  endIndex: number;
-}
+import type { DesensitizeRuleDesc, DesensitizeReviewSummaryItem, DetectedSensitiveItem, NodeExecution } from "@intelliflow/shared";
 
 // ─── Detection ──────────────────────────────────────────────────────────────
 
@@ -77,6 +66,7 @@ async function detectViaModel(
       modelId: models.modelId,
       baseUrl: providers.baseUrl,
       apiKey: providers.apiKey,
+      providerType: providers.type,
     })
     .from(models)
     .innerJoin(providers, eq(models.providerId, providers.id))
@@ -87,7 +77,15 @@ async function detectViaModel(
     throw new Error("Model not found for desensitization detection");
   }
 
-  const { modelId, baseUrl, apiKey } = rows[0];
+  const { modelId, baseUrl, apiKey, providerType } = rows[0];
+  const isOllama = providerType === "ollama";
+
+  const hasV1 = baseUrl.endsWith("/v1") || baseUrl.includes("/v1/");
+  const url = isOllama && !hasV1
+    ? `${baseUrl}/v1/chat/completions`
+    : `${baseUrl}/chat/completions`;
+  console.log(`[desensitize] Starting model detection: model=${modelId}, url=${url}, textLength=${text.length}, categories=${categoryNames.join(",")}`);
+  const t0 = Date.now();
 
   const typesDesc = categoryNames.join(", ");
   const systemPrompt = `你是一个敏感信息检测工具。请分析以下文本，识别其中属于以下类型的敏感信息：${typesDesc}。
@@ -99,12 +97,14 @@ async function detectViaModel(
 
 只返回JSON数组，不要包含其他文本。如果没有发现敏感信息，返回空数组 []。`;
 
-  const response = await fetch(`${baseUrl}/chat/completions`, {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (!isOllama && apiKey) {
+    headers.Authorization = `Bearer ${apiKey}`;
+  }
+
+  const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers,
     body: JSON.stringify({
       model: modelId,
       messages: [
@@ -113,11 +113,14 @@ async function detectViaModel(
       ],
       temperature: 0.1,
     }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(600000),
   });
+
+  const fetchMs = Date.now() - t0;
 
   if (!response.ok) {
     const body = await response.text().catch(() => "");
+    console.error(`[desensitize] Model API failed in ${fetchMs}ms: HTTP ${response.status}`);
     throw new Error(`Model API error: HTTP ${response.status} - ${body.slice(0, 200)}`);
   }
 
@@ -125,6 +128,7 @@ async function detectViaModel(
     choices: Array<{ message: { content: string } }>;
   };
 
+  const totalMs = Date.now() - t0;
   const content = data.choices?.[0]?.message?.content ?? "[]";
 
   // Parse JSON from model response (may have markdown code fences)
@@ -132,8 +136,11 @@ async function detectViaModel(
 
   try {
     const parsed = JSON.parse(jsonStr) as Array<{ original: string; type: string; description: string }>;
-    return Array.isArray(parsed) ? parsed : [];
+    const items = Array.isArray(parsed) ? parsed : [];
+    console.log(`[desensitize] Model detection completed in ${totalMs}ms: found ${items.length} items`);
+    return items;
   } catch {
+    console.warn(`[desensitize] Model returned unparseable JSON in ${totalMs}ms: ${content.slice(0, 100)}`);
     return [];
   }
 }
@@ -192,6 +199,41 @@ function detectViaRegex(
 // ─── Confirm & Store ────────────────────────────────────────────────────────
 
 /**
+ * Validate confirm inputs and build detectedItems for outputData.
+ * Pure function — extracted for testability.
+ */
+export function validateAndBuildDetectedItems(
+  items: Array<{ original: string; placeholder: string; sensitiveType: string }>,
+  reviewSummary?: DesensitizeReviewSummaryItem[],
+): DesensitizeReviewSummaryItem[] {
+  const itemPlaceholders = items.map((it) => it.placeholder);
+  if (new Set(itemPlaceholders).size !== itemPlaceholders.length) {
+    throw new Error("Duplicate placeholders in confirmed items");
+  }
+
+  if (reviewSummary) {
+    const summaryPlaceholders = reviewSummary.map((s) => s.placeholder);
+    if (new Set(summaryPlaceholders).size !== summaryPlaceholders.length) {
+      throw new Error("Duplicate placeholders in reviewSummary");
+    }
+    const checkedSet = new Set(reviewSummary.filter((s) => s.checked).map((s) => s.placeholder));
+    const itemsSet = new Set(itemPlaceholders);
+    for (const p of itemsSet) {
+      if (!checkedSet.has(p)) throw new Error(`Confirmed item ${p} not marked as checked in reviewSummary`);
+    }
+    for (const p of checkedSet) {
+      if (!itemsSet.has(p)) throw new Error(`Summary checked item ${p} has no corresponding confirmed item`);
+    }
+  }
+
+  return reviewSummary ?? items.map((it) => ({
+    placeholder: it.placeholder,
+    sensitiveType: it.sensitiveType,
+    checked: true,
+  }));
+}
+
+/**
  * Store confirmed desensitization mappings and save sanitized text as output.
  */
 export async function confirmDesensitization(
@@ -200,8 +242,11 @@ export async function confirmDesensitization(
   items: Array<{ original: string; placeholder: string; sensitiveType: string }>,
   sanitizedText: string,
   userId: string,
+  reviewSummary?: DesensitizeReviewSummaryItem[],
 ): Promise<NodeExecution> {
   const now = new Date();
+
+  const detectedItems = validateAndBuildDetectedItems(items, reviewSummary);
 
   // Insert confirmed items into desensitizeMappings table
   if (items.length > 0) {
@@ -216,11 +261,11 @@ export async function confirmDesensitization(
     );
   }
 
-  // Store sanitizedText as nodeExecution.outputData
+  // Atomic write — fully replaces detect-phase temporary state
   const [updated] = await db
     .update(nodeExecutions)
     .set({
-      outputData: { text: sanitizedText, mappingCount: items.length },
+      outputData: { text: sanitizedText, mappingCount: items.length, detectedItems },
       updatedAt: now,
     })
     .where(eq(nodeExecutions.id, nodeExecutionId))

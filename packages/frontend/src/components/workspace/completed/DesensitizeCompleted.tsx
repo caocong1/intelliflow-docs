@@ -1,18 +1,13 @@
-import type { NodeConfig, NodeExecution } from "@intelliflow/shared";
+import type { DesensitizeReviewSummaryItem, NodeConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createMemo, createSignal } from "solid-js";
 import { formatDuration } from "../../../lib/format-utils";
-
-interface DetectedItem {
-  original: string;
-  placeholder: string;
-  sensitiveType: string;
-  checked: boolean;
-}
+import HighlightedText from "../shared/HighlightedText";
+import { getTypeLabel } from "../shared/desensitize-utils";
 
 interface DesensitizeOutputData {
   text?: string;
   mappingCount?: number;
-  detectedItems?: DetectedItem[];
+  detectedItems?: DesensitizeReviewSummaryItem[];
 }
 
 interface Props {
@@ -20,63 +15,7 @@ interface Props {
   config?: NodeConfig;
   documentId: string;
   onFullscreen?: (content: string, title: string) => void;
-}
-
-/** Highlight placeholder tokens like [NAME_1] with amber background */
-function HighlightedText(props: { text: string }) {
-  const parts = createMemo(() => {
-    const result: Array<{ type: "text" | "placeholder"; value: string }> = [];
-    const regex = /\[([A-Z_]+\d*)\]/g;
-    let last = 0;
-    let match: RegExpExecArray | null;
-    const t = props.text;
-    // biome-ignore lint/suspicious/noAssignInExpressions: intentional loop pattern
-    while ((match = regex.exec(t)) !== null) {
-      if (match.index > last) {
-        result.push({ type: "text", value: t.slice(last, match.index) });
-      }
-      result.push({ type: "placeholder", value: match[0] });
-      last = match.index + match[0].length;
-    }
-    if (last < t.length) {
-      result.push({ type: "text", value: t.slice(last) });
-    }
-    return result;
-  });
-
-  return (
-    <span>
-      <For each={parts()}>
-        {(part) =>
-          part.type === "placeholder" ? (
-            <span class="bg-amber-100 text-amber-800 px-0.5 rounded font-mono text-xs">
-              {part.value}
-            </span>
-          ) : (
-            <span>{part.value}</span>
-          )
-        }
-      </For>
-    </span>
-  );
-}
-
-const TYPE_LABEL_MAP: Record<string, string> = {
-  NAME: "姓名",
-  PHONE: "电话",
-  EMAIL: "邮件",
-  ID: "证件",
-  ADDRESS: "地址",
-  ORG: "机构",
-  DATE: "日期",
-  AMOUNT: "金额",
-  BANK: "银行卡",
-  IP: "IP地址",
-};
-
-function getTypeLabel(sensitiveType: string): string {
-  const base = sensitiveType.replace(/_\d+$/, "");
-  return TYPE_LABEL_MAP[base] ?? sensitiveType;
+  onReexecute?: () => void;
 }
 
 export default function DesensitizeCompleted(props: Props) {
@@ -343,6 +282,7 @@ export default function DesensitizeCompleted(props: Props) {
         <button
           type="button"
           class="px-4 py-2 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-xl hover:bg-indigo-50 transition-colors"
+          onClick={() => props.onReexecute?.()}
         >
           从此节点重新执行
         </button>

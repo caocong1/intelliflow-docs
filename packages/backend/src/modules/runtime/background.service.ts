@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "../../db";
 import {
   backgroundTasks,
@@ -284,7 +284,8 @@ export async function executeDocumentPipeline(
               .set({ progress, updatedAt: condNow })
               .where(eq(backgroundTasks.id, task.id));
             continue;
-          } else if (executionRule.action === "block") {
+          }
+          if (executionRule.action === "block") {
             // Mark as blocked
             await db
               .update(nodeExecutions)
@@ -352,12 +353,7 @@ export async function executeDocumentPipeline(
         }
 
         case "export": {
-          const exportConfig = nodeDef.config as ExportConfig;
-          const format = exportConfig.formats?.[0] ?? exportConfig.format ?? "markdown";
-          const dateStr = new Date().toISOString().slice(0, 10);
-          const ext = format === "word" ? "docx" : format;
-          const filename = `document_${dateStr}.${ext}`;
-          await generateExport(documentId, exec.id, format, filename, userId);
+          // Export is driven by frontend ExportExecutor — pipeline only sets it to in_progress
           break;
         }
 
@@ -367,7 +363,22 @@ export async function executeDocumentPipeline(
         }
       }
 
-      // Advance node (marks current as completed, activates next)
+      // Interactive nodes: pause pipeline and return control to user
+      if (exec.nodeType === "export") {
+        // Export is already in_progress — don't advance, just exit pipeline
+        const progress = Math.round(((i + 1) / totalNodes) * 100);
+        await db.update(backgroundTasks).set({ progress, updatedAt: new Date() }).where(eq(backgroundTasks.id, task.id));
+        break;
+      }
+      if (exec.nodeType === "model_call") {
+        // Model finished — stay in_progress with output for user review/edit
+        // User will click "确认并继续" to advance
+        const progress = Math.round(((i + 1) / totalNodes) * 100);
+        await db.update(backgroundTasks).set({ progress, updatedAt: new Date() }).where(eq(backgroundTasks.id, task.id));
+        break;
+      }
+
+      // Auto nodes (desensitize, restore, input_transform): advance and continue
       await advanceNode(documentId, exec.id, userId);
 
       // Update progress
@@ -378,29 +389,38 @@ export async function executeDocumentPipeline(
         .where(eq(backgroundTasks.id, task.id));
     }
 
-    // Pipeline completed
+    // Check if all nodes are done or pipeline paused at an interactive node
+    const freshExecs = await db
+      .select()
+      .from(nodeExecutions)
+      .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)));
+    const allDone = freshExecs.every((e) => e.status === "completed" || e.status === "skipped");
+
     const completedAt = new Date();
     await db
       .update(backgroundTasks)
       .set({
         status: "completed",
-        progress: 100,
+        progress: allDone ? 100 : Math.round((freshExecs.filter((e) => e.status === "completed" || e.status === "skipped").length / freshExecs.length) * 100),
         completedAt,
         updatedAt: completedAt,
       })
       .where(eq(backgroundTasks.id, task.id));
 
-    // Ensure document is marked completed
-    await db
-      .update(documents)
-      .set({ status: "completed", updatedAt: completedAt })
-      .where(eq(documents.id, documentId));
+    if (allDone) {
+      await db
+        .update(documents)
+        .set({ status: "completed", updatedAt: completedAt })
+        .where(eq(documents.id, documentId));
+    }
 
-    console.log(`[background] Pipeline completed for document ${documentId}`);
+    console.log(`[background] Pipeline ${allDone ? "completed" : "paused"} for document ${documentId}`);
 
-    // Send completion notifications
-    const durationMs = completedAt.getTime() - now.getTime();
-    await notifyCompletion(userId, documentId, durationMs);
+    // Only send completion notification when ALL nodes are done
+    if (allDone) {
+      const durationMs = completedAt.getTime() - now.getTime();
+      await notifyCompletion(userId, documentId, durationMs);
+    }
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     console.error(`[background] Pipeline failed for document ${documentId}:`, errorMessage);
@@ -492,7 +512,7 @@ async function executeDesensitizeBackground(
     await db
       .update(nodeExecutions)
       .set({
-        outputData: { text: "", mappingCount: 0 },
+        outputData: { text: "", mappingCount: 0, detectedItems: [] },
         updatedAt: new Date(),
       })
       .where(eq(nodeExecutions.id, nodeExecutionId));
@@ -519,6 +539,7 @@ async function executeDesensitizeBackground(
     })),
     sanitizedText,
     userId,
+    items.map((item) => ({ placeholder: item.placeholder, sensitiveType: item.sensitiveType, checked: true })),
   );
 }
 
@@ -526,76 +547,191 @@ async function executeDesensitizeBackground(
 
 /**
  * Detect and clean up orphaned background tasks on server startup.
- * Tasks with status='running' after a restart are orphans — mark them failed.
+ * Handles both `running` and `queued` tasks interrupted by server restart,
+ * as well as `in_progress` documents with no active background task.
  */
 export async function detectOrphanTasks(): Promise<number> {
-  const orphans = await db
+  let cleaned = 0;
+
+  // 1. Clean up running/queued background tasks (interrupted by restart)
+  const orphanTasks = await db
     .select({
       id: backgroundTasks.id,
       documentId: backgroundTasks.documentId,
       userId: backgroundTasks.userId,
     })
     .from(backgroundTasks)
-    .where(eq(backgroundTasks.status, "running"));
-
-  if (orphans.length === 0) return 0;
+    .where(inArray(backgroundTasks.status, ["running", "queued"]));
 
   const now = new Date();
   const errorMessage = "服务器重启，任务中断";
 
-  for (const orphan of orphans) {
-    // Mark background task as failed
-    await db
-      .update(backgroundTasks)
-      .set({
-        status: "failed",
-        errorMessage,
-        updatedAt: now,
-      })
-      .where(eq(backgroundTasks.id, orphan.id));
+  for (const orphan of orphanTasks) {
+    await cleanupFailedTask(orphan.id, orphan.documentId, orphan.userId, errorMessage, now);
+    console.warn(`[background] Orphaned task ${orphan.id} marked as failed (server restart)`);
+    cleaned++;
+  }
 
-    // Mark any in_progress node executions as failed
-    if (orphan.documentId) {
-      const inProgressNodes = await db
-        .select({ id: nodeExecutions.id })
-        .from(nodeExecutions)
+  // 2. Clean up in_progress documents that have NO active (running/queued) background task.
+  //    This catches the case where init was called but start-background never completed,
+  //    or the task record was never created before a crash.
+  const orphanDocIds = new Set(orphanTasks.map((t) => t.documentId).filter(Boolean));
+  const staleDocuments = await db
+    .select({ id: documents.id })
+    .from(documents)
+    .where(eq(documents.status, "in_progress"));
+
+  for (const doc of staleDocuments) {
+    // Skip if we already handled this document above
+    if (orphanDocIds.has(doc.id)) continue;
+
+    // Check if there's an active background task for this document
+    const [activeTask] = await db
+      .select({ id: backgroundTasks.id })
+      .from(backgroundTasks)
+      .where(
+        and(
+          eq(backgroundTasks.documentId, doc.id),
+          inArray(backgroundTasks.status, ["running", "queued"]),
+        ),
+      )
+      .limit(1);
+
+    if (!activeTask) {
+      // No active task → this document is stuck, mark as failed
+      await db
+        .update(nodeExecutions)
+        .set({ status: "failed", errorMessage, updatedAt: now })
         .where(
           and(
-            eq(nodeExecutions.documentId, orphan.documentId),
+            eq(nodeExecutions.documentId, doc.id),
             eq(nodeExecutions.status, "in_progress"),
             eq(nodeExecutions.isCurrent, true),
           ),
         );
 
-      for (const node of inProgressNodes) {
-        await db
-          .update(nodeExecutions)
-          .set({
-            status: "failed",
-            errorMessage,
-            updatedAt: now,
-          })
-          .where(eq(nodeExecutions.id, node.id));
-      }
-
-      // Mark document as failed
       await db
         .update(documents)
         .set({ status: "failed", updatedAt: now })
-        .where(eq(documents.id, orphan.documentId));
-    }
+        .where(eq(documents.id, doc.id));
 
-    // Send failure notification for orphaned task
-    if (orphan.documentId) {
-      try {
-        await notifyFailure(orphan.userId, orphan.documentId, errorMessage);
-      } catch (notifyErr) {
-        console.error(`[background] Failed to send orphan notification for task ${orphan.id}:`, notifyErr);
-      }
+      console.warn(`[background] Orphaned document ${doc.id} (no active task) marked as failed`);
+      cleaned++;
     }
-
-    console.warn(`[background] Orphaned task ${orphan.id} marked as failed (server restart)`);
   }
 
-  return orphans.length;
+  return cleaned;
+}
+
+// ─── Stuck Task Monitor ─────────────────────────────────────────────────────
+
+/** How long a running task can stay alive before being considered stuck (ms). */
+const STUCK_TASK_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
+/** How often to scan for stuck tasks (ms). */
+const MONITOR_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+let monitorTimer: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * Periodically scan for tasks stuck in `running` state beyond the threshold.
+ * This catches cases where a model API hangs past its AbortSignal timeout,
+ * or any other scenario the try-catch in executeDocumentPipeline doesn't cover.
+ */
+export async function detectStuckTasks(): Promise<number> {
+  const cutoff = new Date(Date.now() - STUCK_TASK_THRESHOLD_MS);
+
+  const stuckTasks = await db
+    .select({
+      id: backgroundTasks.id,
+      documentId: backgroundTasks.documentId,
+      userId: backgroundTasks.userId,
+    })
+    .from(backgroundTasks)
+    .where(
+      and(
+        eq(backgroundTasks.status, "running"),
+        lt(backgroundTasks.updatedAt, cutoff),
+      ),
+    );
+
+  if (stuckTasks.length === 0) return 0;
+
+  const errorMessage = "任务执行超时，已自动终止";
+  const now = new Date();
+
+  for (const task of stuckTasks) {
+    await cleanupFailedTask(task.id, task.documentId, task.userId, errorMessage, now);
+    console.warn(`[monitor] Stuck task ${task.id} marked as failed (no progress for ${STUCK_TASK_THRESHOLD_MS / 60000} min)`);
+  }
+
+  return stuckTasks.length;
+}
+
+/**
+ * Start the periodic stuck-task monitor. Call once at server startup.
+ */
+export function startTaskMonitor(): void {
+  if (monitorTimer) return;
+  monitorTimer = setInterval(() => {
+    detectStuckTasks().catch((err) => {
+      console.error("[monitor] Failed to detect stuck tasks:", err);
+    });
+  }, MONITOR_INTERVAL_MS);
+  console.log(`[monitor] Stuck-task monitor started (interval: ${MONITOR_INTERVAL_MS / 1000}s, threshold: ${STUCK_TASK_THRESHOLD_MS / 60000}min)`);
+}
+
+/**
+ * Stop the periodic stuck-task monitor (for graceful shutdown / tests).
+ */
+export function stopTaskMonitor(): void {
+  if (monitorTimer) {
+    clearInterval(monitorTimer);
+    monitorTimer = null;
+  }
+}
+
+// ─── Shared Cleanup Helper ──────────────────────────────────────────────────
+
+/**
+ * Mark a background task (and its associated node executions + document) as failed.
+ */
+async function cleanupFailedTask(
+  taskId: string,
+  documentId: string | null,
+  userId: string,
+  errorMessage: string,
+  now: Date,
+): Promise<void> {
+  // Mark background task as failed
+  await db
+    .update(backgroundTasks)
+    .set({ status: "failed", errorMessage, updatedAt: now })
+    .where(eq(backgroundTasks.id, taskId));
+
+  if (documentId) {
+    // Mark any in_progress node executions as failed
+    await db
+      .update(nodeExecutions)
+      .set({ status: "failed", errorMessage, updatedAt: now })
+      .where(
+        and(
+          eq(nodeExecutions.documentId, documentId),
+          eq(nodeExecutions.status, "in_progress"),
+          eq(nodeExecutions.isCurrent, true),
+        ),
+      );
+
+    // Mark document as failed
+    await db
+      .update(documents)
+      .set({ status: "failed", updatedAt: now })
+      .where(eq(documents.id, documentId));
+
+    // Send failure notification (best-effort)
+    try {
+      await notifyFailure(userId, documentId, errorMessage);
+    } catch (notifyErr) {
+      console.error(`[background] Failed to send failure notification for task ${taskId}:`, notifyErr);
+    }
+  }
 }

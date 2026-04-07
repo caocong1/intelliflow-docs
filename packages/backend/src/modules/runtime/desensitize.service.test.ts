@@ -8,7 +8,7 @@ vi.mock("../../db/schema", () => ({
   providers: {},
 }));
 
-import { validateAndBuildDetectedItems } from "./desensitize.service";
+import { buildConfirmOutputData, validateAndBuildDetectedItems } from "./desensitize.service";
 
 describe("confirmDesensitization validation", () => {
   const baseItems = [
@@ -90,5 +90,90 @@ describe("background autoAdvance contract", () => {
   it("empty text produces detectedItems=[]", () => {
     const result = validateAndBuildDetectedItems([]);
     expect(result).toEqual([]);
+  });
+});
+
+describe("buildConfirmOutputData", () => {
+  const baseItems = [
+    { original: "张三", placeholder: "[NAME_1]", sensitiveType: "person_name" },
+    { original: "13812345678", placeholder: "[PHONE_1]", sensitiveType: "phone_number" },
+  ];
+
+  it("keeps the legacy flat outputData shape when sources are omitted", () => {
+    const { confirmedItems, outputData } = buildConfirmOutputData(
+      baseItems,
+      "[NAME_1] 的电话是 [PHONE_1]",
+    );
+
+    expect(confirmedItems).toEqual(baseItems);
+    expect(outputData).toEqual({
+      text: "[NAME_1] 的电话是 [PHONE_1]",
+      mappingCount: 2,
+      detectedItems: [
+        { placeholder: "[NAME_1]", sensitiveType: "person_name", checked: true },
+        { placeholder: "[PHONE_1]", sensitiveType: "phone_number", checked: true },
+      ],
+    });
+  });
+
+  it("builds per-source outputData and aggregates confirmed items when sources are provided", () => {
+    const { confirmedItems, outputData } = buildConfirmOutputData(
+      [{ original: "legacy", placeholder: "[LEGACY_1]", sensitiveType: "legacy" }],
+      "legacy text",
+      undefined,
+      {
+        "source-a": {
+          displayName: "正文",
+          items: [baseItems[0]],
+          sanitizedText: "[NAME_1] 已脱敏",
+          reviewSummary: [
+            { placeholder: "[NAME_1]", sensitiveType: "person_name", checked: true },
+          ],
+          files: [{ fileId: "file-1", name: "a.txt", desensitizedText: "[NAME_1] 已脱敏" }],
+        },
+        "source-b": {
+          displayName: "电话",
+          items: [baseItems[1]],
+          sanitizedText: "电话 [PHONE_1]",
+        },
+      },
+    );
+
+    expect(confirmedItems).toEqual(baseItems);
+    expect(outputData).toEqual({
+      mappingCount: 2,
+      detectedItems: [
+        { placeholder: "[NAME_1]", sensitiveType: "person_name", checked: true },
+        { placeholder: "[PHONE_1]", sensitiveType: "phone_number", checked: true },
+      ],
+      sources: {
+        "source-a": {
+          displayName: "正文",
+          desensitizedText: "[NAME_1] 已脱敏",
+          files: [{ fileId: "file-1", name: "a.txt", desensitizedText: "[NAME_1] 已脱敏" }],
+        },
+        "source-b": {
+          displayName: "电话",
+          desensitizedText: "电话 [PHONE_1]",
+        },
+      },
+    });
+  });
+
+  it("validates duplicate placeholders across aggregated source items", () => {
+    expect(() =>
+      buildConfirmOutputData([], "", undefined, {
+        "source-a": {
+          displayName: "正文",
+          items: [{ original: "张三", placeholder: "[NAME_1]", sensitiveType: "person_name" }],
+          sanitizedText: "[NAME_1]",
+        },
+        "source-b": {
+          displayName: "附件",
+          items: [{ original: "李四", placeholder: "[NAME_1]", sensitiveType: "person_name" }],
+          sanitizedText: "[NAME_1]",
+        },
+      }),
+    ).toThrow("Duplicate placeholders in confirmed items");
   });
 });

@@ -544,11 +544,48 @@ export interface DesensitizeReviewSummaryItem {
   checked: boolean;
 }
 
+/** 单个文件源的脱敏输出 */
+export interface FileSourceOutput {
+  fileId: string;
+  name: string;
+  desensitizedText: string;
+}
+
+/** 单个输入源的脱敏输出 */
+export interface SourceOutput {
+  displayName: string;
+  desensitizedText: string;
+  files?: FileSourceOutput[];
+}
+
 /** 脱敏节点的最终输出数据结构 */
 export interface DesensitizeOutputData {
   text: string;
   mappingCount: number;
   detectedItems: DesensitizeReviewSummaryItem[];
+  sources?: Record<string, SourceOutput>;
+}
+
+/** 单条还原记录 */
+export interface RestorationItem {
+  placeholder: string;
+  originalValue: string;
+  sensitiveType: string;
+  restored: boolean;
+}
+
+/** 单个输入源的还原输出 */
+export interface RestoreSourceOutput {
+  displayName: string;
+  restoredText: string;
+}
+
+/** 还原节点的最终输出数据结构 */
+export interface RestoreOutputData {
+  originalText: string;
+  restoredText: string;
+  restorations: RestorationItem[];
+  sources: Record<string, RestoreSourceOutput>;
 }
 
 /** 检测阶段临时状态（confirm 后被完整覆盖） */

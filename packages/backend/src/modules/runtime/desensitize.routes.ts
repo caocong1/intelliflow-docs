@@ -7,6 +7,73 @@ import { nodeExecutions, workflows, documents } from "../../db/schema";
 import { eq } from "drizzle-orm";
 import type { DesensitizeConfig, WorkflowNodeDef } from "@intelliflow/shared";
 
+type ConfirmedDesensitizeItemBody = {
+  original: string;
+  placeholder: string;
+  sensitiveType: string;
+};
+
+type DesensitizeReviewSummaryBody = {
+  placeholder: string;
+  sensitiveType: string;
+  checked: boolean;
+};
+
+type SourceConfirmBody = {
+  displayName?: string;
+  items: ConfirmedDesensitizeItemBody[];
+  sanitizedText: string;
+  reviewSummary?: DesensitizeReviewSummaryBody[];
+  files?: Array<{
+    fileId: string;
+    name: string;
+    desensitizedText: string;
+  }>;
+};
+
+type NormalizedSourceConfirmBody = Omit<SourceConfirmBody, "displayName"> & {
+  displayName: string;
+};
+
+const confirmedDesensitizeItemSchema = t.Object({
+  original: t.String(),
+  placeholder: t.String(),
+  sensitiveType: t.String(),
+});
+
+const desensitizeReviewSummarySchema = t.Object({
+  placeholder: t.String(),
+  sensitiveType: t.String(),
+  checked: t.Boolean(),
+});
+
+const sourceConfirmSchema = t.Object({
+  displayName: t.Optional(t.String()),
+  items: t.Array(confirmedDesensitizeItemSchema),
+  sanitizedText: t.String(),
+  reviewSummary: t.Optional(t.Array(desensitizeReviewSummarySchema)),
+  files: t.Optional(
+    t.Array(t.Object({
+      fileId: t.String(),
+      name: t.String(),
+      desensitizedText: t.String(),
+    })),
+  ),
+});
+
+function normalizeSourceConfirmBodies(
+  sources?: Record<string, SourceConfirmBody>,
+): Record<string, NormalizedSourceConfirmBody> | undefined {
+  if (!sources) return undefined;
+
+  return Object.fromEntries(
+    Object.entries(sources).map(([outputId, source]) => [
+      outputId,
+      { ...source, displayName: source.displayName ?? outputId },
+    ]),
+  );
+}
+
 /**
  * Get the desensitize config for a node execution by looking up the workflow.
  */
@@ -156,13 +223,15 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
       }
 
       try {
+        const sources = normalizeSourceConfirmBodies(body.sources);
         const nodeExecution = await confirmDesensitization(
           params.documentId,
           params.nodeExecutionId,
-          body.items as Array<{ original: string; placeholder: string; sensitiveType: string }>,
+          body.items as ConfirmedDesensitizeItemBody[],
           body.sanitizedText,
           user!.id,
           body.reviewSummary,
+          sources,
         );
 
         return nodeExecution;
@@ -175,19 +244,10 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
     {
       params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
       body: t.Object({
-        items: t.Array(
-          t.Object({
-            original: t.String(),
-            placeholder: t.String(),
-            sensitiveType: t.String(),
-          }),
-        ),
+        items: t.Array(confirmedDesensitizeItemSchema),
         sanitizedText: t.String(),
-        reviewSummary: t.Optional(t.Array(t.Object({
-          placeholder: t.String(),
-          sensitiveType: t.String(),
-          checked: t.Boolean(),
-        }))),
+        reviewSummary: t.Optional(t.Array(desensitizeReviewSummarySchema)),
+        sources: t.Optional(t.Record(t.String(), sourceConfirmSchema)),
       }),
     },
   )

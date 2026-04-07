@@ -9,6 +9,30 @@ import type { DocumentRuntimeState, InputSource, InputTransformConfig, NodeExecu
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
+type RuntimeInputSource = {
+  displayName: string;
+  text: string;
+  sourceType?: "text" | "file";
+  fileId?: string;
+  fileName?: string;
+};
+
+type UpstreamFileSource = {
+  fileId: string;
+  name: string;
+  text?: string;
+  desensitizedText?: string;
+  restoredText?: string;
+};
+
+type UpstreamSourceOutput = {
+  displayName?: string;
+  text?: string;
+  desensitizedText?: string;
+  restoredText?: string;
+  files?: UpstreamFileSource[];
+};
+
 function toNodeExecution(row: typeof nodeExecutions.$inferSelect): NodeExecution {
   return {
     id: row.id,
@@ -256,17 +280,61 @@ export async function advanceNode(
       ) {
         // Build multi-source inputData from upstream node's outputData
         const upstreamOutput = completedNode.outputData as Record<string, unknown> | null;
-        const sources: Record<string, { displayName: string; text: string; sourceType?: "text" | "file"; fileId?: string; fileName?: string }> = {};
+        const sources: Record<string, RuntimeInputSource> = {};
 
         for (const src of inputSources) {
           if (!upstreamOutput) continue;
 
           // Check if upstream has sources structure (another desensitize/restore)
-          const upstreamSources = upstreamOutput.sources as Record<string, { text?: string; desensitizedText?: string; restoredText?: string }> | undefined;
+          const upstreamSources = upstreamOutput.sources as
+            | Record<string, UpstreamSourceOutput>
+            | undefined;
           if (upstreamSources?.[src.outputId]) {
             const s = upstreamSources[src.outputId];
-            const text = s.restoredText ?? s.desensitizedText ?? s.text ?? "";
-            if (text) sources[src.outputId] = { displayName: src.displayName, text };
+            const displayName = s.displayName?.trim() || src.displayName;
+            const files = s.files ?? [];
+
+            if (files.length > 1) {
+              let addedFileSource = false;
+              for (const file of files) {
+                const fileText = file.restoredText ?? file.desensitizedText ?? file.text ?? "";
+                if (fileText) {
+                  const fileName = file.name?.trim() || file.fileId;
+                  sources[`${src.outputId}::file::${file.fileId}`] = {
+                    displayName: fileName,
+                    text: fileText,
+                    sourceType: "file",
+                    fileId: file.fileId,
+                    fileName,
+                  };
+                  addedFileSource = true;
+                }
+              }
+              if (addedFileSource) continue;
+            }
+
+            const singleFile = files.length === 1 ? files[0] : undefined;
+            const text = singleFile
+              ? (singleFile.restoredText ??
+                singleFile.desensitizedText ??
+                singleFile.text ??
+                s.restoredText ??
+                s.desensitizedText ??
+                s.text ??
+                "")
+              : (s.restoredText ?? s.desensitizedText ?? s.text ?? "");
+            if (text) {
+              const fileName = singleFile
+                ? singleFile.name?.trim() || singleFile.fileId
+                : undefined;
+              sources[src.outputId] = {
+                displayName: fileName ?? displayName,
+                text,
+                ...(singleFile
+                  ? { sourceType: "file" as const, fileId: singleFile.fileId, fileName }
+                  : {}),
+              };
+            }
             continue;
           }
 

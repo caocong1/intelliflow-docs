@@ -1,7 +1,40 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "../../db";
 import { desensitizeMappings, models, nodeExecutions, providers } from "../../db/schema";
-import type { DesensitizeRuleDesc, DesensitizeReviewSummaryItem, DetectedSensitiveItem, NodeExecution } from "@intelliflow/shared";
+import type {
+  DesensitizeRuleDesc,
+  DesensitizeReviewSummaryItem,
+  DetectedSensitiveItem,
+  FileSourceOutput,
+  NodeExecution,
+  SourceOutput,
+} from "@intelliflow/shared";
+
+type ConfirmedDesensitizeItem = {
+  original: string;
+  placeholder: string;
+  sensitiveType: string;
+};
+
+export type SourceConfirmInput = {
+  displayName: string;
+  items: ConfirmedDesensitizeItem[];
+  sanitizedText: string;
+  reviewSummary?: DesensitizeReviewSummaryItem[];
+  files?: FileSourceOutput[];
+};
+
+type ConfirmOutputData =
+  | {
+    text: string;
+    mappingCount: number;
+    detectedItems: DesensitizeReviewSummaryItem[];
+  }
+  | {
+    mappingCount: number;
+    detectedItems: DesensitizeReviewSummaryItem[];
+    sources: Record<string, SourceOutput>;
+  };
 
 // ─── Detection ──────────────────────────────────────────────────────────────
 
@@ -203,7 +236,7 @@ function detectViaRegex(
  * Pure function — extracted for testability.
  */
 export function validateAndBuildDetectedItems(
-  items: Array<{ original: string; placeholder: string; sensitiveType: string }>,
+  items: ConfirmedDesensitizeItem[],
   reviewSummary?: DesensitizeReviewSummaryItem[],
 ): DesensitizeReviewSummaryItem[] {
   const itemPlaceholders = items.map((it) => it.placeholder);
@@ -233,25 +266,91 @@ export function validateAndBuildDetectedItems(
   }));
 }
 
+function buildDefaultReviewSummary(
+  items: ConfirmedDesensitizeItem[],
+): DesensitizeReviewSummaryItem[] {
+  return items.map((it) => ({
+    placeholder: it.placeholder,
+    sensitiveType: it.sensitiveType,
+    checked: true,
+  }));
+}
+
+/**
+ * Build the final confirm payload without performing database writes.
+ */
+export function buildConfirmOutputData(
+  items: ConfirmedDesensitizeItem[],
+  sanitizedText: string,
+  reviewSummary?: DesensitizeReviewSummaryItem[],
+  sources?: Record<string, SourceConfirmInput>,
+): { confirmedItems: ConfirmedDesensitizeItem[]; outputData: ConfirmOutputData } {
+  if (!sources) {
+    const detectedItems = validateAndBuildDetectedItems(items, reviewSummary);
+    return {
+      confirmedItems: items,
+      outputData: { text: sanitizedText, mappingCount: items.length, detectedItems },
+    };
+  }
+
+  const sourceEntries = Object.entries(sources);
+  const confirmedItems = sourceEntries.flatMap(([, source]) => source.items);
+  const aggregatedReviewSummary = sourceEntries.flatMap(([, source]) =>
+    source.reviewSummary ?? buildDefaultReviewSummary(source.items),
+  );
+  const detectedItems = validateAndBuildDetectedItems(confirmedItems, aggregatedReviewSummary);
+  const sourceOutputs: Record<string, SourceOutput> = {};
+
+  for (const [outputId, source] of sourceEntries) {
+    const sourceOutput: SourceOutput = {
+      displayName: source.displayName,
+      desensitizedText: source.sanitizedText,
+    };
+    if (source.files) {
+      sourceOutput.files = source.files.map((file) => ({
+        fileId: file.fileId,
+        name: file.name,
+        desensitizedText: file.desensitizedText,
+      }));
+    }
+    sourceOutputs[outputId] = sourceOutput;
+  }
+
+  return {
+    confirmedItems,
+    outputData: {
+      mappingCount: confirmedItems.length,
+      detectedItems,
+      sources: sourceOutputs,
+    },
+  };
+}
+
 /**
  * Store confirmed desensitization mappings and save sanitized text as output.
  */
 export async function confirmDesensitization(
   documentId: string,
   nodeExecutionId: string,
-  items: Array<{ original: string; placeholder: string; sensitiveType: string }>,
+  items: ConfirmedDesensitizeItem[],
   sanitizedText: string,
   userId: string,
   reviewSummary?: DesensitizeReviewSummaryItem[],
+  sources?: Record<string, SourceConfirmInput>,
 ): Promise<NodeExecution> {
   const now = new Date();
 
-  const detectedItems = validateAndBuildDetectedItems(items, reviewSummary);
+  const { confirmedItems, outputData } = buildConfirmOutputData(
+    items,
+    sanitizedText,
+    reviewSummary,
+    sources,
+  );
 
   // Insert confirmed items into desensitizeMappings table
-  if (items.length > 0) {
+  if (confirmedItems.length > 0) {
     await db.insert(desensitizeMappings).values(
-      items.map((item) => ({
+      confirmedItems.map((item) => ({
         documentId,
         nodeExecutionId,
         placeholder: item.placeholder,
@@ -265,7 +364,7 @@ export async function confirmDesensitization(
   const [updated] = await db
     .update(nodeExecutions)
     .set({
-      outputData: { text: sanitizedText, mappingCount: items.length, detectedItems },
+      outputData,
       updatedAt: now,
     })
     .where(eq(nodeExecutions.id, nodeExecutionId))

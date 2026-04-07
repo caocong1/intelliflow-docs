@@ -1,3 +1,12 @@
+import type {
+  DesensitizeConfig,
+  DetectedSensitiveItem,
+  ExportConfig,
+  ModelCallConfig,
+  NodeConfig,
+  RestoreConfig,
+  WorkflowNodeDef,
+} from "@intelliflow/shared";
 import { and, asc, eq, inArray, lt } from "drizzle-orm";
 import { db } from "../../db";
 import {
@@ -8,22 +17,15 @@ import {
   users,
   workflows,
 } from "../../db/schema";
-import type {
-  DesensitizeConfig,
-  ExportConfig,
-  ModelCallConfig,
-  NodeConfig,
-  RestoreConfig,
-  WorkflowNodeDef,
-} from "@intelliflow/shared";
-import { initDocumentExecution, advanceNode } from "./runtime.service";
-import { detectSensitiveInfo, confirmDesensitization } from "./desensitize.service";
-import { executeModelCallBackground } from "./model-call.service";
-import { executeRestore } from "./restore.service";
-import { generateExport } from "./export.service";
 import { createNotification } from "../notifications/notifications.service";
 import { sendTextCardMessage } from "../wecom/wecom.service";
 import { evaluateExecutionRule } from "./conditions.service";
+import { confirmDesensitization, detectSensitiveInfo } from "./desensitize.service";
+import type { SourceConfirmInput } from "./desensitize.service";
+import { generateExport } from "./export.service";
+import { executeModelCallBackground } from "./model-call.service";
+import { executeRestore } from "./restore.service";
+import { advanceNode, initDocumentExecution } from "./runtime.service";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -473,6 +475,95 @@ export async function executeDocumentPipeline(
 
 // ─── Background Desensitize ─────────────────────────────────────────────────
 
+type DesensitizeInputSource = {
+  displayName?: string;
+  text?: string;
+  parsedText?: string;
+  restoredText?: string;
+  desensitizedText?: string;
+  content?: string;
+  sourceType?: "text" | "file";
+  fileId?: string;
+  fileName?: string;
+};
+
+type ConfirmedSourceItem = {
+  original: string;
+  placeholder: string;
+  sensitiveType: string;
+};
+
+function getDesensitizeSourceText(source: DesensitizeInputSource): string {
+  if (source.sourceType === "file") {
+    return (
+      source.restoredText ??
+      source.text ??
+      source.parsedText ??
+      source.desensitizedText ??
+      source.content ??
+      ""
+    );
+  }
+  return source.text ?? source.restoredText ?? source.desensitizedText ?? source.content ?? "";
+}
+
+function buildNextDesensitizePlaceholder(
+  sensitiveType: string,
+  placeholderCounters: Map<string, number>,
+): string {
+  const count = (placeholderCounters.get(sensitiveType) ?? 0) + 1;
+  placeholderCounters.set(sensitiveType, count);
+  return `[${sensitiveType.toUpperCase()}_${count}]`;
+}
+
+function buildConfirmedSourceItems(
+  items: DetectedSensitiveItem[],
+  placeholderCounters: Map<string, number>,
+): ConfirmedSourceItem[] {
+  return items.map((item) => ({
+    original: item.original,
+    placeholder: buildNextDesensitizePlaceholder(item.sensitiveType, placeholderCounters),
+    sensitiveType: item.sensitiveType,
+  }));
+}
+
+function buildReviewSummary(
+  items: ConfirmedSourceItem[],
+): NonNullable<SourceConfirmInput["reviewSummary"]> {
+  return items.map((item) => ({
+    placeholder: item.placeholder,
+    sensitiveType: item.sensitiveType,
+    checked: true,
+  }));
+}
+
+function applyDesensitizeReplacements(
+  text: string,
+  items: ConfirmedSourceItem[],
+): string {
+  let sanitizedText = text;
+  for (const item of items) {
+    sanitizedText = sanitizedText.replaceAll(item.original, item.placeholder);
+  }
+  return sanitizedText;
+}
+
+function buildSourceConfirmFiles(
+  source: DesensitizeInputSource,
+  displayName: string,
+  sanitizedText: string,
+): SourceConfirmInput["files"] {
+  if (source.sourceType !== "file" || !source.fileId) return undefined;
+
+  return [
+    {
+      fileId: source.fileId,
+      name: source.fileName?.trim() || displayName || source.fileId,
+      desensitizedText: sanitizedText,
+    },
+  ];
+}
+
 /**
  * Run desensitize detection + confirmation automatically for background mode.
  * Uses the node's inputData text, detects sensitive info, then confirms all detected items.
@@ -494,28 +585,55 @@ async function executeDesensitizeBackground(
 
   const inputData = exec?.inputData as Record<string, unknown> | null;
 
-  // Try to extract text from various input structures
-  let text = "";
-  if (inputData?.text && typeof inputData.text === "string") {
-    text = inputData.text;
-  } else if (inputData?.sources && typeof inputData.sources === "object") {
-    // Multi-source input — concatenate all source texts
-    const sources = inputData.sources as Record<string, { text?: string }>;
-    text = Object.values(sources)
-      .map((s) => s.text ?? "")
-      .filter(Boolean)
-      .join("\n\n");
+  if (
+    inputData?.sources &&
+    typeof inputData.sources === "object" &&
+    !Array.isArray(inputData.sources)
+  ) {
+    const placeholderCounters = new Map<string, number>();
+    const sources: Record<string, SourceConfirmInput> = {};
+
+    for (const [outputId, rawSource] of Object.entries(inputData.sources)) {
+      if (!rawSource || typeof rawSource !== "object" || Array.isArray(rawSource)) {
+        continue;
+      }
+
+      const source = rawSource as DesensitizeInputSource;
+      const displayName = source.displayName?.trim() || outputId;
+      const sourceText = getDesensitizeSourceText(source);
+      const detectedItems = sourceText
+        ? await detectSensitiveInfo(sourceText, config.localModelId, config.categories)
+        : [];
+      const items = buildConfirmedSourceItems(detectedItems, placeholderCounters);
+      const sanitizedText = applyDesensitizeReplacements(sourceText, items);
+      const sourceConfirmInput: SourceConfirmInput = {
+        displayName,
+        items,
+        sanitizedText,
+        reviewSummary: buildReviewSummary(items),
+      };
+      const files = buildSourceConfirmFiles(source, displayName, sanitizedText);
+      if (files) sourceConfirmInput.files = files;
+
+      sources[outputId] = sourceConfirmInput;
+    }
+
+    const sourceValues = Object.values(sources);
+    await confirmDesensitization(
+      documentId,
+      nodeExecutionId,
+      sourceValues.flatMap((source) => source.items),
+      sourceValues.map((source) => source.sanitizedText).join("\n\n"),
+      userId,
+      sourceValues.flatMap((source) => source.reviewSummary ?? []),
+      sources,
+    );
+    return;
   }
 
+  const text = typeof inputData?.text === "string" ? inputData.text : "";
   if (!text) {
-    // No text to desensitize — store empty output and return
-    await db
-      .update(nodeExecutions)
-      .set({
-        outputData: { text: "", mappingCount: 0, detectedItems: [] },
-        updatedAt: new Date(),
-      })
-      .where(eq(nodeExecutions.id, nodeExecutionId));
+    await confirmDesensitization(documentId, nodeExecutionId, [], "", userId);
     return;
   }
 

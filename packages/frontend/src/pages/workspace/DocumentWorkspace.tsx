@@ -10,7 +10,6 @@ import type {
   RestoreConfig,
 } from "@intelliflow/shared";
 import { A, useParams } from "@solidjs/router";
-import { showToast } from "../../components/ui/Toast";
 import {
   For,
   Match,
@@ -32,7 +31,7 @@ import {
   startBackgroundExecution,
 } from "../../api/client";
 import FavoriteButton from "../../components/favorites/FavoriteButton";
-import { checkFavorites, recordAccess } from "../../lib/api/user-activity";
+import { showToast } from "../../components/ui/Toast";
 import ActionBar from "../../components/workspace/ActionBar";
 import AutoSaveIndicator from "../../components/workspace/AutoSaveIndicator";
 import type { SaveStatus } from "../../components/workspace/AutoSaveIndicator";
@@ -40,14 +39,15 @@ import CompletedNodeCard from "../../components/workspace/CompletedNodeCard";
 import ContentPreviewModal from "../../components/workspace/ContentPreviewModal";
 import InlineEditor from "../../components/workspace/InlineEditor";
 import NetworkBanner from "../../components/workspace/NetworkBanner";
-import StepperBar from "../../components/workspace/StepperBar";
+import StepperBar, { nodeTypeLabels } from "../../components/workspace/StepperBar";
 import CompletedViewRouter from "../../components/workspace/completed/CompletedViewRouter";
+import BlockedNodeCard from "../../components/workspace/nodes/BlockedNodeCard";
 import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExecutor";
 import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
 import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
 import ModelCallExecutor from "../../components/workspace/nodes/ModelCallExecutor";
 import RestoreExecutor from "../../components/workspace/nodes/RestoreExecutor";
-import BlockedNodeCard from "../../components/workspace/nodes/BlockedNodeCard";
+import { checkFavorites, recordAccess } from "../../lib/api/user-activity";
 import { formatDuration, formatFileSize } from "../../lib/format-utils";
 import { renderMarkdown } from "../../lib/render-markdown";
 
@@ -78,13 +78,22 @@ export default function DocumentWorkspace() {
     title: string;
   } | null>(null);
   const [copiedFullText, setCopiedFullText] = createSignal(false);
+  const [manualConfirmAction, setManualConfirmAction] = createSignal<
+    null | (() => Promise<boolean>)
+  >(null);
+
+  function handleManualConfirmRegistration(action: (() => Promise<boolean>) | null) {
+    setManualConfirmAction(() => action);
+  }
 
   // Background execution polling state
   const [isGenerating, setIsGenerating] = createSignal(false);
   const [countdown, setCountdown] = createSignal(WORKSPACE_POLL_INTERVAL);
 
   // AI inline editing: available models
-  const [availableModels, setAvailableModels] = createSignal<Array<{ id: string; name: string; deploymentType: "cloud" | "local" }>>([]);
+  const [availableModels, setAvailableModels] = createSignal<
+    Array<{ id: string; name: string; deploymentType: "cloud" | "local" }>
+  >([]);
 
   /** Unified 1.5s debounced auto-save for all editable nodes */
   let saveTimeout: ReturnType<typeof setTimeout>;
@@ -119,6 +128,8 @@ export default function DocumentWorkspace() {
    *  Excludes user-input nodes (input_transform, desensitize) at the current step
    *  since those require manual interaction, not background generation. */
   function isGenerationActive(runtimeState: DocumentRuntimeState): boolean {
+    if (!runtimeState.backgroundTaskActive) return false;
+
     const currentIdx = runtimeState.currentNodeIndex;
     return runtimeState.nodes.some((n, i) => {
       if (n.status !== "in_progress") return false;
@@ -150,18 +161,22 @@ export default function DocumentWorkspace() {
           // Detect state transition: generation just finished
           if (wasGenerating) {
             const hasFailed = runtimeState.nodes.some((n) => n.status === "failed");
+            const allDone = runtimeState.nodes.every(
+              (n) => n.status === "completed" || n.status === "skipped",
+            );
             const docUrl = `/projects/${runtimeState.projectId ?? ""}/documents/${params.documentId}/workspace`;
             if (hasFailed) {
               showToast("文档生成失败", "error", {
                 label: "查看详情",
                 href: docUrl,
               });
-            } else {
+            } else if (allDone) {
               showToast("文档生成完成", "success", {
                 label: "查看文档",
                 href: docUrl,
               });
             }
+            // Pipeline paused at interactive node — no toast needed
           }
         }
       }
@@ -177,9 +192,11 @@ export default function DocumentWorkspace() {
       const res = await startBackgroundExecution(params.documentId);
       if (res && !("error" in res)) {
         setIsGenerating(true);
-        setCountdown(WORKSPACE_POLL_INTERVAL);
-        // Immediately fetch to get the latest state
-        await fetchRuntimeState();
+        // Short delay before first poll — give the backend pipeline time to
+        // update node statuses (fire-and-forget race condition)
+        setCountdown(1);
+      } else if (res && "error" in res) {
+        showToast(res.error, "error");
       }
     } catch {
       setError("启动后台生成失败，请重试");
@@ -254,11 +271,21 @@ export default function DocumentWorkspace() {
         });
         if (!res.ok) return;
         const json = (await res.json()) as {
-          data: Array<{ id: string; displayName: string; deploymentType?: string; isActive: boolean; isProviderDisabled: boolean }>;
+          data: Array<{
+            id: string;
+            displayName: string;
+            deploymentType?: string;
+            isActive: boolean;
+            isProviderDisabled: boolean;
+          }>;
         };
         const active = json.data
           .filter((m) => m.isActive && !m.isProviderDisabled)
-          .map((m) => ({ id: m.id, name: m.displayName, deploymentType: (m.deploymentType ?? "cloud") as "cloud" | "local" }));
+          .map((m) => ({
+            id: m.id,
+            name: m.displayName,
+            deploymentType: (m.deploymentType ?? "cloud") as "cloud" | "local",
+          }));
         setAvailableModels(active);
       } catch {
         // Non-critical — AI editing just won't have model options
@@ -446,13 +473,12 @@ export default function DocumentWorkspace() {
       setViewMode("history");
       setViewIndex(index);
       setShowInlineEditor(false);
+    } else if (node.status === "in_progress") {
+      // Clicking the in-progress node returns to current view
+      setViewMode("current");
+      setViewIndex(index);
+      setShowInlineEditor(false);
     }
-  }
-
-  function handleBackToCurrent() {
-    setViewMode("current");
-    const s = state();
-    if (s) setViewIndex(s.currentNodeIndex);
   }
 
   async function handleAdvance() {
@@ -461,8 +487,10 @@ export default function DocumentWorkspace() {
     setActionLoading(true);
     setShowInlineEditor(false);
     try {
-      // For input_transform nodes, advance first to complete them before background execution
-      if (node.nodeType === "input_transform" && node.status !== "completed") {
+      // Advance the current node to completed before starting background execution.
+      // All interactive nodes (input_transform, desensitize, model_call) pause the pipeline
+      // in in_progress state for user review — must be explicitly advanced here.
+      if (node.status === "in_progress") {
         const result = await advanceNode(params.documentId, node.id);
         if (result && !("error" in result)) {
           setState(result);
@@ -476,6 +504,31 @@ export default function DocumentWorkspace() {
     } finally {
       setActionLoading(false);
     }
+  }
+
+  async function handlePrimaryConfirm() {
+    const node = currentNode();
+    if (!node) return;
+
+    if (node.nodeType === "desensitize" || node.nodeType === "restore") {
+      const confirmAction = manualConfirmAction();
+      if (confirmAction) {
+        try {
+          const shouldAdvance = await confirmAction();
+          if (shouldAdvance === false) return;
+        } catch {
+          return;
+        }
+      }
+    }
+
+    await handleAdvance();
+  }
+
+  function canSkipCurrentNode(): boolean {
+    const node = currentNode();
+    if (!node || node.nodeType === "export") return false;
+    return !!getNodeConfig(node)?.skippable;
   }
 
   async function handleSkip() {
@@ -576,6 +629,7 @@ export default function DocumentWorkspace() {
             documentId={docId}
             onDraftSave={draftSave}
             readOnly={isReadOnly}
+            registerConfirmAction={handleManualConfirmRegistration}
           />
         );
       case "model_call":
@@ -586,6 +640,7 @@ export default function DocumentWorkspace() {
             documentId={docId}
             onDraftSave={draftSave}
             readOnly={isReadOnly}
+            backgroundMode={isGenerating()}
           />
         );
       case "restore":
@@ -596,6 +651,8 @@ export default function DocumentWorkspace() {
             documentId={docId}
             onDraftSave={draftSave}
             readOnly={isReadOnly}
+            registerConfirmAction={handleManualConfirmRegistration}
+            onAdvanceAfterConfirm={handleAdvance}
           />
         );
       case "export":
@@ -688,7 +745,7 @@ export default function DocumentWorkspace() {
       <Show when={!loading() && !error() && state()}>
         {(s) => (
           <>
-            {/* Breadcrumb + Document info + Stepper */}
+            {/* Breadcrumb + Document info */}
             <div
               class="sticky top-0 z-20 px-6 pt-4 pb-3"
               style={{
@@ -725,10 +782,23 @@ export default function DocumentWorkspace() {
 
                 {/* Document title + metadata */}
                 <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <h1 class="text-lg font-bold" style={{ color: "#191c1e" }}>
-                      {s().workflowName ?? "文档工作台"}
-                    </h1>
+                  <div class="flex items-center gap-3 min-w-0">
+                    <div class="flex flex-col min-w-0">
+                      <h1
+                        class="text-lg font-bold leading-tight truncate"
+                        style={{ color: "#191c1e" }}
+                        title={s().documentTitle ?? "文档工作台"}
+                      >
+                        {s().documentTitle ?? "文档工作台"}
+                      </h1>
+                      <span
+                        class="text-[11px] leading-tight truncate"
+                        style={{ color: "#8b8a99" }}
+                        title={s().workflowName}
+                      >
+                        {s().workflowName}
+                      </span>
+                    </div>
                     <FavoriteButton
                       targetType="document"
                       targetId={params.documentId}
@@ -754,12 +824,34 @@ export default function DocumentWorkspace() {
                       }}
                     >
                       <Show when={isGenerating()}>
-                        <svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        <svg
+                          class="w-3 h-3 animate-spin"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          aria-hidden="true"
+                        >
+                          <circle
+                            class="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            stroke-width="4"
+                          />
+                          <path
+                            class="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
                         </svg>
                       </Show>
-                      {hasFailedNodes() ? "生成失败" : isGenerating() ? "生成中" : readOnly() ? "已完成" : "进行中"}
+                      {hasFailedNodes()
+                        ? "生成失败"
+                        : isGenerating()
+                          ? "生成中"
+                          : readOnly()
+                            ? "已完成"
+                            : "进行中"}
                     </span>
                   </div>
                   <div class="flex items-center gap-4 text-xs" style={{ color: "#464555" }}>
@@ -805,8 +897,19 @@ export default function DocumentWorkspace() {
                           }}
                           title="立即刷新"
                         >
-                          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          <svg
+                            class="w-3.5 h-3.5"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
                           </svg>
                         </button>
                       </span>
@@ -814,33 +917,16 @@ export default function DocumentWorkspace() {
                   </div>
                 </div>
 
-                {/* Stepper */}
-                <StepperBar
-                  nodes={s().nodes}
-                  currentIndex={
-                    viewMode() === "current"
-                      ? readOnly()
-                        ? s().nodes.length
-                        : s().currentNodeIndex
-                      : viewIndex()
-                  }
-                  onNodeClick={handleStepperClick}
-                  showResultStep={readOnly()}
-                  onResultClick={() => {
-                    setViewMode("current");
-                    setShowInlineEditor(false);
-                  }}
-                />
               </div>
             </div>
 
-            {/* Content area */}
-            <div
-              class="flex-1 overflow-y-auto px-6 py-6"
-              style={{
-                "padding-bottom": "2rem",
-              }}
-            >
+            {/* Content + Sidebar layout */}
+            <div class="flex flex-1 min-h-0">
+              {/* Content area */}
+              <div
+                class="flex-1 overflow-y-auto px-6 py-6"
+                style={{ "padding-bottom": "2rem" }}
+              >
               <div class="space-y-6">
                 <Switch>
                   {/* Viewing completed node history */}
@@ -848,33 +934,9 @@ export default function DocumentWorkspace() {
                     {(viewed) => (
                       <div class="space-y-4">
                         <Show when={!readOnly()}>
-                          <div class="flex items-center justify-between">
-                            <h2 class="text-sm font-medium" style={{ color: "#191c1e" }}>
-                              历史记录: {viewed().nodeLabel}
-                            </h2>
-                            <button
-                              type="button"
-                              class="text-sm font-medium cursor-pointer bg-transparent border-0 transition-colors flex items-center gap-1"
-                              style={{ color: "#4f46e5" }}
-                              onClick={handleBackToCurrent}
-                            >
-                              <svg
-                                class="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                  stroke-width="2"
-                                  d="M10 19l-7-7m0 0l7-7m-7 7h18"
-                                />
-                              </svg>
-                              返回当前节点
-                            </button>
-                          </div>
+                          <h2 class="text-sm font-medium" style={{ color: "#191c1e" }}>
+                            历史记录: {viewed().nodeLabel}
+                          </h2>
                         </Show>
                         <CompletedViewRouter
                           node={viewed()}
@@ -905,8 +967,19 @@ export default function DocumentWorkspace() {
                       >
                         <div class="flex items-start gap-4">
                           <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                            <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                            <svg
+                              class="w-5 h-5 text-red-600"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+                              />
                             </svg>
                           </div>
                           <div class="flex-1">
@@ -927,8 +1000,19 @@ export default function DocumentWorkspace() {
                             disabled={actionLoading()}
                             onClick={handleRetryGeneration}
                           >
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            <svg
+                              class="w-4 h-4"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                              aria-hidden="true"
+                            >
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                              />
                             </svg>
                             重新生成
                           </button>
@@ -1005,108 +1089,29 @@ export default function DocumentWorkspace() {
                     </div>
                   </Match>
 
-                  {/* Background generation in progress — show node progress */}
+                  {/* Background generation in progress — show in-progress node executor */}
                   <Match when={viewMode() === "current" && isGenerating()}>
-                    <div class="space-y-4">
-                      <For each={s().nodes}>
-                        {(node) => (
-                          <div
-                            class="rounded-xl p-5"
-                            style={{
-                              background: "#ffffff",
-                              border: node.status === "in_progress"
-                                ? "2px solid rgba(79,70,229,0.4)"
-                                : "1px solid rgba(199,196,216,0.2)",
-                              "box-shadow": node.status === "in_progress"
-                                ? "0 4px 16px rgba(79,70,229,0.08)"
-                                : "0 2px 8px rgba(25,28,30,0.04)",
-                            }}
-                          >
-                            <div class="flex items-center gap-3">
-                              {/* Status icon */}
-                              <Switch>
-                                <Match when={node.status === "completed"}>
-                                  <div class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                                    </svg>
-                                  </div>
-                                </Match>
-                                <Match when={node.status === "in_progress"}>
-                                  <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-indigo-600 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                    </svg>
-                                  </div>
-                                </Match>
-                                <Match when={node.status === "failed"}>
-                                  <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                  </div>
-                                </Match>
-                                <Match when={node.status === "pending"}>
-                                  <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <div class="w-2 h-2 rounded-full bg-slate-300" />
-                                  </div>
-                                </Match>
-                                <Match when={node.status === "skipped"}>
-                                  <div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-                                    </svg>
-                                  </div>
-                                </Match>
-                                <Match when={node.status === "blocked"}>
-                                  <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-4 h-4 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                                    </svg>
-                                  </div>
-                                </Match>
-                              </Switch>
-
-                              {/* Node info */}
-                              <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
-                                  <span class="text-sm font-semibold" style={{ color: "#191c1e" }}>
-                                    步骤 {node.stepOrder + 1}: {node.nodeLabel}
-                                  </span>
-                                  <span
-                                    class="text-xs px-2 py-0.5 rounded-full"
-                                    style={{ background: "rgba(79,70,229,0.06)", color: "#4f46e5" }}
-                                  >
-                                    {node.nodeType}
-                                  </span>
-                                </div>
-                                <Show when={node.status === "in_progress"}>
-                                  <p class="text-xs mt-1" style={{ color: "#4f46e5" }}>
-                                    正在执行...
-                                  </p>
-                                </Show>
-                                <Show when={node.status === "completed" && node.completedAt}>
-                                  <p class="text-xs mt-1" style={{ color: "#059669" }}>
-                                    已完成
-                                  </p>
-                                </Show>
-                                <Show when={node.status === "failed" && node.errorMessage}>
-                                  <p class="text-xs mt-1" style={{ color: "#dc2626" }}>
-                                    {node.errorMessage}
-                                  </p>
-                                </Show>
-                                <Show when={node.status === "blocked" && (node.outputData as Record<string, unknown>)?.blockReason}>
-                                  <p class="text-xs mt-1" style={{ color: "#dc2626" }}>
-                                    条件阻断：{(node.outputData as Record<string, unknown>).blockReason as string}
-                                  </p>
-                                </Show>
+                    {(() => {
+                      const inProgressNode = () =>
+                        s().nodes.find((n) => n.status === "in_progress");
+                      return (
+                        <Show
+                          when={inProgressNode()}
+                          fallback={
+                            <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[120px] flex items-center justify-center">
+                              <div class="flex items-center gap-3">
+                                <span class="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                                <span class="text-sm text-[#464555]">正在准备下一步...</span>
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </For>
-                    </div>
+                          }
+                        >
+                          {(node) => (
+                            <div class="space-y-6">{renderExecutor(node())}</div>
+                          )}
+                        </Show>
+                      );
+                    })()}
                   </Match>
 
                   {/* Blocked node — condition triggered, show block card with rollback */}
@@ -1124,56 +1129,23 @@ export default function DocumentWorkspace() {
                   </Match>
 
                   {/* Current in-progress node (manual step-by-step mode) */}
-                  <Match when={viewMode() === "current" && !readOnly() && !isGenerating() && !hasFailedNodes() && !hasBlockedNodes() ? currentNode() : undefined}>
+                  <Match
+                    when={
+                      viewMode() === "current" &&
+                      !readOnly() &&
+                      !isGenerating() &&
+                      !hasFailedNodes() &&
+                      !hasBlockedNodes()
+                        ? currentNode()
+                        : undefined
+                    }
+                  >
                     {(curNode) => (
                       <div class="space-y-6">
                         {/* Node executor -- route by nodeType with real config */}
                         {renderExecutor(curNode())}
 
-                        {/* Inline editor toggle -- shown when node has editable output */}
-                        <Show when={!readOnly() && isNodeEditable() && hasOutputToEdit()}>
-                          <div class="space-y-3">
-                            <div class="flex items-center gap-3">
-                              <button
-                                type="button"
-                                class="px-4 py-2 text-sm font-medium rounded-lg transition-all cursor-pointer border-0"
-                                style={{
-                                  background: showInlineEditor()
-                                    ? "rgba(79,70,229,0.08)"
-                                    : "#e6e8ea",
-                                  color: showInlineEditor() ? "#4f46e5" : "#191c1e",
-                                }}
-                                onClick={() => setShowInlineEditor(!showInlineEditor())}
-                              >
-                                {showInlineEditor() ? "关闭编辑器" : "编辑输出"}
-                              </button>
-
-                              {/* Saved indicator */}
-                              <Show when={savedIndicator()}>
-                                <span class="text-xs text-green-600 font-medium animate-pulse">
-                                  已自动保存
-                                </span>
-                              </Show>
-                            </div>
-
-                            <Show when={showInlineEditor() && currentNode()}>
-                              {(node) => (
-                                <InlineEditor
-                                  content={getNodeOutputText(node())}
-                                  onChange={handleInlineEditorSave}
-                                  readOnly={false}
-                                  placeholder="编辑节点输出内容..."
-                                  documentId={params.documentId}
-                                  nodeExecutionId={node().id}
-                                  nodes={state()?.nodes}
-                                  currentNodeIndex={state()?.currentNodeIndex}
-                                  availableModels={availableModels()}
-                                  defaultModelId={defaultModelId()}
-                                />
-                              )}
-                            </Show>
-                          </div>
-                        </Show>
+                        {/* (Inline editor removed) */}
 
                         {/* Completed node history removed — stepper bar already shows progress */}
                       </div>
@@ -1273,13 +1245,37 @@ export default function DocumentWorkspace() {
                                 }}
                               >
                                 <div class="flex items-center gap-3">
-                                  <svg class="w-5 h-5 text-[#4f46e5]" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                  <svg
+                                    class="w-5 h-5 text-[#4f46e5]"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    stroke-width="1.8"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                    />
                                   </svg>
-                                  <span class="text-sm font-medium text-[#191c1e]">选择格式并导出文档</span>
+                                  <span class="text-sm font-medium text-[#191c1e]">
+                                    选择格式并导出文档
+                                  </span>
                                 </div>
-                                <svg class="w-4 h-4 text-[#464555] group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                                <svg
+                                  class="w-4 h-4 text-[#464555] group-hover:translate-x-0.5 transition-transform"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    d="M9 5l7 7-7 7"
+                                  />
                                 </svg>
                               </button>
                             </Show>
@@ -1416,21 +1412,79 @@ export default function DocumentWorkspace() {
                   </Match>
                 </Switch>
               </div>
+              </div>
+
+              {/* Right sidebar — Process Tracker + Actions */}
+              <div
+                class="flex-shrink-0 flex flex-col border-l"
+                style={{
+                  width: "12rem",
+                  background: "#fafbfc",
+                  "border-color": "rgba(199,196,216,0.2)",
+                }}
+              >
+                <div
+                  class="px-2 pt-3 pb-1 flex-shrink-0"
+                  style={{ "border-bottom": "1px solid rgba(199,196,216,0.15)" }}
+                >
+                  <span class="text-[11px] font-semibold tracking-wide" style={{ color: "#8b8a99" }}>
+                    流程进度
+                  </span>
+                </div>
+                <div class="flex-1 overflow-y-auto">
+                  <StepperBar
+                    nodes={s().nodes}
+                    currentIndex={
+                      viewMode() === "current"
+                        ? readOnly()
+                          ? s().nodes.length
+                          : s().currentNodeIndex
+                        : viewIndex()
+                    }
+                    onNodeClick={handleStepperClick}
+                    showResultStep={readOnly()}
+                    onResultClick={() => {
+                      setViewMode("current");
+                      setShowInlineEditor(false);
+                    }}
+                    vertical
+                  />
+                </div>
+
+                {/* Sidebar action area — replaces former bottom ActionBar */}
+                <Show
+                  when={
+                    !readOnly() &&
+                    currentNode() &&
+                    viewMode() === "current" &&
+                    currentNode()?.nodeType !== "export"
+                  }
+                >
+                  <div class="flex-shrink-0">
+                    <ActionBar
+                      vertical
+                      loading={
+                        actionLoading() ||
+                        isGenerating() ||
+                        ((currentNode()?.nodeType === "desensitize" ||
+                          currentNode()?.nodeType === "restore") &&
+                          !manualConfirmAction() &&
+                          !currentNode()?.outputData)
+                      }
+                      canSkip={canSkipCurrentNode()}
+                      canRollback={s().currentNodeIndex > 0}
+                      isSaving={saveStatus() === "saving"}
+                      hasSaved={saveStatus() === "saved"}
+                      onConfirm={handlePrimaryConfirm}
+                      onSkip={handleSkip}
+                      onRollback={() => setShowRollbackDialog(true)}
+                    />
+                  </div>
+                </Show>
+              </div>
             </div>
 
-            {/* Bottom action bar (fixed, via ActionBar component) */}
-            <Show when={!readOnly() && currentNode() && viewMode() === "current" && currentNode()?.nodeType !== "export"}>
-              <ActionBar
-                loading={actionLoading()}
-                canSkip={currentNode()?.nodeType !== "export"}
-                canRollback={s().currentNodeIndex > 0}
-                isSaving={saveStatus() === "saving"}
-                hasSaved={saveStatus() === "saved"}
-                onConfirm={handleAdvance}
-                onSkip={handleSkip}
-                onRollback={() => setShowRollbackDialog(true)}
-              />
-            </Show>
+            {/* Action bar removed — actions moved to right sidebar */}
 
             {/* Rollback dialog */}
             <Show when={showRollbackDialog()}>
@@ -1469,10 +1523,10 @@ export default function DocumentWorkspace() {
                           onClick={() => handleRollback(node.stepOrder)}
                         >
                           <span class="text-sm font-medium" style={{ color: "#191c1e" }}>
-                            步骤 {node.stepOrder + 1}: {node.nodeLabel}
+                            {node.nodeLabel}
                           </span>
-                          <span class="block text-xs mt-0.5" style={{ color: "#464555" }}>
-                            {node.nodeType}
+                          <span class="block text-xs mt-0.5" style={{ color: "#8b8a99" }}>
+                            {nodeTypeLabels[node.nodeType] ?? node.nodeType}
                           </span>
                         </button>
                       )}

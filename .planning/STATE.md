@@ -1,12 +1,12 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4
-milestone_name: 质量与测试
-status: unknown
-last_updated: "2026-04-04T09:59:36.379Z"
+milestone: v1.4.5
+milestone_name: post-ship polish (unplanned)
+status: shipped; preparing v1.5 via MILESTONE-CONTEXT.md
+last_updated: "2026-04-10T16:40:00.000Z"
 progress:
-  total_phases: 27
-  completed_phases: 27
+  total_phases: 31
+  completed_phases: 31
   total_plans: 91
   completed_plans: 91
 ---
@@ -15,18 +15,29 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-04)
+See: .planning/PROJECT.md (updated 2026-04-10)
 
-**Core value:** 用户能跑通完整流程生成高质量文档 — 安全加固确保生产环境无权限越权、路径穿越、XSS 注入风险
-**Current focus:** v1.4 milestone complete (Phase 30-31 shipped 2026-04-04)
+**Core value:** 用户能跑通完整流程生成高质量文档 — 一站式多模型并行生成、对比、迭代，替代逐个 AI 平台粘贴对比的低效方式
+**Current focus:** v1.4.5 post-ship polish shipped (2026-04-10); v1.5 AI 自动生成流程 preparation in `.planning/MILESTONE-CONTEXT.md`
 
 ## Current Position
 
-v1.4 milestone complete (Phase 30-31 shipped 2026-04-04): Phase 30 (TypeScript Quality), Phase 31 (Test Coverage)
-v1.3 fully shipped: Phases 27-29 (Permission Security, File Security, XSS Defense)
-Last activity: 2026-04-04 — Phase 31-02 complete (sanitizeHtml test suite)
+v1.4.5 post-ship polish shipped 2026-04-10 (29 commits, +19,582 / -3,512 across 105 files):
+  - Desensitize 多源重构 (per-source data model, vertical layout)
+  - Runtime 可续跑 + live SSE (ModelCallLiveEvent, resumable background model-call, per-source restore + retry)
+  - Frontend workspace refactor (ModelCallExecutor snapshot replay, per-source executors, manual confirm hook, sidebar collapse)
+  - Model-call 多选输出 + outputItems 扁平化 (cross-stack cohesive refactor across backend/runtime/editor)
+  - Password management (change-password modal, admin reset)
+  - PRD review demo workflow with blocking export gate + 4-way compare
+  - Responsive workflow management card list
+  - Test runner unification (vitest)
 
-Progress: [██████████] 100% (v1.4 milestone complete)
+v1.4 shipped 2026-04-04: Phases 30-31 (TypeScript Quality + Contract Fixes, Test Coverage)
+v1.3 shipped 2026-04-03: Phases 27-29 (Permission Security, File Security, XSS Defense)
+
+Last activity: 2026-04-10 — v1.4.5 polish committed and aligned; v1.5 milestone context captured in `.planning/MILESTONE-CONTEXT.md` awaiting `/gsd:new-milestone` rerun
+
+Progress: [██████████] 100% (v1.4 milestone complete + v1.4.5 polish shipped)
 
 ## Accumulated Context
 

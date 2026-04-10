@@ -10,11 +10,11 @@
 
 ## Current State
 
-**Shipped:** v1.3 安全与契约修复（部分）(2026-04-03)
-**Codebase:** Bun monorepo, ~44,800 LOC TypeScript
+**Shipped:** v1.4 质量与测试 (2026-04-04) + v1.4.5 post-ship polish (2026-04-07 ~ 04-10, unplanned)
+**Codebase:** Bun monorepo, ~46,500 LOC TypeScript
 **Tech stack:** Bun + ElysiaJS + Drizzle ORM + PostgreSQL 18 + SolidJS + Tailwind CSS v4
 
-v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, project/document management, full document creation runtime. v1.1 adds operational features: background execution + notifications, statistics dashboard, global search/favorites, AI inline editing. v1.2 enhances node capabilities: output path grammar (segmentKey), file slots, structured output (JSON Schema + named artifacts), Word table rendering, system prompt separation, conditional execution (skip/block). v1.3 hardens the platform for production: creator-or-owner write authorization on all runtime routes, path traversal defense with sanitizeFilename/assertWithinRoot, XSS protection via DOMPurify sanitization on all innerHTML render paths.
+v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, project/document management, full document creation runtime. v1.1 adds operational features: background execution + notifications, statistics dashboard, global search/favorites, AI inline editing. v1.2 enhances node capabilities: output path grammar (segmentKey), file slots, structured output (JSON Schema + named artifacts), Word table rendering, system prompt separation, conditional execution (skip/block). v1.3 hardens the platform for production: creator-or-owner write authorization on all runtime routes, path traversal defense with sanitizeFilename/assertWithinRoot, XSS protection via DOMPurify sanitization on all innerHTML render paths. v1.4 closes TypeScript contract gaps (Eden Treaty typed wrappers, DocumentStatus "failed", outputId JSDoc) and adds automated tests for sanitize/sanitize-html/document-status. **v1.4.5 post-ship polish** (unplanned) iterates on runtime resilience and execution-time UX: desensitize node per-source multi-file redesign, resumable background model-call with live SSE streaming, model_call multi-select output + outputItems flattening with stable executor reconciliation (fixes click-swallowing during polling), per-source restore + configured input sources + retry flow, password management (change-password modal + admin reset), responsive workflow management for small screens, PRD review demo workflow with blocking export gate, and the unified vitest runner.
 
 ## Requirements
 
@@ -46,14 +46,25 @@ v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, proj
 - **CMAP-01**: 导出 contentMapping 运行时生效（resolveContent + getExportPreview） — v1.2
 - **PERM-01~05**: 写操作权限控制 — v1.3 (creator-or-owner 模型)
 - **XSS-01~04**: XSS 防护（DOMPurify 净化所有 innerHTML） — v1.3
+- **TSQL-01~04**: Eden Treaty typed API wrappers（RuntimeRoute 接口 + EdenResponse union + WrapperResult 模式）— v1.4
+- **CONT-01~04**: 契约修复（DocumentStatus "failed"、InputSource/VariableRef.outputId JSDoc、validation.ts outputId 注释）— v1.4
+- **TEST-01~03**: 自动化测试（sanitize.test.ts 路径穿越、sanitize-html.test.ts XSS 防护、document-status.test.ts 契约）— v1.4
+- **DESENS-MS-01~04**: 脱敏节点多源重构 — 统一共享类型、后端 confirm 契约重写、per-source 输出数据模型、前端 vertical layout + per-source completed view — v1.4.5
+- **RTRES-01~05**: Runtime 可续跑 + live SSE — `ModelCallLiveEvent`、runtime state flags、resumable background model-call with SSE streaming + snapshot replay、restore originalText — v1.4.5
+- **RTFLOW-01~03**: Per-source restore + configured input sources + retry flow — v1.4.5
+- **MSEL-01~05**: Model-call 多选输出 + outputItems 扁平化 + stable executor reconciliation — `OutputDef.category/groupLabel/modelId/artifactId`、`ModelCallConfig.enableUserSelectionOutput`、`buildModelCallOutputData` / `buildSelectedModelOutputData`、`selectModelOutput` 接收 `string[]`、`mergeModelOutputs` + `<Index>` tab bar 修 polling 点击被吞、`renderExecutor` accessor + `untrack` 避免 polling 重建 — v1.4.5
+- **FEWS-01~04**: Frontend workspace refactor — resumable ModelCallExecutor with snapshot replay、per-source desensitize/restore executors + completed views、workspace shell manual confirm hook、background poll fix — v1.4.5
+- **PWD-01~03**: Password management — backend password endpoints、change-password modal、admin user password reset — v1.4.5
+- **DOCLST-01~02**: Document list 状态标记 — `hasFailedNode` / `isGenerating` flags — v1.4.5
+- **ADMUX-01~03**: Admin UX — sidebar collapse + user menu、logs stats、project status — v1.4.5
+- **ADMRSP-01**: Workflow management responsive card list（小屏卡片视图 + 桌面表格视图共享 `renderActions`）— v1.4.5
+- **WFEDIT-01~02**: Workflow editor — manual restore input sources、richer markdown in PromptEditor/VariablePicker、VariablePicker Modal 化 + 按 category 分组 — v1.4.5
+- **DEMO-01~02**: Demo workflows — bid workflow prompt hardening、PRD review workflow with progress gates + blocking export gate + 4-way compare — v1.4.5
+- **TEST45-01~02**: Test coverage expansion — live-session/model-call state/restore/input-transform tests、catalog.test.ts PRD demo compile check、vitest runner unification (drop bun:test) — v1.4.5
 
 ### Active
 
-#### v1.4 质量与测试
-
-- [ ] TypeScript 收口：集中 `as any` Eden Treaty 类型转换到 typed API wrappers
-- [ ] 契约修复：DocumentStatus 补齐 "failed"、OutputId JSDoc 文档化
-- [ ] 测试覆盖：sanitizeFilename/assertWithinRoot 路径穿越测试、DOMPurify XSS 防护测试、DocumentStatus 契约测试
+v1.4 milestone complete. v1.5 preparation in `.planning/MILESTONE-CONTEXT.md` (AI 自动生成流程). Run `/gsd:new-milestone` to kick off.
 
 ### Future
 
@@ -135,8 +146,10 @@ v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, proj
 | v1.1 运营增强与智能编辑 | 后台生成+通知、统计审计、全局搜索、AI编辑 | Shipped 2026-03-27 |
 | v1.2 节点能力增强 | 输出规范、结构化输出、Word表格、System Prompt、条件执行 | Shipped 2026-03-27 |
 | v1.3 安全与契约修复（部分） | 权限收紧（已完成）、XSS 防护（已完成）、文件安全+TSQL+契约+测试（待 v1.4） | Shipped 2026-04-03 |
-| v1.4 质量与测试 | TypeScript 收口+契约修复+测试覆盖 | Planned |
+| v1.4 质量与测试 | TypeScript 收口+契约修复+测试覆盖 | Shipped 2026-04-04 |
+| v1.4.5 post-ship polish（非计划） | 脱敏多源重构 + Runtime 可续跑/live SSE + model-call 多选输出 + 工作区 refactor + 密码管理 + PRD 评审 demo + 响应式流程管理 + 测试 runner 统一 | Shipped 2026-04-10 |
+| v1.5 AI 自动生成流程 | 管理端向导 + 多阶段 AI 流水线（归一化 → 需求分析 → 蓝图 → 提示词细化 → 评审 → 修订 → 编译 → 校验-修复）+ `workflow_generation_jobs` 表 + 确定性 blueprint→workflow 编译器 | Preparing (see MILESTONE-CONTEXT.md) |
 | v2.0 | 批注、文档导入/复制、配额管理、条件路由、人工审核节点等 | Future |
 
 ---
-*Last updated: 2026-04-04 after v1.3 milestone partial completion*
+*Last updated: 2026-04-10 after v1.4.5 post-ship polish alignment (pre-v1.5)*

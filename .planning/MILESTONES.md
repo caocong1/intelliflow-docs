@@ -1,5 +1,55 @@
 # Milestones
 
+## v1.4.5 Post-ship polish (Shipped: 2026-04-07 ~ 2026-04-10, unplanned)
+
+**Phases completed:** none — out-of-band polish sprint with no formal GSD phases
+**Timeline:** 4 days (2026-04-07 ~ 2026-04-10)
+**Lines changed:** +19,582 / -3,512 across 105 files
+**Git range:** 82b9765 → 38faae0 (29 commits)
+**Codebase:** ~46,500 LOC TypeScript
+**Requirements retroactively captured:** DESENS-MS-01~04, RTRES-01~05, RTFLOW-01~03, MSEL-01~05, FEWS-01~04, PWD-01~03, DOCLST-01~02, ADMUX-01~03, ADMRSP-01, WFEDIT-01~02, DEMO-01~02, TEST45-01~02
+
+**Key accomplishments:**
+
+- **Desensitize 多源重构 (04-07 ~ 04-08, 3 commits):** 统一共享类型、后端 confirm 契约重写、per-source 输出数据模型、前端 vertical layout + per-source completed view (82b9765, 41fcc30, 01d5cae)
+- **Runtime 可续跑 + live SSE (04-10, 4 commits):** `ModelCallLiveEvent` + runtime state flags + restore originalText、resumable background model-call with live SSE streaming、per-source restore + configured input sources + retry flow、password management + document list hasFailedNode/isGenerating (dcbbbaf, 28ede6b, 5c258ae, e510527)
+- **Frontend workspace refactor (04-10, 4 commits):** resumable ModelCallExecutor with snapshot replay、per-source desensitize/restore executors + completed views、workspace shell manual confirm hook + background poll fix、sidebar collapse + user menu + change-password modal (347c6db, aa796f1, 1cabe0d, 49a62ec)
+- **Admin + workflow editor (04-10, 2 commits):** user password reset + logs stats + project status、manual restore input sources + richer markdown in PromptEditor/VariablePicker (59df366, fa02655)
+- **Model-call 多选输出 + outputItems 扁平化 (04-10, 3 commits):** Cross-stack cohesive refactor — `OutputDef.category/groupLabel/modelId/artifactId`, `ModelCallConfig.enableUserSelectionOutput`, `buildModelCallOutputData` / `buildSelectedModelOutputData`, `selectModelOutput(string[])`, `mergeModelOutputs` + `<Index>` tab bar fix for polling click-swallow bug, `renderExecutor` accessor + `untrack` to prevent polling re-instantiation (2f3836b backend, 4238d92 frontend runtime, 319789c editor categories)
+- **PRD review demo workflow (04-10, 2 commits):** bid workflow prompt hardening、PRD review workflow with progress gates + blocking export gate + 4-way compare (9b6bbe8, f2c2059)
+- **Responsive workflow management (04-10, 1 commit):** 小屏卡片视图 + 桌面表格视图共享 `renderActions` helper (ce2981c)
+- **Chores + test coverage (04-10, 5 commits):** test coverage expansion (live-session, model-call state, restore, input-transform)、vitest runner unification、statistics `@ts-expect-error` cleanup、migration script sql.json cast、document-type biome format、statistics pragma cleanup (bb80185, d9a18ed, 0c6cc0a, f9492de, cf54d7b)
+- **Docs + config (04-10, 3 commits):** v1.5 AI workflow generation design doc、CODEBUDDY.md guidance、bunfig/npmrc + gitignore hygiene (53ba9db, 38faae0, 17e7929, fb2312d, f002527)
+
+**Archives:** (none — unplanned polish has no ROADMAP/REQUIREMENTS files)
+
+**Context:** This milestone is retroactively documented. The work started as a continuation of runtime polish after v1.4 shipped, but grew into a substantive set of features and a large cross-stack refactor. The v1.4.5 label was assigned during the v1.5 pre-alignment pause (documented in `.planning/MILESTONE-CONTEXT.md`) to give this batch of changes a tracking anchor before opening the new milestone.
+
+---
+
+## v1.4 质量与测试 (Shipped: 2026-04-04)
+
+**Phases completed:** 2 phases (30-31), 5 plans
+**Timeline:** 1 day (2026-04-04)
+**Lines changed:** +1,702 / -313 across 31 files
+**Git range:** bf16943 → 8184d02 (24 commits)
+**Requirements:** 11/11 v1.4 requirements complete (TSQL-01~04, CONT-01~04, TEST-01~03)
+
+**Key accomplishments:**
+
+- Phase 30 (TypeScript Quality + Contract Fixes):
+  - Plan 30-01: 9 typed runtime API wrappers in `client.ts` (`RuntimeRoute` interface + `EdenResponse` union + `WrapperResult` pattern); replaced all `as any` Eden Treaty casts in `DocumentWorkspace.tsx` (8), `ExportExecutor.tsx` (4), `VersionHistory.tsx` (1)
+  - Plan 30-02: `DocumentStatus` union gains "failed"; backend list API accepts `status=failed`; `InputSource.outputId` + `VariableRef.outputId` get JSDoc; `validation.ts` adds inline comments on `outputId` comparison with `segmentKey` resolution helpers
+- Phase 31 (Test Coverage):
+  - Plan 31-01: set up vitest workspace configs for backend and frontend (projects-based, Vitest 4); add 12 sanitize tests covering `sanitizeFilename` path traversal + null bytes + `assertWithinRoot` escape attempts
+  - Plan 31-02: 15 sanitize-html tests — script tags removed, onerror stripped, safe tags (p/em/strong/code) preserved
+  - Plan 31-03: DocumentStatus type contract tests (all 4 valid values + filter rejection of invalid strings)
+
+**Archives:**
+- Roadmap + requirements still live in `.planning/ROADMAP.md` / `.planning/REQUIREMENTS.md` (v1.4 was small enough that dedicated archives weren't split out)
+
+---
+
 ## v1.3 安全与契约修复（部分） (Shipped: 2026-04-03)
 
 **Phases completed:** 3 phases (27-29), 12 plans

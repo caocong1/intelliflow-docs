@@ -1,5 +1,5 @@
 import type { DesensitizeConfig, DesensitizeReviewItem, NodeExecution } from "@intelliflow/shared";
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
+import { For, Show, createEffect, createMemo, createSignal, on, onCleanup } from "solid-js";
 import { api } from "../../../api/client";
 import HighlightedText from "../shared/HighlightedText";
 import { getTypeLabel, maskOriginal, typeBadgeClass } from "../shared/desensitize-utils";
@@ -15,37 +15,33 @@ interface Props {
   documentId: string;
   onDraftSave: (data: Record<string, unknown>) => void;
   readOnly: boolean;
-  onConfirm?: () => void;
+  registerConfirmAction?: (action: (() => Promise<boolean>) | null) => void;
 }
 
 type Phase = "detect" | "review" | "confirmed";
+type PreviewMode = "original" | "sanitized" | "compare";
 
-/** Source entry with computed offset range */
-interface SourceOffset {
+interface SourceEntry {
   outputId: string;
   displayName: string;
   text: string;
   sourceType: "text" | "file" | undefined;
   fileId?: string;
   fileName?: string;
+}
+
+interface SourceOffset extends SourceEntry {
   offsetStart: number;
   offsetEnd: number;
 }
 
-/** Per-source detection state with local offsets */
-interface SourceDetectionState {
-  sourceId: string;
+interface SourceGroup {
+  baseOutputId: string;
   displayName: string;
-  text: string;
-  offsetStart: number;
-  offsetEnd: number;
-  items: DesensitizeReviewItem[];
-  sourceType: "text" | "file" | undefined;
-  fileId?: string;
-  fileName?: string;
+  sources: SourceEntry[];
+  isFileGroup: boolean;
 }
 
-// Group items by sensitiveType for collapsible category sections
 function groupByType(items: DesensitizeReviewItem[]): Record<string, DesensitizeReviewItem[]> {
   const groups: Record<string, DesensitizeReviewItem[]> = {};
   for (const item of items) {
@@ -55,120 +51,107 @@ function groupByType(items: DesensitizeReviewItem[]): Record<string, Desensitize
   return groups;
 }
 
-/** Check if inputData uses multi-source format */
-function isMultiSource(
-  inputData: Record<string, unknown> | null,
-): inputData is { sources: Record<string, unknown> } {
+function isMultiSource(inputData: Record<string, unknown> | null): boolean {
   return (
     !!inputData &&
     typeof inputData === "object" &&
     "sources" in inputData &&
-    typeof inputData.sources === "object"
+    typeof (inputData as Record<string, unknown>).sources === "object"
   );
 }
 
-/** Build concatenated text and compute offset ranges for each source */
-function buildConcatenatedText(sources: SourceOffset[]): {
+function getBaseOutputId(outputId: string): string {
+  return outputId.split("::file::")[0] ?? outputId;
+}
+
+function buildConcatenatedText(sources: SourceEntry[]): {
   concatenated: string;
   sources: SourceOffset[];
 } {
   const parts: string[] = [];
   const updated: SourceOffset[] = [];
+  let currentOffset = 0;
 
-  for (const src of sources) {
-    if (!src.text?.trim()) continue;
-    const offsetStart = parts.join("\n").length;
-    parts.push(src.text);
-    const offsetEnd = parts.join("\n").length;
-    updated.push({ ...src, offsetStart, offsetEnd });
+  for (const source of sources) {
+    if (!source.text.trim()) continue;
+    if (parts.length > 0) {
+      currentOffset += 1; // \n separator
+    }
+    const offsetStart = currentOffset;
+    parts.push(source.text);
+    currentOffset += source.text.length;
+    updated.push({
+      ...source,
+      offsetStart,
+      offsetEnd: currentOffset,
+    });
   }
 
   return { concatenated: parts.join("\n"), sources: updated };
 }
 
-/** Attribute global detection items to sources based on offset ranges */
 function attributeItemsToSources(
-  items: DesensitizeReviewItem[],
+  detectedItems: DesensitizeReviewItem[],
   sources: SourceOffset[],
-): SourceDetectionState[] {
-  return sources.map((src) => {
-    const localItems: DesensitizeReviewItem[] = [];
+): Record<string, DesensitizeReviewItem[]> {
+  const itemsBySource: Record<string, DesensitizeReviewItem[]> = {};
 
-    for (const item of items) {
-      if (item.startIndex >= src.offsetStart && item.startIndex < src.offsetEnd) {
-        // Convert global offset to local offset within this source
-        const localStart = item.startIndex - src.offsetStart;
-        const localEnd = item.endIndex - src.offsetStart;
-        localItems.push({
-          ...item,
-          startIndex: localStart,
-          endIndex: localEnd,
-        });
-      }
-    }
+  for (const source of sources) {
+    itemsBySource[source.outputId] = [];
+  }
 
-    return {
-      sourceId: src.outputId,
-      displayName: src.displayName,
-      text: src.text,
-      offsetStart: src.offsetStart,
-      offsetEnd: src.offsetEnd,
-      items: localItems,
-      sourceType: src.sourceType,
-      fileId: src.fileId,
-      fileName: src.fileName,
-    };
-  });
+  for (const item of detectedItems) {
+    const matchedSource = sources.find(
+      (source) => item.startIndex >= source.offsetStart && item.startIndex < source.offsetEnd,
+    );
+    if (!matchedSource) continue;
+
+    itemsBySource[matchedSource.outputId] ??= [];
+    itemsBySource[matchedSource.outputId].push({
+      ...item,
+      startIndex: item.startIndex - matchedSource.offsetStart,
+      endIndex: item.endIndex - matchedSource.offsetStart,
+    });
+  }
+
+  return itemsBySource;
 }
 
 export default function DesensitizeExecutor(props: Props) {
-  // Multi-source: parse source entries from inputData
   const multiSource = () =>
     isMultiSource(props.nodeExecution.inputData as Record<string, unknown> | null);
-  const sourceEntries = (): SourceOffset[] => {
-    const input = props.nodeExecution.inputData as Record<string, unknown> | null;
-    if (isMultiSource(input)) {
-      const raw = Object.entries(input.sources as Record<string, Record<string, unknown>>);
-      // Compute raw offsets (will be recalculated in buildConcatenatedText)
-      let offset = 0;
-      const results: SourceOffset[] = [];
-      for (const [outputId, data] of raw) {
-        const text = (data.text as string) ?? "";
-        if (!text.trim()) continue;
-        results.push({
-          outputId,
-          displayName: (data.displayName as string) ?? outputId,
-          text,
-          sourceType: (data.sourceType as "text" | "file" | undefined) ?? undefined,
-          fileId: data.fileId as string | undefined,
-          fileName: data.fileName as string | undefined,
-          offsetStart: offset,
-          offsetEnd: offset + text.length,
-        });
-        offset += text.length + 1; // +1 for newline separator
-      }
-      return results;
-    }
-    return [];
-  };
 
-  // Determine initial phase from existing outputData
+  const sourceEntries = createMemo<SourceEntry[]>(() => {
+    const input = props.nodeExecution.inputData as Record<string, unknown> | null;
+    if (!isMultiSource(input)) return [];
+
+    return Object.entries((input as Record<string, Record<string, unknown>>).sources)
+      .map(([outputId, data]) => {
+        const source = data as Record<string, unknown>;
+        return {
+          outputId,
+          displayName: (source.displayName as string) ?? outputId,
+          text: (source.text as string) ?? "",
+          sourceType: (source.sourceType as "text" | "file" | undefined) ?? undefined,
+          fileId: source.fileId as string | undefined,
+          fileName: source.fileName as string | undefined,
+        };
+      })
+      .filter((source) => source.text.trim());
+  });
+
   const initialPhase = (): Phase => {
     const output = props.nodeExecution.outputData as Record<string, unknown> | null;
-    if (output && (output.text || output.sources)) {
-      return "confirmed";
-    }
-    // Restore review phase if detection was completed but not yet confirmed
-    if (output && output._detectPhase === "detected" && Array.isArray(output._detectedItems)) {
+    if (output?.confirmedAt || props.nodeExecution.status === "completed") return "confirmed";
+    if (output && output._detectPhase === "detected" && Array.isArray(output._detectedItems))
       return "review";
-    }
     return "detect";
   };
 
   const [phase, setPhase] = createSignal<Phase>(initialPhase());
-  // Per-source items stored as Map keyed by outputId
-  const [sourceItems, setSourceItems] = createSignal<Map<string, DesensitizeReviewItem[]>>(
-    new Map(),
+  const [items, setItems] = createSignal<DesensitizeReviewItem[]>([]);
+  const [itemsBySource, setItemsBySource] = createSignal<Record<string, DesensitizeReviewItem[]>>(
+    {},
   );
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
@@ -179,119 +162,262 @@ export default function DesensitizeExecutor(props: Props) {
   });
   const [selectedItemIndex, setSelectedItemIndex] = createSignal<number | null>(null);
   const [collapsedTypes, setCollapsedTypes] = createSignal<Set<string>>(new Set());
+  const [activeGroupIndex, setActiveGroupIndex] = createSignal(0);
+  const [activeFileIndex, setActiveFileIndex] = createSignal(0);
+  const [previewMode, setPreviewMode] = createSignal<PreviewMode>("sanitized");
+  const [navIndex, setNavIndex] = createSignal(-1);
 
-  // Sticky nav refs for scroll-into-view
-  const sourceRefs = new Map<string, HTMLElement>();
+  const sourceGroups = createMemo<SourceGroup[]>(() => {
+    const groups = new Map<string, SourceGroup>();
 
-  // onConfirm trigger -- called by parent workspace via onConfirm prop
-  const triggerConfirm = () => {
-    if (props.onConfirm) {
-      props.onConfirm();
-    }
-  };
-
-  // Auto-detect on mount, or restore cached detection results
-  onMount(() => {
-    if (phase() === "review") {
-      // Restore cached detection items from backend outputData and re-attribute to sources
-      const output = props.nodeExecution.outputData as Record<string, unknown> | null;
-      const cached = output?._detectedItems as DesensitizeReviewItem[] | undefined;
-      if (cached?.length) {
-        const sources = sourceEntries();
-        if (sources.length > 0) {
-          const { sources: updatedSources } = buildConcatenatedText(sources);
-          const attributed = attributeItemsToSources(
-            cached.map((item) => ({ ...item, checked: true })),
-            updatedSources,
-          );
-          const newMap = new Map<string, DesensitizeReviewItem[]>();
-          for (const s of attributed) {
-            newMap.set(s.sourceId, s.items);
-          }
-          setSourceItems(newMap);
-        } else {
-          setSourceItems(
-            new Map([["_single", cached.map((item) => ({ ...item, checked: true }))]]),
-          );
-        }
+    for (const source of sourceEntries()) {
+      const baseOutputId = getBaseOutputId(source.outputId);
+      const existing = groups.get(baseOutputId);
+      if (existing) {
+        existing.sources.push(source);
+        existing.isFileGroup = existing.isFileGroup || source.sourceType === "file";
+        continue;
       }
-    } else if (phase() === "detect" && !props.readOnly) {
-      handleDetect();
+
+      const configuredDisplayName = props.config.inputSources?.find(
+        (input) => input.outputId === baseOutputId,
+      )?.displayName;
+      groups.set(baseOutputId, {
+        baseOutputId,
+        displayName: configuredDisplayName ?? source.displayName,
+        sources: [source],
+        isFileGroup: source.sourceType === "file",
+      });
     }
+
+    return [...groups.values()];
   });
 
-  // ─── Phase 1: Detection (unified, async with polling) ──────────────────────
+  const currentGroup = createMemo(() => {
+    const groups = sourceGroups();
+    const index = activeGroupIndex();
+    if (index >= 0 && index < groups.length) return groups[index];
+    return groups[0];
+  });
+
+  const currentSource = createMemo(() => {
+    const group = currentGroup();
+    if (!group) return undefined;
+    const index = activeFileIndex();
+    if (index >= 0 && index < group.sources.length) return group.sources[index];
+    return group.sources[0];
+  });
+
+  const currentSourceKey = createMemo(() => currentSource()?.outputId ?? "__single__");
+
+  const currentText = createMemo(() => {
+    if (multiSource()) return currentSource()?.text ?? "";
+    return ((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? "";
+  });
+
+  const detectedCount = createMemo(() =>
+    Object.values(itemsBySource()).reduce((sum, current) => sum + current.length, 0),
+  );
+  const selectedCount = createMemo(() =>
+    Object.values(itemsBySource()).reduce(
+      (sum, current) => sum + current.filter((item) => item.checked).length,
+      0,
+    ),
+  );
+  const skippedCount = createMemo(() => detectedCount() - selectedCount());
+
+  const checkedIndices = createMemo(() =>
+    items()
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item }) => item.checked && item.startIndex >= 0)
+      .sort((a, b) => a.item.startIndex - b.item.startIndex)
+      .map(({ idx }) => idx),
+  );
+
+  function navigateItem(direction: "next" | "prev") {
+    const indices = checkedIndices();
+    if (indices.length === 0) return;
+
+    const current = navIndex();
+    let next: number;
+    if (current < 0 || current >= indices.length) {
+      next = direction === "next" ? 0 : indices.length - 1;
+    } else {
+      next =
+        direction === "next"
+          ? (current + 1) % indices.length
+          : (current - 1 + indices.length) % indices.length;
+    }
+
+    setNavIndex(next);
+    setSelectedItemIndex(indices[next]);
+
+    requestAnimationFrame(() => {
+      const itemIndex = indices[next];
+      const el =
+        document.querySelector(`[data-item-index="${itemIndex}"]`) ??
+        document.querySelector(`[data-placeholder="${items()[itemIndex]?.placeholder}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }
+
+  function cacheItems(nextItemsBySource: Record<string, DesensitizeReviewItem[]>) {
+    setItemsBySource(nextItemsBySource);
+    setItems(nextItemsBySource[currentSourceKey()] ?? []);
+  }
+
+  function updateCurrentItems(
+    updater: DesensitizeReviewItem[] | ((prev: DesensitizeReviewItem[]) => DesensitizeReviewItem[]),
+  ) {
+    const sourceKey = currentSourceKey();
+    const nextItems = typeof updater === "function" ? updater(items()) : updater;
+    setItems(nextItems);
+    setItemsBySource((prev) => ({
+      ...prev,
+      [sourceKey]: nextItems,
+    }));
+  }
+
+  createEffect(
+    on(
+      () => props.nodeExecution.id,
+      (nodeExecutionId) => {
+        const nextPhase = initialPhase();
+        console.warn("[desensitize:init]", {
+          documentId: props.documentId,
+          nodeExecutionId,
+          nextPhase,
+          readOnly: props.readOnly,
+          sourceCount: sourceEntries().length,
+          hasOutputData: !!props.nodeExecution.outputData,
+        });
+        setPhase(nextPhase);
+        setError(null);
+        setShowManualAdd(false);
+        setSelectedItemIndex(null);
+        setCollapsedTypes(new Set());
+        setActiveGroupIndex(0);
+        setActiveFileIndex(0);
+        setPreviewMode("sanitized");
+        setNavIndex(-1);
+
+        if (nextPhase === "review") {
+          const output = props.nodeExecution.outputData as Record<string, unknown> | null;
+          const cached = output?._detectedItems as DesensitizeReviewItem[] | undefined;
+          if (cached?.length) {
+            const allSources = sourceEntries();
+            if (allSources.length > 0) {
+              const { sources } = buildConcatenatedText(allSources);
+              cacheItems(
+                attributeItemsToSources(
+                  cached.map((item) => ({ ...item, checked: true })),
+                  sources,
+                ),
+              );
+            } else {
+              const initialItems = cached.map((item) => ({ ...item, checked: true }));
+              setItems(initialItems);
+              setItemsBySource({ [currentSourceKey()]: initialItems });
+            }
+          } else {
+            setItems([]);
+            setItemsBySource({});
+          }
+          return;
+        }
+
+        if (nextPhase === "confirmed") {
+          setItems([]);
+          setItemsBySource({});
+          return;
+        }
+
+        setItems([]);
+        setItemsBySource({});
+        if (!props.readOnly) {
+          queueMicrotask(() => {
+            void handleDetect();
+          });
+        } else {
+          setLoading(false);
+        }
+      },
+      { defer: false },
+    ),
+  );
+
+  createEffect(() => {
+    setSelectedItemIndex(null);
+    setNavIndex(-1);
+    setItems(itemsBySource()[currentSourceKey()] ?? []);
+  });
+
+  createEffect(() => {
+    const idx = selectedItemIndex();
+    if (idx === null) return;
+    queueMicrotask(() => {
+      const el = document.querySelector(`[data-item-index="${idx}"]`) as HTMLElement | null;
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
 
   let detectPollTimer: ReturnType<typeof setInterval> | undefined;
   onCleanup(() => {
     if (detectPollTimer) clearInterval(detectPollTimer);
+    props.registerConfirmAction?.(null);
   });
 
   async function handleDetect() {
-    const sources = sourceEntries();
-    const hasMultiple = sources.length > 1;
+    const allSources = sourceEntries();
+    const { concatenated, sources } = buildConcatenatedText(allSources);
+    const singleText =
+      allSources[0]?.text ??
+      ((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ??
+      "";
+    const text = allSources.length > 1 ? concatenated : singleText;
 
-    if (hasMultiple) {
-      // Unified detection: concatenate all sources with newline separators
-      const { concatenated, sources: updatedSources } = buildConcatenatedText(sources);
-      if (!concatenated.trim()) {
-        setError("无可检测的输入文本");
+    if (!text.trim()) {
+      setError("无可检测的输入文本");
+      return;
+    }
+
+    console.warn("[desensitize:detect] start", {
+      documentId: props.documentId,
+      nodeExecutionId: props.nodeExecution.id,
+      sourceCount: allSources.length,
+      textLength: text.length,
+    });
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const runtimeApi = api.api.runtime as any;
+      console.warn("[desensitize:detect] runtime-path", {
+        hasRuntimeApi: !!runtimeApi,
+        hasDocumentApi: !!runtimeApi?.[props.documentId],
+        hasDesensitizeApi: !!runtimeApi?.[props.documentId]?.desensitize,
+        hasNodeApi: !!runtimeApi?.[props.documentId]?.desensitize?.[props.nodeExecution.id],
+      });
+
+      const res = await runtimeApi[props.documentId].desensitize[
+        props.nodeExecution.id
+      ].detect.post({ text });
+      const data = res.data as Record<string, unknown> | null;
+      if (data && "error" in data) {
+        setError(typeof data.error === "string" ? data.error : "检测失败，请重试");
+        setLoading(false);
         return;
       }
-      setLoading(true);
-      setError(null);
-
-      try {
-        // biome-ignore lint/suspicious/noExplicitAny: matching existing pattern
-        const runtimeApi = api.api.runtime as any;
-        const res = await runtimeApi[props.documentId].desensitize[
-          props.nodeExecution.id
-        ].detect.post({ text: concatenated });
-
-        const data = res.data as Record<string, unknown> | null;
-        if (data && "error" in data) {
-          setError(typeof data.error === "string" ? data.error : "检测失败，请重试");
-          setLoading(false);
-          return;
-        }
-
-        pollDetectStatus(updatedSources);
-      } catch {
-        setError("检测失败，请重试");
-        setLoading(false);
-      }
-    } else {
-      // Single source: original behavior
-      const text =
-        sources.length === 1
-          ? sources[0].text
-          : (((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? "");
-      if (!text.trim()) {
-        setError("无可检测的输入文本");
-        return;
-      }
-      setLoading(true);
-      setError(null);
-
-      try {
-        // biome-ignore lint/suspicious/noExplicitAny: matching existing pattern
-        const runtimeApi = api.api.runtime as any;
-        const res = await runtimeApi[props.documentId].desensitize[
-          props.nodeExecution.id
-        ].detect.post({ text });
-        const data = res.data as Record<string, unknown> | null;
-        if (data && "error" in data) {
-          setError(typeof data.error === "string" ? data.error : "检测失败，请重试");
-          setLoading(false);
-          return;
-        }
-        pollDetectStatus(
-          sources.length === 1 ? [{ ...sources[0], offsetStart: 0, offsetEnd: text.length }] : [],
-        );
-      } catch {
-        setError("检测失败，请重试");
-        setLoading(false);
-      }
+      pollDetectStatus(sources);
+    } catch (error) {
+      console.error("[desensitize:detect] failed", {
+        documentId: props.documentId,
+        nodeExecutionId: props.nodeExecution.id,
+        error,
+      });
+      setError("检测失败，请重试");
+      setLoading(false);
     }
   }
 
@@ -313,21 +439,16 @@ export default function DesensitizeExecutor(props: Props) {
         if (data.status === "detected") {
           clearInterval(detectPollTimer);
           detectPollTimer = undefined;
+
           const detected = (data.items as DesensitizeReviewItem[]).map(
             (item: DesensitizeReviewItem) => ({ ...item, checked: true }),
           );
 
-          if (sources.length > 1) {
-            // Attribute items to each source
-            const attributed = attributeItemsToSources(detected, sources);
-            const newMap = new Map<string, DesensitizeReviewItem[]>();
-            for (const s of attributed) {
-              newMap.set(s.sourceId, s.items);
-            }
-            setSourceItems(newMap);
+          if (sources.length > 0) {
+            cacheItems(attributeItemsToSources(detected, sources));
           } else {
-            // Single source: store under _single key
-            setSourceItems(new Map([["_single", detected]]));
+            setItems(detected);
+            setItemsBySource({ [currentSourceKey()]: detected });
           }
 
           setPhase("review");
@@ -347,44 +468,16 @@ export default function DesensitizeExecutor(props: Props) {
     }, 2000);
   }
 
-  // ─── Phase 2: Review helpers ──────────────────────────────────────────────
-
-  /** Get all items across all sources (for single-source compatibility) */
-  const allItems = createMemo(() => {
-    const map = sourceItems();
-    if (map.has("_single")) return map.get("_single") as DesensitizeReviewItem[];
-    const result: DesensitizeReviewItem[] = [];
-    for (const items of map.values()) {
-      result.push(...items);
-    }
-    return result;
-  });
-
-  function toggleItemGlobal(globalIndex: number) {
-    const map = sourceItems();
-    const all = allItems();
-    if (globalIndex < 0 || globalIndex >= all.length) return;
-    const item = all[globalIndex];
-    // Find which source owns this item
-    for (const [sourceId, items] of map.entries()) {
-      const localIdx = items.indexOf(item);
-      if (localIdx >= 0) {
-        const newMap = new Map(map);
-        newMap.set(
-          sourceId,
-          items.map((it, i) => (i === localIdx ? { ...it, checked: !it.checked } : it)),
-        );
-        setSourceItems(newMap);
-        return;
-      }
-    }
+  function toggleItem(index: number) {
+    updateCurrentItems((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, checked: !item.checked } : item)),
+    );
   }
 
   function toggleTypeCollapsed(type: string) {
     setCollapsedTypes((prev) => {
       const next = new Set(prev);
-      if (next.has(type)) next.delete(type);
-      else next.add(type);
+      next.has(type) ? next.delete(type) : next.add(type);
       return next;
     });
   }
@@ -392,19 +485,17 @@ export default function DesensitizeExecutor(props: Props) {
   function handleManualAdd() {
     const form = manualForm();
     if (!form.original.trim()) return;
-    const map = sourceItems();
-    const all = allItems();
-    const text = multiSource()
-      ? ""
-      : (((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? "");
-    const sameType = all.filter((it) => it.sensitiveType === form.sensitiveType);
+
+    const text = currentText();
+    const sameType = items().filter((item) => item.sensitiveType === form.sensitiveType);
     let maxN = 0;
     for (const item of sameType) {
       const match = item.placeholder.match(/_(\d+)\]$/);
       if (match) maxN = Math.max(maxN, Number.parseInt(match[1], 10));
     }
+
     const placeholder = `[${form.sensitiveType.toUpperCase()}_${maxN + 1}]`;
-    const startIndex = text ? text.indexOf(form.original) : -1;
+    const startIndex = text.indexOf(form.original);
     const newItem: DesensitizeReviewItem = {
       original: form.original,
       placeholder,
@@ -415,39 +506,30 @@ export default function DesensitizeExecutor(props: Props) {
       checked: true,
     };
 
-    // Add to _single source if available, else first source
-    const newMap = new Map(map);
-    if (map.has("_single")) {
-      newMap.set("_single", [...(map.get("_single") ?? []), newItem]);
-    } else if (map.size > 0) {
-      const firstKey = map.keys().next().value as string;
-      newMap.set(firstKey, [...(map.get(firstKey) ?? []), newItem]);
-    } else {
-      newMap.set("_single", [newItem]);
-    }
-    setSourceItems(newMap);
+    updateCurrentItems((prev) => [...prev, newItem]);
     setManualForm({ original: "", sensitiveType: "person_name" });
     setShowManualAdd(false);
   }
 
-  function getSanitizedPreviewForSource(
-    sourceText: string,
-    items: DesensitizeReviewItem[],
-  ): string {
+  function getSanitizedPreviewForSource(sourceText: string, sourceItems: DesensitizeReviewItem[]) {
     let text = sourceText;
-    const checked = items
-      .filter((it) => it.checked && it.startIndex >= 0)
+    const checked = sourceItems
+      .filter((item) => item.checked && item.startIndex >= 0)
       .sort((a, b) => b.startIndex - a.startIndex);
+
     for (const item of checked) {
       text = text.slice(0, item.startIndex) + item.placeholder + text.slice(item.endIndex);
     }
+
     return text;
   }
 
-  // Build confirm body — used internally and exposed via onConfirm prop
+  function getSanitizedPreview() {
+    return getSanitizedPreviewForSource(currentText(), items());
+  }
+
   async function buildAndSubmitConfirm() {
-    const map = sourceItems();
-    const sources = sourceEntries();
+    const allSources = sourceEntries();
     const confirmedSources: Record<
       string,
       {
@@ -458,59 +540,37 @@ export default function DesensitizeExecutor(props: Props) {
       }
     > = {};
 
-    if (multiSource() && sources.length > 0) {
-      for (const src of sources) {
-        const items = map.get(src.outputId) ?? [];
-        const confirmed = items.filter((it) => it.checked);
-        const sanitized = getSanitizedPreviewForSource(src.text, items);
-        confirmedSources[src.outputId] = {
-          displayName: src.displayName,
-          items: confirmed.map((it) => ({
-            original: it.original,
-            placeholder: it.placeholder,
-            sensitiveType: it.sensitiveType,
-          })),
-          sanitizedText: sanitized,
-          reviewSummary: items.map((it) => ({
-            placeholder: it.placeholder,
-            sensitiveType: it.sensitiveType,
-            checked: it.checked,
-          })),
-        };
-      }
-    } else {
-      const items = map.get("_single") ?? [];
-      const confirmed = items.filter((it) => it.checked);
-      const text =
-        ((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? "";
-      const sanitized = getSanitizedPreviewForSource(text, items);
-      confirmedSources._default = {
-        displayName: "Default",
-        items: confirmed.map((it) => ({
-          original: it.original,
-          placeholder: it.placeholder,
-          sensitiveType: it.sensitiveType,
+    for (const source of allSources) {
+      const sourceItems = itemsBySource()[source.outputId] ?? [];
+      const confirmedItems = sourceItems.filter((item) => item.checked);
+      confirmedSources[source.outputId] = {
+        displayName: source.displayName,
+        items: confirmedItems.map((item) => ({
+          original: item.original,
+          placeholder: item.placeholder,
+          sensitiveType: item.sensitiveType,
         })),
-        sanitizedText: sanitized,
-        reviewSummary: items.map((it) => ({
-          placeholder: it.placeholder,
-          sensitiveType: it.sensitiveType,
-          checked: it.checked,
+        sanitizedText: getSanitizedPreviewForSource(source.text, sourceItems),
+        reviewSummary: sourceItems.map((item) => ({
+          placeholder: item.placeholder,
+          sensitiveType: item.sensitiveType,
+          checked: item.checked,
         })),
       };
     }
 
-    // Collect all confirmed items globally for the legacy items field
-    const allItems_ = allItems();
-    const confirmed = allItems_.filter((it) => it.checked);
+    const allDetectedItems = Object.values(itemsBySource()).flat();
+    const confirmedItems = allDetectedItems.filter((item) => item.checked);
     const globalSanitized =
-      sources.length > 1
-        ? sources
-            .map((s) => getSanitizedPreviewForSource(s.text, map.get(s.outputId) ?? []))
+      allSources.length > 0
+        ? allSources
+            .map((source) =>
+              getSanitizedPreviewForSource(source.text, itemsBySource()[source.outputId] ?? []),
+            )
             .join("\n")
         : getSanitizedPreviewForSource(
             ((props.nodeExecution.inputData as Record<string, unknown>)?.text as string) ?? "",
-            map.get("_single") ?? [],
+            items(),
           );
 
     setLoading(true);
@@ -522,16 +582,16 @@ export default function DesensitizeExecutor(props: Props) {
       const res = await runtimeApi[props.documentId].desensitize[
         props.nodeExecution.id
       ].confirm.post({
-        items: confirmed.map((it) => ({
-          original: it.original,
-          placeholder: it.placeholder,
-          sensitiveType: it.sensitiveType,
+        items: confirmedItems.map((item) => ({
+          original: item.original,
+          placeholder: item.placeholder,
+          sensitiveType: item.sensitiveType,
         })),
         sanitizedText: globalSanitized,
-        reviewSummary: allItems_.map((it) => ({
-          placeholder: it.placeholder,
-          sensitiveType: it.sensitiveType,
-          checked: it.checked,
+        reviewSummary: allDetectedItems.map((item) => ({
+          placeholder: item.placeholder,
+          sensitiveType: item.sensitiveType,
+          checked: item.checked,
         })),
         sources: confirmedSources,
       });
@@ -539,26 +599,39 @@ export default function DesensitizeExecutor(props: Props) {
       const data = res.data as Record<string, unknown> | null;
       if (data && !("error" in data)) {
         setPhase("confirmed");
-      } else {
-        const errMsg = data?.error;
-        setError(typeof errMsg === "string" ? errMsg : "确认失败，请重试");
+        return;
       }
-    } catch {
-      setError("确认失败，请重试");
+
+      const errorMessage = data?.error;
+      throw new Error(typeof errorMessage === "string" ? errorMessage : "确认失败，请重试");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "确认失败，请重试";
+      setError(message);
+      throw error;
     } finally {
       setLoading(false);
     }
   }
 
-  // ─── Highlight rendering ──────────────────────────────────────────────────
+  createEffect(() => {
+    props.registerConfirmAction?.(
+      phase() === "review"
+        ? async () => {
+            await buildAndSubmitConfirm();
+            return true;
+          }
+        : null,
+    );
+  });
 
-  function renderHighlightedTextForSource(sourceText: string, items: DesensitizeReviewItem[]) {
-    const checked = items
-      .filter((it) => it.checked && it.startIndex >= 0)
+  function renderHighlightedText() {
+    const text = currentText();
+    const checked = items()
+      .filter((item) => item.checked && item.startIndex >= 0)
       .sort((a, b) => a.startIndex - b.startIndex);
 
     if (checked.length === 0) {
-      return <span>{sourceText}</span>;
+      return <span>{text}</span>;
     }
 
     const parts: Array<{ text: string; isHighlight: boolean; itemIndex: number }> = [];
@@ -567,18 +640,19 @@ export default function DesensitizeExecutor(props: Props) {
     for (const item of checked) {
       if (item.startIndex > lastEnd) {
         parts.push({
-          text: sourceText.slice(lastEnd, item.startIndex),
+          text: text.slice(lastEnd, item.startIndex),
           isHighlight: false,
           itemIndex: -1,
         });
       }
-      const originalIndex = items.indexOf(item);
+
+      const originalIndex = items().indexOf(item);
       parts.push({ text: item.original, isHighlight: true, itemIndex: originalIndex });
       lastEnd = item.endIndex;
     }
 
-    if (lastEnd < sourceText.length) {
-      parts.push({ text: sourceText.slice(lastEnd), isHighlight: false, itemIndex: -1 });
+    if (lastEnd < text.length) {
+      parts.push({ text: text.slice(lastEnd), isHighlight: false, itemIndex: -1 });
     }
 
     return (
@@ -586,16 +660,17 @@ export default function DesensitizeExecutor(props: Props) {
         {(part) => (
           <Show when={part.isHighlight} fallback={<span>{part.text}</span>}>
             <span
-              class={`px-0.5 rounded cursor-pointer transition-colors ${
-                selectedItemIndex() === part.itemIndex
-                  ? "bg-amber-400 ring-2 ring-amber-500"
-                  : "bg-amber-200 hover:bg-amber-300"
-              }`}
+              data-item-index={part.itemIndex}
+              class={`px-0.5 rounded cursor-pointer transition-colors ${selectedItemIndex() === part.itemIndex ? "bg-amber-400 ring-2 ring-amber-500" : "bg-amber-200 hover:bg-amber-300"}`}
               onClick={() => setSelectedItemIndex(part.itemIndex)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") setSelectedItemIndex(part.itemIndex);
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedItemIndex(part.itemIndex);
+                }
               }}
-              title={items[part.itemIndex]?.placeholder}
+              title={items()[part.itemIndex]?.placeholder}
+              tabindex="0"
             >
               {part.text}
             </span>
@@ -605,7 +680,207 @@ export default function DesensitizeExecutor(props: Props) {
     );
   }
 
-  // ─── Read-only / confirmed mode ────────────────────────────────────────────
+  function renderPreviewModeToggle() {
+    const options: Array<{ id: PreviewMode; label: string }> = [
+      { id: "original", label: "原文" },
+      { id: "sanitized", label: "脱敏后" },
+      { id: "compare", label: "对比" },
+    ];
+
+    return (
+      <div class="inline-flex items-center rounded-xl border border-[rgba(199,196,216,0.35)] bg-white p-1">
+        <For each={options}>
+          {(option) => (
+            <button
+              type="button"
+              class={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                previewMode() === option.id
+                  ? "bg-[#f0efff] text-[#4f46e5]"
+                  : "text-[#777587] hover:text-[#464555]"
+              }`}
+              onClick={() => setPreviewMode(option.id)}
+            >
+              {option.label}
+            </button>
+          )}
+        </For>
+      </div>
+    );
+  }
+
+  function renderLineAlignedCompare(
+    origText: string,
+    sanText: string,
+    origLineRenderer?: (line: string, lineOffset: number) => ReturnType<typeof HighlightedText>,
+  ) {
+    const origLines = origText.split("\n");
+    const sanLines = sanText.split("\n");
+    const lineCount = Math.max(origLines.length, sanLines.length);
+    const lineIndices = Array.from({ length: lineCount }, (_, i) => i);
+
+    // Compute cumulative line start offsets for highlight index mapping
+    const lineOffsets: number[] = [];
+    let off = 0;
+    for (const line of origLines) {
+      lineOffsets.push(off);
+      off += line.length + 1;
+    }
+
+    const renderOrig = origLineRenderer ?? ((line: string) => <span>{line}</span>);
+
+    return (
+      <div class="space-y-2">
+        <div class="grid grid-cols-2 gap-4">
+          <h4 class="text-xs font-semibold text-[#464555] uppercase tracking-wide">原文</h4>
+          <h4 class="text-xs font-semibold text-[#464555] uppercase tracking-wide">脱敏后</h4>
+        </div>
+        <div class="max-h-[500px] overflow-y-auto bg-white border border-[rgba(199,196,216,0.35)] rounded-xl p-4">
+          <div class="grid grid-cols-2 gap-x-4">
+            <For each={lineIndices}>
+              {(i) => (
+                <>
+                  <div class="text-sm text-[#191c1e] min-h-[1.5em] leading-relaxed min-w-0 overflow-hidden">
+                    {renderOrig(origLines[i] ?? "", lineOffsets[i] ?? 0)}
+                  </div>
+                  <div class="text-sm text-[#191c1e] min-h-[1.5em] leading-relaxed min-w-0 overflow-hidden">
+                    <HighlightedText text={sanLines[i] ?? ""} />
+                  </div>
+                </>
+              )}
+            </For>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function highlightOriginalLine(line: string, lineOffset: number) {
+    const lineEnd = lineOffset + line.length;
+    const checkedItems = items()
+      .filter((item) => item.checked && item.startIndex >= 0)
+      .filter((item) => item.endIndex > lineOffset && item.startIndex < lineEnd)
+      .sort((a, b) => a.startIndex - b.startIndex);
+
+    if (checkedItems.length === 0) return <span>{line}</span>;
+
+    const parts: Array<{ text: string; isHighlight: boolean; itemIndex: number }> = [];
+    let pos = 0;
+
+    for (const item of checkedItems) {
+      const relStart = Math.max(0, item.startIndex - lineOffset);
+      const relEnd = Math.min(line.length, item.endIndex - lineOffset);
+      if (relStart > pos) {
+        parts.push({ text: line.slice(pos, relStart), isHighlight: false, itemIndex: -1 });
+      }
+      parts.push({
+        text: line.slice(relStart, relEnd),
+        isHighlight: true,
+        itemIndex: items().indexOf(item),
+      });
+      pos = relEnd;
+    }
+    if (pos < line.length) {
+      parts.push({ text: line.slice(pos), isHighlight: false, itemIndex: -1 });
+    }
+
+    return (
+      <For each={parts}>
+        {(part) => (
+          <Show when={part.isHighlight} fallback={<span>{part.text}</span>}>
+            <span
+              data-item-index={part.itemIndex}
+              class={`px-0.5 rounded cursor-pointer transition-colors ${
+                selectedItemIndex() === part.itemIndex
+                  ? "bg-amber-400 ring-2 ring-amber-500"
+                  : "bg-amber-200 hover:bg-amber-300"
+              }`}
+              onClick={() => setSelectedItemIndex(part.itemIndex)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setSelectedItemIndex(part.itemIndex);
+                }
+              }}
+              title={items()[part.itemIndex]?.placeholder}
+              tabindex="0"
+            >
+              {part.text}
+            </span>
+          </Show>
+        )}
+      </For>
+    );
+  }
+
+  function renderSanitizedText() {
+    const text = getSanitizedPreview();
+    const regex = /\[([A-Z_]+\d*)\]/g;
+    const parts: Array<{ text: string; isPlaceholder: boolean; itemIndex: number }> = [];
+    let last = 0;
+    let match: RegExpExecArray | null;
+    // biome-ignore lint/suspicious/noAssignInExpressions: intentional loop pattern
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > last) {
+        parts.push({ text: text.slice(last, match.index), isPlaceholder: false, itemIndex: -1 });
+      }
+      const placeholder = match[0];
+      const itemIndex = items().findIndex((item) => item.checked && item.placeholder === placeholder);
+      parts.push({ text: placeholder, isPlaceholder: true, itemIndex });
+      last = match.index + match[0].length;
+    }
+    if (last < text.length) {
+      parts.push({ text: text.slice(last), isPlaceholder: false, itemIndex: -1 });
+    }
+
+    return (
+      <For each={parts}>
+        {(part) =>
+          part.isPlaceholder ? (
+            <span
+              data-item-index={part.itemIndex >= 0 ? part.itemIndex : undefined}
+              class={`px-0.5 rounded font-mono text-xs cursor-pointer transition-colors ${
+                selectedItemIndex() === part.itemIndex
+                  ? "bg-amber-400 text-amber-900 ring-2 ring-amber-500"
+                  : "bg-amber-100 text-amber-800 hover:bg-amber-200"
+              }`}
+              onClick={() => {
+                if (part.itemIndex >= 0) setSelectedItemIndex(part.itemIndex);
+              }}
+              onKeyDown={(e) => {
+                if ((e.key === "Enter" || e.key === " ") && part.itemIndex >= 0) {
+                  e.preventDefault();
+                  setSelectedItemIndex(part.itemIndex);
+                }
+              }}
+              tabindex="0"
+            >
+              {part.text}
+            </span>
+          ) : (
+            <span>{part.text}</span>
+          )
+        }
+      </For>
+    );
+  }
+
+  function renderTextPanel(title: string, content: "original" | "sanitized", selfScroll = true) {
+    return (
+      <div class="space-y-2 min-w-0">
+        <div class="flex items-center justify-between gap-3">
+          <h4 class="text-xs font-semibold text-[#464555] uppercase tracking-wide">{title}</h4>
+        </div>
+        <div class={`bg-white border border-[rgba(199,196,216,0.35)] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed ${selfScroll ? "max-h-[500px] overflow-y-auto" : "overflow-x-auto"}`}>
+          <Show
+            when={content === "original"}
+            fallback={renderSanitizedText()}
+          >
+            {renderHighlightedText()}
+          </Show>
+        </div>
+      </div>
+    );
+  }
 
   if (props.readOnly || phase() === "confirmed") {
     const outputData = props.nodeExecution.outputData as Record<string, unknown> | null;
@@ -615,10 +890,35 @@ export default function DesensitizeExecutor(props: Props) {
       | Record<string, { displayName: string; desensitizedText: string }>
       | undefined;
     const hasMultiOutput = !!outputSources && Object.keys(outputSources).length > 0;
+    const currentSanitizedText = hasMultiOutput
+      ? (outputSources?.[currentSourceKey()]?.desensitizedText ?? "")
+      : outputText;
+    const isCompletedState = props.readOnly || props.nodeExecution.status === "completed";
+    const statusClass = isCompletedState
+      ? "bg-emerald-50 text-emerald-700"
+      : "bg-indigo-50 text-indigo-700";
+    const statusDotClass = isCompletedState ? "bg-emerald-500" : "bg-indigo-500";
+    const statusLabel = isCompletedState
+      ? `审核完成 · 已脱敏 ${mappingCount} 项`
+      : `已确认 · 已脱敏 ${mappingCount} 项`;
+
+    function renderConfirmedTextPanel(title: string, text: string, highlighted: boolean, selfScroll = true) {
+      return (
+        <div class="space-y-2 min-w-0">
+          <h4 class="text-xs font-semibold text-[#464555] uppercase tracking-wide">{title}</h4>
+          <div class={`bg-white border border-[rgba(199,196,216,0.35)] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed ${selfScroll ? "max-h-[500px] overflow-y-auto" : "overflow-x-auto"}`}>
+            <Show when={text} fallback={<span class="text-[#9fa0a8]">暂无内容</span>}>
+              <Show when={highlighted} fallback={<span>{text}</span>}>
+                <HighlightedText text={text} />
+              </Show>
+            </Show>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
-        {/* Header */}
         <div class="px-6 py-5 bg-gradient-to-r from-[#f2f4f6] to-white border-b border-[rgba(199,196,216,0.15)]">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#3525cd] to-[#4f46e5] flex items-center justify-center flex-shrink-0">
@@ -640,9 +940,11 @@ export default function DesensitizeExecutor(props: Props) {
               <h2 class="text-base font-semibold text-[#191c1e]">信息脱敏</h2>
               <p class="text-xs text-[#464555] mt-0.5">自动检测敏感信息并进行脱敏处理</p>
             </div>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              审核完成 · 已脱敏 {mappingCount} 项
+            <span
+              class={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${statusClass}`}
+            >
+              <span class={`w-1.5 h-1.5 rounded-full ${statusDotClass}`} />
+              {statusLabel}
             </span>
           </div>
         </div>
@@ -650,24 +952,122 @@ export default function DesensitizeExecutor(props: Props) {
           <Show
             when={hasMultiOutput}
             fallback={
-              <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed">
-                {outputText}
+              <div class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+                    <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
+                    文本预览
+                  </h3>
+                  {renderPreviewModeToggle()}
+                </div>
+                <Show
+                  when={previewMode() === "compare"}
+                  fallback={
+                    <Show
+                      when={previewMode() === "original"}
+                      fallback={renderConfirmedTextPanel("脱敏后", outputText, true)}
+                    >
+                      {renderConfirmedTextPanel(
+                        "原文",
+                        ((props.nodeExecution.inputData as Record<string, unknown>)
+                          ?.text as string) ?? "",
+                        false,
+                      )}
+                    </Show>
+                  }
+                >
+                  {renderLineAlignedCompare(
+                    ((props.nodeExecution.inputData as Record<string, unknown>)
+                      ?.text as string) ?? "",
+                    outputText,
+                  )}
+                </Show>
               </div>
             }
           >
-            <div class="space-y-3">
-              <For each={Object.entries(outputSources ?? {})}>
-                {([_outputId, src]) => (
-                  <div class="rounded-xl border border-[rgba(199,196,216,0.25)] overflow-hidden">
-                    <div class="px-4 py-2 bg-[#f7f9fb] border-b border-[rgba(199,196,216,0.15)]">
-                      <span class="text-xs font-medium text-[#464555]">{src.displayName}</span>
-                    </div>
-                    <div class="p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed">
-                      {src.desensitizedText}
-                    </div>
-                  </div>
-                )}
-              </For>
+            <div class="space-y-4">
+              <Show when={sourceGroups().length > 1}>
+                <div class="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-[rgba(199,196,216,0.2)] pb-0">
+                  <For each={sourceGroups()}>
+                    {(group, index) => (
+                      <button
+                        type="button"
+                        class={`px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-[1px] ${
+                          activeGroupIndex() === index()
+                            ? "border-[#4f46e5] text-[#4f46e5]"
+                            : "border-transparent text-[#9fa0a8] hover:text-[#464555]"
+                        }`}
+                        onClick={() => {
+                          setActiveGroupIndex(index());
+                          setActiveFileIndex(0);
+                        }}
+                      >
+                        {group.displayName}
+                        <Show when={group.isFileGroup}>
+                          <span class="ml-1 text-[9px] px-1 py-0.5 rounded bg-blue-50 text-blue-500">
+                            文件
+                          </span>
+                        </Show>
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </Show>
+
+              <Show when={currentGroup()?.isFileGroup && (currentGroup()?.sources.length ?? 0) > 1}>
+                <div class="flex gap-2 overflow-x-auto overflow-y-hidden">
+                  <For each={currentGroup()?.sources ?? []}>
+                    {(source, index) => (
+                      <button
+                        type="button"
+                        class={`px-3 py-1.5 text-xs font-medium whitespace-nowrap rounded-full border transition-colors ${
+                          activeFileIndex() === index()
+                            ? "border-[#4f46e5] bg-[#f0efff] text-[#4f46e5]"
+                            : "border-[rgba(199,196,216,0.35)] bg-white text-[#777587] hover:text-[#464555]"
+                        }`}
+                        onClick={() => setActiveFileIndex(index())}
+                      >
+                        {source.fileName ?? source.displayName}
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </Show>
+
+              <Show
+                when={
+                  currentGroup()?.isFileGroup &&
+                  (currentGroup()?.sources.length ?? 0) === 1 &&
+                  currentSource()?.fileName
+                }
+              >
+                <div class="inline-flex items-center gap-2 text-xs text-[#777587] bg-[#f7f9fb] rounded-full px-3 py-1.5">
+                  <span class="text-[#4f46e5] font-medium">当前文件</span>
+                  <span>{currentSource()?.fileName}</span>
+                </div>
+              </Show>
+
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+                  <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
+                  文本预览
+                </h3>
+                {renderPreviewModeToggle()}
+              </div>
+
+              <Show
+                when={previewMode() === "compare"}
+                fallback={
+                  <Show
+                    when={previewMode() === "original"}
+                    fallback={renderConfirmedTextPanel("脱敏后", currentSanitizedText, true)}
+                  >
+                    {renderConfirmedTextPanel("原文", currentText(), false)}
+                  </Show>
+                }
+              >
+                {renderLineAlignedCompare(currentText(), currentSanitizedText)}
+              </Show>
             </div>
           </Show>
         </div>
@@ -675,737 +1075,441 @@ export default function DesensitizeExecutor(props: Props) {
     );
   }
 
-  // ─── Null guard: no categories configured ─────────────────────────────────
-
   const categoriesConfigured = () => props.config?.categories && props.config.categories.length > 0;
-
-  // ─── Review panel helper for a given list of items ────────────────────────
-
-  function renderReviewPanelForSource(sourceId: string, sourceText: string) {
-    const srcItems = createMemo(() => sourceItems().get(sourceId) ?? []);
-    return (
-      <div class="space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="text-xs font-semibold text-[#464555]">敏感信息审核</span>
-          <button
-            type="button"
-            class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium transition-colors"
-            onClick={() => setShowManualAdd(!showManualAdd())}
-          >
-            {showManualAdd() ? "取消" : "手动添加"}
-          </button>
-        </div>
-
-        {/* Manual add form */}
-        <Show when={showManualAdd()}>
-          <div class="bg-[#f7f9fb] rounded-xl p-3 space-y-2 border border-[rgba(199,196,216,0.35)]">
-            <input
-              type="text"
-              placeholder="输入需要脱敏的文本..."
-              class="w-full px-4 py-2.5 text-sm bg-white border border-[rgba(199,196,216,0.35)] rounded-xl text-[#191c1e] placeholder-[#9fa0a8] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] transition-all"
-              value={manualForm().original}
-              onInput={(e) =>
-                setManualForm((prev) => ({ ...prev, original: e.currentTarget.value }))
-              }
-            />
-            <div class="flex gap-2">
-              <select
-                class="flex-1 px-3 py-2 text-sm bg-white border border-[rgba(199,196,216,0.35)] rounded-xl text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] transition-all"
-                value={manualForm().sensitiveType}
-                onChange={(e) =>
-                  setManualForm((prev) => ({
-                    ...prev,
-                    sensitiveType: e.currentTarget.value,
-                  }))
-                }
-                aria-label="敏感信息类型"
-              >
-                <option value="person_name">姓名</option>
-                <option value="phone_number">手机号</option>
-                <option value="email">邮箱</option>
-                <option value="id_number">身份证号</option>
-                <option value="bank_card">银行卡号</option>
-                <option value="company_name">公司名</option>
-                <option value="address">地址</option>
-              </select>
-              <button
-                type="button"
-                class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-lg hover:scale-[1.02] transition-transform"
-                onClick={handleManualAdd}
-              >
-                添加
-              </button>
-            </div>
-          </div>
-        </Show>
-
-        {/* Category sections */}
-        <div class="space-y-2 max-h-[400px] overflow-y-auto pr-0.5">
-          <For each={Object.entries(groupByType(srcItems()))}>
-            {([type, typeItems]) => {
-              const checkedCount = () => typeItems.filter((it) => it.checked).length;
-              const isCollapsed = () => collapsedTypes().has(type);
-              return (
-                <div class="rounded-xl border border-[rgba(199,196,216,0.35)] overflow-hidden">
-                  {/* Category header */}
-                  <button
-                    type="button"
-                    class="w-full flex items-center justify-between px-3 py-2.5 bg-[#f7f9fb] hover:bg-[#f0efff] transition-colors"
-                    onClick={() => toggleTypeCollapsed(type)}
-                  >
-                    <div class="flex items-center gap-2">
-                      <span
-                        class={`text-xs px-2 py-0.5 rounded-full font-medium ${typeBadgeClass(type)}`}
-                      >
-                        {getTypeLabel(type)}
-                      </span>
-                      <span class="text-xs text-[#9fa0a8]">
-                        ({checkedCount()}/{typeItems.length} 项)
-                      </span>
-                      <button
-                        type="button"
-                        class="text-[10px] text-[#4f46e5] hover:text-[#3525cd] font-medium ml-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const allChecked = typeItems.every((it) => it.checked);
-                          const map = sourceItems();
-                          const newMap = new Map(map);
-                          const items = [...(map.get(sourceId) ?? [])];
-                          newMap.set(
-                            sourceId,
-                            items.map((it) =>
-                              it.sensitiveType === type ? { ...it, checked: !allChecked } : it,
-                            ),
-                          );
-                          setSourceItems(newMap);
-                        }}
-                      >
-                        {typeItems.every((it) => it.checked) ? "全不选" : "全选"}
-                      </button>
-                    </div>
-                    <svg
-                      aria-hidden="true"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      class={`text-[#9fa0a8] transition-transform ${isCollapsed() ? "" : "rotate-180"}`}
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
-
-                  {/* Items list */}
-                  <Show when={!isCollapsed()}>
-                    <div class="divide-y divide-[rgba(199,196,216,0.15)]">
-                      <For each={typeItems}>
-                        {(item) => {
-                          const localIndex = () => srcItems().indexOf(item);
-                          const globalIndex = () => allItems().indexOf(item);
-                          return (
-                            <div
-                              class={`flex items-center gap-3 px-3 py-2.5 bg-white cursor-pointer transition-colors ${
-                                selectedItemIndex() === globalIndex()
-                                  ? "bg-[#f0efff]"
-                                  : "hover:bg-[#fafafe]"
-                              } ${!item.checked ? "opacity-50" : ""}`}
-                              onClick={() => setSelectedItemIndex(globalIndex())}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ")
-                                  setSelectedItemIndex(globalIndex());
-                              }}
-                            >
-                              <div class="flex-1 min-w-0 flex items-center gap-2 text-sm">
-                                <span class="font-mono text-red-400 line-through truncate">
-                                  {maskOriginal(item.original)}
-                                </span>
-                                <span class="text-[#9fa0a8] flex-shrink-0">→</span>
-                                <span class="font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded text-xs truncate">
-                                  {item.placeholder}
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                aria-label={item.checked ? "禁用此项脱敏" : "启用此项脱敏"}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  const map = sourceItems();
-                                  const newMap = new Map(map);
-                                  const items = [...(map.get(sourceId) ?? [])];
-                                  items[localIndex()] = {
-                                    ...items[localIndex()],
-                                    checked: !items[localIndex()].checked,
-                                  };
-                                  newMap.set(sourceId, items);
-                                  setSourceItems(newMap);
-                                }}
-                                class={`relative flex-shrink-0 w-9 h-5 rounded-full transition-colors ${
-                                  item.checked ? "bg-[#4f46e5]" : "bg-[#e6e8ea]"
-                                }`}
-                              >
-                                <span
-                                  class={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                                    item.checked ? "translate-x-4" : "translate-x-0.5"
-                                  }`}
-                                />
-                              </button>
-                            </div>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </Show>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-    );
-  }
-
-  function renderReviewPanel(items: DesensitizeReviewItem[]) {
-    return (
-      <div class="space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
-            <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
-            敏感信息审核
-          </h3>
-          <button
-            type="button"
-            class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium transition-colors"
-            onClick={() => setShowManualAdd(!showManualAdd())}
-          >
-            {showManualAdd() ? "取消" : "手动添加"}
-          </button>
-        </div>
-
-        {/* Manual add form */}
-        <Show when={showManualAdd()}>
-          <div class="bg-[#f7f9fb] rounded-xl p-3 space-y-2 border border-[rgba(199,196,216,0.35)]">
-            <input
-              type="text"
-              placeholder="输入需要脱敏的文本..."
-              class="w-full px-4 py-2.5 text-sm bg-white border border-[rgba(199,196,216,0.35)] rounded-xl text-[#191c1e] placeholder-[#9fa0a8] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] transition-all"
-              value={manualForm().original}
-              onInput={(e) =>
-                setManualForm((prev) => ({ ...prev, original: e.currentTarget.value }))
-              }
-            />
-            <div class="flex gap-2">
-              <select
-                class="flex-1 px-3 py-2 text-sm bg-white border border-[rgba(199,196,216,0.35)] rounded-xl text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] transition-all"
-                value={manualForm().sensitiveType}
-                onChange={(e) =>
-                  setManualForm((prev) => ({
-                    ...prev,
-                    sensitiveType: e.currentTarget.value,
-                  }))
-                }
-                aria-label="敏感信息类型"
-              >
-                <option value="person_name">姓名</option>
-                <option value="phone_number">手机号</option>
-                <option value="email">邮箱</option>
-                <option value="id_number">身份证号</option>
-                <option value="bank_card">银行卡号</option>
-                <option value="company_name">公司名</option>
-                <option value="address">地址</option>
-              </select>
-              <button
-                type="button"
-                class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-lg hover:scale-[1.02] transition-transform"
-                onClick={handleManualAdd}
-              >
-                添加
-              </button>
-            </div>
-          </div>
-        </Show>
-
-        {/* Category sections */}
-        <div class="space-y-2 max-h-[520px] overflow-y-auto pr-0.5">
-          <For each={Object.entries(groupByType(items))}>
-            {([type, typeItems]) => {
-              const checkedCount = () => typeItems.filter((it) => it.checked).length;
-              const isCollapsed = () => collapsedTypes().has(type);
-              return (
-                <div class="rounded-xl border border-[rgba(199,196,216,0.35)] overflow-hidden">
-                  {/* Category header */}
-                  <button
-                    type="button"
-                    class="w-full flex items-center justify-between px-3 py-2.5 bg-[#f7f9fb] hover:bg-[#f0efff] transition-colors"
-                    onClick={() => toggleTypeCollapsed(type)}
-                  >
-                    <div class="flex items-center gap-2">
-                      <span
-                        class={`text-xs px-2 py-0.5 rounded-full font-medium ${typeBadgeClass(type)}`}
-                      >
-                        {getTypeLabel(type)}
-                      </span>
-                      <span class="text-xs text-[#9fa0a8]">
-                        ({checkedCount()}/{typeItems.length} 项)
-                      </span>
-                      <button
-                        type="button"
-                        class="text-[10px] text-[#4f46e5] hover:text-[#3525cd] font-medium ml-1"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const allChecked = typeItems.every((it) => it.checked);
-                          const map = sourceItems();
-                          const newMap = new Map(map);
-                          if (map.has("_single")) {
-                            newMap.set(
-                              "_single",
-                              items.map((it) =>
-                                it.sensitiveType === type ? { ...it, checked: !allChecked } : it,
-                              ),
-                            );
-                          }
-                          setSourceItems(newMap);
-                        }}
-                      >
-                        {typeItems.every((it) => it.checked) ? "全不选" : "全选"}
-                      </button>
-                    </div>
-                    <svg
-                      aria-hidden="true"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      class={`text-[#9fa0a8] transition-transform ${isCollapsed() ? "" : "rotate-180"}`}
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
-
-                  {/* Items list */}
-                  <Show when={!isCollapsed()}>
-                    <div class="divide-y divide-[rgba(199,196,216,0.15)]">
-                      <For each={typeItems}>
-                        {(item) => {
-                          const globalIndex = () => allItems().indexOf(item);
-                          return (
-                            <div
-                              class={`flex items-center gap-3 px-3 py-2.5 bg-white cursor-pointer transition-colors ${
-                                selectedItemIndex() === globalIndex()
-                                  ? "bg-[#f0efff]"
-                                  : "hover:bg-[#fafafe]"
-                              } ${!item.checked ? "opacity-50" : ""}`}
-                              onClick={() => setSelectedItemIndex(globalIndex())}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ")
-                                  setSelectedItemIndex(globalIndex());
-                              }}
-                            >
-                              <div class="flex-1 min-w-0 flex items-center gap-2 text-sm">
-                                <span class="font-mono text-red-400 line-through truncate">
-                                  {maskOriginal(item.original)}
-                                </span>
-                                <span class="text-[#9fa0a8] flex-shrink-0">→</span>
-                                <span class="font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded text-xs truncate">
-                                  {item.placeholder}
-                                </span>
-                              </div>
-                              <button
-                                type="button"
-                                aria-label={item.checked ? "禁用此项脱敏" : "启用此项脱敏"}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleItemGlobal(globalIndex());
-                                }}
-                                class={`relative flex-shrink-0 w-9 h-5 rounded-full transition-colors ${
-                                  item.checked ? "bg-[#4f46e5]" : "bg-[#e6e8ea]"
-                                }`}
-                              >
-                                <span
-                                  class={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                                    item.checked ? "translate-x-4" : "translate-x-0.5"
-                                  }`}
-                                />
-                              </button>
-                            </div>
-                          );
-                        }}
-                      </For>
-                    </div>
-                  </Show>
-                </div>
-              );
-            }}
-          </For>
-        </div>
-      </div>
-    );
-  }
-
-  // ─── Null guard: no categories configured ─────────────────────────────────
-
-  // ─── Main render ──────────────────────────────────────────────────────────
 
   return (
     <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
-      {/* Header */}
-      <div class="px-6 py-5 bg-gradient-to-r from-[#f2f4f6] to-white border-b border-[rgba(199,196,216,0.15)]">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-gradient-to-br from-[#3525cd] to-[#4f46e5] flex items-center justify-center flex-shrink-0">
-            <svg
-              aria-hidden="true"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </div>
-          <div>
-            <h2 class="text-base font-semibold text-[#191c1e]">
+      <div class="px-6 py-4 bg-gradient-to-r from-[#f2f4f6] to-white border-b border-[rgba(199,196,216,0.15)]">
+        <div class="flex items-start justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-full bg-gradient-to-br from-[#3525cd] to-[#4f46e5] flex items-center justify-center flex-shrink-0">
+              <svg
+                aria-hidden="true"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <h2 class="text-sm font-semibold text-[#191c1e]">
               {props.nodeExecution.nodeLabel || "信息脱敏"}
             </h2>
-            <p class="text-xs text-[#464555] mt-0.5">自动检测敏感信息并进行脱敏处理</p>
           </div>
+          <Show when={categoriesConfigured()}>
+            <div class="flex flex-wrap gap-1 items-center justify-end">
+              <For each={props.config.categories}>
+                {(category) => (
+                  <span class="text-[10px] px-2 py-0.5 rounded-full bg-[#f0efff] text-[#4f46e5]">
+                    {category.name}
+                  </span>
+                )}
+              </For>
+              <Show when={phase() === "review"}>
+                <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium ml-1">
+                  {selectedCount()}/{detectedCount()} 项
+                </span>
+              </Show>
+            </div>
+          </Show>
         </div>
       </div>
 
-      <div class="p-6 space-y-5">
-        {/* Null guard */}
+      <div class="p-5 space-y-4">
         <Show when={!categoriesConfigured()}>
-          <div class="text-center py-10 text-[#9fa0a8]">
-            <div class="w-12 h-12 rounded-full bg-[#f7f9fb] flex items-center justify-center mx-auto mb-3">
-              <svg
-                aria-hidden="true"
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="1.5"
-              >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="12" />
-                <line x1="12" y1="16" x2="12.01" y2="16" />
-              </svg>
-            </div>
+          <div class="text-center py-8 text-[#9fa0a8]">
             <p class="text-sm">未配置脱敏类别</p>
             <p class="text-xs mt-1 text-[#c4c4cc]">请在工作流编辑器中配置脱敏类别</p>
           </div>
         </Show>
 
         <Show when={categoriesConfigured()}>
-          {/* Configured categories chips */}
-          <div class="flex flex-wrap gap-1.5 items-center">
-            <span class="text-xs text-[#9fa0a8]">检测类别：</span>
-            <For each={props.config.categories}>
-              {(cat) => (
-                <span class="text-xs px-2.5 py-0.5 rounded-full bg-[#f7f9fb] text-[#464555]">
-                  {cat.name}
-                </span>
-              )}
-            </For>
-          </div>
-
-          {/* Sticky anchor nav bar (multi-source vertical layout) */}
-          <Show when={multiSource() && sourceEntries().length > 1}>
-            <div class="sticky top-0 z-10 bg-[#f7f9fb] rounded-xl px-3 py-2 flex flex-wrap gap-1 items-center shadow-sm">
-              <span class="text-xs text-[#9fa0a8] pr-1">来源：</span>
-              <For each={sourceEntries()}>
-                {(src) => (
-                  <button
-                    type="button"
-                    class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors bg-white text-[#191c1e] shadow-sm hover:bg-[#f0efff]"
-                    onClick={() => {
-                      const el = sourceRefs.get(src.outputId);
-                      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }}
-                  >
-                    {src.displayName}
-                  </button>
-                )}
-              </For>
-            </div>
-          </Show>
-
-          {/* Error display */}
           <Show when={error()}>
             <div class="bg-red-50 text-red-600 px-4 py-3 rounded-xl text-sm border border-red-100">
               {error()}
             </div>
           </Show>
 
-          {/* ── Phase 1: Detection (auto-triggered) ── */}
-          <Show when={phase() === "detect"}>
-            <Show when={loading()}>
-              {/* Scanning animation: pulse shield + progress */}
-              <div class="bg-[#fff7ed] rounded-xl px-5 py-4 space-y-3">
-                <div class="flex items-center gap-3">
-                  <div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center animate-pulse flex-shrink-0">
-                    <svg
-                      class="w-5 h-5 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      stroke-width="1.8"
-                      aria-hidden="true"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
-                      />
-                    </svg>
-                  </div>
-                  <div class="flex-1 min-w-0">
-                    <span class="text-sm text-amber-800 font-semibold">正在扫描敏感信息...</span>
-                    <p class="text-xs text-amber-600 mt-0.5">
-                      检测类别：{props.config.categories.map((c) => c.name).join("、")}
-                    </p>
-                  </div>
-                </div>
-                <div class="h-1 bg-amber-200 rounded-full overflow-hidden">
+          <Show when={phase() === "detect" && loading()}>
+            <div class="bg-[#fff7ed] rounded-xl px-4 py-3 flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-amber-400 flex items-center justify-center animate-pulse flex-shrink-0">
+                <svg
+                  class="w-4 h-4 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                  />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <span class="text-sm text-amber-800 font-medium">正在扫描敏感信息...</span>
+                <div class="h-1 bg-amber-200 rounded-full overflow-hidden mt-1.5">
                   <div
                     class="h-full bg-amber-500 rounded-full animate-pulse"
                     style={{ width: "75%" }}
                   />
                 </div>
               </div>
-            </Show>
-            <Show when={!loading()}>
-              <div class="space-y-3">
-                <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
-                  <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
-                  输入文本
-                </h3>
-                <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed max-h-96 overflow-y-auto">
-                  <Show
-                    when={multiSource() && sourceEntries().length > 1}
-                    fallback={
-                      <span>
-                        {((props.nodeExecution.inputData as Record<string, unknown>)
-                          ?.text as string) ?? ""}
-                      </span>
-                    }
+            </div>
+          </Show>
+
+          <Show
+            when={
+              multiSource() && sourceGroups().length > 1 && !(phase() === "detect" && loading())
+            }
+          >
+            <div class="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-[rgba(199,196,216,0.2)] pb-0">
+              <For each={sourceGroups()}>
+                {(group, index) => (
+                  <button
+                    type="button"
+                    class={`px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-[1px] ${
+                      activeGroupIndex() === index()
+                        ? "border-[#4f46e5] text-[#4f46e5]"
+                        : "border-transparent text-[#9fa0a8] hover:text-[#464555]"
+                    }`}
+                    onClick={() => {
+                      setActiveGroupIndex(index());
+                      setActiveFileIndex(0);
+                    }}
                   >
-                    {/* Vertical stacked sources */}
-                    <div class="space-y-4">
-                      <For each={sourceEntries()}>
-                        {(src) => (
-                          <div>
-                            <p class="text-xs font-medium text-[#464555] mb-1">{src.displayName}</p>
-                            <div class="text-sm whitespace-pre-wrap">{src.text}</div>
-                          </div>
-                        )}
-                      </For>
-                    </div>
-                  </Show>
-                </div>
-                <Show
-                  when={
-                    !multiSource() &&
-                    !(
-                      (props.nodeExecution.inputData as Record<string, unknown>)?.text as string
-                    )?.trim()
-                  }
-                >
-                  <p class="text-sm text-[#9fa0a8] text-center py-4">
-                    暂无输入文本，请等待上游节点完成
-                  </p>
-                </Show>
+                    {group.displayName}
+                    <Show when={group.isFileGroup}>
+                      <span class="ml-1 text-[9px] px-1 py-0.5 rounded bg-blue-50 text-blue-500">
+                        文件
+                      </span>
+                    </Show>
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+
+          <Show
+            when={
+              multiSource() &&
+              currentGroup()?.isFileGroup &&
+              (currentGroup()?.sources.length ?? 0) > 1 &&
+              !(phase() === "detect" && loading())
+            }
+          >
+            <div class="flex gap-2 overflow-x-auto overflow-y-hidden">
+              <For each={currentGroup()?.sources ?? []}>
+                {(source, index) => (
+                  <button
+                    type="button"
+                    class={`px-3 py-1.5 text-xs font-medium whitespace-nowrap rounded-full border transition-colors ${
+                      activeFileIndex() === index()
+                        ? "border-[#4f46e5] bg-[#f0efff] text-[#4f46e5]"
+                        : "border-[rgba(199,196,216,0.35)] bg-white text-[#777587] hover:text-[#464555]"
+                    }`}
+                    onClick={() => setActiveFileIndex(index())}
+                  >
+                    {source.fileName ?? source.displayName}
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+
+          <Show
+            when={
+              multiSource() &&
+              currentGroup()?.isFileGroup &&
+              (currentGroup()?.sources.length ?? 0) === 1 &&
+              currentSource()?.fileName
+            }
+          >
+            <div class="inline-flex items-center gap-2 text-xs text-[#777587] bg-[#f7f9fb] rounded-full px-3 py-1.5">
+              <span class="text-[#4f46e5] font-medium">当前文件</span>
+              <span>{currentSource()?.fileName}</span>
+            </div>
+          </Show>
+
+          <Show when={phase() === "detect" && !loading()}>
+            <Show
+              when={currentText().trim()}
+              fallback={
+                <p class="text-sm text-[#9fa0a8] text-center py-4">
+                  暂无输入文本，请等待上游节点完成
+                </p>
+              }
+            >
+              <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed max-h-[500px] overflow-y-auto">
+                {currentText()}
               </div>
             </Show>
           </Show>
 
-          {/* ── Phase 2: Review ── */}
           <Show when={phase() === "review"}>
-            {/* Status banner */}
-            <div class="bg-[#f0fdf4] rounded-xl px-4 py-3 flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
-                <span class="text-sm text-emerald-700 font-medium">
-                  检测完成，共发现 {allItems().length} 项敏感信息
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-3">
+                <span class="flex items-center gap-1.5 text-emerald-700">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  检测 {detectedCount()}
                 </span>
+                <span class="text-emerald-600">已选 {selectedCount()}</span>
+                <span class="text-slate-400">跳过 {skippedCount()}</span>
               </div>
               <button
                 type="button"
-                class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium transition-colors"
+                class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium"
                 onClick={() => {
                   setPhase("detect");
-                  handleDetect();
+                  void handleDetect();
                 }}
               >
                 重新检测
               </button>
             </div>
 
-            {/* Stats cards */}
-            {(() => {
-              const checkedCount = createMemo(() => allItems().filter((it) => it.checked).length);
-              const skippedCount = createMemo(() => allItems().filter((it) => !it.checked).length);
-              return (
-                <div class="grid grid-cols-3 gap-3">
-                  <div class="rounded-xl px-4 py-3 bg-[#f7f9fb]">
-                    <p class="text-[10px] font-medium text-[#777587] uppercase tracking-wide mb-1">
-                      检测总数
-                    </p>
-                    <p class="text-2xl font-bold text-[#191c1e]">{allItems().length}</p>
-                  </div>
-                  <div class="rounded-xl px-4 py-3 bg-emerald-50">
-                    <p class="text-[10px] font-medium text-emerald-600 uppercase tracking-wide mb-1">
-                      已选脱敏
-                    </p>
-                    <p class="text-2xl font-bold text-emerald-700">{checkedCount()}</p>
-                  </div>
-                  <div class="rounded-xl px-4 py-3 bg-slate-50">
-                    <p class="text-[10px] font-medium text-slate-500 uppercase tracking-wide mb-1">
-                      已跳过
-                    </p>
-                    <p class="text-2xl font-bold text-slate-600">{skippedCount()}</p>
+            <div
+              class={`grid gap-5 ${
+                previewMode() === "compare" ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-2"
+              }`}
+            >
+              <div class="space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                  <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
+                    <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
+                    文本预览
+                  </h3>
+                  <div class="flex items-center gap-2">
+                    <Show when={checkedIndices().length > 0}>
+                      <div class="flex items-center gap-0.5 bg-white border border-[rgba(199,196,216,0.35)] rounded-lg px-2 py-1">
+                        <span class="text-xs text-[#464555] tabular-nums min-w-[2.5rem] text-center">
+                          {navIndex() >= 0 && navIndex() < checkedIndices().length
+                            ? `${navIndex() + 1}/${checkedIndices().length}`
+                            : `0/${checkedIndices().length}`}
+                        </span>
+                        <button
+                          type="button"
+                          class="w-5 h-5 flex items-center justify-center rounded hover:bg-[#f0efff] text-[#777587] hover:text-[#4f46e5] transition-colors"
+                          onClick={() => navigateItem("prev")}
+                          title="上一个 (↑)"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="18 15 12 9 6 15" /></svg>
+                        </button>
+                        <button
+                          type="button"
+                          class="w-5 h-5 flex items-center justify-center rounded hover:bg-[#f0efff] text-[#777587] hover:text-[#4f46e5] transition-colors"
+                          onClick={() => navigateItem("next")}
+                          title="下一个 (↓)"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
+                        </button>
+                      </div>
+                    </Show>
+                    {renderPreviewModeToggle()}
                   </div>
                 </div>
-              );
-            })()}
+                <Show
+                  when={previewMode() === "compare"}
+                  fallback={
+                    <Show
+                      when={previewMode() === "original"}
+                      fallback={renderTextPanel("脱敏后", "sanitized")}
+                    >
+                      {renderTextPanel("原文", "original")}
+                    </Show>
+                  }
+                >
+                  {renderLineAlignedCompare(currentText(), getSanitizedPreview(), highlightOriginalLine)}
+                </Show>
+              </div>
 
-            {/* Vertical source cards layout */}
-            <Show
-              when={multiSource() && sourceEntries().length > 1}
-              fallback={
-                /* Single-source / legacy layout */
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                  {/* Left: highlighted text */}
-                  <div class="space-y-3">
+              <Show when={previewMode() !== "compare"}>
+                <div class="space-y-3">
+                  <div class="flex items-center justify-between">
                     <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
                       <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
-                      文本预览
+                      敏感信息审核
                     </h3>
-                    <div class="bg-white border border-[rgba(199,196,216,0.35)] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed max-h-[500px] overflow-y-auto">
-                      {multiSource()
-                        ? renderHighlightedTextForSource("", sourceItems().get("_single") ?? [])
-                        : renderHighlightedTextForSource(
-                            ((props.nodeExecution.inputData as Record<string, unknown>)
-                              ?.text as string) ?? "",
-                            sourceItems().get("_single") ?? [],
-                          )}
-                    </div>
+                    <button
+                      type="button"
+                      class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium transition-colors"
+                      onClick={() => setShowManualAdd(!showManualAdd())}
+                    >
+                      {showManualAdd() ? "取消" : "手动添加"}
+                    </button>
+                  </div>
 
-                    <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2 mt-4">
-                      <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
-                      脱敏预览
-                    </h3>
-                    <div class="bg-[#f7f9fb] rounded-xl p-4 text-sm text-[#464555] whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto">
-                      <Show
-                        when={multiSource()}
-                        fallback={
-                          <HighlightedText
-                            text={getSanitizedPreviewForSource(
-                              ((props.nodeExecution.inputData as Record<string, unknown>)
-                                ?.text as string) ?? "",
-                              sourceItems().get("_single") ?? [],
-                            )}
-                          />
+                  <Show when={showManualAdd()}>
+                    <div class="bg-[#f7f9fb] rounded-xl p-3 space-y-2 border border-[rgba(199,196,216,0.35)]">
+                      <input
+                        type="text"
+                        placeholder="输入需要脱敏的文本..."
+                        class="w-full px-4 py-2.5 text-sm bg-white border border-[rgba(199,196,216,0.35)] rounded-xl text-[#191c1e] placeholder-[#9fa0a8] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] transition-all"
+                        value={manualForm().original}
+                        onInput={(e) =>
+                          setManualForm((prev) => ({ ...prev, original: e.currentTarget.value }))
                         }
-                      >
-                        <HighlightedText
-                          text={getSanitizedPreviewForSource(
-                            "",
-                            sourceItems().get("_single") ?? [],
-                          )}
-                        />
+                      />
+                      <div class="flex gap-2">
+                        <select
+                          class="flex-1 px-3 py-2 text-sm bg-white border border-[rgba(199,196,216,0.35)] rounded-xl text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] transition-all"
+                          value={manualForm().sensitiveType}
+                          onChange={(e) =>
+                            setManualForm((prev) => ({
+                              ...prev,
+                              sensitiveType: e.currentTarget.value,
+                            }))
+                          }
+                        >
+                          <option value="person_name">姓名</option>
+                          <option value="phone_number">手机号</option>
+                          <option value="email">邮箱</option>
+                          <option value="id_number">身份证号</option>
+                          <option value="bank_card">银行卡号</option>
+                          <option value="company_name">公司名</option>
+                          <option value="address">地址</option>
+                        </select>
+                        <button
+                          type="button"
+                          class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-lg hover:scale-[1.02] transition-transform"
+                          onClick={handleManualAdd}
+                        >
+                          添加
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+
+                  <div class="space-y-2 max-h-[520px] overflow-y-auto pr-0.5">
+                    <For each={Object.entries(groupByType(items()))}>
+                      {([type, typeItems]) => {
+                        const checkedCount = () => typeItems.filter((item) => item.checked).length;
+                        const isCollapsed = () => collapsedTypes().has(type);
+                        return (
+                          <div class="rounded-xl border border-[rgba(199,196,216,0.35)] overflow-hidden">
+                            <div
+                              class="w-full flex items-center justify-between px-3 py-2.5 bg-[#f7f9fb] hover:bg-[#f0efff] transition-colors cursor-pointer"
+                              onClick={() => toggleTypeCollapsed(type)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") toggleTypeCollapsed(type);
+                              }}
+                            >
+                              <div class="flex items-center gap-2">
+                                <span
+                                  class={`text-xs px-2 py-0.5 rounded-full font-medium ${typeBadgeClass(type)}`}
+                                >
+                                  {getTypeLabel(type)}
+                                </span>
+                                <span class="text-xs text-[#9fa0a8]">
+                                  ({checkedCount()}/{typeItems.length} 项)
+                                </span>
+                                <button
+                                  type="button"
+                                  class="text-[10px] text-[#4f46e5] hover:text-[#3525cd] font-medium ml-1"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateCurrentItems((prev) =>
+                                      prev.map((item) =>
+                                        item.sensitiveType === type
+                                          ? {
+                                              ...item,
+                                              checked: !typeItems.every((entry) => entry.checked),
+                                            }
+                                          : item,
+                                      ),
+                                    );
+                                  }}
+                                >
+                                  {typeItems.every((item) => item.checked) ? "全不选" : "全选"}
+                                </button>
+                              </div>
+                              <svg
+                                aria-hidden="true"
+                                width="14"
+                                height="14"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                class={`text-[#9fa0a8] transition-transform ${isCollapsed() ? "" : "rotate-180"}`}
+                              >
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
+                            </div>
+                            <Show when={!isCollapsed()}>
+                              <div class="divide-y divide-[rgba(199,196,216,0.15)]">
+                                <For each={typeItems}>
+                                  {(item) => {
+                                    const index = () => items().indexOf(item);
+                                    return (
+                                      <div
+                                        class={`flex items-center gap-3 px-3 py-2.5 bg-white cursor-pointer transition-colors ${selectedItemIndex() === index() ? "bg-[#f0efff]" : "hover:bg-[#fafafe]"} ${!item.checked ? "opacity-50" : ""}`}
+                                        onClick={() => setSelectedItemIndex(index())}
+                                        onKeyDown={(e) => {
+                                          if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setSelectedItemIndex(index());
+                                          }
+                                        }}
+                                        tabindex="0"
+                                      >
+                                        <div class="flex-1 min-w-0 flex items-center gap-2 text-sm">
+                                          <span class="font-mono text-red-400 line-through truncate">
+                                            {maskOriginal(item.original)}
+                                          </span>
+                                          <span class="text-[#9fa0a8] flex-shrink-0">→</span>
+                                          <span class="font-mono text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded text-xs truncate">
+                                            {item.placeholder}
+                                          </span>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          aria-label={
+                                            item.checked ? "禁用此项脱敏" : "启用此项脱敏"
+                                          }
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleItem(index());
+                                          }}
+                                          class={`relative flex-shrink-0 w-9 h-5 rounded-full transition-colors ${item.checked ? "bg-[#4f46e5]" : "bg-[#e6e8ea]"}`}
+                                        >
+                                          <span
+                                            class={`absolute left-0 top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${item.checked ? "translate-x-4" : "translate-x-0.5"}`}
+                                          />
+                                        </button>
+                                      </div>
+                                    );
+                                  }}
+                                </For>
+                              </div>
+                            </Show>
+                          </div>
+                        );
+                      }}
+                    </For>
+                  </div>
+
+                  <div class="pt-3 border-t border-[rgba(199,196,216,0.2)] space-y-3">
+                    <div class="flex items-center justify-between text-xs text-[#464555]">
+                      <span>
+                        已选择 <span class="font-semibold text-[#191c1e]">{selectedCount()}</span> /{" "}
+                        {detectedCount()} 项
+                      </span>
+                      <Show when={selectedCount() === 0}>
+                        <span class="text-amber-600">请至少选择一项进行脱敏</span>
                       </Show>
                     </div>
                   </div>
-
-                  {/* Right: category sections + checklist */}
-                  {renderReviewPanel(sourceItems().get("_single") ?? [])}
                 </div>
-              }
-            >
-              {/* Multi-source vertical layout */}
-              <For each={sourceEntries()}>
-                {(src) => {
-                  const srcItems = createMemo(() => sourceItems().get(src.outputId) ?? []);
-                  return (
-                    <div
-                      class="rounded-xl border border-[rgba(199,196,216,0.25)] overflow-hidden"
-                      ref={(el: HTMLElement) => {
-                        sourceRefs.set(src.outputId, el);
-                      }}
-                    >
-                      {/* Source card header */}
-                      <div class="px-4 py-2.5 bg-[#f7f9fb] border-b border-[rgba(199,196,216,0.15)]">
-                        <span class="text-xs font-medium text-[#464555]">{src.displayName}</span>
-                      </div>
-
-                      {/* Source content: highlighted text + review */}
-                      <div class="p-4 space-y-3">
-                        {/* Highlighted text */}
-                        <div class="bg-white border border-[rgba(199,196,216,0.35)] rounded-xl p-4 text-sm text-[#191c1e] whitespace-pre-wrap leading-relaxed max-h-[300px] overflow-y-auto">
-                          {renderHighlightedTextForSource(src.text, srcItems())}
-                        </div>
-
-                        {/* Per-source stats */}
-                        <div class="grid grid-cols-3 gap-2">
-                          <div class="rounded-lg px-3 py-1.5 bg-[#f7f9fb]">
-                            <p class="text-[10px] text-[#777587]">检测</p>
-                            <p class="text-base font-bold text-[#191c1e]">{srcItems().length}</p>
-                          </div>
-                          <div class="rounded-lg px-3 py-1.5 bg-emerald-50">
-                            <p class="text-[10px] text-emerald-600">已选</p>
-                            <p class="text-base font-bold text-emerald-700">
-                              {srcItems().filter((it) => it.checked).length}
-                            </p>
-                          </div>
-                          <div class="rounded-lg px-3 py-1.5 bg-slate-50">
-                            <p class="text-[10px] text-slate-500">跳过</p>
-                            <p class="text-base font-bold text-slate-600">
-                              {srcItems().filter((it) => !it.checked).length}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Review panel for this source */}
-                        <Show
-                          when={srcItems().length > 0}
-                          fallback={
-                            <p class="text-xs text-[#9fa0a8] text-center py-2">
-                              该来源未检测到敏感信息
-                            </p>
-                          }
-                        >
-                          {renderReviewPanelForSource(src.outputId, src.text)}
-                        </Show>
-                      </div>
-                    </div>
-                  );
-                }}
-              </For>
-            </Show>
-
-            {/* Summary bar (no confirm button - parent ActionBar handles it via onConfirm) */}
-            <div class="pt-3 border-t border-[rgba(199,196,216,0.2)]">
-              <div class="flex items-center justify-between text-xs text-[#464555]">
-                <span>
-                  已选择{" "}
-                  <span class="font-semibold text-[#191c1e]">
-                    {allItems().filter((it) => it.checked).length}
-                  </span>{" "}
-                  / {allItems().length} 项
-                </span>
-                <Show when={allItems().filter((it) => it.checked).length === 0}>
-                  <span class="text-amber-600">请至少选择一项进行脱敏</span>
-                </Show>
-              </div>
+              </Show>
             </div>
           </Show>
         </Show>

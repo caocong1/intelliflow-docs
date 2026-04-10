@@ -89,7 +89,10 @@ export default function ExportExecutor(props: Props) {
         setPreviewContent(result.content);
         setFilename(`${result.defaultFilename}${FORMAT_EXTENSIONS[format()]}`);
       } else {
-        setError(result && "error" in result ? result.error : "预览加载失败");
+        const errMsg = typeof result === "object" && result !== null && "error" in result
+          ? (result as { error: string }).error
+          : "预览加载失败";
+        setError(errMsg);
       }
     } catch {
       setError("预览加载失败");
@@ -126,7 +129,10 @@ export default function ExportExecutor(props: Props) {
         });
         triggerDownload();
       } else {
-        setError(result && "error" in result ? result.error : "导出失败，请重试");
+        const errMsg = typeof result === "object" && result !== null && "error" in result
+          ? (result as { error: string }).error
+          : "导出失败，请重试";
+        setError(errMsg);
       }
     } catch {
       setError("导出失败，请重试");
@@ -162,20 +168,131 @@ export default function ExportExecutor(props: Props) {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
-  // Simple markdown to HTML renderer
-  function renderMarkdown(md: string): string {
-    return md
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/^### (.+)$/gm, '<h3 class="text-base font-semibold mt-4 mb-1">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-lg font-semibold mt-5 mb-2">$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1 class="text-xl font-bold mt-6 mb-2">$1</h1>')
+  function esc(s: string): string {
+    return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function inlineFmt(s: string): string {
+    return s
+      .replace(/\*\*\*(.+?)\*\*\*/g, "<strong><em>$1</em></strong>")
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
-      .replace(/^- (.+)$/gm, '<li class="ml-4 list-disc">$1</li>')
-      .replace(/^(?!<[hlu])(.*\S.*)$/gm, '<p class="my-1">$1</p>')
-      .replace(/\n{2,}/g, '<div class="my-3"></div>');
+      .replace(/~~(.+?)~~/g, "<del>$1</del>")
+      .replace(/`(.+?)`/g, '<code class="px-1 py-0.5 bg-[#f1f3f5] rounded text-xs font-mono">$1</code>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-[#4f46e5] underline">$1</a>');
+  }
+
+  function renderTableBlock(tableLines: string[]): string {
+    const parseRow = (line: string) =>
+      line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+    const isSep = (line: string) =>
+      /^\|?[\s:]*-+[\s:]*(\|[\s:]*-+[\s:]*)*\|?$/.test(line.trim());
+
+    const hasSep = tableLines.length >= 2 && isSep(tableLines[1]);
+    const headers = hasSep ? parseRow(tableLines[0]) : [];
+    const dataLines = hasSep ? tableLines.slice(2) : tableLines;
+    const rows = dataLines.filter((l) => !isSep(l)).map(parseRow);
+
+    let html = '<div class="overflow-x-auto my-3"><table class="w-full text-sm border-collapse border border-[rgba(199,196,216,0.3)]">';
+    if (headers.length > 0) {
+      html += "<thead><tr>";
+      for (const h of headers) {
+        html += `<th class="px-3 py-2 text-left font-semibold bg-[#f1f3f5] border border-[rgba(199,196,216,0.3)]">${inlineFmt(esc(h))}</th>`;
+      }
+      html += "</tr></thead>";
+    }
+    html += "<tbody>";
+    for (const row of rows) {
+      html += "<tr>";
+      for (const cell of row) {
+        html += `<td class="px-3 py-2 border border-[rgba(199,196,216,0.3)]">${inlineFmt(esc(cell))}</td>`;
+      }
+      html += "</tr>";
+    }
+    html += "</tbody></table></div>";
+    return html;
+  }
+
+  function renderLine(raw: string): string {
+    // Blockquote — check before escaping since > becomes &gt;
+    const bq = raw.match(/^>\s(.*)/);
+    if (bq) return `<blockquote class="pl-3 border-l-4 border-[rgba(199,196,216,0.4)] text-[#464555] my-1">${inlineFmt(esc(bq[1]))}</blockquote>`;
+
+    const s = esc(raw);
+    // Headers h1–h6
+    const hMatch = s.match(/^(#{1,6})\s+(.+)$/);
+    if (hMatch) {
+      const level = hMatch[1].length;
+      const cls = [
+        "text-xl font-bold mt-6 mb-2",
+        "text-lg font-semibold mt-5 mb-2",
+        "text-base font-semibold mt-4 mb-1",
+        "text-sm font-semibold mt-3 mb-1",
+        "text-sm font-medium mt-2 mb-1",
+        "text-sm font-medium mt-2 mb-0.5",
+      ][level - 1];
+      return `<h${level} class="${cls}">${inlineFmt(hMatch[2])}</h${level}>`;
+    }
+    const li = s.match(/^[-*]\s+(.+)$/);
+    if (li) return `<li class="ml-4 list-disc">${inlineFmt(li[1])}</li>`;
+    const oli = s.match(/^\d+\.\s+(.+)$/);
+    if (oli) return `<li class="ml-4 list-decimal">${inlineFmt(oli[1])}</li>`;
+    return `<p class="my-1">${inlineFmt(s)}</p>`;
+  }
+
+  function renderMarkdown(md: string): string {
+    const lines = md.split("\n");
+    const parts: string[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // Table block
+      if (line.trim().startsWith("|")) {
+        const tableLines: string[] = [];
+        while (i < lines.length && lines[i].trim().startsWith("|")) {
+          tableLines.push(lines[i]);
+          i++;
+        }
+        parts.push(renderTableBlock(tableLines));
+        continue;
+      }
+
+      // Code block
+      if (line.trim().startsWith("```")) {
+        const codeLines: string[] = [];
+        i++;
+        while (i < lines.length && !lines[i].trim().startsWith("```")) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        if (i < lines.length) i++;
+        parts.push(
+          `<pre class="bg-[#f1f3f5] rounded-lg p-3 my-2 overflow-x-auto"><code class="text-sm font-mono">${esc(codeLines.join("\n"))}</code></pre>`,
+        );
+        continue;
+      }
+
+      // Horizontal rule
+      if (/^[-*_]{3,}$/.test(line.trim())) {
+        parts.push('<hr class="my-4 border-[rgba(199,196,216,0.3)]" />');
+        i++;
+        continue;
+      }
+
+      // Empty line
+      if (line.trim() === "") {
+        parts.push('<div class="my-3"></div>');
+        i++;
+        continue;
+      }
+
+      parts.push(renderLine(line));
+      i++;
+    }
+
+    return parts.join("\n");
   }
 
   return (

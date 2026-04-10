@@ -48,12 +48,23 @@ export default function InputTransformExecutor(props: Props) {
   // Initialize form data from existing outputData (resume case) or empty
   const existingOutput = props.nodeExecution.outputData as {
     fields?: Record<string, string>;
-    files?: Array<{ fileId: string; name: string; parsedText: string }>;
+    files?: Array<{ fileId: string; name: string; parsedText: string; slotId?: string }>;
+    fileSlots?: Record<string, { text?: string; files?: Array<{ fileId: string; name: string }> }>;
   } | null;
 
   const initialFields: Record<string, string> = {};
   for (const field of props.config?.formFields ?? []) {
     initialFields[field.id] = existingOutput?.fields?.[field.id] ?? "";
+  }
+
+  // Build fileId → slotId mapping from fileSlots
+  const fileSlotMap = new Map<string, string>();
+  if (existingOutput?.fileSlots) {
+    for (const [slotId, slot] of Object.entries(existingOutput.fileSlots)) {
+      for (const f of slot.files ?? []) {
+        fileSlotMap.set(f.fileId, slotId);
+      }
+    }
   }
 
   const [formData, setFormData] = createSignal<Record<string, string>>(initialFields);
@@ -69,6 +80,7 @@ export default function InputTransformExecutor(props: Props) {
       progress: 100,
       error: null,
       showParsed: false,
+      slotId: f.slotId ?? fileSlotMap.get(f.fileId),
     })),
   );
   const [dragOver, setDragOver] = createSignal(false);
@@ -89,7 +101,11 @@ export default function InputTransformExecutor(props: Props) {
         updates[field.id] = new Date().toISOString().slice(0, 16);
       } else if (field.type === "select" && field.defaultValue) {
         updates[field.id] = field.defaultValue;
-      } else if (field.type === "multiselect" && field.defaultValues && field.defaultValues.length > 0) {
+      } else if (
+        field.type === "multiselect" &&
+        field.defaultValues &&
+        field.defaultValues.length > 0
+      ) {
         updates[field.id] = field.defaultValues.join(",");
       }
     }
@@ -113,6 +129,7 @@ export default function InputTransformExecutor(props: Props) {
             fileId: f.fileId,
             name: f.originalName,
             parsedText: f.parsedText,
+            ...(f.slotId ? { slotId: f.slotId } : {}),
           })),
       });
     }, 1000);
@@ -480,9 +497,7 @@ export default function InputTransformExecutor(props: Props) {
             class={currentInputClass()}
           >
             <option value="">请选择...</option>
-            <For each={field.options ?? []}>
-              {(opt) => <option value={opt}>{opt}</option>}
-            </For>
+            <For each={field.options ?? []}>{(opt) => <option value={opt}>{opt}</option>}</For>
           </select>
           {errorEl}
         </div>
@@ -504,7 +519,9 @@ export default function InputTransformExecutor(props: Props) {
       return (
         <div class={`space-y-1.5 ${isWide ? "col-span-2" : ""}`}>
           {labelEl}
-          <div class={`flex flex-wrap gap-2 px-4 py-3 border rounded-xl bg-white transition-all ${hasError() ? "border-red-500" : "border-[rgba(199,196,216,0.35)]"}`}>
+          <div
+            class={`flex flex-wrap gap-2 px-4 py-3 border rounded-xl bg-white transition-all ${hasError() ? "border-red-500" : "border-[rgba(199,196,216,0.35)]"}`}
+          >
             <For each={field.options ?? []}>
               {(opt) => (
                 <label class="flex items-center gap-1.5 text-sm text-[#191c1e] cursor-pointer select-none">
@@ -545,16 +562,17 @@ export default function InputTransformExecutor(props: Props) {
     );
   }
 
-  const hasFileFields = () =>
-    (props.config?.formFields ?? []).some((f) => f.type === "file");
+  const hasFileFields = () => (props.config?.formFields ?? []).some((f) => f.type === "file");
 
   const textFields = () => (props.config?.formFields ?? []).filter((f) => f.type !== "file");
 
   /** File fields with fileSlotId configured — render as independent slot cards */
-  const slotFileFields = () => (props.config?.formFields ?? []).filter((f) => f.type === "file" && f.fileSlotId);
+  const slotFileFields = () =>
+    (props.config?.formFields ?? []).filter((f) => f.type === "file" && f.fileSlotId);
 
   /** File fields without fileSlotId — render in "other files" area */
-  const nonSlotFileFields = () => (props.config?.formFields ?? []).filter((f) => f.type === "file" && !f.fileSlotId);
+  const nonSlotFileFields = () =>
+    (props.config?.formFields ?? []).filter((f) => f.type === "file" && !f.fileSlotId);
 
   /** Whether we have any file slots configured */
   const hasFileSlots = () => slotFileFields().length > 0;
@@ -650,280 +668,155 @@ export default function InputTransformExecutor(props: Props) {
           </div>
         </Show>
 
-        {/* Form fields section */}
-        <Show when={textFields().length > 0}>
+        {/* All form fields in natural order (text + file fields inline) */}
+        <Show when={(props.config?.formFields ?? []).length > 0}>
           <div class="space-y-3">
             <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
               <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
               表单填写
             </h3>
             <div class="grid grid-cols-2 gap-4">
-              <For each={textFields()}>
-                {(field) => renderField(field, field.type === "textarea" || field.type === "multiselect")}
+              <For each={props.config?.formFields ?? []}>
+                {(field) => {
+                  if (field.type === "file") {
+                    const slotId = field.fileSlotId ?? field.id;
+                    const slotFiles = () => filesForSlot(slotId);
+                    const slotInputId = () => `file-slot-${slotId}`;
+                    return (
+                      <div class="col-span-2 rounded-xl border border-slate-200 bg-[#fafafe] overflow-hidden">
+                        <div class="px-4 py-3 bg-gradient-to-r from-[#f0efff] to-white border-b border-slate-100 flex items-center gap-2">
+                          <span class="w-6 h-6 rounded-md bg-[#4f46e5] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+                            {"\uD83D\uDCC1"}
+                          </span>
+                          <span class="text-sm font-medium text-[#191c1e]">
+                            {field.fileSlotLabel || field.label}
+                          </span>
+                          <Show when={slotFiles().length > 0}>
+                            <span class="text-xs text-[#9fa0a8]">({slotFiles().length})</span>
+                          </Show>
+                        </div>
+                        <div class="p-3">
+                          <Show when={!props.readOnly}>
+                            <button
+                              type="button"
+                              class="w-full border-2 border-dashed rounded-lg py-6 text-center transition-all cursor-pointer border-[rgba(199,196,216,0.5)] hover:border-[#4f46e5] hover:bg-[#f0efff]"
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                setDragOver(true);
+                              }}
+                              onDragLeave={() => setDragOver(false)}
+                              onDrop={(e) => handleSlotFileDrop(e, slotId)}
+                              onClick={() => {
+                                (
+                                  document.getElementById(slotInputId()) as HTMLInputElement
+                                )?.click();
+                              }}
+                            >
+                              <p class="text-xs text-[#9fa0a8]">拖拽或点击上传文件到此槽位</p>
+                              <input
+                                id={slotInputId()}
+                                type="file"
+                                multiple={(field.fileCountMode ?? "unlimited") !== "single"}
+                                accept={field.acceptedFileTypes?.join(",") || undefined}
+                                class="hidden"
+                                onChange={(e) => handleSlotFileSelect(e, slotId)}
+                              />
+                            </button>
+                          </Show>
+                          <Show when={slotFiles().length > 0}>
+                            <div class={props.readOnly ? "space-y-1.5" : "mt-2 space-y-1.5"}>
+                              <For each={slotFiles()}>
+                                {(file) => {
+                                  const ext =
+                                    file.originalName.split(".").pop()?.toLowerCase() ?? "";
+                                  return (
+                                    <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-slate-100">
+                                      <div class="flex items-center gap-2 min-w-0">
+                                        <span
+                                          class={`flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold ${getFileExtColor(ext)}`}
+                                        >
+                                          {ext.toUpperCase().slice(0, 4) || "?"}
+                                        </span>
+                                        <span class="text-xs text-[#191c1e] truncate">
+                                          {file.originalName}
+                                        </span>
+                                      </div>
+                                      <div class="flex items-center gap-2 flex-shrink-0">
+                                        <Show when={file.uploading}>
+                                          <span class="text-xs text-blue-600">
+                                            {file.progress}%
+                                          </span>
+                                        </Show>
+                                        <Show when={!file.uploading && !file.error}>
+                                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                        </Show>
+                                        <Show when={!props.readOnly}>
+                                          <button
+                                            type="button"
+                                            class="text-xs text-[#9fa0a8] hover:text-red-500"
+                                            onClick={() => removeFile(file.fileId)}
+                                          >
+                                            移除
+                                          </button>
+                                        </Show>
+                                      </div>
+                                    </div>
+                                  );
+                                }}
+                              </For>
+                            </div>
+                          </Show>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return renderField(
+                    field,
+                    field.type === "textarea" || field.type === "multiselect",
+                  );
+                }}
               </For>
             </div>
           </div>
         </Show>
 
-        {/* File upload area — mixed layout: slot cards first, then "other files" */}
-        <Show when={hasFileFields() && !props.readOnly}>
-          <div class="space-y-4">
-            <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
-              <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
-              文件上传
-            </h3>
-
-            {/* File slot cards */}
-            <Show when={hasFileSlots()}>
-              <For each={slotFileFields()}>
-                {(slotField) => {
-                  const slotId = slotField.fileSlotId ?? slotField.id;
-                  const slotFiles = () => filesForSlot(slotId);
-                  const slotInputId = () => `file-slot-${slotId}`;
-                  return (
-                    <div class="rounded-xl border border-slate-200 bg-[#fafafe] overflow-hidden">
-                      {/* Slot card header */}
-                      <div class="px-4 py-3 bg-gradient-to-r from-[#f0efff] to-white border-b border-slate-100 flex items-center gap-2">
-                        <span class="w-6 h-6 rounded-md bg-[#4f46e5] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
-                          {"\uD83D\uDCC1"}
-                        </span>
-                        <span class="text-sm font-medium text-[#191c1e]">
-                          {slotField.fileSlotLabel || slotField.label}
-                        </span>
-                        <Show when={slotFiles().length > 0}>
-                          <span class="text-xs text-[#9fa0a8]">({slotFiles().length})</span>
-                        </Show>
-                      </div>
-                      {/* Slot drop zone */}
-                      <div class="p-3">
-                        <button
-                          type="button"
-                          class="w-full border-2 border-dashed rounded-lg py-6 text-center transition-all cursor-pointer border-[rgba(199,196,216,0.5)] hover:border-[#4f46e5] hover:bg-[#f0efff]"
-                          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                          onDragLeave={() => setDragOver(false)}
-                          onDrop={(e) => handleSlotFileDrop(e, slotId)}
-                          onClick={() => {
-                            const input = document.getElementById(slotInputId()) as HTMLInputElement;
-                            input?.click();
-                          }}
-                        >
-                          <p class="text-xs text-[#9fa0a8]">拖拽或点击上传文件到此槽位</p>
-                          <input
-                            id={slotInputId()}
-                            type="file"
-                            multiple={(slotField.fileCountMode ?? "unlimited") !== "single"}
-                            accept={slotField.acceptedFileTypes?.join(",") || undefined}
-                            class="hidden"
-                            onChange={(e) => handleSlotFileSelect(e, slotId)}
-                          />
-                        </button>
-                        {/* Slot uploaded files */}
-                        <Show when={slotFiles().length > 0}>
-                          <div class="mt-2 space-y-1.5">
-                            <For each={slotFiles()}>
-                              {(file) => {
-                                const ext = file.originalName.split(".").pop()?.toLowerCase() ?? "";
-                                return (
-                                  <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-slate-100">
-                                    <div class="flex items-center gap-2 min-w-0">
-                                      <span class={`flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold ${getFileExtColor(ext)}`}>
-                                        {ext.toUpperCase().slice(0, 4) || "?"}
-                                      </span>
-                                      <span class="text-xs text-[#191c1e] truncate">{file.originalName}</span>
-                                    </div>
-                                    <div class="flex items-center gap-2 flex-shrink-0">
-                                      <Show when={file.uploading}>
-                                        <span class="text-xs text-blue-600">{file.progress}%</span>
-                                      </Show>
-                                      <Show when={!file.uploading && !file.error}>
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                      </Show>
-                                      <button type="button" class="text-xs text-[#9fa0a8] hover:text-red-500" onClick={() => removeFile(file.fileId)}>
-                                        移除
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              }}
-                            </For>
-                          </div>
-                        </Show>
-                      </div>
-                    </div>
-                  );
-                }}
-              </For>
-            </Show>
-
-            {/* "Other files" area — non-slot file fields or all file fields when no slots configured */}
-            <Show when={!hasFileSlots() || nonSlotFileFields().length > 0}>
-              <div>
-                <Show when={hasFileSlots()}>
-                  <p class="text-xs font-medium text-slate-500 mb-2">其他文件</p>
-                </Show>
-                <button
-                  type="button"
-                  class={`w-full border-2 border-dashed rounded-xl py-10 text-center transition-all cursor-pointer ${
-                    dragOver()
-                      ? "border-[#4f46e5] bg-[#f0efff] scale-[1.01]"
-                      : "border-[rgba(199,196,216,0.6)] hover:border-[#4f46e5] hover:bg-[#fafafe]"
-                  }`}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                  }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={handleFileDrop}
-                  onClick={() => {
-                    const input = document.getElementById("file-input-transform") as HTMLInputElement;
-                    input?.click();
-                  }}
-                >
-                  <div class="flex flex-col items-center gap-2">
-                    <div class="w-10 h-10 rounded-full bg-[#f0efff] flex items-center justify-center">
-                      <svg
-                        aria-hidden="true"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#4f46e5"
-                        stroke-width="1.8"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      >
-                        <polyline points="16 16 12 12 8 16" />
-                        <line x1="12" y1="12" x2="12" y2="21" />
-                        <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3" />
-                      </svg>
-                    </div>
-                    <p class="text-sm font-medium text-[#464555]">拖拽文件到此处，或点击选择文件</p>
-                    <p class="text-xs text-[#9fa0a8]">支持格式：{acceptedTypes()}</p>
-                  </div>
-                  <input
-                    id="file-input-transform"
-                    type="file"
-                    multiple={maxFileCount() !== 1}
-                    accept={acceptedTypes() || undefined}
-                    class="hidden"
-                    onChange={handleFileSelect}
-                  />
-                </button>
-              </div>
-            </Show>
-          </div>
-        </Show>
-
-        {/* Uploaded files list */}
-        <Show when={files().length > 0}>
+        <Show when={unslottedFiles().length > 0}>
           <div class="space-y-3">
             <h3 class="text-sm font-semibold text-[#191c1e] flex items-center gap-2">
-              <span class="w-1 h-4 bg-[#4f46e5] rounded-full" />
-              已上传文件
-              <span class="text-xs text-[#9fa0a8] font-normal">({files().length})</span>
+              <span class="w-1 h-4 bg-amber-500 rounded-full" />
+              历史上传文件
             </h3>
-            <div class="space-y-2">
-              <For each={files()}>
+            <div class="rounded-xl border border-amber-200 bg-amber-50/60 p-3 space-y-1.5">
+              <p class="text-xs text-[#8a5a00]">
+                这些文件来自旧数据，缺少上传槽位信息。重新确认当前步骤后会恢复到对应上传框。
+              </p>
+              <For each={unslottedFiles()}>
                 {(file) => {
                   const ext = file.originalName.split(".").pop()?.toLowerCase() ?? "";
-                  const extLabel = ext.toUpperCase().slice(0, 4) || "?";
-                  const extColor = getFileExtColor(ext);
                   return (
-                    <div class="rounded-xl bg-[#f7f9fb] px-4 py-3 space-y-2">
-                      {/* File header */}
-                      <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-3 min-w-0">
-                          <div
-                            class={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold ${extColor}`}
-                          >
-                            {extLabel}
-                          </div>
-                          <div class="min-w-0">
-                            <p class="text-sm font-medium text-[#191c1e] truncate">
-                              {file.originalName}
-                            </p>
-                            <Show when={file.fileSize > 0}>
-                              <p class="text-xs text-[#9fa0a8]">{formatFileSize(file.fileSize)}</p>
-                            </Show>
-                          </div>
-                        </div>
-
-                        <div class="flex items-center gap-2 flex-shrink-0">
-                          {/* Status badge */}
-                          <Show when={file.uploading}>
-                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">
-                              上传中 {file.progress}%
-                            </span>
-                          </Show>
-                          <Show when={!file.uploading && !file.error}>
-                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-600 text-xs font-medium">
-                              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              解析完成
-                            </span>
-                          </Show>
-                          <Show when={file.error}>
-                            <span class="inline-flex px-2.5 py-0.5 rounded-full bg-red-50 text-red-600 text-xs font-medium">
-                              上传失败
-                            </span>
-                          </Show>
-
-                          {/* View parsed button */}
-                          <Show when={!file.uploading && !file.error}>
-                            <button
-                              type="button"
-                              class="text-xs text-[#4f46e5] hover:text-[#3525cd] font-medium transition-colors"
-                              onClick={() => toggleParsedView(file.fileId)}
-                            >
-                              {file.showParsed ? "收起" : "查看解析结果"}
-                            </button>
-                          </Show>
-
-                          {/* Remove button */}
-                          <Show when={!props.readOnly}>
-                            <button
-                              type="button"
-                              class="text-xs text-[#9fa0a8] hover:text-red-500 transition-colors"
-                              onClick={() => removeFile(file.fileId)}
-                            >
-                              移除
-                            </button>
-                          </Show>
-                        </div>
+                    <div class="flex items-center justify-between px-3 py-2 rounded-lg bg-white border border-amber-100">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <span
+                          class={`flex-shrink-0 w-7 h-7 rounded flex items-center justify-center text-[10px] font-bold ${getFileExtColor(ext)}`}
+                        >
+                          {ext.toUpperCase().slice(0, 4) || "?"}
+                        </span>
+                        <span class="text-xs text-[#191c1e] truncate">{file.originalName}</span>
                       </div>
-
-                      {/* Upload progress bar */}
-                      <Show when={file.uploading}>
-                        <div class="w-full bg-[#e6e8ea] rounded-full h-1.5">
-                          <div
-                            class="bg-gradient-to-r from-[#3525cd] to-[#4f46e5] h-1.5 rounded-full transition-all"
-                            style={{ width: `${file.progress}%` }}
-                          />
-                        </div>
-                      </Show>
-
-                      {/* Error message */}
-                      <Show when={file.error}>
-                        <p class="text-xs text-red-500">{file.error}</p>
-                      </Show>
-
-                      {/* Parsed text preview / edit */}
-                      <Show when={file.showParsed && !file.uploading}>
-                        <div class="mt-2">
-                          <p class="block text-xs font-medium text-[#464555] mb-1.5">
-                            解析内容（可编辑）
-                          </p>
-                          <textarea
-                            value={file.parsedText}
-                            onInput={(e) =>
-                              handleParsedTextEdit(file.fileId, e.currentTarget.value)
-                            }
-                            disabled={props.readOnly}
-                            rows={6}
-                            aria-label={`${file.originalName} 解析内容`}
-                            class="w-full px-4 py-3 border border-[rgba(199,196,216,0.35)] rounded-xl text-sm font-mono bg-white text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] disabled:bg-[#f7f9fb] disabled:text-[#9fa0a8] resize-y transition-all"
-                          />
-                        </div>
-                      </Show>
+                      <div class="flex items-center gap-2 flex-shrink-0">
+                        <Show when={!file.uploading && !file.error}>
+                          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        </Show>
+                        <Show when={!props.readOnly}>
+                          <button
+                            type="button"
+                            class="text-xs text-[#9fa0a8] hover:text-red-500"
+                            onClick={() => removeFile(file.fileId)}
+                          >
+                            移除
+                          </button>
+                        </Show>
+                      </div>
                     </div>
                   );
                 }}

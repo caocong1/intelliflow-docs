@@ -27,7 +27,7 @@ export default function HighlightedText(props: { text: string }) {
       <For each={parts()}>
         {(part) =>
           part.type === "placeholder" ? (
-            <span class="bg-amber-100 text-amber-800 px-0.5 rounded font-mono text-xs">
+            <span class="bg-amber-100 text-amber-800 px-0.5 rounded font-mono text-xs" data-placeholder={part.value}>
               {part.value}
             </span>
           ) : (

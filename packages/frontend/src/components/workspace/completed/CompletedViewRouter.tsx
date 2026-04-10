@@ -1,7 +1,7 @@
-import type { NodeConfig, NodeExecution } from "@intelliflow/shared";
+import type { ExportConfig, NodeConfig, NodeExecution } from "@intelliflow/shared";
 import { Match, Switch } from "solid-js";
+import ExportExecutor from "../nodes/ExportExecutor";
 import DesensitizeCompleted from "./DesensitizeCompleted";
-import ExportCompleted from "./ExportCompleted";
 import InputTransformCompleted from "./InputTransformCompleted";
 import ModelCallCompleted from "./ModelCallCompleted";
 import RestoreCompleted from "./RestoreCompleted";
@@ -11,6 +11,7 @@ interface Props {
   config?: NodeConfig;
   documentId: string;
   onFullscreen?: (content: string, title: string) => void;
+  onReexecute?: () => void;
 }
 
 export default function CompletedViewRouter(props: Props) {
@@ -27,6 +28,7 @@ export default function CompletedViewRouter(props: Props) {
           node={props.node}
           config={props.config}
           documentId={props.documentId}
+          onReexecute={props.onReexecute}
         />
       </Match>
       <Match when={props.node.nodeType === "desensitize"}>
@@ -35,6 +37,7 @@ export default function CompletedViewRouter(props: Props) {
           config={props.config}
           documentId={props.documentId}
           onFullscreen={props.onFullscreen}
+          onReexecute={props.onReexecute}
         />
       </Match>
       <Match when={props.node.nodeType === "model_call"}>
@@ -43,6 +46,7 @@ export default function CompletedViewRouter(props: Props) {
           config={props.config}
           documentId={props.documentId}
           onFullscreen={props.onFullscreen}
+          onReexecute={props.onReexecute}
         />
       </Match>
       <Match when={props.node.nodeType === "restore"}>
@@ -51,10 +55,17 @@ export default function CompletedViewRouter(props: Props) {
           config={props.config}
           documentId={props.documentId}
           onFullscreen={props.onFullscreen}
+          onReexecute={props.onReexecute}
         />
       </Match>
       <Match when={props.node.nodeType === "export"}>
-        <ExportCompleted node={props.node} config={props.config} documentId={props.documentId} />
+        <ExportExecutor
+          nodeExecution={props.node}
+          config={(props.config ?? { type: "export", formats: [], contentMapping: [] }) as ExportConfig}
+          documentId={props.documentId}
+          onDraftSave={() => {}}
+          readOnly={false}
+        />
       </Match>
     </Switch>
   );

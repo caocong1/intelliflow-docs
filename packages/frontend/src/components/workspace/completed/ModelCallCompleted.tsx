@@ -98,7 +98,7 @@ export default function ModelCallCompleted(props: Props) {
   }
 
   return (
-    <div class="flex flex-col min-h-0 rounded-2xl overflow-hidden bg-white shadow-[0_12px_40px_rgba(25,28,30,0.06)]">
+    <div class="rounded-2xl overflow-hidden bg-white shadow-[0_12px_40px_rgba(25,28,30,0.06)]">
       {/* Purple gradient header */}
       <div
         class="relative flex-shrink-0"
@@ -296,7 +296,7 @@ export default function ModelCallCompleted(props: Props) {
       </div>
 
       {/* Content area */}
-      <div class="flex-1 overflow-y-auto">
+      <div>
         <div class="max-w-4xl mx-auto px-12 py-10 space-y-4">
           {/* Fallback warning */}
           <Show when={fallbackWarning()}>

@@ -1,5 +1,5 @@
-import { For, Show, createSignal, onMount } from "solid-js";
 import { useNavigate } from "@solidjs/router";
+import { For, Show, createSignal, onMount } from "solid-js";
 import { api } from "../../api/client";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
@@ -227,14 +227,18 @@ export default function WorkflowManagement() {
         if (error) {
           const errData = error.value as { error?: string; message?: string } | undefined;
           showToast(
-            errData?.error ?? errData?.message ?? (action.action === "enable" ? "启用失败" : "停用失败"),
+            errData?.error ??
+              errData?.message ??
+              (action.action === "enable" ? "启用失败" : "停用失败"),
             "error",
           );
           return;
         }
         showToast(action.action === "enable" ? "流程已启用" : "流程已停用", "success");
       } else if (action.action === "set-default") {
-        const { error } = await api.api.workflows({ id: action.workflow.id })["set-default"].patch();
+        const { error } = await api.api
+          .workflows({ id: action.workflow.id })
+          ["set-default"].patch();
         if (error) {
           const errData = error.value as { error?: string } | undefined;
           showToast(errData?.error ?? "设为默认失败", "error");
@@ -273,15 +277,72 @@ export default function WorkflowManagement() {
   const primaryBtnClass =
     "px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2";
 
+  function renderActions(wf: WorkflowListItem) {
+    return (
+      <div class="flex items-center gap-x-4 gap-y-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => navigate(`/admin/workflows/${wf.id}/edit`)}
+          class="text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
+        >
+          编辑
+        </button>
+        <Show when={wf.status !== "active"}>
+          <button
+            type="button"
+            onClick={() => setConfirmAction({ workflow: wf, action: "enable" })}
+            class="text-sm text-emerald-600 hover:text-emerald-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded"
+          >
+            启用
+          </button>
+        </Show>
+        <Show when={wf.status === "active"}>
+          <button
+            type="button"
+            onClick={() => setConfirmAction({ workflow: wf, action: "disable" })}
+            class="text-sm text-amber-600 hover:text-amber-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 rounded"
+          >
+            停用
+          </button>
+        </Show>
+        <Show when={wf.status === "active" && !wf.isDefault}>
+          <button
+            type="button"
+            onClick={() => setConfirmAction({ workflow: wf, action: "set-default" })}
+            class="text-sm text-slate-600 hover:text-slate-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 rounded"
+          >
+            设为默认
+          </button>
+        </Show>
+        <button
+          type="button"
+          onClick={() => openCopyModal(wf)}
+          class="text-sm text-slate-600 hover:text-slate-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 rounded"
+        >
+          复制
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirmAction({ workflow: wf, action: "delete" })}
+          class="text-sm text-red-500 hover:text-red-700 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
+        >
+          删除
+        </button>
+      </div>
+    );
+  }
+
   const columns: Column<WorkflowListItem>[] = [
     {
       key: "name",
       header: "流程名称",
       render: (wf) => (
-        <div>
-          <span class="font-medium text-slate-900">{wf.name}</span>
+        <div class="min-w-0 max-w-xs">
+          <span class="font-medium text-slate-900 break-words">{wf.name}</span>
           <Show when={wf.description}>
-            <p class="text-xs text-slate-400 truncate max-w-xs mt-0.5">{wf.description}</p>
+            <p class="text-xs text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
+              {wf.description}
+            </p>
           </Show>
         </div>
       ),
@@ -290,7 +351,7 @@ export default function WorkflowManagement() {
       key: "documentTypeName",
       header: "文档类型",
       render: (wf) => (
-        <span class="text-sm text-slate-600">{wf.documentTypeName}</span>
+        <span class="text-sm text-slate-600 whitespace-nowrap">{wf.documentTypeName}</span>
       ),
     },
     {
@@ -310,70 +371,21 @@ export default function WorkflowManagement() {
     {
       key: "nodeCount",
       header: "节点数",
-      render: (wf) => (
-        <span class="text-sm text-slate-500">{wf.nodeCount}</span>
-      ),
+      render: (wf) => <span class="text-sm text-slate-500 tabular-nums">{wf.nodeCount}</span>,
     },
     {
       key: "createdAt",
       header: "创建时间",
-      render: (wf) => <>{formatDate(wf.createdAt)}</>,
+      render: (wf) => (
+        <span class="text-sm text-slate-500 whitespace-nowrap tabular-nums">
+          {formatDate(wf.createdAt)}
+        </span>
+      ),
     },
     {
       key: "actions",
       header: "操作",
-      render: (wf) => (
-        <div class="flex items-center gap-3 flex-wrap">
-          <button
-            type="button"
-            onClick={() => navigate(`/admin/workflows/${wf.id}/edit`)}
-            class="text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1"
-          >
-            编辑
-          </button>
-          <Show when={wf.status !== "active"}>
-            <button
-              type="button"
-              onClick={() => setConfirmAction({ workflow: wf, action: "enable" })}
-              class="text-sm text-emerald-600 hover:text-emerald-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded px-1"
-            >
-              启用
-            </button>
-          </Show>
-          <Show when={wf.status === "active"}>
-            <button
-              type="button"
-              onClick={() => setConfirmAction({ workflow: wf, action: "disable" })}
-              class="text-sm text-amber-600 hover:text-amber-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 rounded px-1"
-            >
-              停用
-            </button>
-          </Show>
-          <Show when={wf.status === "active" && !wf.isDefault}>
-            <button
-              type="button"
-              onClick={() => setConfirmAction({ workflow: wf, action: "set-default" })}
-              class="text-sm text-slate-600 hover:text-slate-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 rounded px-1"
-            >
-              设为默认
-            </button>
-          </Show>
-          <button
-            type="button"
-            onClick={() => openCopyModal(wf)}
-            class="text-sm text-slate-600 hover:text-slate-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-slate-500 rounded px-1"
-          >
-            复制
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirmAction({ workflow: wf, action: "delete" })}
-            class="text-sm text-red-500 hover:text-red-700 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 rounded px-1"
-          >
-            删除
-          </button>
-        </div>
-      ),
+      render: (wf) => renderActions(wf),
     },
   ];
 
@@ -391,10 +403,8 @@ export default function WorkflowManagement() {
     if (!action) return "";
     if (action.action === "delete")
       return `确定要删除流程「${action.workflow.name}」吗？此操作不可撤销。`;
-    if (action.action === "enable")
-      return `确定要启用流程「${action.workflow.name}」吗？`;
-    if (action.action === "disable")
-      return `确定要停用流程「${action.workflow.name}」吗？`;
+    if (action.action === "enable") return `确定要启用流程「${action.workflow.name}」吗？`;
+    if (action.action === "disable") return `确定要停用流程「${action.workflow.name}」吗？`;
     return `确定要将「${action.workflow.name}」设为该文档类型的默认流程吗？`;
   }
 
@@ -419,8 +429,8 @@ export default function WorkflowManagement() {
   }
 
   return (
-    <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
+    <div class="p-4 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5 sm:mb-6">
         <div>
           <h1 class="text-xl font-bold text-indigo-950">流程管理</h1>
           <p class="text-sm text-slate-400 mt-0.5">管理文档生成流程编排</p>
@@ -431,29 +441,38 @@ export default function WorkflowManagement() {
             resetCreateForm();
             setShowCreateModal(true);
           }}
-          class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          class="self-start sm:self-auto inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         >
-          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
             <title>新建</title>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 4v16m8-8H4"
+            />
           </svg>
           新建流程
         </button>
       </div>
 
       {/* Filters */}
-      <div class="flex items-center gap-3 mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
         <select
           value={filterDocTypeId()}
           onChange={(e) => handleDocTypeFilterChange(e.currentTarget.value)}
-          class="px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors bg-white"
+          class="w-full sm:w-auto px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors bg-white"
         >
           <option value="">全部文档类型</option>
-          <For each={docTypes()}>
-            {(dt) => <option value={dt.id}>{dt.name}</option>}
-          </For>
+          <For each={docTypes()}>{(dt) => <option value={dt.id}>{dt.name}</option>}</For>
         </select>
-        <div class="w-64">
+        <div class="w-full sm:w-64">
           <SearchInput
             value={search()}
             onChange={handleSearchChange}
@@ -462,12 +481,71 @@ export default function WorkflowManagement() {
         </div>
       </div>
 
-      <Table
-        columns={columns}
-        data={workflows()}
-        loading={loading()}
-        emptyMessage="暂无流程数据"
-      />
+      {/* Desktop/tablet table */}
+      <div class="hidden lg:block">
+        <Table
+          columns={columns}
+          data={workflows()}
+          loading={loading()}
+          emptyMessage="暂无流程数据"
+        />
+      </div>
+
+      {/* Small-screen card list */}
+      <div class="lg:hidden space-y-3">
+        <Show when={loading()}>
+          <For each={Array.from({ length: 4 })}>
+            {() => (
+              <div class="rounded-xl border border-slate-200 bg-white shadow-sm p-4 animate-pulse">
+                <div class="h-4 w-2/3 bg-indigo-50 rounded mb-3" />
+                <div class="h-3 w-full bg-indigo-50 rounded mb-2" />
+                <div class="h-3 w-1/2 bg-indigo-50 rounded" />
+              </div>
+            )}
+          </For>
+        </Show>
+        <Show when={!loading() && workflows().length === 0}>
+          <div class="rounded-xl border border-slate-200 bg-white shadow-sm py-10 text-center text-sm text-slate-400">
+            暂无流程数据
+          </div>
+        </Show>
+        <Show when={!loading()}>
+          <For each={workflows()}>
+            {(wf) => (
+              <article class="rounded-xl border border-slate-200 bg-white shadow-sm p-4 hover:border-indigo-200 transition-colors">
+                <div class="flex items-start justify-between gap-3">
+                  <h3 class="flex-1 min-w-0 text-sm font-semibold text-slate-900 leading-5 break-words">
+                    {wf.name}
+                  </h3>
+                  <div class="flex-shrink-0">{statusBadge(wf.status)}</div>
+                </div>
+                <Show when={wf.description}>
+                  <p class="mt-1.5 text-xs text-slate-500 leading-relaxed line-clamp-2">
+                    {wf.description}
+                  </p>
+                </Show>
+                <div class="mt-3 flex items-center gap-x-2 gap-y-1.5 flex-wrap text-xs text-slate-500">
+                  <span class="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 font-medium">
+                    {wf.documentTypeName}
+                  </span>
+                  <Show when={wf.isDefault}>
+                    <Badge label="默认" variant="info" />
+                  </Show>
+                  <span class="text-slate-300" aria-hidden="true">
+                    ·
+                  </span>
+                  <span class="tabular-nums">{wf.nodeCount} 节点</span>
+                  <span class="text-slate-300" aria-hidden="true">
+                    ·
+                  </span>
+                  <span class="tabular-nums">{formatDate(wf.createdAt)}</span>
+                </div>
+                <div class="mt-3 pt-3 border-t border-slate-100">{renderActions(wf)}</div>
+              </article>
+            )}
+          </For>
+        </Show>
+      </div>
 
       <Pagination
         page={page()}
@@ -480,11 +558,7 @@ export default function WorkflowManagement() {
       />
 
       {/* Create Modal */}
-      <Modal
-        isOpen={showCreateModal()}
-        onClose={() => setShowCreateModal(false)}
-        title="新建流程"
-      >
+      <Modal isOpen={showCreateModal()} onClose={() => setShowCreateModal(false)} title="新建流程">
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -504,9 +578,7 @@ export default function WorkflowManagement() {
               required
             >
               <option value="">请选择文档类型</option>
-              <For each={docTypes()}>
-                {(dt) => <option value={dt.id}>{dt.name}</option>}
-              </For>
+              <For each={docTypes()}>{(dt) => <option value={dt.id}>{dt.name}</option>}</For>
             </select>
             {createErrors().documentTypeId && (
               <p class="mt-1 text-xs text-red-600">{createErrors().documentTypeId}</p>
@@ -525,9 +597,7 @@ export default function WorkflowManagement() {
               class={inputClass}
               required
             />
-            {createErrors().name && (
-              <p class="mt-1 text-xs text-red-600">{createErrors().name}</p>
-            )}
+            {createErrors().name && <p class="mt-1 text-xs text-red-600">{createErrors().name}</p>}
           </div>
           <div>
             <label for="create-description" class={labelClass}>
@@ -545,18 +615,10 @@ export default function WorkflowManagement() {
             )}
           </div>
           <div class="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(false)}
-              class={cancelBtnClass}
-            >
+            <button type="button" onClick={() => setShowCreateModal(false)} class={cancelBtnClass}>
               取消
             </button>
-            <button
-              type="submit"
-              disabled={submitting()}
-              class={primaryBtnClass}
-            >
+            <button type="submit" disabled={submitting()} class={primaryBtnClass}>
               {submitting() ? "创建中..." : "创建"}
             </button>
           </div>
@@ -564,11 +626,7 @@ export default function WorkflowManagement() {
       </Modal>
 
       {/* Copy Modal */}
-      <Modal
-        isOpen={!!copyingWorkflow()}
-        onClose={() => setCopyingWorkflow(null)}
-        title="复制流程"
-      >
+      <Modal isOpen={!!copyingWorkflow()} onClose={() => setCopyingWorkflow(null)} title="复制流程">
         <div class="space-y-4">
           <div>
             <label for="copy-name" class={labelClass}>
@@ -592,20 +650,12 @@ export default function WorkflowManagement() {
               onChange={(e) => setCopyTargetDocTypeId(e.currentTarget.value)}
               class={inputClass}
             >
-              <For each={docTypes()}>
-                {(dt) => <option value={dt.id}>{dt.name}</option>}
-              </For>
+              <For each={docTypes()}>{(dt) => <option value={dt.id}>{dt.name}</option>}</For>
             </select>
-            <p class="mt-1 text-xs text-slate-400">
-              可选择不同文档类型实现跨类型复制
-            </p>
+            <p class="mt-1 text-xs text-slate-400">可选择不同文档类型实现跨类型复制</p>
           </div>
           <div class="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setCopyingWorkflow(null)}
-              class={cancelBtnClass}
-            >
+            <button type="button" onClick={() => setCopyingWorkflow(null)} class={cancelBtnClass}>
               取消
             </button>
             <button
@@ -629,11 +679,7 @@ export default function WorkflowManagement() {
         <div class="space-y-4">
           <p class="text-sm text-slate-600">{confirmMessage()}</p>
           <div class="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setConfirmAction(null)}
-              class={cancelBtnClass}
-            >
+            <button type="button" onClick={() => setConfirmAction(null)} class={cancelBtnClass}>
               取消
             </button>
             <button

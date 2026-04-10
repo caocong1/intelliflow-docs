@@ -97,6 +97,50 @@ export async function updateUser(
   return result[0];
 }
 
+export async function resetPassword(id: string, newPassword: string): Promise<void> {
+  const passwordHash = await Bun.password.hash(newPassword, "argon2id");
+
+  const result = await db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, id))
+    .returning({ id: users.id });
+
+  if (result.length === 0) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  await deleteUserSessions(id);
+}
+
+export async function changePassword(
+  id: string,
+  oldPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const result = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, id))
+    .limit(1);
+
+  const user = result[0];
+  if (!user?.passwordHash) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  const valid = await Bun.password.verify(oldPassword, user.passwordHash);
+  if (!valid) {
+    throw new Error("WRONG_PASSWORD");
+  }
+
+  const passwordHash = await Bun.password.hash(newPassword, "argon2id");
+  await db
+    .update(users)
+    .set({ passwordHash, updatedAt: new Date() })
+    .where(eq(users.id, id));
+}
+
 export async function toggleUserStatus(id: string): Promise<UserRow> {
   // First get the current user
   const current = await db

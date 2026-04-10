@@ -1,6 +1,6 @@
 import Elysia, { t } from "elysia";
 import { requireAdmin, requireAuth } from "../auth/auth.guard";
-import { createUser, listUsers, toggleUserStatus, updateUser } from "./users.service";
+import { createUser, listUsers, resetPassword, toggleUserStatus, updateUser } from "./users.service";
 
 // ── Read routes (any authenticated user) ─────────────────────────────────────
 
@@ -73,6 +73,28 @@ export const userAdminRoutes = new Elysia({ prefix: "/users" })
       body: t.Object({
         displayName: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
         role: t.Optional(t.Union([t.Literal("admin"), t.Literal("user")])),
+      }),
+    },
+  )
+  .patch(
+    "/:id/password",
+    async ({ params, body, set }) => {
+      try {
+        await resetPassword(params.id, body.password);
+        return { success: true };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message === "USER_NOT_FOUND") {
+          set.status = 404;
+          return { error: "用户不存在" };
+        }
+        throw err;
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Object({
+        password: t.String({ minLength: 6, maxLength: 100 }),
       }),
     },
   )

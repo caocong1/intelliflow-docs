@@ -33,6 +33,8 @@ type DocumentListItem = DocumentRow & {
   progressStep?: number;
   totalSteps?: number;
   currentNodeLabel?: string;
+  hasFailedNode?: boolean;
+  isGenerating?: boolean;
 };
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
@@ -147,6 +149,17 @@ export async function listDocuments(
           AND ne.status = 'in_progress'
         LIMIT 1
       )`.as("current_node_label"),
+      hasFailedNode: sql<boolean>`EXISTS(
+        SELECT 1 FROM node_executions ne
+        WHERE ne.document_id = ${documents.id}
+          AND ne.is_current = true
+          AND ne.status = 'failed'
+      )`.as("has_failed_node"),
+      isGenerating: sql<boolean>`EXISTS(
+        SELECT 1 FROM background_tasks bt
+        WHERE bt.document_id = ${documents.id}
+          AND bt.status IN ('queued', 'running')
+      )`.as("is_generating"),
     })
     .from(documents)
     .innerJoin(users, eq(documents.createdBy, users.id))

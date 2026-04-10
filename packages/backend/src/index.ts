@@ -10,7 +10,7 @@ import { modelAdminRoutes, modelReadRoutes } from "./modules/models/models.route
 import { projectRoutes } from "./modules/projects/projects.routes";
 import { providerRoutes } from "./modules/providers/providers.routes";
 import { userAdminRoutes, userReadRoutes } from "./modules/users/users.routes";
-import { runtimeRoutes } from "./modules/runtime/runtime.routes";
+import { runtimeRoutes, runtimeAdminRoutes } from "./modules/runtime/runtime.routes";
 import { inputTransformRoutes } from "./modules/runtime/input-transform.routes";
 import { desensitizeRoutes } from "./modules/runtime/desensitize.routes";
 import { exportRoutes } from "./modules/runtime/export.routes";
@@ -20,7 +20,7 @@ import { modelCallLogRoutes } from "./modules/runtime/model-call-log.routes";
 import { inlineEditRoutes } from "./modules/runtime/inline-edit.routes";
 import { promptOptimizeRoutes } from "./modules/prompts";
 import { versionRoutes } from "./modules/versions/versions.routes";
-import { detectOrphanTasks } from "./modules/runtime/background.service";
+import { detectOrphanTasks, startTaskMonitor } from "./modules/runtime/background.service";
 import { notificationRoutes } from "./modules/notifications/notifications.routes";
 import { wecomAuthRoutes, wecomAdminRoutes, invitationPublicRoutes, invitationRoutes } from "./modules/wecom/wecom.routes";
 import { statisticsRoutes } from "./modules/statistics/statistics.routes";
@@ -53,6 +53,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(versionRoutes)
   .use(fileRoutes)
   .use(runtimeRoutes)
+  .use(runtimeAdminRoutes)
   .use(inputTransformRoutes)
   .use(desensitizeRoutes)
   .use(exportRoutes)
@@ -78,6 +79,9 @@ detectOrphanTasks()
   .catch((err) => {
     console.error("[startup] Failed to detect orphan tasks:", err);
   });
+
+// Start periodic monitor for stuck tasks (running but no progress)
+startTaskMonitor();
 
 console.log(`Backend running on http://localhost:${app.server?.port}`);
 

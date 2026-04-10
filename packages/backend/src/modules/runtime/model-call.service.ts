@@ -1,6 +1,7 @@
 import type {
   DesensitizeRuleDesc,
   ModelCallConfig,
+  ModelCallLiveEvent,
   ModelOutput,
   NamedOutputDef,
   NodeExecution,
@@ -21,6 +22,17 @@ import {
 } from "../../db/schema";
 import { getStrategy } from "./strategies";
 import type { ModelCallInput } from "./strategies";
+import {
+  applyDelta,
+  broadcast,
+  buildSnapshotEvent,
+  createSession,
+  disposeSessionLater,
+  flushNow,
+  markDone,
+  scheduleFlush,
+  setModelStatus,
+} from "./model-call-live-session";
 
 // ─── Prompt Resolution ──────────────────────────────────────────────────────
 
@@ -141,7 +153,20 @@ export function resolveRef(
     return baseContent;
   }
 
-  // 5. models (model output — returns .content, supports fieldPath for JSON access)
+  // 5. sources (restore node output — returns .restoredText)
+  const sources = od.sources as Record<string, { restoredText?: string; content?: string }> | undefined;
+  if (sources?.[segmentKey]) {
+    return sources[segmentKey].restoredText ?? sources[segmentKey].content;
+  }
+  // Try compound key: segmentKey.fieldPath (restore sources use dotted keys like "node_techresp.form_fills")
+  if (sources && ref.fieldPath) {
+    const compoundKey = `${segmentKey}.${ref.fieldPath}`;
+    if (sources[compoundKey]) {
+      return sources[compoundKey].restoredText ?? sources[compoundKey].content;
+    }
+  }
+
+  // 6. models (model output — returns .content, supports fieldPath for JSON access)
   const modelsMap = od.models as Record<string, { content?: string }> | undefined;
   if (modelsMap?.[segmentKey]) {
     const baseContent = modelsMap[segmentKey].content;
@@ -159,7 +184,7 @@ export function resolveRef(
     return baseContent;
   }
 
-  // 6. Direct property (text, confirmedAt, selectedContent, etc.)
+  // 7. Direct property (text, confirmedAt, selectedContent, etc.)
   if (od[segmentKey] !== undefined && od[segmentKey] !== null) {
     const v = od[segmentKey];
     const baseValue = typeof v === "string" ? v : JSON.stringify(v);
@@ -608,6 +633,9 @@ export async function executeModelCall(
 
 // ─── Background (non-streaming) Model Execution ─────────────────────────────
 
+const BACKGROUND_MODEL_FLUSH_INTERVAL_MS = 500;
+const MODEL_CALL_LIVE_SESSION_TTL_MS = 60_000;
+
 /**
  * Execute model calls for background pipeline — collects full response without SSE streaming.
  * Writes results to nodeExecutions.outputData and auto-selects the first model output.
@@ -689,176 +717,290 @@ export async function executeModelCallBackground(
     throw new Error("No models found for the given IDs");
   }
 
-  // Execute all models in parallel, collect full responses (no SSE)
-  const results = await Promise.allSettled(
-    modelRows.map(async (model) => {
-      const startTime = Date.now();
-      let fullContent = "";
-
-      try {
-        const strategy = getStrategy(model.providerType);
-        const strategyInput: ModelCallInput = {
-          ...model,
-          providerType: model.providerType,
-        };
-
-        // Use a no-op sendEvent since we don't need SSE in background mode
-        const noopSendEvent = () => {};
-        const result = await strategy.execute({
-          model: strategyInput,
-          resolvedPrompt,
-          resolvedSystemPrompt,
-          sendEvent: noopSendEvent,
-        });
-        fullContent = result.content;
-
-        if (result.status === "failed") {
-          throw new Error(result.errorMessage ?? "Model call failed");
-        }
-
-        // Log successful call
-        await db.insert(modelCallLogs).values({
-          documentId,
-          nodeExecutionId,
-          userId,
-          providerId: model.providerId,
-          providerName: model.providerName,
-          modelId: model.id,
-          modelName: model.displayName,
-          callSource: "runtime",
-          promptTemplate: mcConfig.promptTemplate,
-          systemPrompt: resolvedSystemPrompt ?? null,
-          resolvedPrompt,
-          variableMapping: variableMapping ?? null,
-          temperature: model.temperature,
-          maxTokens: model.maxTokens,
-          responseStatus: "completed",
-          responseContent: fullContent,
-          contentLength: fullContent.length,
-          tokenUsage: null,
-          duration: Date.now() - startTime,
-          errorMessage: null,
-        });
-
-        return {
-          modelId: model.id,
-          displayName: model.displayName,
-          content: fullContent,
-          status: "completed" as const,
-        };
-      } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : String(err);
-
-        // Log failed call
-        await db.insert(modelCallLogs).values({
-          documentId,
-          nodeExecutionId,
-          userId,
-          providerId: model.providerId,
-          providerName: model.providerName,
-          modelId: model.id,
-          modelName: model.displayName,
-          callSource: "runtime",
-          promptTemplate: mcConfig.promptTemplate,
-          systemPrompt: resolvedSystemPrompt ?? null,
-          resolvedPrompt,
-          variableMapping: variableMapping ?? null,
-          temperature: model.temperature,
-          maxTokens: model.maxTokens,
-          responseStatus: "failed",
-          responseContent: fullContent || null,
-          contentLength: fullContent.length || null,
-          tokenUsage: null,
-          duration: Date.now() - startTime,
-          errorMessage,
-        });
-
-        return {
-          modelId: model.id,
-          displayName: model.displayName,
-          content: fullContent,
-          status: "failed" as const,
-          errorMessage,
-        };
-      }
-    }),
-  );
-
-  // Build final output data
-  const finalModels: Record<string, ModelOutput> = {};
-  let firstCompletedModelId: string | null = null;
-
-  for (const result of results) {
-    if (result.status === "fulfilled") {
-      const r = result.value;
-      let modelStatus: ModelOutput["status"] = r.status;
-      let formatErrors: string[] | undefined;
-
-      // Validate JSON output if configured
-      if (r.status === "completed" && mcConfig.outputFormat === "json") {
-        const validation = validateModelOutput(r.content, mcConfig);
-        if (validation.status === "format_error") {
-          modelStatus = "format_error";
-          formatErrors = validation.errors;
-        }
-      }
-
-      finalModels[r.modelId] = {
-        modelId: r.modelId,
-        modelDisplayName: r.displayName,
-        content: r.content,
-        status: modelStatus,
-        errorMessage: "errorMessage" in r ? r.errorMessage : undefined,
-        formatErrors,
-      };
-
-      if (
-        (modelStatus === "completed" || modelStatus === "format_error") &&
-        !firstCompletedModelId
-      ) {
-        firstCompletedModelId = r.modelId;
-      }
-    }
-  }
-
-  // Check if at least one model succeeded
-  if (!firstCompletedModelId) {
-    // All models failed — collect error messages
-    const errors = results
-      .map((r) =>
-        r.status === "fulfilled" && r.value.status === "failed" ? r.value.errorMessage : null,
-      )
-      .filter(Boolean)
-      .join("; ");
-    throw new Error(`All model calls failed: ${errors}`);
-  }
-
-  // Auto-select first completed model output
-  const selectedContent = finalModels[firstCompletedModelId]?.content ?? "";
-
-  // Parse named outputs if configured
-  const bgOutputData: Record<string, unknown> = {
-    models: finalModels,
-    selectedContent,
-    text: selectedContent,
-  };
-  if (mcConfig.namedOutputs?.length) {
-    const parsed = parseNamedOutputs(selectedContent, mcConfig.namedOutputs);
-    bgOutputData.namedOutputs = parsed.namedOutputs;
-    if (parsed.fallback) {
-      bgOutputData.fallbackWarning = true;
-    }
+  const initialModels: Record<string, ModelOutput> = {};
+  for (const model of modelRows) {
+    initialModels[model.id] = {
+      modelId: model.id,
+      modelDisplayName: model.displayName,
+      content: "",
+      status: "pending",
+    };
   }
 
   await db
     .update(nodeExecutions)
     .set({
-      outputData: bgOutputData,
-      selectedOutputKey: firstCompletedModelId,
-      completedAt: new Date(),
+      outputData: { models: initialModels },
+      selectedOutputKey: null,
       updatedAt: new Date(),
     })
     .where(eq(nodeExecutions.id, nodeExecutionId));
+
+  createSession({
+    documentId,
+    nodeExecutionId,
+    models: initialModels,
+  });
+
+  const initialSnapshot = buildSnapshotEvent(nodeExecutionId);
+  if (initialSnapshot) {
+    broadcast(nodeExecutionId, initialSnapshot);
+  }
+
+  const flushModelsToDb = async (modelsSnapshot: Record<string, ModelOutput>) => {
+    await db
+      .update(nodeExecutions)
+      .set({
+        outputData: { models: modelsSnapshot },
+        updatedAt: new Date(),
+      })
+      .where(eq(nodeExecutions.id, nodeExecutionId));
+  };
+
+  try {
+    // Execute all models in parallel, but persist intermediate deltas for live SSE + refresh recovery.
+    const results = await Promise.allSettled(
+      modelRows.map(async (model) => {
+        const startTime = Date.now();
+        let fullContent = "";
+
+        setModelStatus(nodeExecutionId, model.id, "streaming", {
+          modelDisplayName: model.displayName,
+          errorMessage: undefined,
+        });
+        broadcast(nodeExecutionId, {
+          type: "status",
+          modelId: model.id,
+          data: "streaming",
+          timestamp: new Date().toISOString(),
+        } satisfies ModelCallLiveEvent);
+
+        try {
+          const strategy = getStrategy(model.providerType);
+          const strategyInput: ModelCallInput = {
+            ...model,
+            providerType: model.providerType,
+          };
+
+          const bgSendEvent = (event: SSEEvent) => {
+            if (event.type !== "delta") return;
+            applyDelta(nodeExecutionId, model.id, event.data);
+            broadcast(nodeExecutionId, event);
+            scheduleFlush(
+              nodeExecutionId,
+              flushModelsToDb,
+              BACKGROUND_MODEL_FLUSH_INTERVAL_MS,
+            );
+          };
+
+          const result = await strategy.execute({
+            model: strategyInput,
+            resolvedPrompt,
+            resolvedSystemPrompt,
+            sendEvent: bgSendEvent,
+          });
+          fullContent = result.content;
+
+          if (result.status === "failed") {
+            throw new Error(result.errorMessage ?? "Model call failed");
+          }
+
+          setModelStatus(nodeExecutionId, model.id, "completed", {
+            modelDisplayName: model.displayName,
+            content: fullContent,
+            errorMessage: undefined,
+            formatErrors: undefined,
+          });
+          await flushNow(nodeExecutionId, flushModelsToDb);
+          broadcast(nodeExecutionId, {
+            type: "complete",
+            modelId: model.id,
+            data: fullContent,
+            timestamp: new Date().toISOString(),
+          } satisfies ModelCallLiveEvent);
+
+          // Log successful call
+          await db.insert(modelCallLogs).values({
+            documentId,
+            nodeExecutionId,
+            userId,
+            providerId: model.providerId,
+            providerName: model.providerName,
+            modelId: model.id,
+            modelName: model.displayName,
+            callSource: "runtime",
+            promptTemplate: mcConfig.promptTemplate,
+            systemPrompt: resolvedSystemPrompt ?? null,
+            resolvedPrompt,
+            variableMapping: variableMapping ?? null,
+            temperature: model.temperature,
+            maxTokens: model.maxTokens,
+            responseStatus: "completed",
+            responseContent: fullContent,
+            contentLength: fullContent.length,
+            tokenUsage: null,
+            duration: Date.now() - startTime,
+            errorMessage: null,
+          });
+
+          return {
+            modelId: model.id,
+            displayName: model.displayName,
+            content: fullContent,
+            status: "completed" as const,
+          };
+        } catch (err: unknown) {
+          const errorMessage = err instanceof Error ? err.message : String(err);
+
+          setModelStatus(nodeExecutionId, model.id, "failed", {
+            modelDisplayName: model.displayName,
+            content: fullContent,
+            errorMessage,
+            formatErrors: undefined,
+          });
+          await flushNow(nodeExecutionId, flushModelsToDb);
+          broadcast(nodeExecutionId, {
+            type: "error",
+            modelId: model.id,
+            data: errorMessage,
+            timestamp: new Date().toISOString(),
+          } satisfies ModelCallLiveEvent);
+
+          // Log failed call
+          await db.insert(modelCallLogs).values({
+            documentId,
+            nodeExecutionId,
+            userId,
+            providerId: model.providerId,
+            providerName: model.providerName,
+            modelId: model.id,
+            modelName: model.displayName,
+            callSource: "runtime",
+            promptTemplate: mcConfig.promptTemplate,
+            systemPrompt: resolvedSystemPrompt ?? null,
+            resolvedPrompt,
+            variableMapping: variableMapping ?? null,
+            temperature: model.temperature,
+            maxTokens: model.maxTokens,
+            responseStatus: "failed",
+            responseContent: fullContent || null,
+            contentLength: fullContent.length || null,
+            tokenUsage: null,
+            duration: Date.now() - startTime,
+            errorMessage,
+          });
+
+          return {
+            modelId: model.id,
+            displayName: model.displayName,
+            content: fullContent,
+            status: "failed" as const,
+            errorMessage,
+          };
+        }
+      }),
+    );
+
+    // Build final output data
+    const finalModels: Record<string, ModelOutput> = {};
+    let firstCompletedModelId: string | null = null;
+
+    for (const result of results) {
+      if (result.status === "fulfilled") {
+        const r = result.value;
+        let modelStatus: ModelOutput["status"] = r.status;
+        let formatErrors: string[] | undefined;
+
+        // Validate JSON output if configured
+        if (r.status === "completed" && mcConfig.outputFormat === "json") {
+          const validation = validateModelOutput(r.content, mcConfig);
+          if (validation.status === "format_error") {
+            modelStatus = "format_error";
+            formatErrors = validation.errors;
+          }
+        }
+
+        finalModels[r.modelId] = {
+          modelId: r.modelId,
+          modelDisplayName: r.displayName,
+          content: r.content,
+          status: modelStatus,
+          errorMessage: "errorMessage" in r ? r.errorMessage : undefined,
+          formatErrors,
+        };
+
+        if (
+          (modelStatus === "completed" || modelStatus === "format_error") &&
+          !firstCompletedModelId
+        ) {
+          firstCompletedModelId = r.modelId;
+        }
+      }
+    }
+
+    // Check if at least one model succeeded
+    if (!firstCompletedModelId) {
+      // All models failed — collect error messages
+      const errors = results
+        .map((r) =>
+          r.status === "fulfilled" && r.value.status === "failed" ? r.value.errorMessage : null,
+        )
+        .filter(Boolean)
+        .join("; ");
+      throw new Error(`All model calls failed: ${errors}`);
+    }
+
+    // Auto-select first completed model output
+    const selectedContent = finalModels[firstCompletedModelId]?.content ?? "";
+
+    for (const [modelId, modelOutput] of Object.entries(finalModels)) {
+      setModelStatus(nodeExecutionId, modelId, modelOutput.status, {
+        modelDisplayName: modelOutput.modelDisplayName,
+        content: modelOutput.content,
+        errorMessage: modelOutput.errorMessage,
+        formatErrors: modelOutput.formatErrors,
+      });
+    }
+
+    // Parse named outputs if configured
+    const bgOutputData: Record<string, unknown> = {
+      models: finalModels,
+      selectedContent,
+      text: selectedContent,
+    };
+    if (mcConfig.namedOutputs?.length) {
+      const parsed = parseNamedOutputs(selectedContent, mcConfig.namedOutputs);
+      bgOutputData.namedOutputs = parsed.namedOutputs;
+      if (parsed.fallback) {
+        bgOutputData.fallbackWarning = true;
+      }
+    }
+
+    await db
+      .update(nodeExecutions)
+      .set({
+        outputData: bgOutputData,
+        selectedOutputKey: firstCompletedModelId,
+        completedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(nodeExecutions.id, nodeExecutionId));
+
+    markDone(nodeExecutionId, "completed");
+    const finalSnapshot = buildSnapshotEvent(nodeExecutionId, firstCompletedModelId);
+    if (finalSnapshot) {
+      broadcast(nodeExecutionId, finalSnapshot);
+    }
+    disposeSessionLater(nodeExecutionId, MODEL_CALL_LIVE_SESSION_TTL_MS);
+  } catch (err) {
+    markDone(nodeExecutionId, "failed");
+    const failedSnapshot = buildSnapshotEvent(nodeExecutionId);
+    if (failedSnapshot) {
+      broadcast(nodeExecutionId, failedSnapshot);
+    }
+    disposeSessionLater(nodeExecutionId, MODEL_CALL_LIVE_SESSION_TTL_MS);
+    throw err;
+  }
 }
 
 // ─── Retry ──────────────────────────────────────────────────────────────────

@@ -23,6 +23,7 @@ import { evaluateExecutionRule } from "./conditions.service";
 import { confirmDesensitization, detectSensitiveInfo } from "./desensitize.service";
 import type { SourceConfirmInput } from "./desensitize.service";
 import { generateExport } from "./export.service";
+import { normalizeModelCallOutputDataForFailure } from "./model-call-state";
 import { executeModelCallBackground } from "./model-call.service";
 import { executeRestore } from "./restore.service";
 import { advanceNode, initDocumentExecution } from "./runtime.service";
@@ -76,11 +77,7 @@ async function getUserWecomId(userId: string): Promise<string | null> {
 /**
  * Send completion notification (in-app + WeChat push).
  */
-async function notifyCompletion(
-  userId: string,
-  documentId: string,
-  durationMs: number,
-) {
+async function notifyCompletion(userId: string, documentId: string, durationMs: number) {
   const ctx = await getDocumentContext(documentId);
   const duration = formatDuration(durationMs);
 
@@ -113,11 +110,7 @@ async function notifyCompletion(
 /**
  * Send failure notification (in-app + WeChat push).
  */
-async function notifyFailure(
-  userId: string,
-  documentId: string,
-  errorSummary: string,
-) {
+async function notifyFailure(userId: string, documentId: string, errorSummary: string) {
   const ctx = await getDocumentContext(documentId);
 
   // In-app notification
@@ -182,12 +175,7 @@ export async function executeDocumentPipeline(
     const executions = await db
       .select()
       .from(nodeExecutions)
-      .where(
-        and(
-          eq(nodeExecutions.documentId, documentId),
-          eq(nodeExecutions.isCurrent, true),
-        ),
-      )
+      .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
       .orderBy(asc(nodeExecutions.stepOrder));
 
     if (executions.length === 0) {
@@ -253,17 +241,15 @@ export async function executeDocumentPipeline(
         const freshExecs = await db
           .select()
           .from(nodeExecutions)
-          .where(
-            and(
-              eq(nodeExecutions.documentId, documentId),
-              eq(nodeExecutions.isCurrent, true),
-            ),
-          )
+          .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
           .orderBy(asc(nodeExecutions.stepOrder));
 
         const { triggered, reason } = evaluateExecutionRule(
           executionRule,
-          freshExecs.map((e) => ({ nodeId: e.nodeId, outputData: e.outputData as Record<string, unknown> | null })),
+          freshExecs.map((e) => ({
+            nodeId: e.nodeId,
+            outputData: e.outputData as Record<string, unknown> | null,
+          })),
         );
 
         if (triggered) {
@@ -339,7 +325,11 @@ export async function executeDocumentPipeline(
         }
 
         case "desensitize": {
-          await executeDesensitizeBackground(documentId, exec.id, nodeDef, userId);
+          const desConfig = nodeDef.config as DesensitizeConfig;
+          if (desConfig.autoAdvance) {
+            await executeDesensitizeBackground(documentId, exec.id, nodeDef, userId);
+          }
+          // Non-autoAdvance: leave in_progress for user review (pipeline will pause below)
           break;
         }
 
@@ -366,21 +356,31 @@ export async function executeDocumentPipeline(
       }
 
       // Interactive nodes: pause pipeline and return control to user
-      if (exec.nodeType === "export") {
-        // Export is already in_progress — don't advance, just exit pipeline
+      if (
+        exec.nodeType === "export" ||
+        exec.nodeType === "restore" ||
+        (exec.nodeType === "desensitize" && !(nodeDef.config as DesensitizeConfig).autoAdvance)
+      ) {
+        // Interactive node is already in_progress with fresh outputData — don't advance
         const progress = Math.round(((i + 1) / totalNodes) * 100);
-        await db.update(backgroundTasks).set({ progress, updatedAt: new Date() }).where(eq(backgroundTasks.id, task.id));
+        await db
+          .update(backgroundTasks)
+          .set({ progress, updatedAt: new Date() })
+          .where(eq(backgroundTasks.id, task.id));
         break;
       }
       if (exec.nodeType === "model_call") {
         // Model finished — stay in_progress with output for user review/edit
         // User will click "确认并继续" to advance
         const progress = Math.round(((i + 1) / totalNodes) * 100);
-        await db.update(backgroundTasks).set({ progress, updatedAt: new Date() }).where(eq(backgroundTasks.id, task.id));
+        await db
+          .update(backgroundTasks)
+          .set({ progress, updatedAt: new Date() })
+          .where(eq(backgroundTasks.id, task.id));
         break;
       }
 
-      // Auto nodes (desensitize, restore, input_transform): advance and continue
+      // Auto nodes (desensitize, input_transform): advance and continue
       await advanceNode(documentId, exec.id, userId);
 
       // Update progress
@@ -403,7 +403,13 @@ export async function executeDocumentPipeline(
       .update(backgroundTasks)
       .set({
         status: "completed",
-        progress: allDone ? 100 : Math.round((freshExecs.filter((e) => e.status === "completed" || e.status === "skipped").length / freshExecs.length) * 100),
+        progress: allDone
+          ? 100
+          : Math.round(
+              (freshExecs.filter((e) => e.status === "completed" || e.status === "skipped").length /
+                freshExecs.length) *
+                100,
+            ),
         completedAt,
         updatedAt: completedAt,
       })
@@ -416,7 +422,9 @@ export async function executeDocumentPipeline(
         .where(eq(documents.id, documentId));
     }
 
-    console.log(`[background] Pipeline ${allDone ? "completed" : "paused"} for document ${documentId}`);
+    console.log(
+      `[background] Pipeline ${allDone ? "completed" : "paused"} for document ${documentId}`,
+    );
 
     // Only send completion notification when ALL nodes are done
     if (allDone) {
@@ -441,7 +449,11 @@ export async function executeDocumentPipeline(
 
     // Mark any in_progress node executions as failed
     const inProgressNodes = await db
-      .select({ id: nodeExecutions.id })
+      .select({
+        id: nodeExecutions.id,
+        nodeType: nodeExecutions.nodeType,
+        outputData: nodeExecutions.outputData,
+      })
       .from(nodeExecutions)
       .where(
         and(
@@ -457,6 +469,13 @@ export async function executeDocumentPipeline(
         .set({
           status: "failed",
           errorMessage: errorMessage.slice(0, 2000),
+          outputData:
+            node.nodeType === "model_call"
+              ? normalizeModelCallOutputDataForFailure(
+                  node.outputData as Record<string, unknown> | null,
+                  errorMessage.slice(0, 2000),
+                )
+              : (node.outputData as Record<string, unknown> | null),
           updatedAt: failedAt,
         })
         .where(eq(nodeExecutions.id, node.id));
@@ -537,10 +556,7 @@ function buildReviewSummary(
   }));
 }
 
-function applyDesensitizeReplacements(
-  text: string,
-  items: ConfirmedSourceItem[],
-): string {
+function applyDesensitizeReplacements(text: string, items: ConfirmedSourceItem[]): string {
   let sanitizedText = text;
   for (const item of items) {
     sanitizedText = sanitizedText.replaceAll(item.original, item.placeholder);
@@ -657,7 +673,11 @@ async function executeDesensitizeBackground(
     })),
     sanitizedText,
     userId,
-    items.map((item) => ({ placeholder: item.placeholder, sensitiveType: item.sensitiveType, checked: true })),
+    items.map((item) => ({
+      placeholder: item.placeholder,
+      sensitiveType: item.sensitiveType,
+      checked: true,
+    })),
   );
 }
 
@@ -665,8 +685,12 @@ async function executeDesensitizeBackground(
 
 /**
  * Detect and clean up orphaned background tasks on server startup.
- * Handles both `running` and `queued` tasks interrupted by server restart,
- * as well as `in_progress` documents with no active background task.
+ * Only `running` / `queued` background tasks interrupted by server restart
+ * should be marked as failed.
+ *
+ * Interactive runtime states such as an input-transform form left open for
+ * editing must remain untouched, even if the parent document is still marked
+ * `in_progress`.
  */
 export async function detectOrphanTasks(): Promise<number> {
   let cleaned = 0;
@@ -690,52 +714,61 @@ export async function detectOrphanTasks(): Promise<number> {
     cleaned++;
   }
 
-  // 2. Clean up in_progress documents that have NO active (running/queued) background task.
-  //    This catches the case where init was called but start-background never completed,
-  //    or the task record was never created before a crash.
-  const orphanDocIds = new Set(orphanTasks.map((t) => t.documentId).filter(Boolean));
-  const staleDocuments = await db
-    .select({ id: documents.id })
-    .from(documents)
-    .where(eq(documents.status, "in_progress"));
+  // 2. Clean up orphaned in_progress nodes (interrupted API calls with no output).
+  //    After step 1, all active background tasks are cleaned up. Any remaining
+  //    in_progress model_call/restore nodes without output were mid-execution
+  //    when the server died. Interactive nodes (input_transform, desensitize,
+  //    export) and model_call with output (user review) are left untouched.
+  const orphanNodes = await db
+    .select({
+      id: nodeExecutions.id,
+      documentId: nodeExecutions.documentId,
+      nodeType: nodeExecutions.nodeType,
+      outputData: nodeExecutions.outputData,
+    })
+    .from(nodeExecutions)
+    .where(
+      and(
+        eq(nodeExecutions.status, "in_progress"),
+        eq(nodeExecutions.isCurrent, true),
+        inArray(nodeExecutions.nodeType, ["model_call", "restore"]),
+      ),
+    );
 
-  for (const doc of staleDocuments) {
-    // Skip if we already handled this document above
-    if (orphanDocIds.has(doc.id)) continue;
+  for (const node of orphanNodes) {
+    // model_call with output text = waiting for user review, not orphaned
+    if (node.nodeType === "model_call" && node.outputData) {
+      const od = node.outputData as Record<string, unknown>;
+      if (od.text || od.selectedContent) continue;
+    }
 
-    // Check if there's an active background task for this document
-    const [activeTask] = await db
-      .select({ id: backgroundTasks.id })
-      .from(backgroundTasks)
-      .where(
-        and(
-          eq(backgroundTasks.documentId, doc.id),
-          inArray(backgroundTasks.status, ["running", "queued"]),
-        ),
-      )
-      .limit(1);
+    await db
+      .update(nodeExecutions)
+      .set({
+        status: "failed",
+        errorMessage,
+        outputData:
+          node.nodeType === "model_call"
+            ? normalizeModelCallOutputDataForFailure(
+                node.outputData as Record<string, unknown> | null,
+                errorMessage,
+              )
+            : (node.outputData as Record<string, unknown> | null),
+        updatedAt: now,
+      })
+      .where(eq(nodeExecutions.id, node.id));
 
-    if (!activeTask) {
-      // No active task → this document is stuck, mark as failed
-      await db
-        .update(nodeExecutions)
-        .set({ status: "failed", errorMessage, updatedAt: now })
-        .where(
-          and(
-            eq(nodeExecutions.documentId, doc.id),
-            eq(nodeExecutions.status, "in_progress"),
-            eq(nodeExecutions.isCurrent, true),
-          ),
-        );
-
+    if (node.documentId) {
       await db
         .update(documents)
         .set({ status: "failed", updatedAt: now })
-        .where(eq(documents.id, doc.id));
-
-      console.warn(`[background] Orphaned document ${doc.id} (no active task) marked as failed`);
-      cleaned++;
+        .where(eq(documents.id, node.documentId));
     }
+
+    console.warn(
+      `[background] Orphaned node ${node.id} (${node.nodeType}) marked as failed (server restart)`,
+    );
+    cleaned++;
   }
 
   return cleaned;
@@ -765,12 +798,7 @@ export async function detectStuckTasks(): Promise<number> {
       userId: backgroundTasks.userId,
     })
     .from(backgroundTasks)
-    .where(
-      and(
-        eq(backgroundTasks.status, "running"),
-        lt(backgroundTasks.updatedAt, cutoff),
-      ),
-    );
+    .where(and(eq(backgroundTasks.status, "running"), lt(backgroundTasks.updatedAt, cutoff)));
 
   if (stuckTasks.length === 0) return 0;
 
@@ -779,7 +807,9 @@ export async function detectStuckTasks(): Promise<number> {
 
   for (const task of stuckTasks) {
     await cleanupFailedTask(task.id, task.documentId, task.userId, errorMessage, now);
-    console.warn(`[monitor] Stuck task ${task.id} marked as failed (no progress for ${STUCK_TASK_THRESHOLD_MS / 60000} min)`);
+    console.warn(
+      `[monitor] Stuck task ${task.id} marked as failed (no progress for ${STUCK_TASK_THRESHOLD_MS / 60000} min)`,
+    );
   }
 
   return stuckTasks.length;
@@ -795,7 +825,9 @@ export function startTaskMonitor(): void {
       console.error("[monitor] Failed to detect stuck tasks:", err);
     });
   }, MONITOR_INTERVAL_MS);
-  console.log(`[monitor] Stuck-task monitor started (interval: ${MONITOR_INTERVAL_MS / 1000}s, threshold: ${STUCK_TASK_THRESHOLD_MS / 60000}min)`);
+  console.log(
+    `[monitor] Stuck-task monitor started (interval: ${MONITOR_INTERVAL_MS / 1000}s, threshold: ${STUCK_TASK_THRESHOLD_MS / 60000}min)`,
+  );
 }
 
 /**
@@ -828,9 +860,13 @@ async function cleanupFailedTask(
 
   if (documentId) {
     // Mark any in_progress node executions as failed
-    await db
-      .update(nodeExecutions)
-      .set({ status: "failed", errorMessage, updatedAt: now })
+    const inProgressNodes = await db
+      .select({
+        id: nodeExecutions.id,
+        nodeType: nodeExecutions.nodeType,
+        outputData: nodeExecutions.outputData,
+      })
+      .from(nodeExecutions)
       .where(
         and(
           eq(nodeExecutions.documentId, documentId),
@@ -838,6 +874,24 @@ async function cleanupFailedTask(
           eq(nodeExecutions.isCurrent, true),
         ),
       );
+
+    for (const node of inProgressNodes) {
+      await db
+        .update(nodeExecutions)
+        .set({
+          status: "failed",
+          errorMessage,
+          outputData:
+            node.nodeType === "model_call"
+              ? normalizeModelCallOutputDataForFailure(
+                  node.outputData as Record<string, unknown> | null,
+                  errorMessage,
+                )
+              : (node.outputData as Record<string, unknown> | null),
+          updatedAt: now,
+        })
+        .where(eq(nodeExecutions.id, node.id));
+    }
 
     // Mark document as failed
     await db
@@ -849,7 +903,10 @@ async function cleanupFailedTask(
     try {
       await notifyFailure(userId, documentId, errorMessage);
     } catch (notifyErr) {
-      console.error(`[background] Failed to send failure notification for task ${taskId}:`, notifyErr);
+      console.error(
+        `[background] Failed to send failure notification for task ${taskId}:`,
+        notifyErr,
+      );
     }
   }
 }

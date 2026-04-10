@@ -17,7 +17,33 @@ import { models, providers } from "../../db/schema";
 import { db } from "../../db";
 import { nodeExecutions } from "../../db/schema";
 import { eq } from "drizzle-orm";
-import type { ModelCallConfig, ModelOutput } from "@intelliflow/shared";
+import type {
+  ModelCallConfig,
+  ModelCallLiveEvent,
+  ModelCallSnapshotPayload,
+  ModelOutput,
+  NodeExecutionStatus,
+} from "@intelliflow/shared";
+import { buildSnapshotEvent, getSession, subscribe } from "./model-call-live-session";
+import { buildModelCallSnapshotPayload, getModelOutputsForDisplay } from "./model-call-state";
+
+function encodeSseEvent(event: ModelCallLiveEvent): string {
+  return `data: ${JSON.stringify(event)}\n\n`;
+}
+
+function buildSnapshotFromExecution(params: {
+  outputData: Record<string, unknown> | null;
+  selectedOutputKey: string | null;
+  status: NodeExecutionStatus;
+  errorMessage?: string | null;
+}): ModelCallSnapshotPayload | null {
+  return buildModelCallSnapshotPayload({
+    outputData: params.outputData,
+    nodeStatus: params.status,
+    errorMessage: params.errorMessage,
+    selectedOutputKey: params.selectedOutputKey,
+  });
+}
 
 export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .use(requireAuth)
@@ -27,7 +53,13 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .get(
     "/:documentId/model-call/:nodeExecutionId/execute",
     async ({ params, user, set }) => {
-      const canEdit = await canEditDocument(params.documentId, user!.id);
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, userId);
       if (!canEdit) {
         set.status = 403;
         return { error: "仅文档创建者或项目负责人可执行此操作" };
@@ -92,7 +124,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           mcConfig.systemPromptTemplate,
           resolvedSystemPrompt,
           variableMapping,
-          user!.id,
+          userId,
           mcConfig,
         );
 
@@ -119,7 +151,13 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .get(
     "/:documentId/model-call/:nodeExecutionId/retry/:modelId",
     async ({ params, user, set }) => {
-      const canEdit = await canEditDocument(params.documentId, user!.id);
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, userId);
       if (!canEdit) {
         set.status = 403;
         return { error: "仅文档创建者或项目负责人可执行此操作" };
@@ -173,7 +211,7 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           mcConfig.systemPromptTemplate,
           resolvedSystemPrompt,
           variableMapping,
-          user!.id,
+          userId,
         );
 
         return new Response(stream, {
@@ -199,7 +237,13 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .post(
     "/:documentId/model-call/:nodeExecutionId/select",
     async ({ params, body, user, set }) => {
-      const canEdit = await canEditDocument(params.documentId, user!.id);
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, userId);
       if (!canEdit) {
         set.status = 403;
         return { error: "仅文档创建者或项目负责人可执行此操作" };
@@ -227,16 +271,27 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   // ─── Status polling fallback ────────────────────────────────────────────────
 
   .get(
-    "/:documentId/model-call/:nodeExecutionId/status",
-    async ({ params, user, set }) => {
-      const isMember = await isDocumentProjectMember(params.documentId, user!.id);
+    "/:documentId/model-call/:nodeExecutionId/stream",
+    async ({ params, request, user, set }) => {
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const isMember = await isDocumentProjectMember(params.documentId, userId);
       if (!isMember) {
         set.status = 403;
         return { error: "仅项目成员可访问运行时" };
       }
 
       const [exec] = await db
-        .select({ outputData: nodeExecutions.outputData })
+        .select({
+          outputData: nodeExecutions.outputData,
+          selectedOutputKey: nodeExecutions.selectedOutputKey,
+          status: nodeExecutions.status,
+          errorMessage: nodeExecutions.errorMessage,
+        })
         .from(nodeExecutions)
         .where(eq(nodeExecutions.id, params.nodeExecutionId))
         .limit(1);
@@ -246,8 +301,109 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         return { error: "未找到节点执行记录" };
       }
 
-      const outputData = (exec.outputData as Record<string, unknown>) ?? {};
-      const modelsData = (outputData.models as Record<string, ModelOutput>) ?? {};
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          const encoder = new TextEncoder();
+          const session = getSession(params.nodeExecutionId);
+          const sessionSnapshot = buildSnapshotEvent(
+            params.nodeExecutionId,
+            exec.selectedOutputKey ?? null,
+          );
+          const fallbackSnapshot = buildSnapshotFromExecution({
+            outputData: exec.outputData as Record<string, unknown> | null,
+            selectedOutputKey: exec.selectedOutputKey,
+            status: exec.status,
+            errorMessage: exec.errorMessage,
+          });
+
+          const initialEvent: ModelCallLiveEvent | null =
+            sessionSnapshot ?? (fallbackSnapshot ? { type: "snapshot", data: fallbackSnapshot } : null);
+
+          if (initialEvent) {
+            controller.enqueue(encoder.encode(encodeSseEvent(initialEvent)));
+          }
+
+          if (!session || session.completed || session.failed || exec.status !== "in_progress") {
+            controller.close();
+            return;
+          }
+
+          const unsubscribe =
+            subscribe(params.nodeExecutionId, (event) => {
+              try {
+                controller.enqueue(encoder.encode(encodeSseEvent(event)));
+                if (event.type === "snapshot" && event.data.done) {
+                  unsubscribe?.();
+                  controller.close();
+                }
+              } catch {
+                unsubscribe?.();
+              }
+            }) ?? null;
+
+          request.signal.addEventListener(
+            "abort",
+            () => {
+              unsubscribe?.();
+              try {
+                controller.close();
+              } catch {
+                // Already closed.
+              }
+            },
+            { once: true },
+          );
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    },
+    {
+      params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
+    },
+  )
+
+  .get(
+    "/:documentId/model-call/:nodeExecutionId/status",
+    async ({ params, user, set }) => {
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const isMember = await isDocumentProjectMember(params.documentId, userId);
+      if (!isMember) {
+        set.status = 403;
+        return { error: "仅项目成员可访问运行时" };
+      }
+
+      const [exec] = await db
+        .select({
+          outputData: nodeExecutions.outputData,
+          status: nodeExecutions.status,
+          errorMessage: nodeExecutions.errorMessage,
+        })
+        .from(nodeExecutions)
+        .where(eq(nodeExecutions.id, params.nodeExecutionId))
+        .limit(1);
+
+      if (!exec) {
+        set.status = 404;
+        return { error: "未找到节点执行记录" };
+      }
+
+      const modelsData = getModelOutputsForDisplay({
+        outputData: exec.outputData as Record<string, unknown> | null,
+        nodeStatus: exec.status,
+        errorMessage: exec.errorMessage,
+      });
 
       return { models: modelsData };
     },
@@ -261,7 +417,13 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .post(
     "/:documentId/model-call/:nodeExecutionId/models/:modelId/revalidate",
     async ({ params, body, user, set }) => {
-      const canEdit = await canEditDocument(params.documentId, user!.id);
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, userId);
       if (!canEdit) {
         set.status = 403;
         return { error: "仅文档创建者或项目负责人可执行此操作" };
@@ -337,7 +499,13 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
   .post(
     "/:documentId/model-call/:nodeExecutionId/models/:modelId/ai-fix",
     async ({ params, user, set }) => {
-      const canEdit = await canEditDocument(params.documentId, user!.id);
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, userId);
       if (!canEdit) {
         set.status = 403;
         return { error: "仅文档创建者或项目负责人可执行此操作" };

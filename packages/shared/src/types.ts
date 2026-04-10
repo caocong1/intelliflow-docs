@@ -490,6 +490,21 @@ export interface SSEEvent {
   timestamp: string;
 }
 
+/** Snapshot payload for resumable model-call live streaming */
+export interface ModelCallSnapshotPayload {
+  models: Record<string, ModelOutput>;
+  selectedModelId?: string | null;
+  done: boolean;
+}
+
+/** Live SSE events for background model-call execution */
+export type ModelCallLiveEvent =
+  | SSEEvent
+  | {
+      type: "snapshot";
+      data: ModelCallSnapshotPayload;
+    };
+
 /** Model call log entry */
 export interface ModelCallLog {
   id: string;
@@ -514,8 +529,10 @@ export interface ModelCallLog {
 export interface DocumentRuntimeState {
   documentId: string;
   projectId: string | null;
+  documentTitle: string;
   workflowName: string;
   currentNodeIndex: number;
+  backgroundTaskActive: boolean;
   nodes: NodeExecution[];
   workflowNodes: WorkflowNodeDef[];
 }
@@ -564,6 +581,7 @@ export interface DesensitizeOutputData {
   mappingCount: number;
   detectedItems: DesensitizeReviewSummaryItem[];
   sources?: Record<string, SourceOutput>;
+  confirmedAt?: string;
 }
 
 /** 单条还原记录 */
@@ -577,6 +595,7 @@ export interface RestorationItem {
 /** 单个输入源的还原输出 */
 export interface RestoreSourceOutput {
   displayName: string;
+  originalText: string;   // 恢复前文本
   restoredText: string;
 }
 
@@ -586,6 +605,7 @@ export interface RestoreOutputData {
   restoredText: string;
   restorations: RestorationItem[];
   sources: Record<string, RestoreSourceOutput>;
+  confirmedAt?: string;   // 确认时间戳
 }
 
 /** 检测阶段临时状态（confirm 后被完整覆盖） */

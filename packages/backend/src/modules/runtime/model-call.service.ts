@@ -3,8 +3,6 @@ import type {
   ModelCallConfig,
   ModelCallLiveEvent,
   ModelOutput,
-  NamedOutputDef,
-  NodeExecution,
   SSEEvent,
   WorkflowNodeDef,
 } from "@intelliflow/shared";
@@ -20,8 +18,6 @@ import {
   providers,
   workflows,
 } from "../../db/schema";
-import { getStrategy } from "./strategies";
-import type { ModelCallInput } from "./strategies";
 import {
   applyDelta,
   broadcast,
@@ -33,6 +29,9 @@ import {
   scheduleFlush,
   setModelStatus,
 } from "./model-call-live-session";
+import { buildModelCallOutputData, buildSelectedModelOutputData } from "./model-call-output";
+import { getStrategy } from "./strategies";
+import type { ModelCallInput } from "./strategies";
 
 // ─── Prompt Resolution ──────────────────────────────────────────────────────
 
@@ -101,9 +100,10 @@ export function resolveFieldPath(obj: unknown, fieldPath: string): string | unde
  * 1. fieldsByKey[segmentKey] — machineKey lookup
  * 2. fields[segmentKey] — UUID fallback
  * 3. fileSlots[segmentKey] — file slot (.text)
- * 4. namedOutputs[segmentKey] — named outputs (.content, Phase 24 stub)
- * 5. models[segmentKey] — model output (.content)
- * 6. od[segmentKey] — direct property (text, confirmedAt, etc.)
+ * 4. namedOutputs[segmentKey] — selected named outputs (.content)
+ * 5. outputItems[segmentKey] — flattened model/artifact outputs
+ * 6. models[segmentKey] — model output (.content)
+ * 7. od[segmentKey] — direct property (text, confirmedAt, etc.)
  */
 export function resolveRef(
   ref: { nodeId: string; outputId: string; fieldPath?: string },
@@ -153,8 +153,28 @@ export function resolveRef(
     return baseContent;
   }
 
-  // 5. sources (restore node output — returns .restoredText)
-  const sources = od.sources as Record<string, { restoredText?: string; content?: string }> | undefined;
+  // 5. outputItems (flattened model/artifact outputs, supports fieldPath for JSON access)
+  const outputItems = od.outputItems as Record<string, { content?: string }> | undefined;
+  if (outputItems?.[segmentKey]) {
+    const baseContent = outputItems[segmentKey].content;
+    if (ref.fieldPath && baseContent) {
+      try {
+        const parsed = JSON.parse(baseContent);
+        return resolveFieldPath(parsed, ref.fieldPath);
+      } catch {
+        console.warn(
+          `resolveRef: failed to parse outputItem "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`,
+        );
+        return undefined;
+      }
+    }
+    return baseContent;
+  }
+
+  // 6. sources (restore node output — returns .restoredText)
+  const sources = od.sources as
+    | Record<string, { restoredText?: string; content?: string }>
+    | undefined;
   if (sources?.[segmentKey]) {
     return sources[segmentKey].restoredText ?? sources[segmentKey].content;
   }
@@ -166,7 +186,7 @@ export function resolveRef(
     }
   }
 
-  // 6. models (model output — returns .content, supports fieldPath for JSON access)
+  // 7. models (model output — returns .content, supports fieldPath for JSON access)
   const modelsMap = od.models as Record<string, { content?: string }> | undefined;
   if (modelsMap?.[segmentKey]) {
     const baseContent = modelsMap[segmentKey].content;
@@ -184,7 +204,7 @@ export function resolveRef(
     return baseContent;
   }
 
-  // 7. Direct property (text, confirmedAt, selectedContent, etc.)
+  // 8. Direct property (text, confirmedAt, selectedContent, etc.)
   if (od[segmentKey] !== undefined && od[segmentKey] !== null) {
     const v = od[segmentKey];
     const baseValue = typeof v === "string" ? v : JSON.stringify(v);
@@ -342,48 +362,6 @@ export function validateModelOutput(
   }
 
   return { status: "completed" };
-}
-
-/**
- * Parse named output delimiters from raw model content.
- * Expected format: ===OUTPUT:id===\n...content...\n===END:id===
- * Falls back to storing entire content as _default when delimiters not found.
- */
-export function parseNamedOutputs(
-  rawContent: string,
-  expectedDefs: NamedOutputDef[],
-): {
-  namedOutputs: Record<string, { content: string; format: string }>;
-  fallback: boolean;
-} {
-  const expectedIds = expectedDefs.map((d) => d.id);
-  const formatMap = new Map(expectedDefs.map((d) => [d.id, d.format]));
-  const result: Record<string, { content: string; format: string }> = {};
-
-  const regex = /===OUTPUT:(\w+)===\n?([\s\S]*?)===END:\1===/g;
-  let match: RegExpExecArray | null;
-  match = regex.exec(rawContent);
-  while (match !== null) {
-    const id = match[1];
-    const content = match[2].trim();
-    result[id] = {
-      content,
-      format: formatMap.get(id) ?? "text",
-    };
-    match = regex.exec(rawContent);
-  }
-
-  // Check if all expected IDs were found
-  const allFound = expectedIds.every((id) => id in result);
-  if (allFound) {
-    return { namedOutputs: result, fallback: false };
-  }
-
-  // Fallback: store entire content as _default
-  return {
-    namedOutputs: { _default: { content: rawContent, format: "text" } },
-    fallback: true,
-  };
 }
 
 // ─── Model Execution ────────────────────────────────────────────────────────
@@ -602,26 +580,22 @@ export async function executeModelCall(
         }
       }
 
-      // Parse named outputs if configured
-      const outputDataPayload: Record<string, unknown> = { models: finalModels };
-      if (config?.namedOutputs?.length) {
-        // Use the first completed model's content for named output parsing
-        const firstCompleted = Object.values(finalModels).find(
+      const firstCompletedModelId =
+        Object.values(finalModels).find(
           (m) => m.status === "completed" || m.status === "format_error",
-        );
-        if (firstCompleted) {
-          const parsed = parseNamedOutputs(firstCompleted.content, config.namedOutputs);
-          outputDataPayload.namedOutputs = parsed.namedOutputs;
-          if (parsed.fallback) {
-            outputDataPayload.fallbackWarning = true;
-          }
-        }
-      }
+        )?.modelId ?? null;
+      const { outputData: outputDataPayload, selectedOutputKey } = buildModelCallOutputData({
+        models: finalModels,
+        config,
+        defaultSelectedModelId:
+          config?.enableUserSelectionOutput === true ? null : firstCompletedModelId,
+      });
 
       await db
         .update(nodeExecutions)
         .set({
           outputData: outputDataPayload,
+          selectedOutputKey,
           updatedAt: new Date(),
         })
         .where(eq(nodeExecutions.id, nodeExecutionId));
@@ -786,11 +760,7 @@ export async function executeModelCallBackground(
             if (event.type !== "delta") return;
             applyDelta(nodeExecutionId, model.id, event.data);
             broadcast(nodeExecutionId, event);
-            scheduleFlush(
-              nodeExecutionId,
-              flushModelsToDb,
-              BACKGROUND_MODEL_FLUSH_INTERVAL_MS,
-            );
+            scheduleFlush(nodeExecutionId, flushModelsToDb, BACKGROUND_MODEL_FLUSH_INTERVAL_MS);
           };
 
           const result = await strategy.execute({
@@ -950,9 +920,6 @@ export async function executeModelCallBackground(
       throw new Error(`All model calls failed: ${errors}`);
     }
 
-    // Auto-select first completed model output
-    const selectedContent = finalModels[firstCompletedModelId]?.content ?? "";
-
     for (const [modelId, modelOutput] of Object.entries(finalModels)) {
       setModelStatus(nodeExecutionId, modelId, modelOutput.status, {
         modelDisplayName: modelOutput.modelDisplayName,
@@ -962,32 +929,25 @@ export async function executeModelCallBackground(
       });
     }
 
-    // Parse named outputs if configured
-    const bgOutputData: Record<string, unknown> = {
+    const { outputData: bgOutputData, selectedOutputKey } = buildModelCallOutputData({
       models: finalModels,
-      selectedContent,
-      text: selectedContent,
-    };
-    if (mcConfig.namedOutputs?.length) {
-      const parsed = parseNamedOutputs(selectedContent, mcConfig.namedOutputs);
-      bgOutputData.namedOutputs = parsed.namedOutputs;
-      if (parsed.fallback) {
-        bgOutputData.fallbackWarning = true;
-      }
-    }
+      config: mcConfig,
+      defaultSelectedModelId:
+        mcConfig.enableUserSelectionOutput === true ? null : firstCompletedModelId,
+    });
 
     await db
       .update(nodeExecutions)
       .set({
         outputData: bgOutputData,
-        selectedOutputKey: firstCompletedModelId,
+        selectedOutputKey,
         completedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(nodeExecutions.id, nodeExecutionId));
 
     markDone(nodeExecutionId, "completed");
-    const finalSnapshot = buildSnapshotEvent(nodeExecutionId, firstCompletedModelId);
+    const finalSnapshot = buildSnapshotEvent(nodeExecutionId, selectedOutputKey);
     if (finalSnapshot) {
       broadcast(nodeExecutionId, finalSnapshot);
     }
@@ -1198,8 +1158,8 @@ export async function retryModelCall(
 export async function selectModelOutput(
   documentId: string,
   nodeExecutionId: string,
-  selectedModelId: string,
-): Promise<void> {
+  selectedModelIds: string[],
+): Promise<{ outputData: Record<string, unknown>; selectedOutputKey: string | null }> {
   const [exec] = await db
     .select({ outputData: nodeExecutions.outputData })
     .from(nodeExecutions)
@@ -1210,23 +1170,37 @@ export async function selectModelOutput(
 
   const outputData = (exec.outputData as Record<string, unknown>) ?? {};
   const modelsMap = (outputData.models as Record<string, ModelOutput>) ?? {};
-  const selected = modelsMap[selectedModelId];
+  const config = await getModelCallConfig(nodeExecutionId);
+  const normalizedSelectedModelIds = selectedModelIds.filter((modelId) => Boolean(modelsMap[modelId]));
+  if (normalizedSelectedModelIds.length === 0) {
+    throw new Error("Selected model output not found");
+  }
 
-  if (!selected) throw new Error("Selected model output not found");
+  const { outputData: nextOutputData, selectedOutputKey } = buildSelectedModelOutputData(
+    outputData,
+    normalizedSelectedModelIds,
+    config?.type === "model_call"
+      ? {
+          namedOutputs: config.namedOutputs,
+          outputFormat: config.outputFormat,
+          enableUserSelectionOutput: config.enableUserSelectionOutput,
+        }
+      : undefined,
+  );
 
-  // Copy selected content to selectedContent + set selectedOutputKey
   await db
     .update(nodeExecutions)
     .set({
-      selectedOutputKey: selectedModelId,
-      outputData: {
-        ...outputData,
-        selectedContent: selected.content,
-        text: selected.content,
-      },
+      selectedOutputKey,
+      outputData: nextOutputData,
       updatedAt: new Date(),
     })
     .where(eq(nodeExecutions.id, nodeExecutionId));
+
+  return {
+    outputData: nextOutputData,
+    selectedOutputKey,
+  };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────

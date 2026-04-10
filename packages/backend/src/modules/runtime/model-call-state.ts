@@ -117,6 +117,9 @@ export function buildModelCallSnapshotPayload(params: {
   return {
     models,
     selectedModelId: params.selectedOutputKey,
+    selectedModelIds: ((params.outputData?.selectedModelIds as string[] | undefined) ?? []).filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    ),
     done: params.nodeStatus !== "in_progress",
   };
 }

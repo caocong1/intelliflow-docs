@@ -100,6 +100,18 @@ export interface OutputDef {
   name: string;
   description?: string;
   segmentKey?: string; // canonical path identifier for variable resolution
+  category?:
+    | "field"
+    | "file_slot"
+    | "model"
+    | "model_artifact"
+    | "selected"
+    | "selected_artifact"
+    | "desensitized"
+    | "restored";
+  groupLabel?: string;
+  modelId?: string;
+  artifactId?: string;
 }
 
 /** Explicit input source reference for desensitize/restore nodes */
@@ -211,6 +223,8 @@ export interface ModelCallConfig {
   stepDescription?: string;
   /** Named artifact definitions for multi-segment output */
   namedOutputs?: NamedOutputDef[];
+  /** Whether this node exposes an extra "user selected output" group downstream */
+  enableUserSelectionOutput?: boolean;
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
@@ -494,6 +508,7 @@ export interface SSEEvent {
 export interface ModelCallSnapshotPayload {
   models: Record<string, ModelOutput>;
   selectedModelId?: string | null;
+  selectedModelIds?: string[];
   done: boolean;
 }
 

@@ -250,12 +250,22 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       }
 
       try {
-        await selectModelOutput(
+        const selectedModelIds =
+          body.selectedModelIds && body.selectedModelIds.length > 0
+            ? body.selectedModelIds
+            : body.selectedModelId
+              ? [body.selectedModelId]
+              : [];
+        const result = await selectModelOutput(
           params.documentId,
           params.nodeExecutionId,
-          body.selectedModelId,
+          selectedModelIds,
         );
-        return { success: true };
+        return {
+          success: true,
+          outputData: result.outputData,
+          selectedOutputKey: result.selectedOutputKey,
+        };
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         set.status = 400;
@@ -264,7 +274,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
     },
     {
       params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
-      body: t.Object({ selectedModelId: t.String() }),
+      body: t.Object({
+        selectedModelId: t.Optional(t.String()),
+        selectedModelIds: t.Optional(t.Array(t.String())),
+      }),
     },
   )
 

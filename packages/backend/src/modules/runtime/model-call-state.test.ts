@@ -99,6 +99,7 @@ describe("model-call failed-state normalization", () => {
         },
       },
       selectedModelId: null,
+      selectedModelIds: [],
       done: true,
     });
   });

@@ -124,6 +124,16 @@ function resolveConfiguredSourceText(
     }
   }
 
+  const outputItems = outputData.outputItems as
+    | Record<string, { content?: string }>
+    | undefined;
+  if (outputItems && typeof outputItems === "object" && !Array.isArray(outputItems)) {
+    for (const key of candidateKeys) {
+      const content = typeof outputItems[key]?.content === "string" ? outputItems[key].content : "";
+      if (content.trim()) return content;
+    }
+  }
+
   for (const rawKey of ["selectedContent", "text"] as const) {
     const rawContent = outputData[rawKey];
     if (typeof rawContent !== "string" || !rawContent.trim()) continue;
@@ -235,6 +245,18 @@ export function collectWhitelistedOutputParts(
   const namedOutputs = outputData.namedOutputs as Record<string, NamedOutputValue> | undefined;
   if (namedOutputs && typeof namedOutputs === "object" && !Array.isArray(namedOutputs)) {
     for (const [outputId, value] of Object.entries(namedOutputs)) {
+      const text = typeof value?.content === "string" ? value.content.trim() : "";
+      if (!allowedOutputs.has(outputId) || !text || seen.has(outputId)) continue;
+      collected.push({ outputId, text });
+      seen.add(outputId);
+    }
+  }
+
+  const outputItems = outputData.outputItems as
+    | Record<string, { content?: string }>
+    | undefined;
+  if (outputItems && typeof outputItems === "object" && !Array.isArray(outputItems)) {
+    for (const [outputId, value] of Object.entries(outputItems)) {
       const text = typeof value?.content === "string" ? value.content.trim() : "";
       if (!allowedOutputs.has(outputId) || !text || seen.has(outputId)) continue;
       collected.push({ outputId, text });

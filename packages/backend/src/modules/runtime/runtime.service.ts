@@ -354,6 +354,32 @@ export async function advanceNode(
             (o) => o.id === src.outputId || o.segmentKey === src.outputId,
           );
           const resolvedOutputId = matchedOutput?.id ?? src.outputId;
+          const candidateOutputKeys = [
+            src.outputId,
+            matchedOutput?.segmentKey,
+            matchedOutput?.id,
+            resolvedOutputId,
+          ].filter((value): value is string => typeof value === "string" && value.length > 0);
+
+          const outputItems = upstreamOutput.outputItems as
+            | Record<string, { content?: string }>
+            | undefined;
+          if (outputItems && typeof outputItems === "object" && !Array.isArray(outputItems)) {
+            for (const key of candidateOutputKeys) {
+              const text = outputItems[key]?.content;
+              if (typeof text === "string" && text) {
+                sources[src.outputId] = {
+                  displayName: src.displayName,
+                  text,
+                  sourceType: "text",
+                };
+                break;
+              }
+            }
+            if (sources[src.outputId]) {
+              continue;
+            }
+          }
 
           // Try field-level lookup: strip "{nodeId}-field-" prefix from outputId to get fields key
           const fieldKeyMatch = resolvedOutputId.match(/^.+-field-(.+)$/);

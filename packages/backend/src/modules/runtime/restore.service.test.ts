@@ -58,6 +58,23 @@ describe("collectWhitelistedOutputParts", () => {
     ]);
   });
 
+  it("collects allowed outputs from outputItems when using flattened model-call outputs", () => {
+    const parts = collectWhitelistedOutputParts(
+      {
+        outputItems: {
+          selected: { content: "# 用户选择输出" },
+          "selected__artifact__prd_v1": { content: "# 选中 PRD" },
+        },
+      },
+      new Set(["selected", "selected__artifact__prd_v1"]),
+    );
+
+    expect(parts).toEqual([
+      { outputId: "selected", text: "# 用户选择输出" },
+      { outputId: "selected__artifact__prd_v1", text: "# 选中 PRD" },
+    ]);
+  });
+
   it("strips internal chapter marker comments from parsed text parts", () => {
     const parts = collectWhitelistedOutputParts(
       {

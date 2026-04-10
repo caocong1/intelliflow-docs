@@ -85,62 +85,65 @@ interface RuntimeRoute {
   "start-background": { post: (body?: unknown) => Promise<EdenResponse<{ status: string }>> };
 }
 
+/** Wrapper result with error message when backend returns an error */
+export type WrapperResult<T> = T | { data?: never; error: string } | null;
+
 /** Helper to access a runtime route by documentId */
 function runtimeOf(documentId: string): RuntimeRoute {
   return (api.api.runtime as unknown as Record<string, RuntimeRoute>)[documentId];
 }
 
-/** GET /runtime/:documentId → DocumentRuntimeState | null */
-export async function getRuntimeState(documentId: string): Promise<DocumentRuntimeState | null> {
+/** GET /runtime/:documentId → DocumentRuntimeState | WrapperResult */
+export async function getRuntimeState(documentId: string): Promise<WrapperResult<DocumentRuntimeState>> {
   const res = await runtimeOf(documentId).get();
   if ("data" in res) return res.data;
-  return null;
+  return { error: (res as { error: string }).error };
 }
 
-/** POST /runtime/:documentId/init → DocumentRuntimeState | null */
-export async function initRuntime(documentId: string): Promise<DocumentRuntimeState | null> {
+/** POST /runtime/:documentId/init → DocumentRuntimeState | WrapperResult */
+export async function initRuntime(documentId: string): Promise<WrapperResult<DocumentRuntimeState>> {
   const res = await runtimeOf(documentId).init.post();
   if ("data" in res) return res.data;
-  return null;
+  return { error: (res as { error: string }).error };
 }
 
-/** POST /runtime/:documentId/start-background → { status: string } | null */
+/** POST /runtime/:documentId/start-background → { status: string } | WrapperResult */
 export async function startBackgroundExecution(
   documentId: string,
-): Promise<{ status: string } | null> {
+): Promise<WrapperResult<{ status: string }>> {
   const res = await runtimeOf(documentId)["start-background"].post();
   if ("data" in res) return res.data;
-  return null;
+  return { error: (res as { error: string }).error };
 }
 
-/** POST /runtime/:documentId/advance/:nodeExecutionId → DocumentRuntimeState | null */
+/** POST /runtime/:documentId/advance/:nodeExecutionId → DocumentRuntimeState | WrapperResult */
 export async function advanceNode(
   documentId: string,
   nodeExecutionId: string,
-): Promise<DocumentRuntimeState | null> {
+): Promise<WrapperResult<DocumentRuntimeState>> {
   const res = await runtimeOf(documentId).advance[nodeExecutionId].post();
   if ("data" in res) return res.data;
-  return null;
+  return { error: (res as { error: string }).error };
 }
 
-/** POST /runtime/:documentId/skip/:nodeExecutionId → DocumentRuntimeState | null */
+/** POST /runtime/:documentId/skip/:nodeExecutionId → DocumentRuntimeState | WrapperResult */
 export async function skipNode(
   documentId: string,
   nodeExecutionId: string,
-): Promise<DocumentRuntimeState | null> {
+): Promise<WrapperResult<DocumentRuntimeState>> {
   const res = await runtimeOf(documentId).skip[nodeExecutionId].post();
   if ("data" in res) return res.data;
-  return null;
+  return { error: (res as { error: string }).error };
 }
 
-/** POST /runtime/:documentId/rollback → DocumentRuntimeState | null */
+/** POST /runtime/:documentId/rollback → DocumentRuntimeState | WrapperResult */
 export async function rollbackNode(
   documentId: string,
   targetStepOrder: number,
-): Promise<DocumentRuntimeState | null> {
+): Promise<WrapperResult<DocumentRuntimeState>> {
   const res = await runtimeOf(documentId).rollback.post({ targetStepOrder });
   if ("data" in res) return res.data;
-  return null;
+  return { error: (res as { error: string }).error };
 }
 
 /** GET /runtime/:documentId/export/:nodeExecutionId/preview → { content, defaultFilename } | null */
@@ -175,6 +178,35 @@ export async function getVersionDiff(
     return res.data as VersionDiffResult;
   }
   return null;
+}
+
+/** PUT /runtime/:documentId/restore/:nodeExecutionId/source — per-source restored text update */
+export async function updateRestoreSource(
+  documentId: string,
+  nodeExecutionId: string,
+  sourceId: string,
+  restoredText: string,
+): Promise<unknown> {
+  // biome-ignore lint/suspicious/noExplicitAny: eden treaty dynamic path
+  const runtimeApi = api.api.runtime as any;
+  const res = await runtimeApi[documentId].restore[nodeExecutionId].source.put({
+    sourceId,
+    restoredText,
+  });
+  if (res.data && !("error" in res.data)) return res.data;
+  throw new Error((res.data as Record<string, string>)?.error ?? "更新恢复文本失败");
+}
+
+/** POST /runtime/:documentId/restore/:nodeExecutionId/confirm — confirm restore results */
+export async function confirmRestore(
+  documentId: string,
+  nodeExecutionId: string,
+): Promise<unknown> {
+  // biome-ignore lint/suspicious/noExplicitAny: eden treaty dynamic path
+  const runtimeApi = api.api.runtime as any;
+  const res = await runtimeApi[documentId].restore[nodeExecutionId].confirm.post();
+  if (res.data && !("error" in res.data)) return res.data;
+  throw new Error((res.data as Record<string, string>)?.error ?? "确认恢复失败");
 }
 
 /** Alias for backward compatibility */

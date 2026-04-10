@@ -1,5 +1,5 @@
 import type { ModelOutput } from "@intelliflow/shared";
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal } from "solid-js";
 import type { JSX } from "solid-js";
 
 interface Props {
@@ -37,6 +37,25 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string; pulse: boolean
 export default function ModelCompareView(props: Props) {
   const modelList = () => Object.values(props.models);
   const [viewMode, setViewMode] = createSignal<CompareViewMode>("markdown");
+  const scrollers = new Map<string, HTMLDivElement>();
+
+  createEffect(() => {
+    const models = modelList();
+    for (const model of models) {
+      const scroller = scrollers.get(model.modelId);
+      if (!scroller) continue;
+      if (model.status !== "streaming" && model.status !== "pending") continue;
+
+      const contentKey = `${model.modelId}:${model.content.length}:${model.status}:${viewMode()}`;
+      void contentKey;
+
+      requestAnimationFrame(() => {
+        const target = scrollers.get(model.modelId);
+        if (!target) return;
+        target.scrollTop = target.scrollHeight;
+      });
+    }
+  });
 
   function statusBadge(status: ModelOutput["status"]) {
     const config = STATUS_CONFIG[status] ?? STATUS_CONFIG.pending;
@@ -165,7 +184,10 @@ export default function ModelCompareView(props: Props) {
                 </div>
 
                 {/* Content area */}
-                <div class="flex-1 p-4 bg-[#f7f9fb] min-h-[300px] max-h-[500px] overflow-y-auto">
+                <div
+                  ref={(el) => scrollers.set(model.modelId, el)}
+                  class="flex-1 p-4 bg-[#f7f9fb] min-h-[300px] max-h-[500px] overflow-y-auto"
+                >
                   <Show
                     when={model.content || model.status === "streaming"}
                     fallback={

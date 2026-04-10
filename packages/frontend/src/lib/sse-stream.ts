@@ -5,27 +5,27 @@
  * Uses XMLHttpRequest with onprogress for reliable chunked streaming through
  * dev proxies. Fetch + ReadableStream can stall in some proxy configurations.
  */
-
-export interface SSEEvent {
-  type: "delta" | "complete" | "error" | "status";
-  modelId: string;
-  data: string;
-}
+import type { ModelCallLiveEvent, ModelCallSnapshotPayload, SSEEvent } from "@intelliflow/shared";
 
 export interface SSEStreamOptions {
   url: string;
   method?: "GET" | "POST";
   body?: unknown;
+  onSnapshot?: (snapshot: ModelCallSnapshotPayload) => void;
+  onStatus?: (modelId: string, data: string) => void;
   onDelta: (modelId: string, data: string) => void;
   onComplete: (modelId: string, data: string) => void;
   onError: (modelId: string, data: string) => void;
   signal: AbortSignal;
 }
 
-function parseSSEChunks(
+export function parseSSEChunks(
   raw: string,
-  callbacks: Pick<SSEStreamOptions, "onDelta" | "onComplete" | "onError">,
-) {
+  callbacks: Pick<
+    SSEStreamOptions,
+    "onSnapshot" | "onStatus" | "onDelta" | "onComplete" | "onError"
+  >,
+): void {
   const chunks = raw.split("\n\n");
   for (const chunk of chunks) {
     for (const line of chunk.split("\n")) {
@@ -33,8 +33,14 @@ function parseSSEChunks(
       if (!trimmed.startsWith("data:")) continue;
       const dataStr = trimmed.slice(5).trim();
       try {
-        const event = JSON.parse(dataStr) as SSEEvent;
+        const event = JSON.parse(dataStr) as ModelCallLiveEvent;
         switch (event.type) {
+          case "snapshot":
+            callbacks.onSnapshot?.(event.data);
+            break;
+          case "status":
+            callbacks.onStatus?.(event.modelId, event.data);
+            break;
           case "delta":
             callbacks.onDelta(event.modelId, event.data);
             break;
@@ -44,7 +50,10 @@ function parseSSEChunks(
           case "error":
             callbacks.onError(event.modelId, event.data);
             break;
-          // "status" events are informational, no callback needed
+          default: {
+            const _exhaustive: SSEEvent = event;
+            void _exhaustive;
+          }
         }
       } catch {
         // Skip unparseable data lines
@@ -60,7 +69,7 @@ function parseSSEChunks(
  * Falls back gracefully when the full response arrives at once (proxy buffering).
  */
 export function streamSSE(options: SSEStreamOptions): Promise<void> {
-  const { url, method = "GET", body, onDelta, onComplete, onError, signal } = options;
+  const { url, method = "GET", body, onSnapshot, onStatus, onDelta, onComplete, onError, signal } = options;
   const token = localStorage.getItem("auth_token");
 
   return new Promise<void>((resolve, reject) => {
@@ -86,7 +95,7 @@ export function streamSSE(options: SSEStreamOptions): Promise<void> {
       const newData = xhr.responseText.slice(processedLength);
       if (!newData) return;
       processedLength = xhr.responseText.length;
-      parseSSEChunks(newData, { onDelta, onComplete, onError });
+      parseSSEChunks(newData, { onSnapshot, onStatus, onDelta, onComplete, onError });
     };
 
     xhr.onload = () => {
@@ -103,7 +112,7 @@ export function streamSSE(options: SSEStreamOptions): Promise<void> {
       // Process any remaining data not caught by onprogress
       const remaining = xhr.responseText.slice(processedLength);
       if (remaining) {
-        parseSSEChunks(remaining, { onDelta, onComplete, onError });
+        parseSSEChunks(remaining, { onSnapshot, onStatus, onDelta, onComplete, onError });
       }
       resolve();
     };

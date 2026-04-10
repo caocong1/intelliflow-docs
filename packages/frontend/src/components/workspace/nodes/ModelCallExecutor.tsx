@@ -1,4 +1,10 @@
-import type { ModelCallConfig, ModelOutput, NamedOutputDef, NodeExecution, SSEEvent } from "@intelliflow/shared";
+import type {
+  ModelCallConfig,
+  ModelCallLiveEvent,
+  ModelOutput,
+  NamedOutputDef,
+  NodeExecution,
+} from "@intelliflow/shared";
 import { For, Match, Show, Switch, createEffect, createSignal, onCleanup } from "solid-js";
 import { renderMarkdown } from "../../../lib/render-markdown";
 import { streamSSE } from "../../../lib/sse-stream";
@@ -11,6 +17,7 @@ interface Props {
   documentId: string;
   onDraftSave: (data: Record<string, unknown>) => void;
   readOnly: boolean;
+  backgroundMode?: boolean;
 }
 
 type ExecutionPhase = "idle" | "streaming" | "polling" | "done";
@@ -31,6 +38,109 @@ const ERROR_MESSAGES: Record<string, string> = {
   unavailable: "模型不可用",
 };
 
+function cloneModelOutputs(models: Record<string, ModelOutput>): Record<string, ModelOutput> {
+  return Object.fromEntries(
+    Object.entries(models).map(([modelId, model]) => [modelId, { ...model }]),
+  );
+}
+
+function normalizeModelOutputsForReview(
+  outputData: Record<string, unknown> | null,
+  models: Record<string, ModelOutput>,
+): Record<string, ModelOutput> {
+  if (!outputData) return cloneModelOutputs(models);
+
+  const hasFinalOutput =
+    typeof outputData.selectedContent === "string" || typeof outputData.text === "string";
+  if (!hasFinalOutput) return cloneModelOutputs(models);
+
+  return Object.fromEntries(
+    Object.entries(models).map(([modelId, model]) => {
+      if (model.status === "pending" || model.status === "streaming") {
+        return [
+          modelId,
+          {
+            ...model,
+            status: "completed" as const,
+            errorMessage: undefined,
+          },
+        ];
+      }
+
+      return [modelId, { ...model }];
+    }),
+  );
+}
+
+export function hasInProgressModelOutputs(models: Record<string, ModelOutput>): boolean {
+  return Object.values(models).some((model) => model.status === "pending" || model.status === "streaming");
+}
+
+export function deriveModelCallExecutionPhase(params: {
+  models: Record<string, ModelOutput>;
+  nodeStatus: NodeExecution["status"];
+  backgroundMode?: boolean;
+}): ExecutionPhase {
+  const entries = Object.values(params.models);
+
+  if (entries.length === 0) {
+    return params.backgroundMode && params.nodeStatus === "in_progress" ? "polling" : "idle";
+  }
+
+  if (hasInProgressModelOutputs(params.models)) {
+    return "polling";
+  }
+
+  return "done";
+}
+
+export function applyModelCallStreamEvent(
+  prev: Record<string, ModelOutput>,
+  event: ModelCallLiveEvent,
+  modelNames?: Record<string, string>,
+): Record<string, ModelOutput> {
+  if (event.type === "snapshot") {
+    return cloneModelOutputs(event.data.models);
+  }
+
+  const current = { ...prev };
+  const existing = current[event.modelId] ?? {
+    modelId: event.modelId,
+    modelDisplayName: modelNames?.[event.modelId] ?? event.modelId,
+    content: "",
+    status: "pending" as const,
+  };
+
+  switch (event.type) {
+    case "status":
+      current[event.modelId] = { ...existing, status: "streaming" };
+      break;
+    case "delta":
+      current[event.modelId] = {
+        ...existing,
+        content: existing.content + event.data,
+        status: "streaming",
+      };
+      break;
+    case "complete":
+      current[event.modelId] = {
+        ...existing,
+        content: event.data,
+        status: "completed",
+      };
+      break;
+    case "error":
+      current[event.modelId] = {
+        ...existing,
+        status: "failed",
+        errorMessage: event.data,
+      };
+      break;
+  }
+
+  return current;
+}
+
 // RECV-03: Cancel AI generation deferred to v2 per user decision
 
 export default function ModelCallExecutor(props: Props) {
@@ -38,7 +148,8 @@ export default function ModelCallExecutor(props: Props) {
 
   const existingModels = (): Record<string, ModelOutput> => {
     const od = props.nodeExecution.outputData as Record<string, unknown> | null;
-    return (od?.models as Record<string, ModelOutput>) ?? {};
+    const models = (od?.models as Record<string, ModelOutput>) ?? {};
+    return normalizeModelOutputsForReview(od, models);
   };
 
   const hasExistingOutput = () => Object.keys(existingModels()).length > 0;
@@ -55,15 +166,11 @@ export default function ModelCallExecutor(props: Props) {
   // NEVER re-trigger model call if models already exist in outputData
 
   function computeInitialPhase(): ExecutionPhase {
-    const models = existingModels();
-    const entries = Object.values(models);
-    if (entries.length === 0) return "idle";
-
-    // If any model is still streaming, poll for status (reconnect safety)
-    const hasStreaming = entries.some((m) => m.status === "streaming");
-    if (hasStreaming) return "polling";
-
-    return "done";
+    return deriveModelCallExecutionPhase({
+      models: existingModels(),
+      nodeStatus: props.nodeExecution.status,
+      backgroundMode: props.backgroundMode,
+    });
   }
 
   const [phase, setPhase] = createSignal<ExecutionPhase>(computeInitialPhase());
@@ -108,17 +215,31 @@ export default function ModelCallExecutor(props: Props) {
   };
 
   let abortController: AbortController | null = null;
+  let liveAbortController: AbortController | null = null;
+  let liveReconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let singleModelScroller: HTMLDivElement | undefined;
+  let activeTabScroller: HTMLDivElement | undefined;
+  const [liveSubscribed, setLiveSubscribed] = createSignal(false);
 
   onCleanup(() => {
     abortController?.abort();
+    liveAbortController?.abort();
+    if (liveReconnectTimer) clearTimeout(liveReconnectTimer);
     if (pollTimer) clearInterval(pollTimer);
   });
 
   // ─── SSE Reconnect Safety: Poll /status instead of re-triggering ────────────
 
+  function stopStatusPolling() {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
   function startStatusPolling() {
-    if (pollTimer) clearInterval(pollTimer);
+    stopStatusPolling();
 
     pollTimer = setInterval(async () => {
       try {
@@ -132,31 +253,16 @@ export default function ModelCallExecutor(props: Props) {
 
         if (!res.ok) return;
 
-        const data = (await res.json()) as {
-          models: Record<string, { status: string; content?: string; errorMessage?: string }>;
-        };
+        const data = (await res.json()) as { models: Record<string, ModelOutput> };
+        setModelOutputs(cloneModelOutputs(data.models));
 
-        // Update model outputs from polled status
-        setModelOutputs((prev) => {
-          const updated = { ...prev };
-          for (const [modelId, info] of Object.entries(data.models)) {
-            const existing = updated[modelId];
-            if (existing) {
-              updated[modelId] = {
-                ...existing,
-                status: info.status as ModelOutput["status"],
-                content: info.content ?? existing.content,
-                errorMessage: info.errorMessage,
-              };
-            }
-          }
-          return updated;
-        });
-
-        // Check if all models are done
-        const allDone = Object.values(data.models).every(
-          (m) => m.status === "completed" || m.status === "failed" || m.status === "format_error",
-        );
+        // Check if all models are done (empty = still waiting for backend to write)
+        const modelEntries = Object.values(data.models);
+        const allDone =
+          modelEntries.length > 0 &&
+          modelEntries.every(
+            (m) => m.status === "completed" || m.status === "failed" || m.status === "format_error",
+          );
         if (allDone) {
           if (pollTimer) clearInterval(pollTimer);
           pollTimer = null;
@@ -168,74 +274,239 @@ export default function ModelCallExecutor(props: Props) {
     }, 3000);
   }
 
-  // Start polling if initial phase is "polling" (reconnect scenario)
-  createEffect(() => {
-    if (phase() === "polling") {
-      startStatusPolling();
+  function syncActiveTab(models: Record<string, ModelOutput>, preferredModelId?: string | null) {
+    const keys = Object.keys(models);
+    if (keys.length === 0) return;
+    if (preferredModelId && models[preferredModelId]) {
+      setActiveTab(preferredModelId);
+      return;
     }
+    if (!activeTab() || !models[activeTab()]) {
+      setActiveTab(keys[0]);
+    }
+  }
+
+  function applyLiveEvent(event: ModelCallLiveEvent) {
+    setModelOutputs((prev) => applyModelCallStreamEvent(prev, event, props.config.modelNames));
+
+    if (event.type === "snapshot") {
+      if (event.data.selectedModelId) {
+        setSelectedModelId(event.data.selectedModelId);
+      }
+      syncActiveTab(event.data.models, event.data.selectedModelId);
+      setPhase(event.data.done ? "done" : "streaming");
+      return;
+    }
+
+    if (!activeTab()) {
+      setActiveTab(event.modelId);
+    }
+
+    if (event.type === "status" || event.type === "delta") {
+      setPhase("streaming");
+    }
+  }
+
+  function clearLiveReconnectTimer() {
+    if (liveReconnectTimer) {
+      clearTimeout(liveReconnectTimer);
+      liveReconnectTimer = null;
+    }
+  }
+
+  function shouldUseLiveStream() {
+    const outputs = modelOutputs();
+    return (
+      Boolean(props.backgroundMode) &&
+      Object.keys(outputs).length > 0 &&
+      hasInProgressModelOutputs(outputs)
+    );
+  }
+
+  function scheduleLiveReconnect() {
+    clearLiveReconnectTimer();
+    liveReconnectTimer = setTimeout(() => {
+      liveReconnectTimer = null;
+      if (shouldUseLiveStream() && !liveAbortController) {
+        void startLiveStream();
+      }
+    }, 1000);
+  }
+
+  async function startLiveStream() {
+    if (liveAbortController || !shouldUseLiveStream()) return;
+
+    clearLiveReconnectTimer();
+    stopStatusPolling();
+    setLiveSubscribed(true);
+
+    const controller = new AbortController();
+    liveAbortController = controller;
+
+    try {
+      await streamSSE({
+        url: `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/stream`,
+        onSnapshot: (snapshot) => {
+          applyLiveEvent({ type: "snapshot", data: snapshot });
+        },
+        onStatus: (modelId, data) => {
+          applyLiveEvent({
+            type: "status",
+            modelId,
+            data,
+            timestamp: new Date().toISOString(),
+          });
+        },
+        onDelta: (modelId, data) => {
+          applyLiveEvent({
+            type: "delta",
+            modelId,
+            data,
+            timestamp: new Date().toISOString(),
+          });
+        },
+        onComplete: (modelId, data) => {
+          applyLiveEvent({
+            type: "complete",
+            modelId,
+            data,
+            timestamp: new Date().toISOString(),
+          });
+        },
+        onError: (modelId, data) => {
+          applyLiveEvent({
+            type: "error",
+            modelId,
+            data,
+            timestamp: new Date().toISOString(),
+          });
+        },
+        signal: controller.signal,
+      });
+    } catch {
+      // Fall back to polling + reconnect; background live stream errors should not hard-fail the UI.
+    } finally {
+      if (liveAbortController === controller) {
+        liveAbortController = null;
+      }
+      setLiveSubscribed(false);
+
+      if (!controller.signal.aborted && shouldUseLiveStream()) {
+        setPhase("polling");
+        scheduleLiveReconnect();
+      }
+    }
+  }
+
+  // Start polling only when live stream is not available.
+  createEffect(() => {
+    if (phase() === "polling" && !liveSubscribed()) {
+      startStatusPolling();
+    } else {
+      stopStatusPolling();
+    }
+  });
+
+  createEffect(() => {
+    if (liveSubscribed()) return;
+
+    const incomingModels = existingModels();
+    if (Object.keys(incomingModels).length === 0) return;
+
+    setModelOutputs(cloneModelOutputs(incomingModels));
+    syncActiveTab(incomingModels, props.nodeExecution.selectedOutputKey);
+    if (props.nodeExecution.selectedOutputKey) {
+      setSelectedModelId(props.nodeExecution.selectedOutputKey);
+    }
+    setPhase(
+      deriveModelCallExecutionPhase({
+        models: incomingModels,
+        nodeStatus: props.nodeExecution.status,
+        backgroundMode: props.backgroundMode,
+      }),
+    );
+  });
+
+  createEffect(() => {
+    if (shouldUseLiveStream()) {
+      void startLiveStream();
+      return;
+    }
+
+    clearLiveReconnectTimer();
+    if (liveAbortController) {
+      liveAbortController.abort();
+      liveAbortController = null;
+    }
+    setLiveSubscribed(false);
   });
 
   // Set initial active tab
   createEffect(() => {
     if (!activeTab()) {
-      const keys = Object.keys(modelOutputs());
-      if (keys.length > 0) {
-        setActiveTab(keys[0]);
-      }
+      syncActiveTab(modelOutputs(), selectedModelId());
     }
+  });
+
+  createEffect(() => {
+    const activeModel = isMultiModel() ? modelOutputs()[activeTab()] : modelList()[0];
+    const scroller = isMultiModel() ? activeTabScroller : singleModelScroller;
+
+    if (!activeModel || !scroller) return;
+    if (activeModel.status !== "streaming" && activeModel.status !== "pending") return;
+
+    const contentKey = `${activeModel.modelId}:${activeModel.content.length}:${activeModel.status}:${viewMode()}`;
+    void contentKey;
+
+    requestAnimationFrame(() => {
+      if (!scroller) return;
+      scroller.scrollTop = scroller.scrollHeight;
+    });
   });
 
   // ─── SSE Streaming ─────────────────────────────────────────────────────────
 
   async function startStreaming(url: string) {
-    const token = localStorage.getItem("auth_token");
+    abortController?.abort();
     abortController = new AbortController();
 
     try {
-      const response = await fetch(url, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      await streamSSE({
+        url,
+        onStatus: (modelId, data) => {
+          applyLiveEvent({
+            type: "status",
+            modelId,
+            data,
+            timestamp: new Date().toISOString(),
+          });
+        },
+        onDelta: (modelId, data) => {
+          applyLiveEvent({
+            type: "delta",
+            modelId,
+            data,
+            timestamp: new Date().toISOString(),
+          });
+        },
+        onComplete: (modelId, data) => {
+          applyLiveEvent({
+            type: "complete",
+            modelId,
+            data,
+            timestamp: new Date().toISOString(),
+          });
+        },
+        onError: (modelId, data) => {
+          applyLiveEvent({
+            type: "error",
+            modelId,
+            data,
+            timestamp: new Date().toISOString(),
+          });
+        },
         signal: abortController.signal,
       });
-
-      if (!response.ok) {
-        const body = await response.text().catch(() => "");
-        try {
-          const parsed = JSON.parse(body);
-          throw new Error(parsed.error ?? `HTTP ${response.status}`);
-        } catch {
-          throw new Error(`HTTP ${response.status}: ${body.slice(0, 200)}`);
-        }
-      }
-
-      if (!response.body) throw new Error("No response body");
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const chunks = buffer.split("\n\n");
-        buffer = chunks.pop() ?? "";
-
-        for (const chunk of chunks) {
-          for (const line of chunk.split("\n")) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.slice(5).trim();
-
-            try {
-              const event = JSON.parse(dataStr) as SSEEvent;
-              handleSSEEvent(event);
-            } catch {
-              // Skip unparseable
-            }
-          }
-        }
-      }
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       const message = err instanceof Error ? err.message : String(err);
@@ -243,52 +514,6 @@ export default function ModelCallExecutor(props: Props) {
     }
 
     setPhase("done");
-  }
-
-  function handleSSEEvent(event: SSEEvent) {
-    setModelOutputs((prev) => {
-      const current = { ...prev };
-      const existing = current[event.modelId] ?? {
-        modelId: event.modelId,
-        modelDisplayName: props.config.modelNames?.[event.modelId] ?? event.modelId,
-        content: "",
-        status: "pending" as const,
-      };
-
-      switch (event.type) {
-        case "status":
-          current[event.modelId] = { ...existing, status: "streaming" };
-          break;
-        case "delta":
-          current[event.modelId] = {
-            ...existing,
-            content: existing.content + event.data,
-            status: "streaming",
-          };
-          break;
-        case "complete":
-          current[event.modelId] = {
-            ...existing,
-            content: event.data,
-            status: "completed",
-          };
-          break;
-        case "error":
-          current[event.modelId] = {
-            ...existing,
-            status: "failed",
-            errorMessage: event.data,
-          };
-          break;
-      }
-
-      return current;
-    });
-
-    // Set first tab if not set
-    if (!activeTab()) {
-      setActiveTab(event.modelId);
-    }
   }
 
   // ─── Error localization ─────────────────────────────────────────────────────
@@ -310,8 +535,9 @@ export default function ModelCallExecutor(props: Props) {
   // ─── Actions ──────────────────────────────────────────────────────────────
 
   function handleStartGeneration() {
-    // NEVER call execute if models already exist in outputData
+    // NEVER call execute if models already exist or backend is already running
     if (hasExistingOutput()) return;
+    if (props.backgroundMode && props.nodeExecution.status === "in_progress" && phase() === "polling") return;
 
     setPhase("streaming");
     setError(null);
@@ -821,16 +1047,20 @@ export default function ModelCallExecutor(props: Props) {
           </div>
         </Show>
 
-        {/* Polling state (reconnect) */}
-        <Show when={phase() === "polling"}>
-          <div class="bg-indigo-50 rounded-xl px-4 py-3 flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-indigo-500 animate-ping" />
-            <span class="text-sm text-indigo-700">模型生成中，正在获取最新状态...</span>
+        {/* Streaming/Polling — waiting for first model response */}
+        <Show when={(phase() === "streaming" || phase() === "polling") && modelList().length === 0}>
+          <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] flex items-center justify-center">
+            <div class="flex flex-col items-center gap-3">
+              <span class="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+              <span class="text-sm text-[#464555]">
+                {phase() === "polling" ? "正在获取生成状态..." : "模型正在准备响应..."}
+              </span>
+            </div>
           </div>
         </Show>
 
-        {/* Streaming / Polling / Done */}
-        <Show when={phase() !== "idle"}>
+        {/* Streaming / Polling / Done — model content */}
+        <Show when={phase() !== "idle" && modelList().length > 0}>
           <Switch>
             {/* Compare view */}
             <Match when={showCompare() && isMultiModel()}>
@@ -882,19 +1112,34 @@ export default function ModelCallExecutor(props: Props) {
 
                       {/* Normal content (not format_error) */}
                       <Show when={model()?.status !== "format_error"}>
-                        <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto">
+                        <div
+                          ref={singleModelScroller}
+                          class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto"
+                        >
                           <Show
-                            when={viewMode() === "markdown"}
+                            when={model()?.content}
                             fallback={
-                              <pre class="text-sm text-[#191c1e] whitespace-pre-wrap font-mono leading-relaxed">
-                                {model()?.content ?? ""}
-                              </pre>
+                              <Show when={model()?.status === "streaming" || model()?.status === "pending"}>
+                                <div class="flex items-center gap-2.5 py-2">
+                                  <span class="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin flex-shrink-0" />
+                                  <span class="text-sm text-[#464555]">正在生成中...</span>
+                                </div>
+                              </Show>
                             }
                           >
-                            {renderMarkdown(model()?.content ?? "")}
-                          </Show>
-                          <Show when={model()?.status === "streaming"}>
-                            <span class="inline-block w-2 h-4 bg-indigo-500 animate-pulse ml-0.5" />
+                            <Show
+                              when={viewMode() === "markdown"}
+                              fallback={
+                                <pre class="text-sm text-[#191c1e] whitespace-pre-wrap font-mono leading-relaxed">
+                                  {model()?.content ?? ""}
+                                </pre>
+                              }
+                            >
+                              {renderMarkdown(model()?.content ?? "")}
+                            </Show>
+                            <Show when={model()?.status === "streaming"}>
+                              <span class="inline-block w-2 h-4 bg-indigo-500 animate-pulse ml-0.5" />
+                            </Show>
                           </Show>
                         </div>
                       </Show>
@@ -966,19 +1211,34 @@ export default function ModelCallExecutor(props: Props) {
 
                       {/* Normal content (not format_error) */}
                       <Show when={model().status !== "format_error"}>
-                        <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto">
+                        <div
+                          ref={activeTabScroller}
+                          class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto"
+                        >
                           <Show
-                            when={viewMode() === "markdown"}
+                            when={model().content}
                             fallback={
-                              <pre class="text-sm text-[#191c1e] whitespace-pre-wrap font-mono leading-relaxed">
-                                {model().content}
-                              </pre>
+                              <Show when={model().status === "streaming" || model().status === "pending"}>
+                                <div class="flex items-center gap-2.5 py-2">
+                                  <span class="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin flex-shrink-0" />
+                                  <span class="text-sm text-[#464555]">正在生成中...</span>
+                                </div>
+                              </Show>
                             }
                           >
-                            {renderMarkdown(model().content)}
-                          </Show>
-                          <Show when={model().status === "streaming"}>
-                            <span class="inline-block w-2 h-4 bg-indigo-500 animate-pulse ml-0.5" />
+                            <Show
+                              when={viewMode() === "markdown"}
+                              fallback={
+                                <pre class="text-sm text-[#191c1e] whitespace-pre-wrap font-mono leading-relaxed">
+                                  {model().content}
+                                </pre>
+                              }
+                            >
+                              {renderMarkdown(model().content)}
+                            </Show>
+                            <Show when={model().status === "streaming"}>
+                              <span class="inline-block w-2 h-4 bg-indigo-500 animate-pulse ml-0.5" />
+                            </Show>
                           </Show>
                         </div>
                       </Show>

@@ -5,6 +5,8 @@ type ModalProps = {
   isOpen: boolean;
   onClose: () => void;
   title: string;
+  dialogClass?: string;
+  bodyClass?: string;
 };
 
 const Modal: ParentComponent<ModalProps> = (props) => {
@@ -65,7 +67,7 @@ const Modal: ParentComponent<ModalProps> = (props) => {
         <dialog
           ref={setDialogRef}
           open
-          class="relative inset-auto bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform transition-all p-0 m-0 max-h-[90vh] flex flex-col"
+          class={`relative inset-auto bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 transform transition-all p-0 m-0 max-h-[90vh] flex flex-col ${props.dialogClass ?? ""}`}
           aria-label={props.title}
         >
           <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100">
@@ -93,7 +95,7 @@ const Modal: ParentComponent<ModalProps> = (props) => {
               </svg>
             </button>
           </div>
-          <div class="px-6 py-5 overflow-y-auto">{props.children}</div>
+          <div class={props.bodyClass ?? "px-6 py-5 overflow-y-auto"}>{props.children}</div>
         </dialog>
       </div>
     </Show>

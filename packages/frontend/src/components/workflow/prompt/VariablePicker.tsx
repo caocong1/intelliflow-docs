@@ -1,6 +1,7 @@
 import type { ModelCallConfig, NamedOutputDef, OutputDef, VariableRef } from "@intelliflow/shared";
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
+import Modal from "../../ui/Modal";
 
 // ─── Schema Tree Types ──────────────────────────────────────────────────────
 
@@ -141,7 +142,7 @@ export function buildPickerItems(upstreamNodes: FlowNodeData[]): PickerItem[] {
   for (const node of upstreamNodes) {
     const outputs = (node.data.outputs as OutputDef[]).filter((o) => o.name);
     for (const output of outputs) {
-      items.push({ node, output, key: `${node.id}.${output.name}` });
+      items.push({ node, output, key: `${node.id}.${output.segmentKey || output.id}` });
     }
   }
   return items;
@@ -157,6 +158,17 @@ const TYPE_BADGE_CLASSES: Record<string, string> = {
   array: "bg-purple-100 text-purple-700",
   object: "bg-slate-100 text-slate-600",
   unknown: "bg-slate-100 text-slate-500",
+};
+
+const OUTPUT_GROUP_LABELS: Record<string, string> = {
+  field: "文本字段",
+  file_slot: "文件输入",
+  model: "模型整体输出",
+  model_artifact: "模型产物",
+  selected: "用户选择输出",
+  selected_artifact: "用户选择产物",
+  desensitized: "脱敏输出",
+  restored: "恢复输出",
 };
 
 // ─── Schema Tree Rendering Component ────────────────────────────────────────
@@ -268,6 +280,45 @@ function getSchemaForOutput(
   return null;
 }
 
+function matchesOutputSearch(node: FlowNodeData, output: OutputDef, query: string): boolean {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return true;
+
+  return [
+    node.data.label,
+    node.data.nodeType,
+    output.name,
+    output.description,
+    output.segmentKey,
+    output.groupLabel,
+    output.modelId,
+    output.artifactId,
+    OUTPUT_GROUP_LABELS[output.category ?? ""],
+  ]
+    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .some((value) => value.toLowerCase().includes(normalized));
+}
+
+function groupOutputs(outputs: OutputDef[]) {
+  const groups = new Map<string, { title: string; outputs: OutputDef[] }>();
+
+  for (const output of outputs) {
+    const key = `${output.category ?? "default"}::${output.groupLabel ?? ""}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        title:
+          output.groupLabel ??
+          OUTPUT_GROUP_LABELS[output.category ?? ""] ??
+          "节点输出",
+        outputs: [],
+      });
+    }
+    groups.get(key)?.outputs.push(output);
+  }
+
+  return Array.from(groups.values());
+}
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function VariablePicker(props: VariablePickerProps) {
@@ -275,11 +326,6 @@ export default function VariablePicker(props: VariablePickerProps) {
 
   function nodeOutputs(node: FlowNodeData): OutputDef[] {
     return (node.data.outputs as OutputDef[]).filter((o) => o.name);
-  }
-
-  function matchesSearch(text: string): boolean {
-    const q = search().toLowerCase();
-    return q === "" || text.toLowerCase().includes(q);
   }
 
   function handleSelectOutput(node: FlowNodeData, output: OutputDef) {
@@ -306,41 +352,45 @@ export default function VariablePicker(props: VariablePickerProps) {
     props.onSelect(variableName, ref);
   }
 
-  /** Determine output type from OutputDef.id prefix after nodeId */
   function getOutputTypeIcon(output: OutputDef): { icon: string; class: string; title: string } {
-    const id = output.id;
-    // OutputDef.id format: ${nodeId}-field-${key}, ${nodeId}-fileslot-${key}, ${nodeId}-model-${key}, etc.
-    if (id.includes("-fileslot-"))
+    if (output.category === "file_slot" || output.id.includes("-fileslot-"))
       return { icon: "\uD83D\uDCC1", class: "bg-purple-100 text-purple-600", title: "文件槽" };
-    if (id.includes("-model-"))
+    if (
+      output.category === "model" ||
+      output.category === "model_artifact" ||
+      output.category === "selected" ||
+      output.category === "selected_artifact" ||
+      output.id.includes("-model-")
+    )
       return { icon: "\uD83E\uDD16", class: "bg-amber-100 text-amber-600", title: "模型输出" };
-    if (id.includes("-desensitized-"))
+    if (output.category === "desensitized" || output.id.includes("-desensitized-"))
       return { icon: "\uD83D\uDD12", class: "bg-orange-100 text-orange-600", title: "脱敏" };
-    if (id.includes("-restored-"))
+    if (output.category === "restored" || output.id.includes("-restored-"))
       return { icon: "\uD83D\uDD13", class: "bg-green-100 text-green-600", title: "恢复" };
-    // Default: field type
     return { icon: "T", class: "bg-slate-100 text-slate-600", title: "文本字段" };
   }
 
-  const filteredNodes = () =>
-    props.upstreamNodes.filter((node) => {
-      const outputs = nodeOutputs(node);
-      if (outputs.length === 0) return false;
-      if (search() === "") return true;
-      return matchesSearch(node.data.label) || outputs.some((o) => matchesSearch(o.name));
-    });
+  const filteredNodes = createMemo(() =>
+    props.upstreamNodes
+      .map((node) => {
+        const outputs = nodeOutputs(node).filter((output) =>
+          matchesOutputSearch(node, output, search()),
+        );
+        return { node, outputs, groups: groupOutputs(outputs) };
+      })
+      .filter((entry) => entry.outputs.length > 0),
+  );
 
   // Flat list of filtered items to map highlightedIndex to the correct item
   const flatFilteredItems = createMemo(() => {
     const items: PickerItem[] = [];
-    for (const node of filteredNodes()) {
-      const outputs = nodeOutputs(node);
-      const filtered =
-        search() === ""
-          ? outputs
-          : outputs.filter((o) => matchesSearch(node.data.label) || matchesSearch(o.name));
-      for (const output of filtered) {
-        items.push({ node, output, key: `${node.id}.${output.name}` });
+    for (const entry of filteredNodes()) {
+      for (const output of entry.outputs) {
+        items.push({
+          node: entry.node,
+          output,
+          key: `${entry.node.id}.${output.segmentKey || output.id}`,
+        });
       }
     }
     return items;
@@ -361,143 +411,191 @@ export default function VariablePicker(props: VariablePickerProps) {
   });
 
   return (
-    <div class="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
-      {/* Search */}
-      <div class="p-2 border-b border-slate-100">
+    <Modal
+      isOpen={true}
+      onClose={props.onClose}
+      title="选择节点输出"
+      dialogClass="max-w-5xl"
+      bodyClass="p-0"
+    >
+      <div class="border-b border-slate-100 px-6 py-4 space-y-3">
+        <div class="flex items-center justify-between gap-4">
+          <div>
+            <p class="text-sm font-medium text-slate-700">从上游节点中选择可引用输出</p>
+            <p class="text-xs text-slate-500 mt-1">
+              支持搜索节点名、输出名、产物说明、模型信息和用户选择输出。
+            </p>
+          </div>
+          <span class="text-xs text-slate-400 whitespace-nowrap">
+            共 {flatFilteredItems().length} 项
+          </span>
+        </div>
         <input
           type="text"
           value={search()}
           onInput={(e) => setSearch(e.currentTarget.value)}
-          placeholder="搜索节点输出..."
-          class="w-full text-xs px-2 py-1.5 border border-slate-200 rounded bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+          placeholder="搜索节点、输出、产物、模型..."
+          class="w-full text-sm px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
         />
       </div>
 
-      <div ref={listRef} class="max-h-60 overflow-y-auto">
+      <div ref={listRef} class="max-h-[65vh] overflow-y-auto px-6 py-5 space-y-4">
         <Show when={!hasResults()}>
-          <p class="text-xs text-slate-400 text-center py-4">无匹配节点输出</p>
+          <div class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
+            <p class="text-sm text-slate-500">无匹配节点输出</p>
+            <p class="text-xs text-slate-400 mt-1">可以换个关键词，或直接浏览上游节点分组。</p>
+          </div>
         </Show>
 
-        {/* Upstream node variables */}
         <For each={filteredNodes()}>
-          {(node) => {
-            const outputs = () => {
-              const allOutputs = nodeOutputs(node);
-              if (search() === "") return allOutputs;
-              return allOutputs.filter(
-                (o) => matchesSearch(node.data.label) || matchesSearch(o.name),
-              );
-            };
-
-            // Check if this is a model_call node with potential schema
+          {(entry) => {
+            const node = entry.node;
             const isModelCall = () => node.data.config.type === "model_call";
             const modelConfig = () =>
               isModelCall() ? (node.data.config as ModelCallConfig) : null;
 
             return (
-              <div>
-                {/* Group header */}
-                <div class="px-3 py-1.5 bg-slate-50 border-b border-slate-100 flex items-center gap-1.5">
-                  <span class="text-sm leading-none">{getNodeIcon(node.data.nodeType)}</span>
-                  <span class="text-xs font-semibold text-slate-600">
-                    插入 {node.data.label} 的输出
-                  </span>
+              <div class="rounded-2xl border border-slate-200 bg-white shadow-[0_6px_24px_rgba(15,23,42,0.04)] overflow-hidden">
+                <div class="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
+                  <div class="flex items-center gap-2">
+                    <span class="text-lg leading-none">{getNodeIcon(node.data.nodeType)}</span>
+                    <div>
+                      <p class="text-sm font-semibold text-slate-800">{node.data.label}</p>
+                      <p class="text-xs text-slate-500">{getNodeTypeLabel(node.data.nodeType)}</p>
+                    </div>
+                  </div>
+                  <span class="text-xs text-slate-400">{entry.outputs.length} 项输出</span>
                 </div>
-                {/* Outputs */}
-                <For each={outputs()}>
-                  {(output) => {
-                    const itemKey = `${node.id}.${output.name}`;
-                    const isHighlighted = () => {
-                      const idx = props.highlightedIndex;
-                      if (idx === undefined || idx < 0) return false;
-                      const items = flatFilteredItems();
-                      return idx < items.length && items[idx].key === itemKey;
-                    };
 
-                    // Get schema tree for this output (if available)
-                    const schemaTree = createMemo(() => {
-                      const cfg = modelConfig();
-                      if (!cfg) return null;
-                      const schema = getSchemaForOutput(cfg, output);
-                      if (!schema) return null;
-                      const tree = buildSchemaTree(schema);
-                      return tree.length > 0 ? tree : null;
-                    });
-
-                    const [treeExpanded, setTreeExpanded] = createSignal(false);
-
-                    return (
-                      <div>
-                        <div class="flex items-center">
-                          {/* Tree expand toggle (only for outputs with schema) */}
-                          <Show when={schemaTree()}>
-                            <button
-                              type="button"
-                              class="pl-2 pr-0 py-1.5 text-[10px] text-slate-400 hover:text-slate-600 cursor-pointer focus:outline-none flex-shrink-0"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTreeExpanded((v) => !v);
-                              }}
-                            >
-                              {treeExpanded() ? "\u25BE" : "\u25B8"}
-                            </button>
-                          </Show>
-
-                          <button
-                            type="button"
-                            data-picker-key={itemKey}
-                            class={`flex-1 text-left py-1.5 text-xs transition-colors cursor-pointer focus:outline-none flex items-center gap-1.5 ${
-                              schemaTree() ? "px-1" : "px-4"
-                            } ${
-                              isHighlighted()
-                                ? "bg-indigo-50 text-indigo-700"
-                                : "text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
-                            }`}
-                            onClick={() => handleSelectOutput(node, output)}
-                          >
-                            {(() => {
-                              const typeIcon = getOutputTypeIcon(output);
-                              return (
-                                <span
-                                  class={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold flex-shrink-0 ${typeIcon.class}`}
-                                  title={typeIcon.title}
-                                >
-                                  {typeIcon.icon}
-                                </span>
-                              );
-                            })()}
-                            <span class="text-slate-400 mr-0.5">{node.data.label}.</span>
-                            <span class="font-medium">{output.name}</span>
-                            <Show when={schemaTree()}>
-                              <span class="ml-auto text-[9px] text-slate-400">JSON</span>
-                            </Show>
-                          </button>
+                <div class="px-5 py-4 space-y-4">
+                  <For each={entry.groups}>
+                    {(group) => (
+                      <div class="space-y-2">
+                        <div class="flex items-center justify-between">
+                          <h4 class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            {group.title}
+                          </h4>
+                          <span class="text-[11px] text-slate-400">{group.outputs.length} 项</span>
                         </div>
 
-                        {/* Schema tree (expanded) */}
-                        <Show when={treeExpanded() && schemaTree()}>
-                          <div class="border-l-2 border-slate-100 ml-4">
-                            <SchemaTreeView
-                              nodes={schemaTree() ?? []}
-                              nodeId={node.id}
-                              segmentKey={output.segmentKey || output.id}
-                              level={0}
-                              onSelectField={(fieldPath) =>
-                                handleSelectField(node, output, fieldPath)
-                              }
-                            />
-                          </div>
-                        </Show>
+                        <div class="space-y-2">
+                          <For each={group.outputs}>
+                            {(output) => {
+                              const itemKey = `${node.id}.${output.segmentKey || output.id}`;
+                              const isHighlighted = () => {
+                                const idx = props.highlightedIndex;
+                                if (idx === undefined || idx < 0) return false;
+                                const items = flatFilteredItems();
+                                return idx < items.length && items[idx].key === itemKey;
+                              };
+
+                              const schemaTree = createMemo(() => {
+                                const cfg = modelConfig();
+                                if (!cfg) return null;
+                                const schema = getSchemaForOutput(cfg, output);
+                                if (!schema) return null;
+                                const tree = buildSchemaTree(schema);
+                                return tree.length > 0 ? tree : null;
+                              });
+
+                              const [treeExpanded, setTreeExpanded] = createSignal(false);
+
+                              return (
+                                <div class="rounded-xl border border-slate-200 overflow-hidden">
+                                  <div class="flex items-stretch">
+                                    <Show when={schemaTree()}>
+                                      <button
+                                        type="button"
+                                        class="px-3 text-xs text-slate-400 hover:text-slate-600 border-r border-slate-100"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setTreeExpanded((v) => !v);
+                                        }}
+                                      >
+                                        {treeExpanded() ? "\u25BE" : "\u25B8"}
+                                      </button>
+                                    </Show>
+
+                                    <button
+                                      type="button"
+                                      data-picker-key={itemKey}
+                                      class={`flex-1 text-left px-4 py-3 transition-colors cursor-pointer focus:outline-none ${
+                                        isHighlighted()
+                                          ? "bg-indigo-50 text-indigo-700"
+                                          : "bg-white text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"
+                                      }`}
+                                      onClick={() => handleSelectOutput(node, output)}
+                                    >
+                                      <div class="flex items-start gap-3">
+                                        {(() => {
+                                          const typeIcon = getOutputTypeIcon(output);
+                                          return (
+                                            <span
+                                              class={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${typeIcon.class}`}
+                                              title={typeIcon.title}
+                                            >
+                                              {typeIcon.icon}
+                                            </span>
+                                          );
+                                        })()}
+                                        <div class="min-w-0 flex-1">
+                                          <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="text-sm font-semibold">{output.name}</span>
+                                            <span class="text-[11px] text-slate-400 font-mono">
+                                              {node.data.label}.{output.segmentKey || output.id}
+                                            </span>
+                                          </div>
+                                          <Show when={output.description}>
+                                            <p class="text-xs text-slate-500 mt-1">{output.description}</p>
+                                          </Show>
+                                          <div class="flex items-center gap-2 flex-wrap mt-2">
+                                            <Show when={output.category}>
+                                              <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                                                {OUTPUT_GROUP_LABELS[output.category ?? ""] ?? output.category}
+                                              </span>
+                                            </Show>
+                                            <Show when={output.groupLabel}>
+                                              <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600">
+                                                {output.groupLabel}
+                                              </span>
+                                            </Show>
+                                            <Show when={schemaTree()}>
+                                              <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">
+                                                可展开 JSON 字段
+                                              </span>
+                                            </Show>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  </div>
+
+                                  <Show when={treeExpanded() && schemaTree()}>
+                                    <div class="border-t border-slate-100 bg-slate-50 py-2">
+                                      <SchemaTreeView
+                                        nodes={schemaTree() ?? []}
+                                        nodeId={node.id}
+                                        segmentKey={output.segmentKey || output.id}
+                                        level={0}
+                                        onSelectField={(fieldPath) => handleSelectField(node, output, fieldPath)}
+                                      />
+                                    </div>
+                                  </Show>
+                                </div>
+                              );
+                            }}
+                          </For>
+                        </div>
                       </div>
-                    );
-                  }}
-                </For>
+                    )}
+                  </For>
+                </div>
               </div>
             );
           }}
         </For>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -510,4 +608,15 @@ function getNodeIcon(nodeType: string): string {
     export: "\uD83D\uDCE4",
   };
   return icons[nodeType] ?? "\u2699\uFE0F";
+}
+
+function getNodeTypeLabel(nodeType: string): string {
+  const labels: Record<string, string> = {
+    input_transform: "输入转换",
+    desensitize: "信息脱敏",
+    model_call: "模型调用",
+    restore: "信息恢复",
+    export: "文件导出",
+  };
+  return labels[nodeType] ?? nodeType;
 }

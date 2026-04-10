@@ -156,20 +156,24 @@ export default function WorkflowEditor() {
       const wf = res.data as unknown as WorkflowRaw;
       setWorkflowName(wf.name);
 
-      const flowNodes: FlowNodeData[] = wf.nodes.map((n) => ({
-        id: n.id,
-        type: n.type,
-        position: n.position ?? { x: 0, y: 0 },
-        size: { width: 180, height: 60 },
-        data: {
-          nodeType: n.type,
-          label: n.label || DEFAULT_LABELS[n.type],
-          config: (n.config || buildDefaultConfig(n.type)) as unknown as NodeConfig,
-          outputs: (n.outputs || []) as unknown as OutputDef[],
-        },
-        sourceHandle: "right" as const,
-        targetHandle: "left" as const,
-      }));
+      const flowNodes: FlowNodeData[] = wf.nodes.map((n) => {
+        const config = (n.config || buildDefaultConfig(n.type)) as unknown as NodeConfig;
+        const outputs = deriveOutputs(n.id, config);
+        return {
+          id: n.id,
+          type: n.type,
+          position: n.position ?? { x: 0, y: 0 },
+          size: { width: 180, height: 60 },
+          data: {
+            nodeType: n.type,
+            label: n.label || DEFAULT_LABELS[n.type],
+            config,
+            outputs,
+          },
+          sourceHandle: "right" as const,
+          targetHandle: "left" as const,
+        };
+      });
 
       const flowEdges: FlowEdgeData[] = wf.edges.map((e) => ({
         id: e.id,

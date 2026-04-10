@@ -270,6 +270,7 @@ export default function PromptEditor(props: PromptEditorProps) {
         e.preventDefault();
         return;
       }
+      if (items.length === 0) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setHighlightedIndex((i) => (i + 1) % items.length);
@@ -338,6 +339,7 @@ export default function PromptEditor(props: PromptEditorProps) {
 
   function handleBlur() {
     clearTimeout(blurTimer);
+    if (showPicker()) return;
     blurTimer = setTimeout(() => setShowPicker(false), 150);
   }
 

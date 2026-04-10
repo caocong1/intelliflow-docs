@@ -233,6 +233,32 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
         )}
       </div>
 
+      {/* User selection output */}
+      <div class="border-t border-slate-100 pt-3">
+        <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+          <label class="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={props.config.enableUserSelectionOutput ?? false}
+              onChange={(e) =>
+                props.onChange({
+                  ...props.config,
+                  enableUserSelectionOutput: e.currentTarget.checked,
+                })
+              }
+              class="mt-0.5 rounded border-gray-300 text-purple-600 focus:ring-purple-500 cursor-pointer"
+            />
+            <span class="flex-1">
+              <span class="block text-sm font-medium text-slate-700">启用用户选择输出</span>
+              <span class="mt-1 block text-xs leading-5 text-slate-500">
+                开启后，运行时会显示“选择输出”区域，用户必须选择一个或多个模型结果。
+                节点会额外暴露一组“用户选择输出”给下游节点使用；关闭后，仅暴露各模型自身输出。
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+
       {/* Step Description */}
       <div class="border-t border-slate-100 pt-3">
         <label class="text-sm font-medium text-gray-700 mb-1 block">
@@ -379,10 +405,23 @@ export default function ModelCallConfigPanel(props: ModelCallConfigProps) {
         <Show
           when={(props.config.namedOutputs ?? []).length > 0}
           fallback={
-            <p class="text-xs text-slate-400 italic py-2">未配置输出项时，模型输出作为单个整体</p>
+            <div class="py-2 space-y-1">
+              <p class="text-xs text-slate-400 italic">未配置输出项时，节点将按“每个模型一个整体输出”暴露给下游。</p>
+              <Show when={props.config.enableUserSelectionOutput}>
+                <p class="text-xs text-indigo-600">已启用用户选择输出：还会额外生成 1 个“用户选择输出”。</p>
+              </Show>
+            </div>
           }
         >
           <div class="space-y-3">
+            <div class="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2">
+              <p class="text-xs text-slate-500 leading-5">
+                已配置命名产物时，下游可直接引用“模型 × 产物”输出。
+                <Show when={props.config.enableUserSelectionOutput}>
+                  <> 同时还会增加一组“用户选择输出 × 产物”。</>
+                </Show>
+              </p>
+            </div>
             <Index each={props.config.namedOutputs ?? []}>
               {(output, index) => (
                 <SimpleNamedOutputCard

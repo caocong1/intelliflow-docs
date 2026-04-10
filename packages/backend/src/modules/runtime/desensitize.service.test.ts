@@ -10,6 +10,8 @@ vi.mock("../../db/schema", () => ({
 
 import { buildConfirmOutputData, validateAndBuildDetectedItems } from "./desensitize.service";
 
+import { extractStructuredJson } from "./desensitize.service";
+
 describe("confirmDesensitization validation", () => {
   const baseItems = [
     { original: "张三", placeholder: "[NAME_1]", sensitiveType: "person_name" },
@@ -75,9 +77,7 @@ describe("confirmDesensitization validation", () => {
 
 describe("background autoAdvance contract", () => {
   it("passes reviewSummary with all items checked=true", () => {
-    const items = [
-      { original: "张三", placeholder: "[NAME_1]", sensitiveType: "person_name" },
-    ];
+    const items = [{ original: "张三", placeholder: "[NAME_1]", sensitiveType: "person_name" }];
     const reviewSummary = items.map((it) => ({
       placeholder: it.placeholder,
       sensitiveType: it.sensitiveType,
@@ -113,6 +113,7 @@ describe("buildConfirmOutputData", () => {
         { placeholder: "[NAME_1]", sensitiveType: "person_name", checked: true },
         { placeholder: "[PHONE_1]", sensitiveType: "phone_number", checked: true },
       ],
+      confirmedAt: expect.any(String),
     });
   });
 
@@ -126,9 +127,7 @@ describe("buildConfirmOutputData", () => {
           displayName: "正文",
           items: [baseItems[0]],
           sanitizedText: "[NAME_1] 已脱敏",
-          reviewSummary: [
-            { placeholder: "[NAME_1]", sensitiveType: "person_name", checked: true },
-          ],
+          reviewSummary: [{ placeholder: "[NAME_1]", sensitiveType: "person_name", checked: true }],
           files: [{ fileId: "file-1", name: "a.txt", desensitizedText: "[NAME_1] 已脱敏" }],
         },
         "source-b": {
@@ -146,6 +145,7 @@ describe("buildConfirmOutputData", () => {
         { placeholder: "[NAME_1]", sensitiveType: "person_name", checked: true },
         { placeholder: "[PHONE_1]", sensitiveType: "phone_number", checked: true },
       ],
+      confirmedAt: expect.any(String),
       sources: {
         "source-a": {
           displayName: "正文",
@@ -175,5 +175,28 @@ describe("buildConfirmOutputData", () => {
         },
       }),
     ).toThrow("Duplicate placeholders in confirmed items");
+  });
+});
+
+describe("extractStructuredJson", () => {
+  it("extracts fenced json even when prefixed by markdown separators", () => {
+    const raw = `---
+\`\`\`json
+[
+  {
+    "original": "韩总",
+    "type": "person_name",
+    "description": "人名"
+  }
+]
+\`\`\``;
+
+    expect(extractStructuredJson(raw)).toBe(`[
+  {
+    "original": "韩总",
+    "type": "person_name",
+    "description": "人名"
+  }
+]`);
   });
 });

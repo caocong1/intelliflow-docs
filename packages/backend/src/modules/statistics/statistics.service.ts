@@ -1,6 +1,14 @@
+import { and, avg, count, countDistinct, desc, eq, gte, lte, sql, sum } from "drizzle-orm";
 import { db } from "../../db";
-import { modelCallLogs, models, documents, users, workflows, projects, nodeExecutions } from "../../db/schema";
-import { sql, eq, and, gte, lte, count, countDistinct, avg, sum, desc } from "drizzle-orm";
+import {
+  documents,
+  modelCallLogs,
+  models,
+  nodeExecutions,
+  projects,
+  users,
+  workflows,
+} from "../../db/schema";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -46,7 +54,12 @@ function buildFilterConditions(filters: StatisticsFilters) {
  * Whether filters require joining documents/workflows/projects tables.
  */
 function needsDocumentJoin(filters: StatisticsFilters): boolean {
-  return !!(filters.projectId || filters.documentTypeId || filters.workflowId || filters.department);
+  return !!(
+    filters.projectId ||
+    filters.documentTypeId ||
+    filters.workflowId ||
+    filters.department
+  );
 }
 
 // ─── Cost estimation SQL fragment ───────────────────────────────────────────
@@ -78,7 +91,6 @@ function baseQuery(filters: StatisticsFilters) {
     .leftJoin(models, eq(modelCallLogs.modelId, models.id));
 
   if (needsDocumentJoin(filters)) {
-    // @ts-expect-error - drizzle chaining with conditional joins
     query = query
       .leftJoin(documents, eq(modelCallLogs.documentId, documents.id))
       .leftJoin(workflows, eq(documents.workflowId, workflows.id))
@@ -113,7 +125,6 @@ export async function getOverviewKpis(filters: StatisticsFilters) {
     .leftJoin(models, eq(modelCallLogs.modelId, models.id));
 
   if (joinsDocs) {
-    // @ts-expect-error - drizzle chaining with conditional joins
     mainQuery = mainQuery
       .leftJoin(documents, eq(modelCallLogs.documentId, documents.id))
       .leftJoin(workflows, eq(documents.workflowId, workflows.id))
@@ -131,9 +142,7 @@ export async function getOverviewKpis(filters: StatisticsFilters) {
     todayConditions.push(whereClause);
   }
 
-  let todayQuery = db
-    .select({ todayCalls: count(modelCallLogs.id) })
-    .from(modelCallLogs);
+  let todayQuery = db.select({ todayCalls: count(modelCallLogs.id) }).from(modelCallLogs);
 
   if (joinsDocs) {
     // @ts-expect-error - drizzle chaining with conditional joins
@@ -176,17 +185,13 @@ export async function getTrends(filters: StatisticsFilters, granularity: Granula
     .leftJoin(models, eq(modelCallLogs.modelId, models.id));
 
   if (joinsDocs) {
-    // @ts-expect-error - drizzle chaining with conditional joins
     query = query
       .leftJoin(documents, eq(modelCallLogs.documentId, documents.id))
       .leftJoin(workflows, eq(documents.workflowId, workflows.id))
       .leftJoin(projects, eq(documents.projectId, projects.id));
   }
 
-  return query
-    .where(whereClause)
-    .groupBy(sql`period`)
-    .orderBy(sql`period`);
+  return query.where(whereClause).groupBy(sql`period`).orderBy(sql`period`);
 }
 
 // ─── By Model ───────────────────────────────────────────────────────────────
@@ -212,7 +217,6 @@ export async function getByModel(filters: StatisticsFilters) {
     .leftJoin(models, eq(modelCallLogs.modelId, models.id));
 
   if (joinsDocs) {
-    // @ts-expect-error - drizzle chaining with conditional joins
     query = query
       .leftJoin(documents, eq(modelCallLogs.documentId, documents.id))
       .leftJoin(workflows, eq(documents.workflowId, workflows.id))
@@ -243,7 +247,6 @@ export async function getModelTrends(filters: StatisticsFilters, granularity: Gr
     .leftJoin(models, eq(modelCallLogs.modelId, models.id));
 
   if (joinsDocs) {
-    // @ts-expect-error - drizzle chaining with conditional joins
     query = query
       .leftJoin(documents, eq(modelCallLogs.documentId, documents.id))
       .leftJoin(workflows, eq(documents.workflowId, workflows.id))
@@ -276,7 +279,6 @@ export async function getByUser(filters: StatisticsFilters) {
     .leftJoin(users, eq(modelCallLogs.userId, users.id));
 
   if (joinsDocs) {
-    // @ts-expect-error - drizzle chaining with conditional joins
     query = query
       .leftJoin(documents, eq(modelCallLogs.documentId, documents.id))
       .leftJoin(workflows, eq(documents.workflowId, workflows.id))
@@ -308,7 +310,6 @@ export async function getUserTrends(filters: StatisticsFilters, granularity: Gra
     .leftJoin(users, eq(modelCallLogs.userId, users.id));
 
   if (joinsDocs) {
-    // @ts-expect-error - drizzle chaining with conditional joins
     query = query
       .leftJoin(documents, eq(modelCallLogs.documentId, documents.id))
       .leftJoin(workflows, eq(documents.workflowId, workflows.id))
@@ -356,7 +357,10 @@ export async function getByWorkflow(filters: StatisticsFilters) {
     .orderBy(sql`count(${modelCallLogs.id}) DESC`);
 }
 
-export async function getWorkflowTrends(filters: StatisticsFilters, granularity: Granularity = "day") {
+export async function getWorkflowTrends(
+  filters: StatisticsFilters,
+  granularity: Granularity = "day",
+) {
   const whereClause = buildFilterConditions(filters);
   const period = sql`date_trunc(${granularity}, ${modelCallLogs.createdAt})`;
 
@@ -398,9 +402,7 @@ export async function getAuditByUser(filters: StatisticsFilters, page = 1, pageS
   const offset = (page - 1) * pageSize;
 
   // Count total distinct users
-  let countQuery = db
-    .select({ total: countDistinct(modelCallLogs.userId) })
-    .from(modelCallLogs);
+  let countQuery = db.select({ total: countDistinct(modelCallLogs.userId) }).from(modelCallLogs);
 
   if (joinsDocs) {
     // @ts-expect-error - drizzle chaining with conditional joins
@@ -427,7 +429,6 @@ export async function getAuditByUser(filters: StatisticsFilters, page = 1, pageS
     .leftJoin(users, eq(modelCallLogs.userId, users.id));
 
   if (joinsDocs) {
-    // @ts-expect-error - drizzle chaining with conditional joins
     query = query
       .leftJoin(documents, eq(modelCallLogs.documentId, documents.id))
       .leftJoin(workflows, eq(documents.workflowId, workflows.id))
@@ -493,12 +494,7 @@ export async function getAuditByDocument(filters: StatisticsFilters, page = 1, p
     .leftJoin(workflows, eq(documents.workflowId, workflows.id))
     .leftJoin(projects, eq(documents.projectId, projects.id))
     .where(where)
-    .groupBy(
-      modelCallLogs.documentId,
-      documents.title,
-      users.displayName,
-      workflows.name,
-    )
+    .groupBy(modelCallLogs.documentId, documents.title, users.displayName, workflows.name)
     .orderBy(sql`MIN(${modelCallLogs.createdAt}) DESC`)
     .limit(pageSize)
     .offset(offset);

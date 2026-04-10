@@ -83,7 +83,9 @@ function migrateNode(node: NodeDef): { changed: boolean; node: NodeDef } {
   for (let i = 0; i < ids.length; i++) {
     const start = positions[i];
     const end =
-      i + 1 < ids.length ? delimiterSection.indexOf(delimiterPrefix, start) : delimiterSection.length;
+      i + 1 < ids.length
+        ? delimiterSection.indexOf(delimiterPrefix, start)
+        : delimiterSection.length;
     outputPrompts.set(ids[i], delimiterSection.substring(start, end).trim());
   }
 
@@ -101,7 +103,10 @@ function migrateNode(node: NodeDef): { changed: boolean; node: NodeDef } {
 
   return {
     changed: true,
-    node: { ...node, config: { ...restConfig, promptTemplate: mainPrompt, namedOutputs: updatedOutputs } },
+    node: {
+      ...node,
+      config: { ...restConfig, promptTemplate: mainPrompt, namedOutputs: updatedOutputs },
+    },
   };
 }
 
@@ -119,7 +124,7 @@ async function main() {
       if (m.changed) {
         changed = true;
         console.log(`[${wf.name}] "${node.label}" migrated:`);
-        for (const o of (m.node.config.namedOutputs ?? [])) {
+        for (const o of m.node.config.namedOutputs ?? []) {
           if (o.outputPrompt) console.log(`  ${o.id}: ${o.outputPrompt.substring(0, 70)}...`);
         }
         const pt = m.node.config.promptTemplate ?? "";
@@ -129,9 +134,9 @@ async function main() {
     }
 
     if (changed) {
-      await sql`UPDATE workflows SET nodes = ${sql.json(result)} WHERE id = ${wf.id}`;
+      await sql`UPDATE workflows SET nodes = ${sql.json(result as unknown as Parameters<typeof sql.json>[0])} WHERE id = ${wf.id}`;
       updated++;
-      console.log(`  -> Updated\n`);
+      console.log("  -> Updated\n");
     }
   }
 

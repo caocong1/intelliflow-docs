@@ -227,7 +227,10 @@ function fieldsToJsonSchema(fields: SimpleFieldDef[]): object {
   return {
     type: "object",
     properties: Object.fromEntries(
-      fields.map((f) => [f.name, { type: f.type, ...(f.description ? { description: f.description } : {}) }]),
+      fields.map((f) => [
+        f.name,
+        { type: f.type, ...(f.description ? { description: f.description } : {}) },
+      ]),
     ),
     required: fields.filter((f) => f.required).map((f) => f.name),
   };
@@ -277,7 +280,7 @@ async function main() {
     }
 
     if (changed) {
-      await sql`UPDATE workflows SET nodes = ${sql.json(result)} WHERE id = ${wf.id}`;
+      await sql`UPDATE workflows SET nodes = ${sql.json(result as unknown as Parameters<typeof sql.json>[0])} WHERE id = ${wf.id}`;
       updated++;
       console.log(`  -> ${wf.name} updated\n`);
     }

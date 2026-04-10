@@ -7,6 +7,7 @@ import {
   applyModelCallStreamEvent,
   deriveModelCallExecutionPhase,
   hasInProgressModelOutputs,
+  mergeModelOutputs,
 } from "./ModelCallExecutor";
 
 const baseModel = (overrides: Partial<ModelOutput> = {}): ModelOutput => ({
@@ -128,5 +129,88 @@ describe("ModelCallExecutor helpers", () => {
         backgroundMode: true,
       }),
     ).toBe("done");
+  });
+
+  describe("mergeModelOutputs", () => {
+    it("returns prev reference untouched when nothing changed", () => {
+      const prev = {
+        "model-1": baseModel({ content: "hello", status: "streaming" }),
+        "model-2": baseModel({
+          modelId: "model-2",
+          modelDisplayName: "Model Two",
+          content: "world",
+          status: "streaming",
+        }),
+      };
+      const incoming = {
+        "model-1": baseModel({ content: "hello", status: "streaming" }),
+        "model-2": baseModel({
+          modelId: "model-2",
+          modelDisplayName: "Model Two",
+          content: "world",
+          status: "streaming",
+        }),
+      };
+
+      const merged = mergeModelOutputs(prev, incoming);
+      // Same reference → signal subscribers won't fire
+      expect(merged).toBe(prev);
+    });
+
+    it("preserves references for unchanged models when others change", () => {
+      const stableModel = baseModel({
+        modelId: "model-1",
+        content: "finished",
+        status: "completed",
+      });
+      const prev = {
+        "model-1": stableModel,
+        "model-2": baseModel({
+          modelId: "model-2",
+          modelDisplayName: "Model Two",
+          content: "old",
+          status: "streaming",
+        }),
+      };
+      const incoming = {
+        "model-1": baseModel({
+          modelId: "model-1",
+          content: "finished",
+          status: "completed",
+        }),
+        "model-2": baseModel({
+          modelId: "model-2",
+          modelDisplayName: "Model Two",
+          content: "old + delta",
+          status: "streaming",
+        }),
+      };
+
+      const merged = mergeModelOutputs(prev, incoming);
+      expect(merged).not.toBe(prev);
+      // Unchanged model keeps its old reference — <For>/<Index> children stay
+      expect(merged["model-1"]).toBe(stableModel);
+      // Changed model gets a new reference with updated content
+      expect(merged["model-2"]).not.toBe(prev["model-2"]);
+      expect(merged["model-2"].content).toBe("old + delta");
+    });
+
+    it("adds new models and drops removed models from the merged result", () => {
+      const prev = {
+        "model-1": baseModel({ modelId: "model-1" }),
+      };
+      const incoming = {
+        "model-2": baseModel({
+          modelId: "model-2",
+          modelDisplayName: "Model Two",
+          content: "fresh",
+          status: "streaming",
+        }),
+      };
+
+      const merged = mergeModelOutputs(prev, incoming);
+      expect(Object.keys(merged)).toEqual(["model-2"]);
+      expect(merged["model-2"].content).toBe("fresh");
+    });
   });
 });

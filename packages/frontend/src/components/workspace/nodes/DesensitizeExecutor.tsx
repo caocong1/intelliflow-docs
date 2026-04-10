@@ -295,7 +295,7 @@ export default function DesensitizeExecutor(props: Props) {
         setError(null);
         setShowManualAdd(false);
         setSelectedItemIndex(null);
-        setCollapsedTypes(new Set());
+        setCollapsedTypes(new Set<string>());
         setActiveGroupIndex(0);
         setActiveFileIndex(0);
         setPreviewMode("sanitized");

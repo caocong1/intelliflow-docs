@@ -20,6 +20,7 @@ import {
   createSignal,
   onCleanup,
   onMount,
+  untrack,
 } from "solid-js";
 import {
   advanceNode,
@@ -510,7 +511,11 @@ export default function DocumentWorkspace() {
     const node = currentNode();
     if (!node) return;
 
-    if (node.nodeType === "desensitize" || node.nodeType === "restore") {
+    if (
+      node.nodeType === "desensitize" ||
+      node.nodeType === "restore" ||
+      node.nodeType === "model_call"
+    ) {
       const confirmAction = manualConfirmAction();
       if (confirmAction) {
         try {
@@ -586,86 +591,25 @@ export default function DocumentWorkspace() {
   }
 
   /** Render executor with real config from workflowNodes */
-  function renderExecutor(node: NodeExecution) {
-    const config = getNodeConfig(node);
-    if (!config) {
-      return (
-        <div
-          class="rounded-xl p-8 text-center"
-          style={{
-            background: "#ffffff",
-            "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
-          }}
-        >
-          <div class="text-sm" style={{ color: "#464555" }}>
-            加载节点配置中...
-          </div>
-        </div>
-      );
-    }
-
-    const isReadOnly = readOnly();
-    const docId = params.documentId;
-    const draftSave = (data: unknown) => {
-      debouncedDraftSave(data as Record<string, unknown>);
-    };
-
-    switch (node.nodeType) {
-      case "input_transform":
-        return (
-          <InputTransformExecutor
-            nodeExecution={node}
-            config={config as InputTransformConfig}
-            documentId={docId}
-            onDraftSave={draftSave}
-            readOnly={isReadOnly}
-          />
-        );
-      case "desensitize":
-        return (
-          <DesensitizeExecutor
-            nodeExecution={node}
-            config={config as DesensitizeConfig}
-            documentId={docId}
-            onDraftSave={draftSave}
-            readOnly={isReadOnly}
-            registerConfirmAction={handleManualConfirmRegistration}
-          />
-        );
-      case "model_call":
-        return (
-          <ModelCallExecutor
-            nodeExecution={node}
-            config={config as ModelCallConfig}
-            documentId={docId}
-            onDraftSave={draftSave}
-            readOnly={isReadOnly}
-            backgroundMode={isGenerating()}
-          />
-        );
-      case "restore":
-        return (
-          <RestoreExecutor
-            nodeExecution={node}
-            config={config as RestoreConfig}
-            documentId={docId}
-            onDraftSave={draftSave}
-            readOnly={isReadOnly}
-            registerConfirmAction={handleManualConfirmRegistration}
-            onAdvanceAfterConfirm={handleAdvance}
-          />
-        );
-      case "export":
-        return (
-          <ExportExecutor
-            nodeExecution={node}
-            config={config as ExportConfig}
-            documentId={docId}
-            onDraftSave={draftSave}
-            readOnly={isReadOnly}
-          />
-        );
-      default:
+  /**
+   * Build the executor for the given node.
+   *
+   * Takes an *accessor* (not a plain node) so executor component instances
+   * stay mounted across polling updates. Internally wrapped in `untrack` so
+   * the function call at the JSX site does not create reactive dependencies
+   * that would re-invoke renderExecutor on every poll — which would
+   * re-instantiate the executor and wipe its internal state (e.g. the
+   * currently-selected model tab inside ModelCallExecutor).
+   *
+   * JSX props like `nodeExecution={nodeAccessor()}` are compiled by Solid
+   * into reactive getters: the component is created once, but reads of
+   * `props.nodeExecution` inside it always return the latest value.
+   */
+  function renderExecutor(nodeAccessor: () => NodeExecution) {
+    return untrack(() => {
+      const initialNode = nodeAccessor();
+      const initialConfig = getNodeConfig(initialNode);
+      if (!initialConfig) {
         return (
           <div
             class="rounded-xl p-8 text-center"
@@ -674,24 +618,102 @@ export default function DocumentWorkspace() {
               "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
             }}
           >
-            <div class="text-sm mb-2" style={{ color: "#464555" }}>
-              节点执行器
-            </div>
-            <div class="text-lg font-semibold" style={{ color: "#191c1e" }}>
-              {node.nodeLabel}
-            </div>
-            <div
-              class="mt-2 inline-flex px-3 py-1 rounded-full text-xs font-medium"
-              style={{
-                background: "rgba(79,70,229,0.08)",
-                color: "#4f46e5",
-              }}
-            >
-              {node.nodeType}
+            <div class="text-sm" style={{ color: "#464555" }}>
+              加载节点配置中...
             </div>
           </div>
         );
-    }
+      }
+
+      const docId = params.documentId;
+      const draftSave = (data: unknown) => {
+        debouncedDraftSave(data as Record<string, unknown>);
+      };
+
+      switch (initialNode.nodeType) {
+        case "input_transform":
+          return (
+            <InputTransformExecutor
+              nodeExecution={nodeAccessor()}
+              config={getNodeConfig(nodeAccessor()) as InputTransformConfig}
+              documentId={docId}
+              onDraftSave={draftSave}
+              readOnly={readOnly()}
+            />
+          );
+        case "desensitize":
+          return (
+            <DesensitizeExecutor
+              nodeExecution={nodeAccessor()}
+              config={getNodeConfig(nodeAccessor()) as DesensitizeConfig}
+              documentId={docId}
+              onDraftSave={draftSave}
+              readOnly={readOnly()}
+              registerConfirmAction={handleManualConfirmRegistration}
+            />
+          );
+        case "model_call":
+          return (
+            <ModelCallExecutor
+              nodeExecution={nodeAccessor()}
+              config={getNodeConfig(nodeAccessor()) as ModelCallConfig}
+              documentId={docId}
+              onDraftSave={draftSave}
+              readOnly={readOnly()}
+              backgroundMode={isGenerating()}
+              registerConfirmAction={handleManualConfirmRegistration}
+            />
+          );
+        case "restore":
+          return (
+            <RestoreExecutor
+              nodeExecution={nodeAccessor()}
+              config={getNodeConfig(nodeAccessor()) as RestoreConfig}
+              documentId={docId}
+              onDraftSave={draftSave}
+              readOnly={readOnly()}
+              registerConfirmAction={handleManualConfirmRegistration}
+              onAdvanceAfterConfirm={handleAdvance}
+            />
+          );
+        case "export":
+          return (
+            <ExportExecutor
+              nodeExecution={nodeAccessor()}
+              config={getNodeConfig(nodeAccessor()) as ExportConfig}
+              documentId={docId}
+              onDraftSave={draftSave}
+              readOnly={readOnly()}
+            />
+          );
+        default:
+          return (
+            <div
+              class="rounded-xl p-8 text-center"
+              style={{
+                background: "#ffffff",
+                "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
+              }}
+            >
+              <div class="text-sm mb-2" style={{ color: "#464555" }}>
+                节点执行器
+              </div>
+              <div class="text-lg font-semibold" style={{ color: "#191c1e" }}>
+                {nodeAccessor().nodeLabel}
+              </div>
+              <div
+                class="mt-2 inline-flex px-3 py-1 rounded-full text-xs font-medium"
+                style={{
+                  background: "rgba(79,70,229,0.08)",
+                  color: "#4f46e5",
+                }}
+              >
+                {nodeAccessor().nodeType}
+              </div>
+            </div>
+          );
+      }
+    });
   }
 
   const backHref = () => {
@@ -1107,7 +1129,7 @@ export default function DocumentWorkspace() {
                           }
                         >
                           {(node) => (
-                            <div class="space-y-6">{renderExecutor(node())}</div>
+                            <div class="space-y-6">{renderExecutor(node)}</div>
                           )}
                         </Show>
                       );
@@ -1143,7 +1165,7 @@ export default function DocumentWorkspace() {
                     {(curNode) => (
                       <div class="space-y-6">
                         {/* Node executor -- route by nodeType with real config */}
-                        {renderExecutor(curNode())}
+                        {renderExecutor(curNode)}
 
                         {/* (Inline editor removed) */}
 

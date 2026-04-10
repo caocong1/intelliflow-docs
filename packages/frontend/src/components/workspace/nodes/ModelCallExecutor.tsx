@@ -5,7 +5,7 @@ import type {
   NamedOutputDef,
   NodeExecution,
 } from "@intelliflow/shared";
-import { For, Match, Show, Switch, createEffect, createSignal, onCleanup } from "solid-js";
+import { For, Index, Match, Show, Switch, createEffect, createSignal, onCleanup } from "solid-js";
 import { renderMarkdown } from "../../../lib/render-markdown";
 import { streamSSE } from "../../../lib/sse-stream";
 import ModelCompareView from "./ModelCompareView";
@@ -18,11 +18,20 @@ interface Props {
   onDraftSave: (data: Record<string, unknown>) => void;
   readOnly: boolean;
   backgroundMode?: boolean;
+  registerConfirmAction?: (action: (() => Promise<boolean>) | null) => void;
 }
 
 type ExecutionPhase = "idle" | "streaming" | "polling" | "done";
 
 type ViewMode = "markdown" | "source";
+
+type ModelCallNamedOutput = {
+  content: string;
+  format: string;
+  modelId?: string;
+  modelDisplayName?: string;
+  modelIds?: string[];
+};
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "等待中",
@@ -42,6 +51,75 @@ function cloneModelOutputs(models: Record<string, ModelOutput>): Record<string, 
   return Object.fromEntries(
     Object.entries(models).map(([modelId, model]) => [modelId, { ...model }]),
   );
+}
+
+function stringArraysEqual(a: string[] | undefined, b: string[] | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function modelOutputEquals(a: ModelOutput, b: ModelOutput): boolean {
+  return (
+    a.modelId === b.modelId &&
+    a.modelDisplayName === b.modelDisplayName &&
+    a.content === b.content &&
+    a.status === b.status &&
+    a.errorMessage === b.errorMessage &&
+    a.tokenCount === b.tokenCount &&
+    stringArraysEqual(a.formatErrors, b.formatErrors)
+  );
+}
+
+/**
+ * Merge incoming model outputs into prev, preserving object references for
+ * models whose fields are unchanged. This is critical for keeping SolidJS
+ * `<For>` reconciliation stable during live polling / SSE snapshot refreshes:
+ * without it, every poll tick replaces every model reference, which tears down
+ * and re-creates all tab buttons and content containers — breaking mid-click
+ * tab switches and causing visible UI flicker.
+ *
+ * Returns the prev reference untouched when nothing changed, so signal
+ * subscribers are not notified.
+ */
+export function mergeModelOutputs(
+  prev: Record<string, ModelOutput>,
+  incoming: Record<string, ModelOutput>,
+): Record<string, ModelOutput> {
+  const incomingKeys = Object.keys(incoming);
+  const prevKeys = Object.keys(prev);
+
+  let structureChanged = incomingKeys.length !== prevKeys.length;
+  if (!structureChanged) {
+    for (const key of incomingKeys) {
+      if (!(key in prev)) {
+        structureChanged = true;
+        break;
+      }
+    }
+  }
+
+  let anyChanged = structureChanged;
+  const next: Record<string, ModelOutput> = {};
+
+  for (const key of incomingKeys) {
+    const prevModel = prev[key];
+    const incomingModel = incoming[key];
+
+    if (prevModel && modelOutputEquals(prevModel, incomingModel)) {
+      // Unchanged — reuse previous reference so <For> keeps the same DOM node
+      next[key] = prevModel;
+    } else {
+      next[key] = { ...incomingModel };
+      anyChanged = true;
+    }
+  }
+
+  return anyChanged ? next : prev;
 }
 
 function normalizeModelOutputsForReview(
@@ -72,6 +150,24 @@ function normalizeModelOutputsForReview(
   );
 }
 
+function getSelectedModelIdsFromOutputData(
+  outputData: Record<string, unknown> | null,
+  fallbackSelectedKey?: string | null,
+): string[] {
+  const selectedModelIds = outputData?.selectedModelIds;
+  if (Array.isArray(selectedModelIds)) {
+    return selectedModelIds.filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
+  }
+
+  if (fallbackSelectedKey) {
+    return [fallbackSelectedKey];
+  }
+
+  return [];
+}
+
 export function hasInProgressModelOutputs(models: Record<string, ModelOutput>): boolean {
   return Object.values(models).some((model) => model.status === "pending" || model.status === "streaming");
 }
@@ -100,7 +196,7 @@ export function applyModelCallStreamEvent(
   modelNames?: Record<string, string>,
 ): Record<string, ModelOutput> {
   if (event.type === "snapshot") {
-    return cloneModelOutputs(event.data.models);
+    return mergeModelOutputs(prev, event.data.models);
   }
 
   const current = { ...prev };
@@ -146,8 +242,13 @@ export function applyModelCallStreamEvent(
 export default function ModelCallExecutor(props: Props) {
   // ─── Existing output detection ──────────────────────────────────────────────
 
+  const [localOutputData, setLocalOutputData] = createSignal<Record<string, unknown> | null>(
+    (props.nodeExecution.outputData as Record<string, unknown> | null) ?? null,
+  );
+  const currentOutputData = () => localOutputData();
+
   const existingModels = (): Record<string, ModelOutput> => {
-    const od = props.nodeExecution.outputData as Record<string, unknown> | null;
+    const od = currentOutputData();
     const models = (od?.models as Record<string, ModelOutput>) ?? {};
     return normalizeModelOutputsForReview(od, models);
   };
@@ -179,8 +280,13 @@ export default function ModelCallExecutor(props: Props) {
   );
   const [activeTab, setActiveTab] = createSignal<string>("");
   const [showCompare, setShowCompare] = createSignal(false);
+  const [selectedModelIds, setSelectedModelIds] = createSignal<string[]>(
+    getSelectedModelIdsFromOutputData(currentOutputData(), props.nodeExecution.selectedOutputKey),
+  );
   const [selectedModelId, setSelectedModelId] = createSignal<string>(
-    props.nodeExecution.selectedOutputKey ?? "",
+    getSelectedModelIdsFromOutputData(currentOutputData(), props.nodeExecution.selectedOutputKey)[0] ??
+      props.nodeExecution.selectedOutputKey ??
+      "",
   );
   const [error, setError] = createSignal<string | null>(null);
   const [selectLoading, setSelectLoading] = createSignal(false);
@@ -196,23 +302,32 @@ export default function ModelCallExecutor(props: Props) {
 
   // ─── Named outputs from outputData ────────────────────────────────────────
   const namedOutputs = () => {
-    const od = props.nodeExecution.outputData as Record<string, unknown> | null;
-    return (od?.namedOutputs as Record<string, { content: string; format: string; modelId: string }>) ?? null;
+    const od = currentOutputData();
+    return (od?.namedOutputs as Record<string, ModelCallNamedOutput>) ?? null;
+  };
+
+  const namedOutputsByModel = () => {
+    const od = currentOutputData();
+    return (od?.namedOutputsByModel as Record<string, Record<string, ModelCallNamedOutput>>) ?? {};
   };
 
   const fallbackWarning = () => {
-    const od = props.nodeExecution.outputData as Record<string, unknown> | null;
+    const od = currentOutputData();
     return (od?.fallbackWarning as boolean) ?? false;
   };
 
   const hasNamedOutputs = () => {
-    const no = namedOutputs();
-    return no !== null && Object.keys(no).length > 0;
+    return (
+      Object.keys(namedOutputs() ?? {}).length > 0 ||
+      Object.keys(namedOutputsByModel()).length > 0
+    );
   };
 
   const namedOutputDefs = (): NamedOutputDef[] => {
     return props.config.namedOutputs ?? [];
   };
+
+  const selectionEnabled = () => props.config.enableUserSelectionOutput ?? false;
 
   let abortController: AbortController | null = null;
   let liveAbortController: AbortController | null = null;
@@ -223,6 +338,7 @@ export default function ModelCallExecutor(props: Props) {
   const [liveSubscribed, setLiveSubscribed] = createSignal(false);
 
   onCleanup(() => {
+    props.registerConfirmAction?.(null);
     abortController?.abort();
     liveAbortController?.abort();
     if (liveReconnectTimer) clearTimeout(liveReconnectTimer);
@@ -254,7 +370,7 @@ export default function ModelCallExecutor(props: Props) {
         if (!res.ok) return;
 
         const data = (await res.json()) as { models: Record<string, ModelOutput> };
-        setModelOutputs(cloneModelOutputs(data.models));
+        setModelOutputs((prev) => mergeModelOutputs(prev, data.models));
 
         // Check if all models are done (empty = still waiting for backend to write)
         const modelEntries = Object.values(data.models);
@@ -274,15 +390,22 @@ export default function ModelCallExecutor(props: Props) {
     }, 3000);
   }
 
-  function syncActiveTab(models: Record<string, ModelOutput>, preferredModelId?: string | null) {
+  function syncActiveTab(models: Record<string, ModelOutput>, preferredModelId?: string | null, force?: boolean) {
     const keys = Object.keys(models);
     if (keys.length === 0) return;
-    if (preferredModelId && models[preferredModelId]) {
+    // Only override user selection when explicitly forced (e.g. snapshot with selectedModelId)
+    // or when current tab is invalid
+    if (force && preferredModelId && models[preferredModelId]) {
       setActiveTab(preferredModelId);
       return;
     }
     if (!activeTab() || !models[activeTab()]) {
-      setActiveTab(keys[0]);
+      // Try preferredModelId as fallback before defaulting to first
+      if (preferredModelId && models[preferredModelId]) {
+        setActiveTab(preferredModelId);
+      } else {
+        setActiveTab(keys[0]);
+      }
     }
   }
 
@@ -290,15 +413,21 @@ export default function ModelCallExecutor(props: Props) {
     setModelOutputs((prev) => applyModelCallStreamEvent(prev, event, props.config.modelNames));
 
     if (event.type === "snapshot") {
-      if (event.data.selectedModelId) {
-        setSelectedModelId(event.data.selectedModelId);
-      }
-      syncActiveTab(event.data.models, event.data.selectedModelId);
+      const nextSelectedIds =
+        event.data.selectedModelIds && event.data.selectedModelIds.length > 0
+          ? event.data.selectedModelIds
+          : event.data.selectedModelId
+            ? [event.data.selectedModelId]
+            : [];
+      setSelectedModelIds(nextSelectedIds);
+      setSelectedModelId(nextSelectedIds[0] ?? event.data.selectedModelId ?? "");
+      // Only force-switch tab on snapshot if no active tab is set yet
+      syncActiveTab(event.data.models, event.data.selectedModelId, !activeTab());
       setPhase(event.data.done ? "done" : "streaming");
       return;
     }
 
-    if (!activeTab()) {
+    if (!activeTab() || !modelOutputs()[activeTab()]) {
       setActiveTab(event.modelId);
     }
 
@@ -408,16 +537,43 @@ export default function ModelCallExecutor(props: Props) {
   });
 
   createEffect(() => {
+    const nextOutputData =
+      (props.nodeExecution.outputData as Record<string, unknown> | null) ?? null;
+    setLocalOutputData(nextOutputData);
+  });
+
+  createEffect(() => {
+    if (!selectionEnabled()) {
+      props.registerConfirmAction?.(null);
+      return;
+    }
+
+    props.registerConfirmAction?.(async () => {
+      if (selectedModelIds().length > 0) {
+        setError(null);
+        return true;
+      }
+
+      setError("请至少选择一个模型输出后再继续。");
+      return false;
+    });
+  });
+
+  createEffect(() => {
     if (liveSubscribed()) return;
 
     const incomingModels = existingModels();
     if (Object.keys(incomingModels).length === 0) return;
 
-    setModelOutputs(cloneModelOutputs(incomingModels));
+    setModelOutputs((prev) => mergeModelOutputs(prev, incomingModels));
+    // Don't override user's active tab selection — only sync if current tab is invalid
     syncActiveTab(incomingModels, props.nodeExecution.selectedOutputKey);
-    if (props.nodeExecution.selectedOutputKey) {
-      setSelectedModelId(props.nodeExecution.selectedOutputKey);
-    }
+    const nextSelectedIds = getSelectedModelIdsFromOutputData(
+      currentOutputData(),
+      props.nodeExecution.selectedOutputKey,
+    );
+    setSelectedModelIds(nextSelectedIds);
+    setSelectedModelId(nextSelectedIds[0] ?? props.nodeExecution.selectedOutputKey ?? "");
     setPhase(
       deriveModelCallExecutionPhase({
         models: incomingModels,
@@ -565,6 +721,12 @@ export default function ModelCallExecutor(props: Props) {
   }
 
   async function handleSelect(modelId: string) {
+    const nextSelectedIds = selectionEnabled()
+      ? selectedModelIds().includes(modelId)
+        ? selectedModelIds().filter((id) => id !== modelId)
+        : [...selectedModelIds(), modelId]
+      : [modelId];
+
     setSelectLoading(true);
     try {
       const token = localStorage.getItem("auth_token");
@@ -576,23 +738,28 @@ export default function ModelCallExecutor(props: Props) {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ selectedModelId: modelId }),
+          body: JSON.stringify({
+            selectedModelId: nextSelectedIds[0],
+            selectedModelIds: nextSelectedIds,
+          }),
         },
       );
 
       if (res.ok) {
-        setSelectedModelId(modelId);
-        const selected = modelOutputs()[modelId];
-        if (selected) {
-          props.onDraftSave({
-            models: modelOutputs(),
-            selectedContent: selected.content,
-            text: selected.content,
-          });
+        const data = (await res.json()) as {
+          outputData?: Record<string, unknown>;
+          selectedOutputKey?: string | null;
+        };
+        setSelectedModelIds(nextSelectedIds);
+        setSelectedModelId(data.selectedOutputKey ?? nextSelectedIds[0] ?? "");
+        if (data.outputData) {
+          setLocalOutputData(data.outputData);
+          props.onDraftSave(data.outputData);
         }
+        setError(null);
       }
     } catch {
-      // ignore
+      setError("保存所选输出失败，请重试。");
     } finally {
       setSelectLoading(false);
     }
@@ -693,16 +860,18 @@ export default function ModelCallExecutor(props: Props) {
 
   function handleNamedOutputChange(artifactId: string, newContent: string) {
     // Update outputData namedOutputs via draft save
-    const od = props.nodeExecution.outputData as Record<string, unknown> | null;
-    const currentNamedOutputs = (od?.namedOutputs as Record<string, { content: string; format: string; modelId: string }>) ?? {};
+    const od = currentOutputData();
+    const currentNamedOutputs = (od?.namedOutputs as Record<string, ModelCallNamedOutput>) ?? {};
     const updated = {
       ...currentNamedOutputs,
       [artifactId]: { ...currentNamedOutputs[artifactId], content: newContent },
     };
-    props.onDraftSave({
+    const nextOutputData = {
       ...od,
       namedOutputs: updated,
-    });
+    };
+    setLocalOutputData(nextOutputData);
+    props.onDraftSave(nextOutputData);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -720,6 +889,10 @@ export default function ModelCallExecutor(props: Props) {
 
   function hasAnyCompleted(): boolean {
     return modelList().some((m) => m.status === "completed");
+  }
+
+  function isModelSelected(modelId: string): boolean {
+    return selectedModelIds().includes(modelId);
   }
 
   function statusBadge(status: ModelOutput["status"]) {
@@ -902,7 +1075,7 @@ export default function ModelCallExecutor(props: Props) {
     const output = existingModels()[selected];
     const content =
       output?.content ??
-      ((props.nodeExecution.outputData as Record<string, unknown>)?.selectedContent as string) ??
+      ((currentOutputData() as Record<string, unknown> | null)?.selectedContent as string) ??
       "";
 
     return (
@@ -1067,6 +1240,7 @@ export default function ModelCallExecutor(props: Props) {
               <ModelCompareView
                 models={modelOutputs()}
                 renderMarkdown={renderMarkdown}
+                viewMode={viewMode()}
                 onClose={() => setShowCompare(false)}
               />
             </Match>
@@ -1152,24 +1326,27 @@ export default function ModelCallExecutor(props: Props) {
             {/* Multi-model tab mode */}
             <Match when={isMultiModel() && !showCompare()}>
               <div class="space-y-3">
-                {/* Tab bar */}
+                {/* Tab bar — use <Index> so button DOM stays stable across
+                    polling/streaming re-renders. <For> would rebuild every
+                    button on each content delta (because model refs change),
+                    which swallows user clicks mid-render. */}
                 <div class="flex items-center gap-1 border-b border-[rgba(199,196,216,0.2)]">
-                  <For each={modelList()}>
+                  <Index each={modelList()}>
                     {(model) => (
                       <button
                         type="button"
                         class={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                          activeTab() === model.modelId
+                          activeTab() === model().modelId
                             ? "border-indigo-600 text-indigo-600"
                             : "border-transparent text-[#464555] hover:text-[#191c1e]"
                         }`}
-                        onClick={() => setActiveTab(model.modelId)}
+                        onClick={() => setActiveTab(model().modelId)}
                       >
-                        <span class="mr-1.5">{model.modelDisplayName}</span>
-                        {statusBadge(model.status)}
+                        <span class="mr-1.5">{model().modelDisplayName}</span>
+                        {statusBadge(model().status)}
                       </button>
                     )}
-                  </For>
+                  </Index>
 
                   {/* Compare button */}
                   <Show when={modelList().length >= 2}>
@@ -1262,19 +1439,61 @@ export default function ModelCallExecutor(props: Props) {
           {/* Named output cards */}
           <Show when={hasNamedOutputs() && phase() === "done"}>
             <div class="space-y-3">
-              <Show when={isMultiModel()}>
-                {/* Multi-model: group by model */}
-                <For each={modelList().filter((m) => m.status === "completed" || m.status === "format_error")}>
+              <Show
+                when={selectionEnabled() && Object.keys(namedOutputs() ?? {}).length > 0}
+              >
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-[#191c1e]">用户选择输出</h4>
+                    <span class="text-xs text-[#464555]">
+                      已选 {selectedModelIds().length} 个模型
+                    </span>
+                  </div>
+                  <div class="space-y-2">
+                    <For each={Object.entries(namedOutputs() ?? {})}>
+                      {([artifactId, artifact]) => {
+                        const def = namedOutputDefs().find((d) => d.id === artifactId);
+                        return (
+                          <NamedOutputCard
+                            artifactId={artifactId}
+                            artifactName={def?.name ?? artifactId}
+                            content={artifact.content}
+                            format={artifact.format}
+                            modelId="selected"
+                            onContentChange={handleNamedOutputChange}
+                            readonly={props.readOnly}
+                          />
+                        );
+                      }}
+                    </For>
+                  </div>
+                </div>
+              </Show>
+
+              <Show when={Object.keys(namedOutputsByModel()).length > 0}>
+                <For
+                  each={modelList().filter(
+                    (m) => m.status === "completed" || m.status === "format_error",
+                  )}
+                >
                   {(model) => {
                     const modelArtifacts = () => {
-                      const no = namedOutputs();
-                      if (!no) return [];
-                      return Object.entries(no).filter(([_, v]) => v.modelId === model.modelId);
+                      const artifacts = namedOutputsByModel()[model.modelId];
+                      if (!artifacts) return [];
+                      return Object.entries(artifacts).filter(([artifactId]) => artifactId !== "_default");
                     };
+
                     return (
                       <Show when={modelArtifacts().length > 0}>
                         <div class="space-y-2">
-                          <h4 class="text-sm font-semibold text-[#191c1e]">{model.modelDisplayName}</h4>
+                          <div class="flex items-center gap-2">
+                            <h4 class="text-sm font-semibold text-[#191c1e]">{model.modelDisplayName}</h4>
+                            <Show when={selectionEnabled() && isModelSelected(model.modelId)}>
+                              <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 font-medium">
+                                已加入用户选择
+                              </span>
+                            </Show>
+                          </div>
                           <div class="space-y-2">
                             <For each={modelArtifacts()}>
                               {([artifactId, artifact]) => {
@@ -1285,9 +1504,9 @@ export default function ModelCallExecutor(props: Props) {
                                     artifactName={def?.name ?? artifactId}
                                     content={artifact.content}
                                     format={artifact.format}
-                                    modelId={artifact.modelId}
+                                    modelId={artifact.modelId ?? model.modelId}
                                     onContentChange={handleNamedOutputChange}
-                                    readonly={props.readOnly}
+                                    readonly={props.readOnly || isMultiModel()}
                                   />
                                 );
                               }}
@@ -1300,8 +1519,12 @@ export default function ModelCallExecutor(props: Props) {
                 </For>
               </Show>
 
-              <Show when={!isMultiModel()}>
-                {/* Single model: render cards directly */}
+              <Show
+                when={
+                  Object.keys(namedOutputsByModel()).length === 0 &&
+                  Object.keys(namedOutputs() ?? {}).length > 0
+                }
+              >
                 <For each={Object.entries(namedOutputs() ?? {})}>
                   {([artifactId, artifact]) => {
                     const def = namedOutputDefs().find((d) => d.id === artifactId);
@@ -1311,7 +1534,7 @@ export default function ModelCallExecutor(props: Props) {
                         artifactName={def?.name ?? artifactId}
                         content={artifact.content}
                         format={artifact.format}
-                        modelId={artifact.modelId}
+                        modelId={artifact.modelId ?? "selected"}
                         onContentChange={handleNamedOutputChange}
                         readonly={props.readOnly}
                       />
@@ -1322,28 +1545,31 @@ export default function ModelCallExecutor(props: Props) {
             </div>
           </Show>
 
-          {/* Output selection — show after at least one model completed */}
-          <Show when={hasAnyCompleted() && !showCompare()}>
+          {/* Output selection — only when user-selection output is enabled */}
+          <Show when={selectionEnabled() && hasAnyCompleted() && !showCompare()}>
             <div class="bg-[#f7f9fb] rounded-xl px-5 py-4 space-y-3">
               <p class="text-xs font-semibold text-[#464555] uppercase tracking-wide">选择输出</p>
+              <p class="text-xs text-[#6b6a78]">
+                选择一个或多个模型结果，系统会生成对应的“用户选择输出”供下游节点引用。
+              </p>
               <div class="space-y-2">
                 <For each={modelList().filter((m) => m.status === "completed")}>
                   {(model) => (
                     <div
                       class={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                        selectedModelId() === model.modelId
+                        isModelSelected(model.modelId)
                           ? "bg-[#e2dfff] border border-[rgba(79,70,229,0.3)]"
                           : "bg-white border border-[rgba(199,196,216,0.15)] hover:bg-[#f7f9fb]"
                       }`}
                     >
                       <div
                         class={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          selectedModelId() === model.modelId
+                          isModelSelected(model.modelId)
                             ? "border-indigo-500 bg-indigo-500"
                             : "border-[rgba(199,196,216,0.6)]"
                         }`}
                       >
-                        <Show when={selectedModelId() === model.modelId}>
+                        <Show when={isModelSelected(model.modelId)}>
                           <div class="w-1.5 h-1.5 rounded-full bg-white" />
                         </Show>
                       </div>
@@ -1353,35 +1579,39 @@ export default function ModelCallExecutor(props: Props) {
                         </span>
                         <span class="ml-2 text-xs text-[#464555]">{model.content.length} 字符</span>
                       </div>
-                      <Show when={selectedModelId() === model.modelId}>
+                      <Show when={isModelSelected(model.modelId)}>
                         <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-600 font-medium">
                           已选择
                         </span>
                       </Show>
-                      <Show when={selectedModelId() !== model.modelId}>
+                      <Show when={!isModelSelected(model.modelId)}>
                         <button
                           type="button"
                           class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
                           onClick={() => handleSelect(model.modelId)}
                           disabled={selectLoading()}
                         >
-                          选择此输出
+                          加入选择
+                        </button>
+                      </Show>
+                      <Show when={isModelSelected(model.modelId)}>
+                        <button
+                          type="button"
+                          class="px-3 py-1.5 text-xs font-medium text-[#464555] border border-[rgba(199,196,216,0.4)] rounded-lg hover:bg-white transition-colors"
+                          onClick={() => handleSelect(model.modelId)}
+                          disabled={selectLoading()}
+                        >
+                          取消
                         </button>
                       </Show>
                     </div>
                   )}
                 </For>
               </div>
-
-              {/* Auto-select for single model */}
-              <Show when={!isMultiModel() && hasAnyCompleted() && !selectedModelId()}>
-                {(() => {
-                  const completed = modelList().find((m) => m.status === "completed");
-                  if (completed) {
-                    handleSelect(completed.modelId);
-                  }
-                  return null;
-                })()}
+              <Show when={selectedModelIds().length === 0}>
+                <div class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  继续前至少选择 1 个模型输出。
+                </div>
               </Show>
             </div>
           </Show>

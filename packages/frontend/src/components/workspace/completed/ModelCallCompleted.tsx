@@ -30,7 +30,15 @@ export default function ModelCallCompleted(props: Props) {
       models?: Record<string, ModelOutput>;
       selectedContent?: string;
       selectedModelId?: string;
-      namedOutputs?: Record<string, { content: string; format: string; modelId: string }>;
+      selectedModelIds?: string[];
+      namedOutputs?: Record<
+        string,
+        { content: string; format: string; modelId?: string; modelIds?: string[] }
+      >;
+      namedOutputsByModel?: Record<
+        string,
+        Record<string, { content: string; format: string; modelId?: string }>
+      >;
       fallbackWarning?: boolean;
     } | null;
 
@@ -48,8 +56,10 @@ export default function ModelCallCompleted(props: Props) {
   };
 
   const hasNamedOutputs = () => {
-    const no = od()?.namedOutputs;
-    return no !== undefined && no !== null && Object.keys(no).length > 0;
+    return (
+      Object.keys(od()?.namedOutputs ?? {}).length > 0 ||
+      Object.keys(od()?.namedOutputsByModel ?? {}).length > 0
+    );
   };
 
   const namedOutputDefs = (): NamedOutputDef[] => {
@@ -311,27 +321,77 @@ export default function ModelCallCompleted(props: Props) {
           {/* Named output cards mode */}
           <Show when={hasNamedOutputs()}>
             <div class="space-y-3">
-              <Show when={modelEntries().length > 1}>
-                {/* Multi-model: show cards for active model tab */}
-                <For each={Object.entries(od()?.namedOutputs ?? {}).filter(([_, v]) => v.modelId === selectedModelId())}>
-                  {([artifactId, artifact]) => {
-                    const def = namedOutputDefs().find((d) => d.id === artifactId);
+              <Show
+                when={
+                  (cfg()?.enableUserSelectionOutput ?? false) &&
+                  Object.keys(od()?.namedOutputs ?? {}).length > 0
+                }
+              >
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-[#191c1e]">用户选择输出</h4>
+                    <span class="text-xs text-[#464555]">
+                      已选 {(od()?.selectedModelIds ?? []).length} 个模型
+                    </span>
+                  </div>
+                  <For each={Object.entries(od()?.namedOutputs ?? {})}>
+                    {([artifactId, artifact]) => {
+                      const def = namedOutputDefs().find((d) => d.id === artifactId);
+                      return (
+                        <NamedOutputCard
+                          artifactId={artifactId}
+                          artifactName={def?.name ?? artifactId}
+                          content={artifact.content}
+                          format={artifact.format}
+                          modelId="selected"
+                          readonly={true}
+                        />
+                      );
+                    }}
+                  </For>
+                </div>
+              </Show>
+
+              <Show when={Object.keys(od()?.namedOutputsByModel ?? {}).length > 0}>
+                <For each={modelEntries()}>
+                  {(model) => {
+                    const modelArtifacts = () =>
+                      Object.entries(od()?.namedOutputsByModel?.[model.key] ?? {}).filter(
+                        ([artifactId]) => artifactId !== "_default",
+                      );
+
                     return (
-                      <NamedOutputCard
-                        artifactId={artifactId}
-                        artifactName={def?.name ?? artifactId}
-                        content={artifact.content}
-                        format={artifact.format}
-                        modelId={artifact.modelId}
-                        readonly={true}
-                      />
+                      <Show when={modelArtifacts().length > 0}>
+                        <div class="space-y-2">
+                          <h4 class="text-sm font-semibold text-[#191c1e]">{model.modelDisplayName}</h4>
+                          <For each={modelArtifacts()}>
+                            {([artifactId, artifact]) => {
+                              const def = namedOutputDefs().find((d) => d.id === artifactId);
+                              return (
+                                <NamedOutputCard
+                                  artifactId={artifactId}
+                                  artifactName={def?.name ?? artifactId}
+                                  content={artifact.content}
+                                  format={artifact.format}
+                                  modelId={artifact.modelId ?? model.key}
+                                  readonly={true}
+                                />
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </Show>
                     );
                   }}
                 </For>
               </Show>
 
-              <Show when={modelEntries().length <= 1}>
-                {/* Single model: show all named output cards */}
+              <Show
+                when={
+                  Object.keys(od()?.namedOutputsByModel ?? {}).length === 0 &&
+                  Object.keys(od()?.namedOutputs ?? {}).length > 0
+                }
+              >
                 <For each={Object.entries(od()?.namedOutputs ?? {})}>
                   {([artifactId, artifact]) => {
                     const def = namedOutputDefs().find((d) => d.id === artifactId);
@@ -341,7 +401,7 @@ export default function ModelCallCompleted(props: Props) {
                         artifactName={def?.name ?? artifactId}
                         content={artifact.content}
                         format={artifact.format}
-                        modelId={artifact.modelId}
+                        modelId={artifact.modelId ?? "selected"}
                         readonly={true}
                       />
                     );

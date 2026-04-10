@@ -135,61 +135,69 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Phase mapping filled during roadmap creation.
+Phase mapping filled during roadmap creation (2026-04-10).
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase TBD | Pending |
-| DATA-02 | Phase TBD | Pending |
-| DATA-03 | Phase TBD | Pending |
-| DATA-04 | Phase TBD | Pending |
-| GEN-01 | Phase TBD | Pending |
-| GEN-02 | Phase TBD | Pending |
-| GEN-03 | Phase TBD | Pending |
-| GEN-04 | Phase TBD | Pending |
-| PIPE-01 | Phase TBD | Pending |
-| PIPE-02 | Phase TBD | Pending |
-| PIPE-03 | Phase TBD | Pending |
-| PIPE-04 | Phase TBD | Pending |
-| PIPE-05 | Phase TBD | Pending |
-| PIPE-06 | Phase TBD | Pending |
-| COMP-01 | Phase TBD | Pending |
-| COMP-02 | Phase TBD | Pending |
-| COMP-03 | Phase TBD | Pending |
-| COMP-04 | Phase TBD | Pending |
-| VFIX-01 | Phase TBD | Pending |
-| VFIX-02 | Phase TBD | Pending |
-| VFIX-03 | Phase TBD | Pending |
-| VFIX-04 | Phase TBD | Pending |
-| API-01 | Phase TBD | Pending |
-| API-02 | Phase TBD | Pending |
-| API-03 | Phase TBD | Pending |
-| API-04 | Phase TBD | Pending |
-| API-05 | Phase TBD | Pending |
-| MROLE-01 | Phase TBD | Pending |
-| MROLE-02 | Phase TBD | Pending |
-| MROLE-03 | Phase TBD | Pending |
-| WIZ-01 | Phase TBD | Pending |
-| WIZ-02 | Phase TBD | Pending |
-| WIZ-03 | Phase TBD | Pending |
-| WIZ-04 | Phase TBD | Pending |
-| WIZ-05 | Phase TBD | Pending |
-| WIZ-06 | Phase TBD | Pending |
-| FERE-01 | Phase TBD | Pending |
-| FERE-02 | Phase TBD | Pending |
-| FERE-03 | Phase TBD | Pending |
-| FAIL-01 | Phase TBD | Pending |
-| FAIL-02 | Phase TBD | Pending |
-| FAIL-03 | Phase TBD | Pending |
-| TEST-01 | Phase TBD | Pending |
-| TEST-02 | Phase TBD | Pending |
-| TEST-03 | Phase TBD | Pending |
+| DATA-01 | Phase 32 | Pending |
+| DATA-02 | Phase 32 | Pending |
+| DATA-03 | Phase 32 | Pending |
+| DATA-04 | Phase 32 | Pending |
+| GEN-01 | Phase 32 | Pending |
+| GEN-02 | Phase 32 | Pending |
+| GEN-03 | Phase 34 | Pending |
+| GEN-04 | Phase 34 | Pending |
+| PIPE-01 | Phase 33 | Pending |
+| PIPE-02 | Phase 34 | Pending |
+| PIPE-03 | Phase 34 | Pending |
+| PIPE-04 | Phase 34 | Pending |
+| PIPE-05 | Phase 34 | Pending |
+| PIPE-06 | Phase 34 | Pending |
+| COMP-01 | Phase 33 | Pending |
+| COMP-02 | Phase 33 | Pending |
+| COMP-03 | Phase 33 | Pending |
+| COMP-04 | Phase 33 | Pending |
+| VFIX-01 | Phase 33 | Pending |
+| VFIX-02 | Phase 35 | Pending |
+| VFIX-03 | Phase 35 | Pending |
+| VFIX-04 | Phase 35 | Pending |
+| API-01 | Phase 35 | Pending |
+| API-02 | Phase 35 | Pending |
+| API-03 | Phase 35 | Pending |
+| API-04 | Phase 35 | Pending |
+| API-05 | Phase 35 | Pending |
+| MROLE-01 | Phase 32 | Pending |
+| MROLE-02 | Phase 32 | Pending |
+| MROLE-03 | Phase 32 | Pending |
+| WIZ-01 | Phase 36 | Pending |
+| WIZ-02 | Phase 36 | Pending |
+| WIZ-03 | Phase 36 | Pending |
+| WIZ-04 | Phase 36 | Pending |
+| WIZ-05 | Phase 36 | Pending |
+| WIZ-06 | Phase 36 | Pending |
+| FERE-01 | Phase 36 | Pending |
+| FERE-02 | Phase 36 | Pending |
+| FERE-03 | Phase 36 | Pending |
+| FAIL-01 | Phase 35 | Pending |
+| FAIL-02 | Phase 36 | Pending |
+| FAIL-03 | Phase 35 | Pending |
+| TEST-01 | Phase 37 | Pending |
+| TEST-02 | Phase 37 | Pending |
+| TEST-03 | Phase 37 | Pending |
 
 **Coverage:**
-- v1.5 requirements: 44 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 44
+- v1.5 requirements: 45 total
+- Mapped to phases: 45 (100%)
+- Unmapped: 0
+
+**Per-phase breakdown:**
+- Phase 32: 9 requirements (DATA-01~04, GEN-01~02, MROLE-01~03)
+- Phase 33: 6 requirements (PIPE-01, COMP-01~04, VFIX-01)
+- Phase 34: 7 requirements (GEN-03~04, PIPE-02~06)
+- Phase 35: 10 requirements (VFIX-02~04, API-01~05, FAIL-01, FAIL-03)
+- Phase 36: 10 requirements (WIZ-01~06, FERE-01~03, FAIL-02)
+- Phase 37: 3 requirements (TEST-01~03)
 
 ---
 *Requirements defined: 2026-04-10*
-*Last updated: 2026-04-10 after v1.5 milestone scoping*
+*Last updated: 2026-04-10 after v1.5 roadmap creation (Phases 32-37, 45/45 mapped)*

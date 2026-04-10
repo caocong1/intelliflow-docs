@@ -238,6 +238,7 @@ export default function ConfigPanel(props: ConfigPanelProps) {
                   <RestoreConfigPanel
                     config={nodeConfig() as unknown as RestoreConfig}
                     allNodes={props.allNodes}
+                    upstreamNodes={upstreamNodes()}
                     onChange={(c) => handleConfigChange(c as unknown as Record<string, unknown>)}
                   />
                 </Match>

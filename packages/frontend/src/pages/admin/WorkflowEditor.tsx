@@ -10,6 +10,7 @@ import ValidationOverlay, { type ValidationError } from "../../components/workfl
 import { createFlowStore } from "../../lib/flow-engine/store";
 import { createSelectionStore } from "../../lib/flow-engine/selection";
 import { deriveOutputs } from "../../lib/flow-engine/derive-outputs";
+import { shouldAutoSyncInputSources } from "../../lib/flow-engine/input-source-sync";
 import { createUndoRedo } from "../../lib/flow-engine/undo-redo";
 import { createAutosave } from "../../lib/flow-engine/autosave";
 import type { FlowNodeData, FlowEdgeData } from "../../lib/flow-engine/types";
@@ -95,7 +96,12 @@ export default function WorkflowEditor() {
       label: n.data.label,
       position: n.position,
       config: n.data.config as unknown as Record<string, unknown>,
-      outputs: n.data.outputs as unknown as Array<{ id: string; name: string; description?: string }>,
+      outputs: n.data.outputs as unknown as Array<{
+        id: string;
+        name: string;
+        description?: string;
+        segmentKey?: string;
+      }>,
     }));
     const backendEdges = snapshot.edges.map((e) => ({
       id: e.id,
@@ -327,15 +333,15 @@ export default function WorkflowEditor() {
    */
   function syncInputSources() {
     for (const node of store.nodes) {
-      const config = node.data.config as unknown as Record<string, unknown>;
-      if (config.type !== "desensitize" && config.type !== "restore") continue;
+      const config = node.data.config as NodeConfig;
+      if (!shouldAutoSyncInputSources(config)) continue;
 
       // Find the incoming edge to this node
       const incomingEdge = store.edges.find((e) => e.target === node.id);
       if (!incomingEdge) {
         // No incoming edge — clear inputSources
-        if ((config as { inputSources?: unknown[] }).inputSources?.length) {
-          const updatedConfig = { ...config, inputSources: [] } as unknown as NodeConfig;
+        if ((config.inputSources?.length ?? 0) > 0) {
+          const updatedConfig = { ...config, inputSources: [] } as NodeConfig;
           const outputs = deriveOutputs(node.id, updatedConfig);
           store.updateNode(node.id, {
             data: { ...node.data, config: updatedConfig, outputs },
@@ -357,13 +363,13 @@ export default function WorkflowEditor() {
       }));
 
       // Only update if changed (avoid infinite loops)
-      const existing = (config as { inputSources?: InputSource[] }).inputSources ?? [];
+      const existing = config.inputSources ?? [];
       const changed =
         existing.length !== newInputSources.length ||
         existing.some((s, i) => s.outputId !== newInputSources[i]?.outputId || s.displayName !== newInputSources[i]?.displayName);
 
       if (changed) {
-        const updatedConfig = { ...config, inputSources: newInputSources } as unknown as NodeConfig;
+        const updatedConfig = { ...config, inputSources: newInputSources } as NodeConfig;
         const outputs = deriveOutputs(node.id, updatedConfig);
         store.updateNode(node.id, {
           data: { ...node.data, config: updatedConfig, outputs },

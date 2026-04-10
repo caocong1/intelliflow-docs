@@ -75,10 +75,10 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
     case "restore":
       if (config.inputSources && config.inputSources.length > 0) {
         return config.inputSources.map((src) => ({
-          id: `${nodeId}-restored-${src.outputId}`,
+          id: `${nodeId}-restored-${src.sourceNodeId}-${src.outputId}`,
           name: `${src.displayName}.恢复`,
           description: `恢复后文本: ${src.displayName}`,
-          segmentKey: src.outputId,
+          segmentKey: `${src.sourceNodeId}.${src.outputId}`,
         }));
       }
       return [{ id: `${nodeId}-restored`, name: "恢复后文本", segmentKey: "restored" }];

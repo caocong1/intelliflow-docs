@@ -533,7 +533,9 @@ export function validateWorkflow(
         continue;
       }
 
-      const srcOutputExists = srcNode.outputs.some((o) => o.id === src.outputId);
+      const srcOutputExists = srcNode.outputs.some(
+        (o) => o.id === src.outputId || o.segmentKey === src.outputId,
+      );
       if (!srcOutputExists) {
         errors.push({
           nodeId: node.id,

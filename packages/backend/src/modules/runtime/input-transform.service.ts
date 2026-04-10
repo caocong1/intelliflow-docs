@@ -1,12 +1,12 @@
-import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { join, extname } from "node:path";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { extname, join } from "node:path";
+import type { FormFieldDef, WorkflowNodeDef } from "@intelliflow/shared";
 import { eq } from "drizzle-orm";
+import { AppError } from "../../common/errors";
+import { sanitizeFilename } from "../../common/sanitize";
 import { db } from "../../db";
 import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { getUploadPath, insertDocumentFile } from "../files/files.service";
-import type { FormFieldDef, WorkflowNodeDef } from "@intelliflow/shared";
-import { AppError } from "../../common/errors";
-import { sanitizeFilename } from "../../common/sanitize";
 
 // ─── File parsing ────────────────────────────────────────────────────────────
 
@@ -19,7 +19,12 @@ export async function parseUploadedFile(filePath: string, mimeType: string): Pro
   const ext = extname(filePath).toLowerCase();
 
   // Plain text / markdown
-  if (ext === ".txt" || ext === ".md" || mimeType === "text/plain" || mimeType === "text/markdown") {
+  if (
+    ext === ".txt" ||
+    ext === ".md" ||
+    mimeType === "text/plain" ||
+    mimeType === "text/markdown"
+  ) {
     const buf = await readFile(filePath, "utf-8");
     return buf;
   }
@@ -189,6 +194,10 @@ export interface ConfirmInputTransformParams {
   userId: string;
 }
 
+export function resolveFileOutputSlotId(field: Pick<FormFieldDef, "id" | "fileSlotId">): string {
+  return field.fileSlotId ?? field.id;
+}
+
 /**
  * Confirm the input transform node:
  * 1. Merge form fields + file parsed texts into outputData
@@ -218,7 +227,8 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
       const wfNodes = doc.nodes as WorkflowNodeDef[];
       const nodeDef = wfNodes.find((n) => n.id === nodeExec.nodeId);
       const cfg = nodeDef?.config;
-      formFields = cfg && "formFields" in cfg ? (cfg as { formFields: FormFieldDef[] }).formFields : [];
+      formFields =
+        cfg && "formFields" in cfg ? (cfg as { formFields: FormFieldDef[] }).formFields : [];
     }
   }
 
@@ -262,6 +272,7 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
       fileId: f.fileId,
       name: f.name,
       parsedText: f.parsedText,
+      ...(f.slotId ? { slotId: f.slotId } : {}),
     })),
     fileSlots,
     text: combinedText,
@@ -297,17 +308,19 @@ export async function confirmInputTransform(params: ConfirmInputTransformParams)
  * Build fileSlots: group file outputs by their associated fileSlotId.
  * For each slot, aggregate concatenated parsedText and file info.
  */
-function buildFileSlots(
+export function buildFileSlots(
   fileOutputs: Array<{ fileId: string; name: string; parsedText: string; slotId?: string }>,
   formFields: FormFieldDef[],
 ): Record<string, { text: string; files: Array<{ fileId: string; name: string }> }> {
-  const slots: Record<string, { text: string; files: Array<{ fileId: string; name: string }> }> = {};
+  const slots: Record<string, { text: string; files: Array<{ fileId: string; name: string }> }> =
+    {};
 
-  // Build a set of valid fileSlotIds from form field definitions
+  // Accept explicit fileSlotId and fall back to field.id so legacy file fields
+  // without fileSlotId still round-trip through rollback/refresh correctly.
   const slotIdSet = new Set<string>();
   for (const field of formFields) {
-    if (field.fileSlotId) {
-      slotIdSet.add(field.fileSlotId);
+    if (field.type === "file") {
+      slotIdSet.add(resolveFileOutputSlotId(field));
     }
   }
 

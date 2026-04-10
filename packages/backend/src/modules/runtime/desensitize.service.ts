@@ -26,15 +26,17 @@ export type SourceConfirmInput = {
 
 type ConfirmOutputData =
   | {
-    text: string;
-    mappingCount: number;
-    detectedItems: DesensitizeReviewSummaryItem[];
-  }
+      text: string;
+      mappingCount: number;
+      detectedItems: DesensitizeReviewSummaryItem[];
+      confirmedAt: string;
+    }
   | {
-    mappingCount: number;
-    detectedItems: DesensitizeReviewSummaryItem[];
-    sources: Record<string, SourceOutput>;
-  };
+      mappingCount: number;
+      detectedItems: DesensitizeReviewSummaryItem[];
+      sources: Record<string, SourceOutput>;
+      confirmedAt: string;
+    };
 
 // ─── Detection ──────────────────────────────────────────────────────────────
 
@@ -43,6 +45,29 @@ type ConfirmOutputData =
  */
 /** System-defined placeholder format: [TYPE_N] */
 const PLACEHOLDER_FORMAT = "[{TYPE}_{N}]";
+
+export function extractStructuredJson(content: string): string {
+  const trimmed = content.trim();
+
+  const fencedMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fencedMatch?.[1]) {
+    return fencedMatch[1].trim();
+  }
+
+  const arrayStart = trimmed.indexOf("[");
+  const arrayEnd = trimmed.lastIndexOf("]");
+  if (arrayStart >= 0 && arrayEnd > arrayStart) {
+    return trimmed.slice(arrayStart, arrayEnd + 1).trim();
+  }
+
+  const objectStart = trimmed.indexOf("{");
+  const objectEnd = trimmed.lastIndexOf("}");
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    return trimmed.slice(objectStart, objectEnd + 1).trim();
+  }
+
+  return trimmed;
+}
 
 export async function detectSensitiveInfo(
   text: string,
@@ -67,9 +92,10 @@ export async function detectSensitiveInfo(
     counters.set(item.type, count);
 
     // System-defined placeholder format: [TYPE_N]
-    const placeholder = PLACEHOLDER_FORMAT
-      .replace("{TYPE}", item.type.toUpperCase())
-      .replace("{N}", String(count));
+    const placeholder = PLACEHOLDER_FORMAT.replace("{TYPE}", item.type.toUpperCase()).replace(
+      "{N}",
+      String(count),
+    );
 
     // Find position in text
     const startIndex = text.indexOf(item.original);
@@ -114,10 +140,10 @@ async function detectViaModel(
   const isOllama = providerType === "ollama";
 
   const hasV1 = baseUrl.endsWith("/v1") || baseUrl.includes("/v1/");
-  const url = isOllama && !hasV1
-    ? `${baseUrl}/v1/chat/completions`
-    : `${baseUrl}/chat/completions`;
-  console.log(`[desensitize] Starting model detection: model=${modelId}, url=${url}, textLength=${text.length}, categories=${categoryNames.join(",")}`);
+  const url = isOllama && !hasV1 ? `${baseUrl}/v1/chat/completions` : `${baseUrl}/chat/completions`;
+  console.log(
+    `[desensitize] Starting model detection: model=${modelId}, url=${url}, textLength=${text.length}, categories=${categoryNames.join(",")}`,
+  );
   const t0 = Date.now();
 
   const typesDesc = categoryNames.join(", ");
@@ -164,16 +190,25 @@ async function detectViaModel(
   const totalMs = Date.now() - t0;
   const content = data.choices?.[0]?.message?.content ?? "[]";
 
-  // Parse JSON from model response (may have markdown code fences)
-  const jsonStr = content.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
+  // Parse JSON from model response. Some models prepend separators like `---`
+  // before the fenced JSON block, so extract the first structured payload first.
+  const jsonStr = extractStructuredJson(content);
 
   try {
-    const parsed = JSON.parse(jsonStr) as Array<{ original: string; type: string; description: string }>;
+    const parsed = JSON.parse(jsonStr) as Array<{
+      original: string;
+      type: string;
+      description: string;
+    }>;
     const items = Array.isArray(parsed) ? parsed : [];
-    console.log(`[desensitize] Model detection completed in ${totalMs}ms: found ${items.length} items`);
+    console.log(
+      `[desensitize] Model detection completed in ${totalMs}ms: found ${items.length} items`,
+    );
     return items;
   } catch {
-    console.warn(`[desensitize] Model returned unparseable JSON in ${totalMs}ms: ${content.slice(0, 100)}`);
+    console.warn(
+      `[desensitize] Model returned unparseable JSON in ${totalMs}ms: ${content.slice(0, 100)}`,
+    );
     return [];
   }
 }
@@ -214,7 +249,8 @@ function detectViaRegex(
     let match: RegExpExecArray | null;
     // Reset lastIndex for global regex
     pattern.regex.lastIndex = 0;
-    while ((match = pattern.regex.exec(text)) !== null) {
+    match = pattern.regex.exec(text);
+    while (match !== null) {
       if (!seen.has(match[0])) {
         seen.add(match[0]);
         results.push({
@@ -223,6 +259,7 @@ function detectViaRegex(
           description: pattern.description,
         });
       }
+      match = pattern.regex.exec(text);
     }
   }
 
@@ -252,18 +289,23 @@ export function validateAndBuildDetectedItems(
     const checkedSet = new Set(reviewSummary.filter((s) => s.checked).map((s) => s.placeholder));
     const itemsSet = new Set(itemPlaceholders);
     for (const p of itemsSet) {
-      if (!checkedSet.has(p)) throw new Error(`Confirmed item ${p} not marked as checked in reviewSummary`);
+      if (!checkedSet.has(p))
+        throw new Error(`Confirmed item ${p} not marked as checked in reviewSummary`);
     }
     for (const p of checkedSet) {
-      if (!itemsSet.has(p)) throw new Error(`Summary checked item ${p} has no corresponding confirmed item`);
+      if (!itemsSet.has(p))
+        throw new Error(`Summary checked item ${p} has no corresponding confirmed item`);
     }
   }
 
-  return reviewSummary ?? items.map((it) => ({
-    placeholder: it.placeholder,
-    sensitiveType: it.sensitiveType,
-    checked: true,
-  }));
+  return (
+    reviewSummary ??
+    items.map((it) => ({
+      placeholder: it.placeholder,
+      sensitiveType: it.sensitiveType,
+      checked: true,
+    }))
+  );
 }
 
 function buildDefaultReviewSummary(
@@ -285,18 +327,20 @@ export function buildConfirmOutputData(
   reviewSummary?: DesensitizeReviewSummaryItem[],
   sources?: Record<string, SourceConfirmInput>,
 ): { confirmedItems: ConfirmedDesensitizeItem[]; outputData: ConfirmOutputData } {
+  const confirmedAt = new Date().toISOString();
+
   if (!sources) {
     const detectedItems = validateAndBuildDetectedItems(items, reviewSummary);
     return {
       confirmedItems: items,
-      outputData: { text: sanitizedText, mappingCount: items.length, detectedItems },
+      outputData: { text: sanitizedText, mappingCount: items.length, detectedItems, confirmedAt },
     };
   }
 
   const sourceEntries = Object.entries(sources);
   const confirmedItems = sourceEntries.flatMap(([, source]) => source.items);
-  const aggregatedReviewSummary = sourceEntries.flatMap(([, source]) =>
-    source.reviewSummary ?? buildDefaultReviewSummary(source.items),
+  const aggregatedReviewSummary = sourceEntries.flatMap(
+    ([, source]) => source.reviewSummary ?? buildDefaultReviewSummary(source.items),
   );
   const detectedItems = validateAndBuildDetectedItems(confirmedItems, aggregatedReviewSummary);
   const sourceOutputs: Record<string, SourceOutput> = {};
@@ -322,6 +366,7 @@ export function buildConfirmOutputData(
       mappingCount: confirmedItems.length,
       detectedItems,
       sources: sourceOutputs,
+      confirmedAt,
     },
   };
 }

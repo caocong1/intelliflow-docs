@@ -261,9 +261,37 @@ export const runtimeRoutes = new Elysia({ prefix: "/runtime" })
         // Verify input_transform node is confirmed (completed)
         const inputNode = state.nodes.find((n) => n.nodeType === "input_transform");
         if (inputNode && inputNode.status !== "completed") {
+          // If failed but has outputData (interrupted by server restart), reset to in_progress
+          // so user can review and re-confirm the form
+          if (inputNode.status === "failed" && inputNode.outputData) {
+            await db
+              .update(nodeExecutions)
+              .set({ status: "in_progress", errorMessage: null, updatedAt: new Date() })
+              .where(eq(nodeExecutions.id, inputNode.id));
+          }
           set.status = 400;
           return { error: "请先确认输入转换节点" };
         }
+
+        // Ensure document status is in_progress (may have been marked failed by orphan detection)
+        const retryNow = new Date();
+        await db
+          .update(documents)
+          .set({ status: "in_progress", updatedAt: retryNow })
+          .where(eq(documents.id, params.documentId));
+
+        // Reset failed/blocked nodes to pending before firing pipeline,
+        // so the frontend poll sees correct transitional state (not stale "failed")
+        await db
+          .update(nodeExecutions)
+          .set({ status: "pending", errorMessage: null, updatedAt: retryNow })
+          .where(
+            and(
+              eq(nodeExecutions.documentId, params.documentId),
+              eq(nodeExecutions.isCurrent, true),
+              inArray(nodeExecutions.status, ["failed", "blocked"]),
+            ),
+          );
 
         // Fire-and-forget: run pipeline in background
         executeDocumentPipeline(params.documentId, user!.id).catch((err) => {

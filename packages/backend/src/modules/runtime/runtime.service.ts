@@ -1,8 +1,8 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
-import { and, asc, eq, gt, max, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, max, sql } from "drizzle-orm";
 import { db } from "../../db";
-import { documents, nodeExecutions, workflows } from "../../db/schema";
+import { backgroundTasks, documents, nodeExecutions, workflows } from "../../db/schema";
 import { createVersionSnapshot } from "../versions/versions.service";
 import { evaluateExecutionRule } from "./conditions.service";
 import type { DocumentRuntimeState, InputSource, InputTransformConfig, NodeExecution, WorkflowEdgeDef, WorkflowNodeDef, NodeConfig } from "@intelliflow/shared";
@@ -338,62 +338,150 @@ export async function advanceNode(
             continue;
           }
 
+          // Resolve outputId against the upstream node's declared outputs first.
+          // inputSources.outputId may be either the canonical `${nodeId}-field-...` /
+          // `${nodeId}-fileslot-...` form or a bare `segmentKey` (legacy seeds did this).
+          // Normalizing to the canonical id lets the regex dispatch below route both
+          // shapes to the same lookup path instead of falling back to the combined blob.
+          const sourceNodeDef = wfData?.nodes.find(
+            (n: WorkflowNodeDef) => n.id === src.sourceNodeId,
+          );
+          const inputTransformFields =
+            sourceNodeDef?.config.type === "input_transform"
+              ? (sourceNodeDef.config as InputTransformConfig).formFields
+              : undefined;
+          const matchedOutput = sourceNodeDef?.outputs.find(
+            (o) => o.id === src.outputId || o.segmentKey === src.outputId,
+          );
+          const resolvedOutputId = matchedOutput?.id ?? src.outputId;
+
           // Try field-level lookup: strip "{nodeId}-field-" prefix from outputId to get fields key
-          const fieldKeyMatch = src.outputId.match(/^.+-field-(.+)$/);
+          const fieldKeyMatch = resolvedOutputId.match(/^.+-field-(.+)$/);
           const fieldKey = fieldKeyMatch?.[1];
           const fields = upstreamOutput.fields as Record<string, string> | undefined;
+          const fieldsByKey = upstreamOutput.fieldsByKey as Record<string, string> | undefined;
 
-          // Text field — single source
-          if (fieldKey && fields?.[fieldKey]) {
-            sources[src.outputId] = { displayName: src.displayName, text: fields[fieldKey], sourceType: "text" };
-            continue;
-          }
-
-          // File field — detect via upstream node config + split per file
+          // Text field — single source (try fields by id first, then by machineKey)
           if (fieldKey) {
-            const sourceNodeDef = wfData!.nodes.find((n: WorkflowNodeDef) => n.id === src.sourceNodeId);
-            if (sourceNodeDef?.config.type === "input_transform") {
-              const formFields = (sourceNodeDef.config as InputTransformConfig).formFields;
-              const field = formFields.find((f) => f.id === fieldKey);
-              const fileSlots = upstreamOutput.fileSlots as Record<string, { text?: string; files?: Array<{ fileId: string; name: string }> }> | undefined;
-              const allFiles = upstreamOutput.files as Array<{ fileId: string; name: string; parsedText: string }> | undefined;
+            const matchedField = inputTransformFields?.find(
+              (field) => field.id === fieldKey || field.machineKey === fieldKey,
+            );
+            const fieldValue =
+              fields?.[fieldKey] ??
+              fieldsByKey?.[fieldKey] ??
+              (matchedField ? fields?.[matchedField.id] : undefined);
+            if (fieldValue) {
+              sources[src.outputId] = {
+                displayName: src.displayName,
+                text: fieldValue,
+                sourceType: "text",
+              };
+              continue;
+            }
 
-              if (field?.type === "file" && field.fileSlotId && fileSlots?.[field.fileSlotId]) {
-                const slot = fileSlots[field.fileSlotId];
-                const slotFiles = slot.files ?? [];
-
-                if (slotFiles.length > 1 && allFiles) {
-                  // Multi-file: split into per-file sources
-                  for (const sf of slotFiles) {
-                    const fileData = allFiles.find((f) => f.fileId === sf.fileId);
-                    const fileText = fileData?.parsedText ?? "";
-                    if (fileText) {
-                      sources[`${src.outputId}::file::${sf.fileId}`] = {
-                        displayName: sf.name,
-                        text: fileText,
-                        sourceType: "file",
-                        fileId: sf.fileId,
-                        fileName: sf.name,
-                      };
-                    }
-                  }
-                } else if (slot.text) {
-                  // Single file
-                  const singleFile = slotFiles[0];
-                  sources[src.outputId] = {
-                    displayName: src.displayName,
-                    text: slot.text,
-                    sourceType: "file",
-                    fileId: singleFile?.fileId,
-                    fileName: singleFile?.name,
-                  };
-                }
-                continue;
-              }
+            // Explicit input fields should stay empty instead of falling back to the
+            // aggregate output text, otherwise the UI renders fake tabs for empty items.
+            if (matchedField && matchedField.type !== "file") {
+              continue;
             }
           }
 
-          // Fallback to combined text
+          // FileSlot source — match {nodeId}-fileslot-{fileSlotId} pattern
+          const fileslotMatch = resolvedOutputId.match(/-fileslot-(.+)$/);
+          if (fileslotMatch) {
+            const fileSlotId = fileslotMatch[1];
+            const fileSlots = upstreamOutput.fileSlots as Record<string, { text?: string; files?: Array<{ fileId: string; name: string }> }> | undefined;
+            const allFiles = upstreamOutput.files as Array<{ fileId: string; name: string; parsedText: string }> | undefined;
+
+            if (fileSlots?.[fileSlotId]) {
+              const slot = fileSlots[fileSlotId];
+              const slotFiles = slot.files ?? [];
+
+              if (slotFiles.length > 1 && allFiles) {
+                for (const sf of slotFiles) {
+                  const fileData = allFiles.find((f) => f.fileId === sf.fileId);
+                  const fileText = fileData?.parsedText ?? "";
+                  if (fileText) {
+                    sources[`${src.outputId}::file::${sf.fileId}`] = {
+                      displayName: sf.name,
+                      text: fileText,
+                      sourceType: "file",
+                      fileId: sf.fileId,
+                      fileName: sf.name,
+                    };
+                  }
+                }
+              } else if (slot.text) {
+                const singleFile = slotFiles[0];
+                sources[src.outputId] = {
+                  displayName: singleFile?.name ?? src.displayName,
+                  text: slot.text,
+                  sourceType: "file",
+                  fileId: singleFile?.fileId,
+                  fileName: singleFile?.name,
+                };
+              }
+            }
+            const draftSlotFiles = (
+              upstreamOutput.files as
+                | Array<{ fileId: string; name: string; parsedText: string; slotId?: string }>
+                | undefined
+            )?.filter((file) => file.slotId === fileSlotId);
+            if (draftSlotFiles?.length) {
+              if (draftSlotFiles.length > 1) {
+                for (const file of draftSlotFiles) {
+                  if (file.parsedText) {
+                    sources[`${src.outputId}::file::${file.fileId}`] = {
+                      displayName: file.name,
+                      text: file.parsedText,
+                      sourceType: "file",
+                      fileId: file.fileId,
+                      fileName: file.name,
+                    };
+                  }
+                }
+              } else if (draftSlotFiles[0].parsedText) {
+                const singleFile = draftSlotFiles[0];
+                sources[src.outputId] = {
+                  displayName: singleFile.name ?? src.displayName,
+                  text: singleFile.parsedText,
+                  sourceType: "file",
+                  fileId: singleFile.fileId,
+                  fileName: singleFile.name,
+                };
+              }
+            }
+            // File slot outputs are explicit inputs as well. If the slot is empty,
+            // skip it instead of falling back to the merged `[f1] ...` text blob.
+            continue;
+          }
+
+          // File-upload combined output — split into individual file sources
+          if (resolvedOutputId.match(/-file-upload$/)) {
+            const hasExplicitFileSlots = inputTransformFields?.some(
+              (field) => field.type === "file" && field.fileSlotId,
+            );
+            if (hasExplicitFileSlots) {
+              continue;
+            }
+            const allFiles = upstreamOutput.files as Array<{ fileId: string; name: string; parsedText: string }> | undefined;
+            if (allFiles?.length) {
+              for (const file of allFiles) {
+                if (file.parsedText) {
+                  sources[`${src.outputId}::file::${file.fileId}`] = {
+                    displayName: file.name,
+                    text: file.parsedText,
+                    sourceType: "file",
+                    fileId: file.fileId,
+                    fileName: file.name,
+                  };
+                }
+              }
+            }
+            continue;
+          }
+
+          // Fallback to combined text (last resort for unknown output patterns)
           const fallback = (upstreamOutput.text as string) ?? (upstreamOutput.content as string) ?? "";
           if (fallback) sources[src.outputId] = { displayName: src.displayName, text: fallback };
         }
@@ -474,20 +562,6 @@ export async function advanceNode(
       })
       .where(eq(nodeExecutions.id, nextNode.id));
 
-    // Check if next node has autoAdvance and is a restore node
-    if (wfData) {
-      const nodeDef = wfData.nodes.find((n: WorkflowNodeDef) => n.id === nextNode.nodeId);
-      if (nodeDef?.config?.autoAdvance && nodeDef.type === "restore") {
-        // Auto-complete restore node
-        await db
-          .update(nodeExecutions)
-          .set({ status: "completed", completedAt: now, updatedAt: now })
-          .where(eq(nodeExecutions.id, nextNode.id));
-
-        // Recursively advance to find the real next node
-        return advanceNode(documentId, nextNode.id, userId, depth + 1);
-      }
-    }
   } else {
     // No next node — document completed
     await db
@@ -544,20 +618,28 @@ export async function rollbackToNode(
       .where(eq(nodeExecutions.id, id));
   }
 
-  // Create new execution rows with incremented round
-  // Preserve inputData so re-executed nodes still have their upstream input
-  const newValues = toRollback.map((row, index) => ({
-    documentId,
-    nodeId: row.nodeId,
-    nodeLabel: row.nodeLabel,
-    nodeType: row.nodeType,
-    status: index === 0 ? ("in_progress" as const) : ("pending" as const),
-    stepOrder: row.stepOrder,
-    executionRound: newRound,
-    isCurrent: true,
-    inputData: row.inputData,
-    startedAt: index === 0 ? now : null,
-  }));
+  // Create new execution rows with incremented round.
+  // Only the rollback target keeps its state:
+  // - input_transform keeps outputData so the form can be edited again
+  // - other target nodes keep inputData so they can be re-run from their upstream inputs
+  // All downstream nodes must be cleared, otherwise stale inputs from the previous round leak
+  // into the new execution round.
+  const newValues = toRollback.map((row, index) => {
+    const isTarget = index === 0;
+    return {
+      documentId,
+      nodeId: row.nodeId,
+      nodeLabel: row.nodeLabel,
+      nodeType: row.nodeType,
+      status: isTarget ? ("in_progress" as const) : ("pending" as const),
+      stepOrder: row.stepOrder,
+      executionRound: newRound,
+      isCurrent: true,
+      inputData: isTarget ? row.inputData : null,
+      outputData: isTarget && row.nodeType === "input_transform" ? row.outputData : null,
+      startedAt: isTarget ? now : null,
+    };
+  });
 
   await db.insert(nodeExecutions).values(newValues);
 
@@ -681,23 +763,37 @@ async function buildRuntimeState(
 ): Promise<DocumentRuntimeState> {
   // Get workflow name and nodes
   const docRows = await db
-    .select({ workflowName: workflows.name, nodes: workflows.nodes, projectId: documents.projectId })
+    .select({ documentTitle: documents.title, workflowName: workflows.name, nodes: workflows.nodes, projectId: documents.projectId })
     .from(documents)
     .innerJoin(workflows, eq(documents.workflowId, workflows.id))
     .where(eq(documents.id, documentId))
     .limit(1);
 
+  const documentTitle = docRows[0]?.documentTitle ?? "未命名文档";
   const workflowName = docRows[0]?.workflowName ?? "Unknown";
   const workflowNodes = (docRows[0]?.nodes as WorkflowNodeDef[]) ?? [];
   const projectId = docRows[0]?.projectId ?? null;
 
+  const activeBackgroundTasks = await db
+    .select({ id: backgroundTasks.id })
+    .from(backgroundTasks)
+    .where(
+      and(
+        eq(backgroundTasks.documentId, documentId),
+        inArray(backgroundTasks.status, ["queued", "running"]),
+      ),
+    )
+    .limit(1);
+  const backgroundTaskActive = activeBackgroundTasks.length > 0;
+
   // Filter to only current executions
   const currentExecutions = executions.filter((e) => e.isCurrent);
 
-  // Compute currentNodeIndex
+  // Compute currentNodeIndex: first node that still needs work
   let currentNodeIndex = currentExecutions.length - 1;
   for (let i = 0; i < currentExecutions.length; i++) {
-    if (currentExecutions[i].status === "in_progress") {
+    const status = currentExecutions[i].status;
+    if (status !== "completed" && status !== "skipped") {
       currentNodeIndex = i;
       break;
     }
@@ -706,8 +802,10 @@ async function buildRuntimeState(
   return {
     documentId,
     projectId,
+    documentTitle,
     workflowName,
     currentNodeIndex,
+    backgroundTaskActive,
     nodes: currentExecutions.map(toNodeExecution),
     workflowNodes,
   };

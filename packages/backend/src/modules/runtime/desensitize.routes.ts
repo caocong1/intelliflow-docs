@@ -107,6 +107,22 @@ async function getDesensitizeConfig(
   return nodeDef.config as DesensitizeConfig;
 }
 
+async function getNodeExecutionMeta(nodeExecutionId: string): Promise<{
+  executionRound: number;
+  nodeLabel: string;
+} | null> {
+  const [exec] = await db
+    .select({
+      executionRound: nodeExecutions.executionRound,
+      nodeLabel: nodeExecutions.nodeLabel,
+    })
+    .from(nodeExecutions)
+    .where(eq(nodeExecutions.id, nodeExecutionId))
+    .limit(1);
+
+  return exec ?? null;
+}
+
 export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
   .use(requireAuth)
 
@@ -122,6 +138,7 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
       }
 
       const config = await getDesensitizeConfig(params.nodeExecutionId);
+      const execMeta = await getNodeExecutionMeta(params.nodeExecutionId);
       if (!config) {
         set.status = 404;
         return { error: "未找到脱敏节点配置" };
@@ -135,8 +152,22 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
         .where(eq(nodeExecutions.id, params.nodeExecutionId));
 
       // Fire-and-forget: run detection in background to avoid gateway timeout
+      console.warn("[desensitize:detect] queued", {
+        documentId: params.documentId,
+        nodeExecutionId: params.nodeExecutionId,
+        executionRound: execMeta?.executionRound ?? null,
+        nodeLabel: execMeta?.nodeLabel ?? null,
+        textLength: body.text.length,
+      });
       detectSensitiveInfo(body.text, config.localModelId, config.categories)
         .then(async (items) => {
+          console.warn("[desensitize:detect] completed", {
+            documentId: params.documentId,
+            nodeExecutionId: params.nodeExecutionId,
+            executionRound: execMeta?.executionRound ?? null,
+            nodeLabel: execMeta?.nodeLabel ?? null,
+            itemCount: items.length,
+          });
           await db
             .update(nodeExecutions)
             .set({
@@ -147,6 +178,13 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
         })
         .catch(async (err: unknown) => {
           const message = err instanceof Error ? err.message : String(err);
+          console.error("[desensitize:detect] failed", {
+            documentId: params.documentId,
+            nodeExecutionId: params.nodeExecutionId,
+            executionRound: execMeta?.executionRound ?? null,
+            nodeLabel: execMeta?.nodeLabel ?? null,
+            error: message,
+          });
           await db
             .update(nodeExecutions)
             .set({
@@ -224,6 +262,15 @@ export const desensitizeRoutes = new Elysia({ prefix: "/runtime" })
 
       try {
         const sources = normalizeSourceConfirmBodies(body.sources);
+        console.warn("[desensitize:confirm] request", {
+          documentId: params.documentId,
+          nodeExecutionId: params.nodeExecutionId,
+          userId: user!.id,
+          itemCount: body.items.length,
+          reviewSummaryCount: body.reviewSummary?.length ?? 0,
+          sourceCount: sources ? Object.keys(sources).length : 0,
+          sourceKeys: sources ? Object.keys(sources) : [],
+        });
         const nodeExecution = await confirmDesensitization(
           params.documentId,
           params.nodeExecutionId,

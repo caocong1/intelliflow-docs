@@ -1,7 +1,7 @@
 import Elysia, { t } from "elysia";
 import { requireAuth } from "../auth/auth.guard";
 import { isDocumentProjectMember, canEditDocument } from "../versions/versions.service";
-import { executeRestore, updateRestoredText } from "./restore.service";
+import { executeRestore, confirmRestore, updateRestoreSource } from "./restore.service";
 import { db } from "../../db";
 import { nodeExecutions, workflows, documents } from "../../db/schema";
 import { eq } from "drizzle-orm";
@@ -79,25 +79,42 @@ export const restoreRoutes = new Elysia({ prefix: "/runtime" })
     },
   )
 
-  // ─── Update restored text (manual correction) ────────────────────────────
+  // ─── Confirm restore ─────────────────────────────────────────────────────
+
+  .post(
+    "/:documentId/restore/:nodeExecutionId/confirm",
+    async ({ params, user, set }) => {
+      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!canEdit) {
+        set.status = 403;
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
+      }
+      try {
+        return await confirmRestore(params.documentId, params.nodeExecutionId);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        set.status = 400;
+        return { error: message };
+      }
+    },
+    { params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }) },
+  )
+
+  // ─── Update restore source (per-source edit) ───────────────────────────
 
   .put(
-    "/:documentId/restore/:nodeExecutionId/text",
+    "/:documentId/restore/:nodeExecutionId/source",
     async ({ params, body, user, set }) => {
       const canEdit = await canEditDocument(params.documentId, user!.id);
       if (!canEdit) {
         set.status = 403;
         return { error: "仅文档创建者或项目负责人可执行此操作" };
       }
-
       try {
-        const result = await updateRestoredText(
-          params.documentId,
-          params.nodeExecutionId,
-          body.updatedText,
+        return await updateRestoreSource(
+          params.documentId, params.nodeExecutionId,
+          body.sourceId, body.restoredText,
         );
-
-        return result;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         set.status = 400;
@@ -106,6 +123,6 @@ export const restoreRoutes = new Elysia({ prefix: "/runtime" })
     },
     {
       params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
-      body: t.Object({ updatedText: t.String() }),
+      body: t.Object({ sourceId: t.String(), restoredText: t.String() }),
     },
   );

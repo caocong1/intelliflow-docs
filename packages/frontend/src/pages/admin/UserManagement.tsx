@@ -33,6 +33,9 @@ export default function UserManagement() {
     user: User;
     action: "toggle";
   } | null>(null);
+  const [resetPwUser, setResetPwUser] = createSignal<User | null>(null);
+  const [resetPwValue, setResetPwValue] = createSignal("");
+  const [resetPwError, setResetPwError] = createSignal("");
   const [submitting, setSubmitting] = createSignal(false);
 
   // Create form
@@ -170,6 +173,34 @@ export default function UserManagement() {
     }
   }
 
+  async function handleResetPassword() {
+    const user = resetPwUser();
+    if (!user) return;
+    if (resetPwValue().length < 6) {
+      setResetPwError("密码长度至少 6 个字符");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const { error } = await api.api.users({ id: user.id }).password.patch({
+        password: resetPwValue(),
+      });
+      if (error) {
+        const errData = error.value as { error?: string } | undefined;
+        showToast(errData?.error ?? "重置密码失败", "error");
+        return;
+      }
+      showToast("密码已重置", "success");
+      setResetPwUser(null);
+      setResetPwValue("");
+      setResetPwError("");
+    } catch {
+      showToast("网络错误，请稍后重试", "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("zh-CN", {
       year: "numeric",
@@ -225,6 +256,17 @@ export default function UserManagement() {
             class="text-sm text-indigo-600 hover:text-indigo-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1"
           >
             编辑
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setResetPwUser(u);
+              setResetPwValue("");
+              setResetPwError("");
+            }}
+            class="text-sm text-amber-600 hover:text-amber-800 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1"
+          >
+            重置密码
           </button>
           <button
             type="button"
@@ -421,6 +463,58 @@ export default function UserManagement() {
               class={primaryBtnClass}
             >
               {submitting() ? "保存中..." : "保存"}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Reset Password Modal */}
+      <Modal
+        isOpen={!!resetPwUser()}
+        onClose={() => setResetPwUser(null)}
+        title={`重置密码 — ${resetPwUser()?.displayName ?? ""}`}
+      >
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleResetPassword();
+          }}
+          class="space-y-4"
+        >
+          <div>
+            <label for="reset-password" class={labelClass}>
+              新密码
+            </label>
+            <input
+              id="reset-password"
+              type="password"
+              value={resetPwValue()}
+              onInput={(e) => {
+                setResetPwValue(e.currentTarget.value);
+                setResetPwError("");
+              }}
+              class={inputClass}
+              placeholder="至少 6 个字符"
+              required
+            />
+            {resetPwError() && (
+              <p class="mt-1 text-xs text-red-600">{resetPwError()}</p>
+            )}
+          </div>
+          <div class="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setResetPwUser(null)}
+              class={cancelBtnClass}
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={submitting()}
+              class={primaryBtnClass}
+            >
+              {submitting() ? "重置中..." : "确认重置"}
             </button>
           </div>
         </form>

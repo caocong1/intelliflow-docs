@@ -39,6 +39,8 @@ type DocumentItem = {
   progressStep?: number;
   totalSteps?: number;
   currentNodeLabel?: string;
+  hasFailedNode?: boolean;
+  isGenerating?: boolean;
 };
 
 type DocumentTypeItem = {
@@ -59,7 +61,8 @@ const statusMap: Record<
   { label: string; variant: "success" | "warning" | "error" | "info"; spinning?: boolean }
 > = {
   draft: { label: "草稿", variant: "info" },
-  in_progress: { label: "生成中", variant: "warning", spinning: true },
+  in_progress: { label: "进行中", variant: "info" },
+  generating: { label: "生成中", variant: "warning", spinning: true },
   completed: { label: "已完成", variant: "success" },
   failed: { label: "生成失败", variant: "error" },
 };
@@ -178,7 +181,7 @@ export default function ProjectHome() {
       setDocsTotal(result.total);
 
       // Check for active generations to control polling
-      const hasActive = result.data.some((d) => d.status === "in_progress");
+      const hasActive = result.data.some((d) => d.isGenerating && !d.hasFailedNode);
       setHasActiveGenerations(hasActive);
       if (hasActive) {
         setListCountdown(LIST_POLL_INTERVAL);
@@ -569,7 +572,7 @@ export default function ProjectHome() {
               >
                 <option value="">全部状态</option>
                 <option value="draft">草稿</option>
-                <option value="in_progress">生成中</option>
+                <option value="in_progress">进行中</option>
                 <option value="completed">已完成</option>
                 <option value="failed">生成失败</option>
               </select>
@@ -638,7 +641,7 @@ export default function ProjectHome() {
             </Show>
 
             <Show when={docs().length > 0}>
-              <div class="overflow-x-auto">
+              <div>
                 <table class="min-w-full divide-y divide-slate-200">
                   <thead class="bg-slate-50">
                     <tr>
@@ -653,7 +656,11 @@ export default function ProjectHome() {
                   <tbody class="bg-white divide-y divide-slate-100">
                     <For each={docs()}>
                       {(doc) => {
-                        const st = () => statusMap[doc.status] ?? statusMap.draft;
+                        const effectiveStatus = () =>
+                          doc.hasFailedNode ? "failed"
+                          : doc.isGenerating ? "generating"
+                          : doc.status;
+                        const st = () => statusMap[effectiveStatus()] ?? statusMap.draft;
                         const canEdit = () => doc.createdBy === auth.user()?.id;
                         const canDelete = () => doc.createdBy === auth.user()?.id || isOwner();
 
@@ -664,7 +671,7 @@ export default function ProjectHome() {
                           >
                             <td class="px-5 py-3 text-sm max-w-xs">
                               <div class="font-medium text-slate-900 truncate">{doc.title}</div>
-                              <Show when={doc.status === "in_progress" && doc.totalSteps && doc.totalSteps > 0}>
+                              <Show when={(effectiveStatus() === "generating" || effectiveStatus() === "in_progress") && doc.totalSteps && doc.totalSteps > 0}>
                                 <div class="mt-1.5 space-y-1">
                                   <div class="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
                                     <div
@@ -673,7 +680,7 @@ export default function ProjectHome() {
                                     />
                                   </div>
                                   <p class="text-xs text-slate-400">
-                                    进度: {doc.progressStep ?? 0}/{doc.totalSteps}
+                                    步骤: {(doc.progressStep ?? 0) + (doc.currentNodeLabel ? 1 : 0)}/{doc.totalSteps}
                                     <Show when={doc.currentNodeLabel}>
                                       {" "}&middot; {doc.currentNodeLabel}
                                     </Show>

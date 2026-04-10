@@ -16,6 +16,29 @@
 
 v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, project/document management, full document creation runtime. v1.1 adds operational features: background execution + notifications, statistics dashboard, global search/favorites, AI inline editing. v1.2 enhances node capabilities: output path grammar (segmentKey), file slots, structured output (JSON Schema + named artifacts), Word table rendering, system prompt separation, conditional execution (skip/block). v1.3 hardens the platform for production: creator-or-owner write authorization on all runtime routes, path traversal defense with sanitizeFilename/assertWithinRoot, XSS protection via DOMPurify sanitization on all innerHTML render paths. v1.4 closes TypeScript contract gaps (Eden Treaty typed wrappers, DocumentStatus "failed", outputId JSDoc) and adds automated tests for sanitize/sanitize-html/document-status. **v1.4.5 post-ship polish** (unplanned) iterates on runtime resilience and execution-time UX: desensitize node per-source multi-file redesign, resumable background model-call with live SSE streaming, model_call multi-select output + outputItems flattening with stable executor reconciliation (fixes click-swallowing during polling), per-source restore + configured input sources + retry flow, password management (change-password modal + admin reset), responsive workflow management for small screens, PRD review demo workflow with blocking export gate, and the unified vitest runner.
 
+## Current Milestone: v1.5 AI 自动生成流程
+
+**Goal:** 管理员通过向导填写业务意图 + 输入文件结构，后端固定的多阶段 AI 流水线（归一化 → 需求分析 → 蓝图 → 提示词细化 → 结构评审 → 蓝图修订 → 确定性编译 → 校验-修复闭环）自动生成合法、可编辑的 `draft` 工作流。
+
+**Target features:**
+- 管理端独立菜单 + 路由 `/admin/workflow-ai`（保留现有"新建流程"入口不变）
+- `workflow-generator` 后端模块（routes / service / orchestrator / compiler / validation-fix / prompts / types）
+- 新建 `workflow_generation_jobs` 表持久化请求 + 中间产物 + 结果
+- `modelCallLogs.callSource` 枚举扩展 `workflow_generation`
+- 8 阶段 AI 编排 pipeline（阶段 0 归一化 → 1 需求分析 → 2 蓝图 → 3 提示词细化 → 4 结构评审 → 5 蓝图修订 → 6 确定性编译 → 7 校验-修复 → 8 落库与摘要）
+- `WorkflowBlueprintDraft` 中间表示 + 确定性 `blueprint → workflow` 编译器（复用 demo workflow builder 思路）
+- 校验-修复闭环（复用现有 `validateWorkflow`，3 轮自修上限）
+- 前端向导页（三段：创建向导 / 任务状态轮询 / 结果预览）
+- 任务完成后跳转 `/admin/workflows/:id/edit` 继续微调
+- 失败处理 + 错误摘要报告 + 重新生成入口
+- 5 角色模型绑定（analysis/blueprint/prompt/review/repair），默认统一模型
+
+**Scope decisions:** 仅生成结构（不绑定模板文件）；v1.5 只接受自然语言输入（不引用已有流程）；job 全部保留不自动清理；复用 modelCallLogs 记基础日志；3 轮自修上限；完整向导表单（6 必填 + 8 可选）。
+
+**Non-goals:** 用户自定义 AI 编排逻辑；任意 DAG / 分支图生成；直接生成 active 工作流；多独立导出文件打包；无人工确认一键上线。
+
+**Source design doc:** `docs/design/ai-workflow-generation-plan.md` (2026-04-10)
+
 ## Requirements
 
 ### Validated
@@ -64,7 +87,7 @@ v1.0 delivers the complete MVP: auth, admin config, visual workflow editor, proj
 
 ### Active
 
-v1.4 milestone complete. v1.5 preparation in `.planning/MILESTONE-CONTEXT.md` (AI 自动生成流程). Run `/gsd:new-milestone` to kick off.
+v1.5 AI 自动生成流程 — building the admin-facing workflow generator (wizard + multi-stage AI pipeline + `workflow_generation_jobs` table + deterministic blueprint→workflow compiler + validate-fix loop). Phase numbering continues from Phase 32.
 
 ### Future
 
@@ -148,8 +171,8 @@ v1.4 milestone complete. v1.5 preparation in `.planning/MILESTONE-CONTEXT.md` (A
 | v1.3 安全与契约修复（部分） | 权限收紧（已完成）、XSS 防护（已完成）、文件安全+TSQL+契约+测试（待 v1.4） | Shipped 2026-04-03 |
 | v1.4 质量与测试 | TypeScript 收口+契约修复+测试覆盖 | Shipped 2026-04-04 |
 | v1.4.5 post-ship polish（非计划） | 脱敏多源重构 + Runtime 可续跑/live SSE + model-call 多选输出 + 工作区 refactor + 密码管理 + PRD 评审 demo + 响应式流程管理 + 测试 runner 统一 | Shipped 2026-04-10 |
-| v1.5 AI 自动生成流程 | 管理端向导 + 多阶段 AI 流水线（归一化 → 需求分析 → 蓝图 → 提示词细化 → 评审 → 修订 → 编译 → 校验-修复）+ `workflow_generation_jobs` 表 + 确定性 blueprint→workflow 编译器 | Preparing (see MILESTONE-CONTEXT.md) |
+| v1.5 AI 自动生成流程 | 管理端向导 + 多阶段 AI 流水线（归一化 → 需求分析 → 蓝图 → 提示词细化 → 评审 → 修订 → 编译 → 校验-修复）+ `workflow_generation_jobs` 表 + 确定性 blueprint→workflow 编译器 | Active (Phase 32+) |
 | v2.0 | 批注、文档导入/复制、配额管理、条件路由、人工审核节点等 | Future |
 
 ---
-*Last updated: 2026-04-10 after v1.4.5 post-ship polish alignment (pre-v1.5)*
+*Last updated: 2026-04-10 after starting milestone v1.5 AI 自动生成流程*

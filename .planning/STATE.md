@@ -1,14 +1,14 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4.5
-milestone_name: post-ship polish (unplanned)
-status: shipped; preparing v1.5 via MILESTONE-CONTEXT.md
-last_updated: "2026-04-10T16:40:00.000Z"
+milestone: v1.5
+milestone_name: AI 自动生成流程
+status: defining requirements
+last_updated: "2026-04-10T17:00:00.000Z"
 progress:
-  total_phases: 31
-  completed_phases: 31
-  total_plans: 91
-  completed_plans: 91
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
@@ -18,26 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-10)
 
 **Core value:** 用户能跑通完整流程生成高质量文档 — 一站式多模型并行生成、对比、迭代，替代逐个 AI 平台粘贴对比的低效方式
-**Current focus:** v1.4.5 post-ship polish shipped (2026-04-10); v1.5 AI 自动生成流程 preparation in `.planning/MILESTONE-CONTEXT.md`
+**Current focus:** v1.5 AI 自动生成流程 — 管理端向导 + 多阶段 AI 流水线自动生成 draft 工作流
 
 ## Current Position
 
-v1.4.5 post-ship polish shipped 2026-04-10 (29 commits, +19,582 / -3,512 across 105 files):
-  - Desensitize 多源重构 (per-source data model, vertical layout)
-  - Runtime 可续跑 + live SSE (ModelCallLiveEvent, resumable background model-call, per-source restore + retry)
-  - Frontend workspace refactor (ModelCallExecutor snapshot replay, per-source executors, manual confirm hook, sidebar collapse)
-  - Model-call 多选输出 + outputItems 扁平化 (cross-stack cohesive refactor across backend/runtime/editor)
-  - Password management (change-password modal, admin reset)
-  - PRD review demo workflow with blocking export gate + 4-way compare
-  - Responsive workflow management card list
-  - Test runner unification (vitest)
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-10 — Milestone v1.5 AI 自动生成流程 started (continues from Phase 32)
 
-v1.4 shipped 2026-04-04: Phases 30-31 (TypeScript Quality + Contract Fixes, Test Coverage)
-v1.3 shipped 2026-04-03: Phases 27-29 (Permission Security, File Security, XSS Defense)
-
-Last activity: 2026-04-10 — v1.4.5 polish committed and aligned; v1.5 milestone context captured in `.planning/MILESTONE-CONTEXT.md` awaiting `/gsd:new-milestone` rerun
-
-Progress: [██████████] 100% (v1.4 milestone complete + v1.4.5 polish shipped)
+Progress: [░░░░░░░░░░] 0% (v1.5 just started)
 
 ## Accumulated Context
 
@@ -61,6 +51,9 @@ v1.0: 5 core phases grew to 16 with gap-closure phases. 50 plans, 82 requirement
 v1.1: 6 phases (17-22), 25 requirements.
 v1.2: 4 phases (23-26), 14 plans.
 v1.3: 5 phases (27-31), 28 requirements. Phase 27-29 shipped 2026-04-03; Phase 30-31 deferred to v1.4.
+v1.4: 2 phases (30-31), 5 plans (shipped 2026-04-04).
+v1.4.5 post-ship polish (unplanned, shipped 2026-04-10): no formal phases, 29 commits retroactively captured as DESENS-MS / RTRES / RTFLOW / MSEL / FEWS / PWD / DOCLST / ADMUX / ADMRSP / WFEDIT / DEMO / TEST45 requirements.
+v1.5: Starting Phase 32+. Source design doc `docs/design/ai-workflow-generation-plan.md`.
 
 ### Pending Todos
 
@@ -72,6 +65,6 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-04
-Stopped at: Phase 31-02 plan completed (sanitizeHtml.test.ts — 15 tests, all passing)
+Last session: 2026-04-10
+Stopped at: v1.5 milestone started — defining requirements
 Resume file: None

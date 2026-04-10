@@ -5,6 +5,7 @@ import type {
   WorkflowBlueprint,
 } from "./builders";
 import {
+  buildBlockingExportGateRule,
   buildExportGateRule,
   buildQaArtifacts,
   buildRolePrompt,
@@ -23,6 +24,7 @@ import {
   multiselectField,
   numberField,
   promptSection,
+  restoreContentRef,
   restoreVar,
   selectField,
   skipWhenAll,
@@ -83,6 +85,85 @@ function buildWorkflowDefinition(params: {
     nodes,
     edges,
   };
+}
+
+const PRD_SCOPE_MODULES = [
+  "门户",
+  "移动端",
+  "管理后台",
+  "数据中台",
+  "接口平台",
+  "设备接入",
+  "智能分析",
+  "开放生态",
+];
+
+function buildPrdProgressGateArtifact(id: string, name: string) {
+  return jsonArtifact(
+    id,
+    name,
+    "输出 JSON 对象，字段固定为 can_progress(boolean), blocking_count(number), reason(string)。若存在阻断级问题，can_progress=false。",
+    [
+      {
+        name: "can_progress",
+        type: "boolean",
+        required: true,
+        description: "是否允许进入下一轮改写",
+      },
+      {
+        name: "blocking_count",
+        type: "number",
+        required: true,
+        description: "阻断问题数量",
+      },
+      {
+        name: "reason",
+        type: "string",
+        required: true,
+        description: "门控说明",
+      },
+    ],
+  );
+}
+
+function buildPrdFinalQaArtifacts() {
+  return [
+    markdownArtifact(
+      "qa_report",
+      "最终治理报告",
+      "输出 Markdown，包含：PASS/WARNING/FAIL 结论、通过项、阻断项、回退建议。请面向正式发版前的产品文档治理。",
+    ),
+    jsonArtifact(
+      "issue_list_final",
+      "最终问题清单",
+      "输出 JSON 数组，每项包含 issue_id, severity, category, description, suggestion, owner_hint。",
+    ),
+    jsonArtifact(
+      "qa_gate",
+      "最终导出门",
+      "输出 JSON 对象，字段固定为 can_export(boolean), blocking_count(number), reason(string)。存在阻断项时 can_export=false。",
+      [
+        {
+          name: "can_export",
+          type: "boolean",
+          required: true,
+          description: "是否允许导出",
+        },
+        {
+          name: "blocking_count",
+          type: "number",
+          required: true,
+          description: "阻断问题数量",
+        },
+        {
+          name: "reason",
+          type: "string",
+          required: true,
+          description: "导出门控结论",
+        },
+      ],
+    ),
+  ];
 }
 
 function buildSolutionFlagship(models: DemoModelSelection): DemoWorkflowDefinition {
@@ -824,6 +905,605 @@ function buildRequirementFlagship(models: DemoModelSelection): DemoWorkflowDefin
     name: "需求规格与概要设计 Agent 流程",
     description: "10 节点旗舰流程，展示需求分析、领域设计、接口数据设计、测试策略和评审门控。",
     isDefault: true,
+    category: "flagship",
+    blueprint,
+    models,
+  });
+}
+
+function buildPrdReviewFlagship(models: DemoModelSelection): DemoWorkflowDefinition {
+  const blueprint: WorkflowBlueprint = {
+    inputFields: [
+      textField("document_title", "文档标题", true),
+      textField("product_name", "产品/项目名称", true),
+      textField("target_release", "目标版本", true),
+      textareaField("target_users", "目标用户", true),
+      textareaField("problem_statement", "问题定义", true),
+      textareaField("business_goals", "业务目标", true),
+      textareaField("core_scenarios", "核心场景", true),
+      textareaField("success_metrics", "成功指标"),
+      multiselectField("scope_modules", "范围模块", PRD_SCOPE_MODULES),
+      textareaField("non_functional_requirements", "非功能要求"),
+      textareaField("compliance_constraints", "合规约束"),
+      textareaField("technical_constraints", "技术约束"),
+      fileField("user_research_material", "用户研究材料", false, "unlimited"),
+      fileField("competitor_material", "竞品材料", false, "unlimited"),
+      fileField("prototype_material", "原型材料", false, "unlimited"),
+      fileField("data_metric_material", "数据指标材料", false, "unlimited"),
+      fileField("historical_prd", "已有 PRD/历史版本", false, "unlimited"),
+    ],
+    preRestoreStages: [
+      {
+        id: "node_facts",
+        label: "事实基线官",
+        displayName: "事实基线官",
+        systemPromptTemplate: buildSystemPrompt("事实基线官"),
+        stepDescription: "抽取事实基线、术语和边界约束",
+        promptTemplate: buildRolePrompt({
+          role: "事实基线官",
+          mission: "请把输入材料整理成 PRD 起草可直接引用的事实基线、待确认问题和边界约束。",
+          sections: [
+            promptSection(
+              "基础信息",
+              lines(
+                `- 文档标题：${inputVar("document_title")}`,
+                `- 产品/项目名称：${inputVar("product_name")}`,
+                `- 目标版本：${inputVar("target_release")}`,
+                `- 目标用户：${inputVar("target_users")}`,
+                `- 范围模块：${inputVar("scope_modules")}`,
+              ),
+            ),
+            promptSection(
+              "业务输入",
+              lines(
+                `### 问题定义\n${inputVar("problem_statement")}`,
+                `### 业务目标\n${inputVar("business_goals")}`,
+                `### 核心场景\n${inputVar("core_scenarios")}`,
+                `### 成功指标\n${inputVar("success_metrics")}`,
+                `### 非功能要求\n${inputVar("non_functional_requirements")}`,
+                `### 合规约束\n${inputVar("compliance_constraints")}`,
+                `### 技术约束\n${inputVar("technical_constraints")}`,
+                `### 已有 PRD/历史版本\n${inputVar("historical_prd")}`,
+              ),
+            ),
+          ],
+          extraRules: ["所有缺失事实必须标为“待确认”，不得补造。"],
+        }),
+        namedOutputs: [
+          jsonArtifact(
+            "baseline_facts",
+            "事实基线",
+            "输出 JSON 对象，字段包含 problem, goals, users, scenarios, metrics, dependencies, unresolved_assumptions。",
+          ),
+          markdownArtifact(
+            "missing_questions",
+            "待确认问题",
+            "输出 Markdown，按 P0/P1/P2 分组列出需要业务方补充确认的问题。",
+          ),
+          markdownArtifact("glossary", "术语表", "输出 Markdown，沉淀关键术语、定义和统一口径。"),
+          markdownArtifact(
+            "boundary_constraints",
+            "边界约束",
+            "输出 Markdown，列出合规、技术、资源、时间边界和不可突破条件。",
+          ),
+        ],
+      },
+      {
+        id: "node_insight",
+        label: "用户洞察官",
+        displayName: "用户洞察官",
+        systemPromptTemplate: buildSystemPrompt("用户洞察官"),
+        stepDescription: "构建人群画像、场景和痛点证据",
+        promptTemplate: buildRolePrompt({
+          role: "用户洞察官",
+          mission: "请基于研究材料、原型和业务目标，输出产品决策可用的用户洞察。",
+          sections: [
+            promptSection(
+              "上游基线",
+              lines(
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 待确认问题\n{{node_facts.missing_questions}}",
+                "### 边界约束\n{{node_facts.boundary_constraints}}",
+              ),
+            ),
+            promptSection(
+              "用户证据",
+              lines(
+                `### 目标用户\n${inputVar("target_users")}`,
+                `### 核心场景\n${inputVar("core_scenarios")}`,
+                `### 用户研究材料\n${inputVar("user_research_material")}`,
+                `### 原型材料\n${inputVar("prototype_material")}`,
+                `### 数据指标材料\n${inputVar("data_metric_material")}`,
+              ),
+            ),
+          ],
+        }),
+        namedOutputs: [
+          markdownArtifact(
+            "persona_pack",
+            "用户画像包",
+            "输出 Markdown，覆盖核心角色、目标、动机、阻碍、使用频率和成功标准。",
+          ),
+          jsonArtifact(
+            "scenario_map",
+            "场景地图",
+            "输出 JSON 数组，每项包含 persona, scenario, trigger, current_flow, expected_flow, success_signal。",
+          ),
+          markdownArtifact(
+            "painpoint_evidence",
+            "痛点证据",
+            "输出 Markdown，逐条列出痛点、证据、影响范围、优先级判断。",
+          ),
+        ],
+      },
+      {
+        id: "node_competitor",
+        label: "竞品策略官",
+        displayName: "竞品策略官",
+        systemPromptTemplate: buildSystemPrompt("竞品策略官"),
+        stepDescription: "沉淀竞品对照与差异化策略",
+        executionRule: skipWhenNoInput("node_input", "competitor_material"),
+        promptTemplate: buildRolePrompt({
+          role: "竞品策略官",
+          mission: "请将竞品材料转成 PRD 可直接使用的对照矩阵、差异化方向和可借鉴模式。",
+          sections: [
+            promptSection(
+              "业务与用户上下文",
+              lines(
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 用户画像包\n{{node_insight.persona_pack}}",
+                "### 痛点证据\n{{node_insight.painpoint_evidence}}",
+              ),
+            ),
+            promptSection(
+              "竞品输入",
+              lines(
+                `### 竞品材料\n${inputVar("competitor_material")}`,
+                `### 原型材料\n${inputVar("prototype_material")}`,
+                `### 已有 PRD/历史版本\n${inputVar("historical_prd")}`,
+              ),
+            ),
+          ],
+          extraRules: ["如竞品材料缺失或质量过低，请明确写“竞品证据不足”，不要假设市场事实。"],
+        }),
+        namedOutputs: [
+          markdownArtifact(
+            "competitor_matrix",
+            "竞品对照矩阵",
+            "输出 Markdown 表格，对比目标用户、核心能力、体验差异、弱项和空白位。",
+          ),
+          markdownArtifact(
+            "differentiation_axes",
+            "差异化方向",
+            "输出 Markdown，说明应该强化、规避和不跟进的方向。",
+          ),
+          markdownArtifact(
+            "pattern_notes",
+            "模式借鉴",
+            "输出 Markdown，列出可借鉴的交互/流程模式及适用前提。",
+          ),
+        ],
+      },
+      {
+        id: "node_scope",
+        label: "范围规划官",
+        displayName: "范围规划官",
+        systemPromptTemplate: buildSystemPrompt("范围规划官"),
+        stepDescription: "形成范围矩阵、特性清单和版本切分",
+        promptTemplate: buildRolePrompt({
+          role: "范围规划官",
+          mission: "请基于事实、洞察与竞品结论，形成可执行的版本范围与优先级切分。",
+          sections: [
+            promptSection(
+              "输入结论",
+              lines(
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 待确认问题\n{{node_facts.missing_questions}}",
+                "### 用户画像包\n{{node_insight.persona_pack}}",
+                "### 场景地图\n{{node_insight.scenario_map}}",
+                "### 痛点证据\n{{node_insight.painpoint_evidence}}",
+                "### 竞品对照矩阵\n{{node_competitor.competitor_matrix}}",
+                "### 差异化方向\n{{node_competitor.differentiation_axes}}",
+              ),
+            ),
+            promptSection(
+              "范围约束",
+              lines(
+                `### 成功指标\n${inputVar("success_metrics")}`,
+                `### 范围模块\n${inputVar("scope_modules")}`,
+                `### 合规约束\n${inputVar("compliance_constraints")}`,
+                `### 技术约束\n${inputVar("technical_constraints")}`,
+              ),
+            ),
+          ],
+        }),
+        namedOutputs: [
+          jsonArtifact(
+            "scope_matrix",
+            "范围矩阵",
+            "输出 JSON 数组，每项包含 module, goal, in_scope, out_of_scope, rationale, risk。",
+          ),
+          jsonArtifact(
+            "feature_backlog",
+            "特性清单",
+            "输出 JSON 数组，每项包含 feature, user_value, priority, release_bucket, dependency, acceptance_note。",
+          ),
+          markdownArtifact(
+            "release_cut",
+            "版本切分",
+            "输出 Markdown，说明本期必须做、可延后、明确不做的版本切分方案。",
+          ),
+          markdownArtifact(
+            "non_goals",
+            "非目标",
+            "输出 Markdown，明确本版本不承诺、不解决、不展开的事项。",
+          ),
+        ],
+      },
+      {
+        id: "node_prd_v1",
+        label: "PRD V1 起草委员会",
+        displayName: "PRD V1 起草委员会",
+        systemPromptTemplate: buildSystemPrompt("PRD V1 起草委员会"),
+        stepDescription: "多模型并行起草 PRD V1",
+        modelMode: "compare",
+        compareModelCount: 4,
+        promptTemplate: buildRolePrompt({
+          role: "PRD V1 起草委员会",
+          mission: "请将已有分析结论装配为一版完整、可评审的 PRD V1。",
+          sections: [
+            promptSection(
+              "基础信息",
+              lines(
+                `- 文档标题：${inputVar("document_title")}`,
+                `- 产品/项目名称：${inputVar("product_name")}`,
+                `- 目标版本：${inputVar("target_release")}`,
+              ),
+            ),
+            promptSection(
+              "上游结论",
+              lines(
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 待确认问题\n{{node_facts.missing_questions}}",
+                "### 用户画像包\n{{node_insight.persona_pack}}",
+                "### 场景地图\n{{node_insight.scenario_map}}",
+                "### 痛点证据\n{{node_insight.painpoint_evidence}}",
+                "### 竞品对照矩阵\n{{node_competitor.competitor_matrix}}",
+                "### 差异化方向\n{{node_competitor.differentiation_axes}}",
+                "### 范围矩阵\n{{node_scope.scope_matrix}}",
+                "### 特性清单\n{{node_scope.feature_backlog}}",
+                "### 版本切分\n{{node_scope.release_cut}}",
+                "### 非目标\n{{node_scope.non_goals}}",
+              ),
+            ),
+            promptSection(
+              "原始材料",
+              lines(
+                `### 原型材料\n${inputVar("prototype_material")}`,
+                `### 数据指标材料\n${inputVar("data_metric_material")}`,
+                `### 已有 PRD/历史版本\n${inputVar("historical_prd")}`,
+              ),
+            ),
+          ],
+          extraRules: [
+            "PRD 正文缺失处必须写“待确认”。",
+            "decision_log_v1 必须包含“新增决定 / 保留争议 / 删除内容”三个小节。",
+          ],
+        }),
+        namedOutputs: [
+          markdownArtifact(
+            "prd_v1",
+            "PRD V1",
+            "输出 Markdown 完整 PRD，至少包含背景、目标、用户、场景、需求范围、非功能要求、验收要点、风险与依赖。",
+          ),
+          markdownArtifact(
+            "open_items_v1",
+            "V1 未决事项",
+            "输出 Markdown，列出待确认事项、决策风险、需要额外材料补齐的点。",
+          ),
+          markdownArtifact(
+            "decision_log_v1",
+            "V1 决策日志",
+            "输出 Markdown，严格包含“新增决定 / 保留争议 / 删除内容”三个小节。",
+          ),
+        ],
+      },
+      {
+        id: "node_review_v1",
+        label: "V1 审稿委员会",
+        displayName: "V1 审稿委员会",
+        systemPromptTemplate: buildSystemPrompt("V1 审稿委员会"),
+        stepDescription: "多模型并行审稿，产出第一轮修改简报",
+        modelMode: "compare",
+        compareModelCount: 4,
+        promptTemplate: buildRolePrompt({
+          role: "V1 审稿委员会",
+          mission:
+            "请站在资深产品评审视角，指出 PRD V1 的事实缺口、逻辑断裂、边界问题和可执行性风险。",
+          sections: [
+            promptSection(
+              "评审对象",
+              lines(
+                "### PRD V1\n{{node_prd_v1.prd_v1}}",
+                "### V1 未决事项\n{{node_prd_v1.open_items_v1}}",
+                "### V1 决策日志\n{{node_prd_v1.decision_log_v1}}",
+              ),
+            ),
+            promptSection(
+              "对照基线",
+              lines(
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 边界约束\n{{node_facts.boundary_constraints}}",
+                "### 范围矩阵\n{{node_scope.scope_matrix}}",
+                "### 版本切分\n{{node_scope.release_cut}}",
+                `### 合规约束\n${inputVar("compliance_constraints")}`,
+                `### 技术约束\n${inputVar("technical_constraints")}`,
+              ),
+            ),
+          ],
+          extraRules: [
+            "issue_list_v1 只记录可执行问题，不写空泛意见。",
+            "rewrite_brief_v1 必须按阻断项优先级组织，禁止遗漏已发现问题。",
+          ],
+        }),
+        namedOutputs: [
+          markdownArtifact(
+            "review_v1",
+            "V1 评审结论",
+            "输出 Markdown，包含整体评价、亮点、主要缺口、是否建议进入改写。",
+          ),
+          jsonArtifact(
+            "issue_list_v1",
+            "V1 问题清单",
+            "输出 JSON 数组，每项包含 issue_id, severity, category, description, suggestion, affected_section。",
+          ),
+          markdownArtifact(
+            "rewrite_brief_v1",
+            "V1 改写简报",
+            "输出 Markdown，面向下一轮重写，给出逐项改写要求和取舍原则。",
+          ),
+          buildPrdProgressGateArtifact("quality_gate_v1", "V1 质量门"),
+        ],
+      },
+      {
+        id: "node_prd_v2",
+        label: "PRD V2 重写委员会",
+        displayName: "PRD V2 重写委员会",
+        systemPromptTemplate: buildSystemPrompt("PRD V2 重写委员会"),
+        stepDescription: "根据 V1 问题清单重写 PRD V2",
+        modelMode: "compare",
+        compareModelCount: 4,
+        promptTemplate: buildRolePrompt({
+          role: "PRD V2 重写委员会",
+          mission: "请严格根据上一轮问题清单与改写简报重写 PRD，生成更稳定的 V2 版本。",
+          sections: [
+            promptSection(
+              "重写输入",
+              lines(
+                "### PRD V1\n{{node_prd_v1.prd_v1}}",
+                "### V1 未决事项\n{{node_prd_v1.open_items_v1}}",
+                "### V1 决策日志\n{{node_prd_v1.decision_log_v1}}",
+                "### V1 问题清单\n{{node_review_v1.issue_list_v1}}",
+                "### V1 改写简报\n{{node_review_v1.rewrite_brief_v1}}",
+                "### V1 质量门\n{{node_review_v1.quality_gate_v1}}",
+              ),
+            ),
+            promptSection(
+              "硬约束",
+              lines(
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 边界约束\n{{node_facts.boundary_constraints}}",
+                "### 非目标\n{{node_scope.non_goals}}",
+              ),
+            ),
+          ],
+          extraRules: [
+            "上一轮 issue_list 是硬约束，必须逐项处理，不允许回归已解决问题。",
+            "change_log_v2 必须包含“新增决定 / 保留争议 / 删除内容”三个小节。",
+          ],
+        }),
+        namedOutputs: [
+          markdownArtifact(
+            "prd_v2",
+            "PRD V2",
+            "输出 Markdown 完整 PRD V2，修复已知问题并保留必要的待确认项。",
+          ),
+          markdownArtifact(
+            "change_log_v2",
+            "V2 变更日志",
+            "输出 Markdown，严格包含“新增决定 / 保留争议 / 删除内容”三个小节，并说明对应修复点。",
+          ),
+          markdownArtifact(
+            "open_items_v2",
+            "V2 未决事项",
+            "输出 Markdown，列出仍无法落定的事项及其影响。",
+          ),
+        ],
+      },
+      {
+        id: "node_review_v2",
+        label: "V2 审稿委员会",
+        displayName: "V2 审稿委员会",
+        systemPromptTemplate: buildSystemPrompt("V2 审稿委员会"),
+        stepDescription: "多模型并行审稿，收敛到最终定稿简报",
+        modelMode: "compare",
+        compareModelCount: 4,
+        promptTemplate: buildRolePrompt({
+          role: "V2 审稿委员会",
+          mission: "请评估 PRD V2 是否已具备定稿条件，并输出最终定稿的修改要求。",
+          sections: [
+            promptSection(
+              "评审对象",
+              lines(
+                "### PRD V2\n{{node_prd_v2.prd_v2}}",
+                "### V2 变更日志\n{{node_prd_v2.change_log_v2}}",
+                "### V2 未决事项\n{{node_prd_v2.open_items_v2}}",
+              ),
+            ),
+            promptSection(
+              "历史约束",
+              lines(
+                "### V1 问题清单\n{{node_review_v1.issue_list_v1}}",
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 范围矩阵\n{{node_scope.scope_matrix}}",
+                "### 版本切分\n{{node_scope.release_cut}}",
+              ),
+            ),
+          ],
+          extraRules: [
+            "issue_list_v2 只保留仍未解决或新暴露的问题，不得把已关闭问题重新打开，除非明确说明回归原因。",
+            "rewrite_brief_v2 必须可直接驱动最终定稿。",
+          ],
+        }),
+        namedOutputs: [
+          markdownArtifact(
+            "review_v2",
+            "V2 评审结论",
+            "输出 Markdown，说明是否建议进入最终定稿，以及仍需修正的重点。",
+          ),
+          jsonArtifact(
+            "issue_list_v2",
+            "V2 问题清单",
+            "输出 JSON 数组，每项包含 issue_id, severity, category, description, suggestion, regression(boolean)。",
+          ),
+          markdownArtifact(
+            "rewrite_brief_v2",
+            "V2 改写简报",
+            "输出 Markdown，给出最终定稿应完成的修改动作、删改边界和保留项。",
+          ),
+          buildPrdProgressGateArtifact("quality_gate_v2", "V2 质量门"),
+        ],
+      },
+      {
+        id: "node_final_prd",
+        label: "Final PRD 合成委员会",
+        displayName: "Final PRD 合成委员会",
+        systemPromptTemplate: buildSystemPrompt("Final PRD 合成委员会"),
+        stepDescription: "吸收两轮评审后生成最终 PRD 包",
+        modelMode: "compare",
+        compareModelCount: 4,
+        promptTemplate: buildRolePrompt({
+          role: "Final PRD 合成委员会",
+          mission: "请结合两轮评审结果生成最终可交付的 PRD，并补齐交接材料。",
+          sections: [
+            promptSection(
+              "定稿输入",
+              lines(
+                "### PRD V2\n{{node_prd_v2.prd_v2}}",
+                "### V2 变更日志\n{{node_prd_v2.change_log_v2}}",
+                "### V2 未决事项\n{{node_prd_v2.open_items_v2}}",
+                "### V2 问题清单\n{{node_review_v2.issue_list_v2}}",
+                "### V2 改写简报\n{{node_review_v2.rewrite_brief_v2}}",
+                "### V2 质量门\n{{node_review_v2.quality_gate_v2}}",
+              ),
+            ),
+            promptSection(
+              "基线回看",
+              lines(
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 术语表\n{{node_facts.glossary}}",
+                "### 边界约束\n{{node_facts.boundary_constraints}}",
+              ),
+            ),
+          ],
+          extraRules: [
+            "必须落实上一轮 issue_list 与 rewrite_brief，不允许遗漏。",
+            "final_change_log 必须包含“新增决定 / 保留争议 / 删除内容”三个小节。",
+          ],
+        }),
+        namedOutputs: [
+          markdownArtifact(
+            "prd_final",
+            "最终 PRD",
+            "输出 Markdown 完整最终 PRD，章节完整、口径统一、缺失事实明确标注待确认。",
+          ),
+          markdownArtifact(
+            "final_change_log",
+            "最终变更日志",
+            "输出 Markdown，严格包含“新增决定 / 保留争议 / 删除内容”三个小节，并给出对应影响。",
+          ),
+          markdownArtifact(
+            "handoff_notes",
+            "交接说明",
+            "输出 Markdown，说明研发交接要点、依赖清单、风险、未决项与后续建议。",
+          ),
+        ],
+      },
+      {
+        id: "node_governance",
+        label: "最终治理门",
+        displayName: "最终治理门",
+        systemPromptTemplate: buildSystemPrompt("最终治理门"),
+        stepDescription: "给最终 PRD 做导出前门控",
+        modelMode: "compare",
+        compareModelCount: 4,
+        promptTemplate: buildRolePrompt({
+          role: "最终治理门",
+          mission:
+            "请作为发版前治理评审，对最终 PRD 包做最后一次完整检查并给出是否允许导出的结论。",
+          sections: [
+            promptSection(
+              "治理对象",
+              lines(
+                "### 最终 PRD\n{{node_final_prd.prd_final}}",
+                "### 最终变更日志\n{{node_final_prd.final_change_log}}",
+                "### 交接说明\n{{node_final_prd.handoff_notes}}",
+              ),
+            ),
+            promptSection(
+              "门控依据",
+              lines(
+                "### 事实基线\n{{node_facts.baseline_facts}}",
+                "### 待确认问题\n{{node_facts.missing_questions}}",
+                "### 范围矩阵\n{{node_scope.scope_matrix}}",
+                "### 非目标\n{{node_scope.non_goals}}",
+                `### 合规约束\n${inputVar("compliance_constraints")}`,
+                `### 技术约束\n${inputVar("technical_constraints")}`,
+              ),
+            ),
+          ],
+          extraRules: ["只要存在会影响导出的重大缺口，qa_gate.can_export 必须为 false。"],
+        }),
+        namedOutputs: buildPrdFinalQaArtifacts(),
+      },
+    ],
+    restoreSources: [
+      {
+        sourceNodeId: "node_final_prd",
+        outputId: "prd_final",
+        displayName: "Final PRD 合成委员会 · 最终 PRD",
+      },
+      {
+        sourceNodeId: "node_final_prd",
+        outputId: "final_change_log",
+        displayName: "Final PRD 合成委员会 · 最终变更日志",
+      },
+      {
+        sourceNodeId: "node_final_prd",
+        outputId: "handoff_notes",
+        displayName: "Final PRD 合成委员会 · 交接说明",
+      },
+      {
+        sourceNodeId: "node_governance",
+        outputId: "qa_report",
+        displayName: "最终治理门 · 最终治理报告",
+      },
+    ],
+    exportRule: buildBlockingExportGateRule("node_governance"),
+    exportContentMapping: [
+      restoreContentRef("node_final_prd", "prd_final"),
+      restoreContentRef("node_final_prd", "final_change_log"),
+      restoreContentRef("node_final_prd", "handoff_notes"),
+      restoreContentRef("node_governance", "qa_report"),
+    ],
+  };
+
+  return buildWorkflowDefinition({
+    documentTypeCode: "requirement_design",
+    name: "产品经理 PRD 多模型评审流程",
+    description:
+      "14 节点旗舰流程，展示 PRD 的事实基线、洞察、竞品、范围、双轮起草评审和最终治理门控。",
+    isDefault: false,
     category: "flagship",
     blueprint,
     models,
@@ -2557,6 +3237,7 @@ export function buildDemoCatalog(models: DemoModelSelection): {
     workflows: [
       buildSolutionFlagship(models),
       buildRequirementFlagship(models),
+      buildPrdReviewFlagship(models),
       buildTechnicalFlagship(models),
       buildImplementationFlagship(models),
       buildProcurementFlagship(models),

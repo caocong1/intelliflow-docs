@@ -59,6 +59,7 @@ export interface StageSpec {
   stepDescription?: string;
   systemPromptTemplate?: string;
   modelMode?: "single" | "compare";
+  compareModelCount?: number;
 }
 
 export interface RestoreSourceSpec {
@@ -73,11 +74,13 @@ export interface WorkflowBlueprint {
   restoreSources: RestoreSourceSpec[];
   postRestoreStages?: StageSpec[];
   exportRule?: NodeExecutionRule;
+  exportContentMapping?: VariableRef[];
   exportFormats?: Array<"word" | "pdf" | "markdown">;
 }
 
 const X_STEP = 300;
 const DEFAULT_FILE_TYPES = [".pdf", ".doc,.docx", ".xls,.xlsx", ".md", ".txt"];
+const DEFAULT_COMPARE_MODEL_COUNT = 3;
 
 const PROVIDER_PRIORITY: Record<string, number> = {
   opencode: 0,
@@ -197,7 +200,7 @@ export function resolveDemoModels(availableModels: AvailableModel[]): DemoModelS
   const compareClouds = pickPreferredModels(
     cloudModels,
     CLOUD_MODEL_PRIORITY,
-    Math.min(3, cloudModels.length),
+    Math.min(4, cloudModels.length),
   );
   if (compareClouds.length < 2) {
     throw new Error("未找到足够的多模型复核模型");
@@ -535,6 +538,19 @@ export function buildExportGateRule(nodeId: string): NodeExecutionRule {
   });
 }
 
+export function buildBlockingExportGateRule(nodeId: string): NodeExecutionRule {
+  return blockWhen({
+    logic: "and",
+    conditions: [
+      {
+        sourceRef: conditionRef(nodeId, "qa_gate", "can_export"),
+        operator: "equals",
+        value: "false",
+      },
+    ],
+  });
+}
+
 export function skipWhenNoInput(nodeId: string, outputId: string): NodeExecutionRule {
   return skipWhen({
     logic: "and",
@@ -558,6 +574,14 @@ export function skipWhenAll(
     logic: "and",
     conditions,
   });
+}
+
+export function restoreContentRef(sourceNodeId: string, outputId: string): VariableRef {
+  return {
+    nodeId: "node_restore",
+    outputId: `${sourceNodeId}.${outputId}`,
+    variableName: `node_restore.${sourceNodeId}.${outputId}`,
+  };
 }
 
 export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
@@ -687,7 +711,12 @@ function buildStageNode(
   models: DemoModelSelection,
 ): WorkflowNodeDef {
   const selectedModels =
-    stage.modelMode === "compare" ? models.compareClouds : [models.primaryCloud];
+    stage.modelMode === "compare"
+      ? models.compareClouds.slice(
+          0,
+          Math.max(2, stage.compareModelCount ?? DEFAULT_COMPARE_MODEL_COUNT),
+        )
+      : [models.primaryCloud];
 
   const config: NodeConfig = {
     type: "model_call",
@@ -776,7 +805,7 @@ export function buildWorkflowFromBlueprint(
       {
         type: "export",
         formats: blueprint.exportFormats ?? ["word", "pdf", "markdown"],
-        contentMapping: [],
+        contentMapping: blueprint.exportContentMapping ?? [],
         executionRule: blueprint.exportRule,
       },
       cursor,

@@ -1,4 +1,4 @@
-import { createSignal, For, onMount } from "solid-js";
+import { For, createSignal, onMount } from "solid-js";
 import { api } from "../../api/client";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
@@ -31,12 +31,16 @@ export default function DocumentTypeManagement() {
   } | null>(null);
   const [submitting, setSubmitting] = createSignal(false);
   const [deleteCheckLoading, setDeleteCheckLoading] = createSignal(false);
-  const [associatedWorkflows, setAssociatedWorkflows] = createSignal<{id: string; name: string}[]>([]);
-  const [associatedDocuments, setAssociatedDocuments] = createSignal<{id: string; title: string}[]>([]);
+  const [associatedWorkflows, setAssociatedWorkflows] = createSignal<
+    { id: string; name: string }[]
+  >([]);
+  const [associatedDocuments, setAssociatedDocuments] = createSignal<
+    { id: string; title: string }[]
+  >([]);
   const [deleteFailedInfo, setDeleteFailedInfo] = createSignal<{
     docTypeName: string;
-    workflows: {id: string; name: string}[];
-    documents: {id: string; title: string}[];
+    workflows: { id: string; name: string }[];
+    documents: { id: string; title: string }[];
   } | null>(null);
 
   // Create form
@@ -180,10 +184,7 @@ export default function DocumentTypeManagement() {
         showToast(errData?.error ?? "操作失败", "error");
         return;
       }
-      showToast(
-        action.docType.isActive ? "文档类型已停用" : "文档类型已启用",
-        "success",
-      );
+      showToast(action.docType.isActive ? "文档类型已停用" : "文档类型已启用", "success");
       setConfirmAction(null);
       await fetchDocTypes();
     } catch {
@@ -200,13 +201,19 @@ export default function DocumentTypeManagement() {
     try {
       const { error } = await api.api["document-types"]({ id: action.docType.id }).delete();
       if (error) {
-        const errData = error.value as {
-          error?: string;
-          workflows?: { id: string; name: string }[];
-          documents?: { id: string; title: string }[];
-        } | undefined;
+        const errData = error.value as
+          | {
+              error?: string;
+              workflows?: { id: string; name: string }[];
+              documents?: { id: string; title: string }[];
+            }
+          | undefined;
         // If 409 with associations, show the detail dialog instead of a toast
-        if (error.status === 409 && errData && (errData.workflows?.length || errData.documents?.length)) {
+        if (
+          (error.status as number) === 409 &&
+          errData &&
+          (errData.workflows?.length || errData.documents?.length)
+        ) {
           setConfirmAction(null);
           setDeleteFailedInfo({
             docTypeName: action.docType.name,
@@ -307,7 +314,8 @@ export default function DocumentTypeManagement() {
               setDeleteCheckLoading(true);
               setAssociatedWorkflows([]);
               setAssociatedDocuments([]);
-              api.api["document-types"]({ id: dt.id }).associations.get()
+              api.api["document-types"]({ id: dt.id })
+                .associations.get()
                 .then(({ data, error }) => {
                   if (!error && data) {
                     const result = data as unknown as {
@@ -353,9 +361,20 @@ export default function DocumentTypeManagement() {
             }}
             class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
           >
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden="true"
+            >
               <title>新建</title>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 4v16m8-8H4"
+              />
             </svg>
             新建文档类型
           </button>
@@ -437,18 +456,10 @@ export default function DocumentTypeManagement() {
             )}
           </div>
           <div class="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(false)}
-              class={cancelBtnClass}
-            >
+            <button type="button" onClick={() => setShowCreateModal(false)} class={cancelBtnClass}>
               取消
             </button>
-            <button
-              type="submit"
-              disabled={submitting()}
-              class={primaryBtnClass}
-            >
+            <button type="submit" disabled={submitting()} class={primaryBtnClass}>
               {submitting() ? "创建中..." : "创建"}
             </button>
           </div>
@@ -507,18 +518,10 @@ export default function DocumentTypeManagement() {
             />
           </div>
           <div class="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={() => setEditingDocType(null)}
-              class={cancelBtnClass}
-            >
+            <button type="button" onClick={() => setEditingDocType(null)} class={cancelBtnClass}>
               取消
             </button>
-            <button
-              type="submit"
-              disabled={submitting()}
-              class={primaryBtnClass}
-            >
+            <button type="submit" disabled={submitting()} class={primaryBtnClass}>
               {submitting() ? "保存中..." : "保存"}
             </button>
           </div>
@@ -544,7 +547,7 @@ export default function DocumentTypeManagement() {
                 <div class="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
                 <span>正在检查关联...</span>
               </div>
-            ) : (associatedWorkflows().length > 0 || associatedDocuments().length > 0) ? (
+            ) : associatedWorkflows().length > 0 || associatedDocuments().length > 0 ? (
               <div>
                 <p class="text-sm text-red-600 font-medium mb-3">
                   无法删除：该文档类型存在关联的工作流或文档，请先处理这些关联项。
@@ -583,11 +586,7 @@ export default function DocumentTypeManagement() {
             </p>
           )}
           <div class="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => setConfirmAction(null)}
-              class={cancelBtnClass}
-            >
+            <button type="button" onClick={() => setConfirmAction(null)} class={cancelBtnClass}>
               取消
             </button>
             <button
@@ -596,7 +595,12 @@ export default function DocumentTypeManagement() {
                 if (confirmAction()?.action === "delete") handleDelete();
                 else handleToggleStatus();
               }}
-              disabled={submitting() || deleteCheckLoading() || (confirmAction()?.action === "delete" && (associatedWorkflows().length > 0 || associatedDocuments().length > 0))}
+              disabled={
+                submitting() ||
+                deleteCheckLoading() ||
+                (confirmAction()?.action === "delete" &&
+                  (associatedWorkflows().length > 0 || associatedDocuments().length > 0))
+              }
               class={`px-4 py-2 text-sm text-white rounded-lg transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 ${
                 confirmAction()?.action === "delete" || confirmAction()?.docType.isActive
                   ? "bg-red-600 hover:bg-red-700 focus:ring-red-500"
@@ -646,11 +650,7 @@ export default function DocumentTypeManagement() {
             </div>
           )}
           <div class="flex justify-end pt-2">
-            <button
-              type="button"
-              onClick={() => setDeleteFailedInfo(null)}
-              class={cancelBtnClass}
-            >
+            <button type="button" onClick={() => setDeleteFailedInfo(null)} class={cancelBtnClass}>
               关闭
             </button>
           </div>

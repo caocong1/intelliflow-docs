@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import type { DocumentStatus } from "@intelliflow/shared/src/types.js";
+import type { DocumentStatus } from "@intelliflow/shared";
+import { describe, expect, it } from "vitest";
 
 // Suite 1: Compile-time type verification
 // DocumentStatus must include "failed" as one of its union members.
@@ -16,9 +16,9 @@ describe("DocumentStatus type", () => {
   it("all four status values are valid", () => {
     const statuses: DocumentStatus[] = ["draft", "in_progress", "completed", "failed"];
     expect(statuses).toHaveLength(4);
-    statuses.forEach((s) => {
+    for (const s of statuses) {
       expect(["draft", "in_progress", "completed", "failed"]).toContain(s);
-    });
+    }
   });
 
   it("only the four defined status values are valid", () => {
@@ -55,9 +55,9 @@ describe("listDocuments status filter logic", () => {
   });
 
   it("accepts all four status values", () => {
-    VALID_STATUSES.forEach((s) => {
+    for (const s of VALID_STATUSES) {
       expect(filterStatus(s)).toBe(s);
-    });
+    }
   });
 
   it("rejects invalid status strings", () => {

@@ -515,7 +515,9 @@ export function buildAvailableLayoutsFromProfile(
 export function buildNativeTemplateProfile(
   templateInfos: NativeTemplateInfo[],
 ): NativeTemplateProfile {
-  const templateInfo = templateInfos.find((info) => info.name !== "__native_template__") ?? templateInfos[0];
+  const templateInfo =
+    templateInfos.find((info) => info.name === "__native_template__") ??
+    [...templateInfos].sort((a, b) => (b.slides?.length ?? 0) - (a.slides?.length ?? 0))[0];
   const slides: NativeTemplateProfileSlide[] = (templateInfo?.slides ?? []).map((slide) => {
     const taggedSlots: Partial<Record<TemplateSlotTag, NativeTemplateSlot[]>> = {};
     const titleFallback: NativeTemplateSlot[] = [];

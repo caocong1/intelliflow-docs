@@ -50,7 +50,7 @@ async function parsePptxTemplate(buffer: Buffer): Promise<ParsedTemplateInfo> {
       outputDir: "",
     });
 
-    automizer.loadRoot(buffer);
+    automizer.loadRoot(buffer).load(buffer, "__native_template__");
     const templateInfos = await automizer.setCreationIds();
 
     if (!templateInfos || templateInfos.length === 0) {

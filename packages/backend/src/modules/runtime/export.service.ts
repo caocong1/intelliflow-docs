@@ -2449,6 +2449,7 @@ export async function generateExport(
   // Generate file buffer
   let buffer: Buffer;
   let mimeType: string;
+  let appliedTemplateId: string | null = null;
 
   switch (format) {
     case "word": {
@@ -2471,6 +2472,7 @@ export async function generateExport(
         templateIdOverride !== undefined
           ? templateIdOverride
           : config?.templateBindings?.pptx ?? config?.templateId ?? null;
+      appliedTemplateId = pptxTemplateId;
       buffer = await generatePptBuffer(content, pptxTemplateId);
       mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
       break;
@@ -2504,7 +2506,13 @@ export async function generateExport(
   await db
     .update(nodeExecutions)
     .set({
-      outputData: { format, filename, storagePath, fileSize },
+      outputData: {
+        format,
+        filename,
+        storagePath,
+        fileSize,
+        ...(format === "pptx" ? { templateId: appliedTemplateId } : {}),
+      },
       updatedAt: now,
     })
     .where(eq(nodeExecutions.id, nodeExecutionId));

@@ -1,5 +1,5 @@
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
-import { For, Show, createMemo, createResource, createSignal, onMount } from "solid-js";
+import { For, Show, createEffect, createMemo, createResource, createSignal, onMount } from "solid-js";
 import { advanceNode, generateExport, getExportPreview } from "../../../api/client";
 import { downloadBlobResponse, type DownloadProgress } from "../../../lib/download";
 import { listTemplates, type PptTemplate } from "../../../lib/api/ppt-templates";
@@ -90,6 +90,7 @@ export default function ExportExecutor(props: Props) {
     filename: string;
     format: string;
     fileSize: number;
+    templateId?: string | null;
   } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [pptTemplates] = createResource(fetchPptTemplates);
@@ -107,9 +108,23 @@ export default function ExportExecutor(props: Props) {
         filename: output.filename,
         format: output.format,
         fileSize: output.fileSize,
+        templateId: typeof output.templateId === "string" ? output.templateId : null,
       };
     }
     return null;
+  });
+  const isPptExportResultStale = createMemo(() => {
+    if (format() !== "pptx") return false;
+    const result = latestExportResult();
+    if (!result || result.format !== "pptx") return false;
+    return (selectedPptTemplateId() ?? null) !== (result.templateId ?? null);
+  });
+
+  createEffect(() => {
+    if (format() === "pptx") {
+      selectedPptTemplateId();
+      setExportResult(null);
+    }
   });
 
   onMount(async () => {
@@ -161,6 +176,7 @@ export default function ExportExecutor(props: Props) {
           filename: result.filename,
           format: result.format,
           fileSize: result.fileSize,
+          templateId: runtimeTemplateId ?? null,
         });
         setExporting(false);
         await triggerDownload();
@@ -512,61 +528,72 @@ export default function ExportExecutor(props: Props) {
       {/* Export result */}
       <Show when={latestExportResult()}>
         {(result) => (
-          <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)]">
-            <div class="flex items-center gap-4 p-4 bg-green-50 rounded-xl border border-[rgba(199,196,216,0.15)]">
-              <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold">
-                {FORMAT_ICONS[result().format as ExportFormat] ?? "F"}
-              </div>
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-medium text-[#191c1e] truncate">{result().filename}</p>
-                <p class="text-xs text-green-600">
-                  导出完成 &middot;{" "}
-                  {FORMAT_LABELS[result().format as ExportFormat] ?? result().format.toUpperCase()}{" "}
-                  &middot; {formatFileSize(result().fileSize)}
-                </p>
-              </div>
-              <button
-                type="button"
-                class="px-4 py-2 text-sm font-medium text-[#4f46e5] bg-[#e2dfff] rounded-xl hover:bg-[#d4d0ff] transition-colors"
-                onClick={triggerDownload}
-                disabled={downloading()}
-              >
-                {downloading() ? "下载中..." : "下载文件"}
-              </button>
-            </div>
-            <Show when={downloading() && downloadProgress()}>
-              {(progress) => (
-                <div class="mt-3 rounded-xl border border-[rgba(79,70,229,0.12)] bg-indigo-50 px-4 py-3">
-                  <div class="flex items-center justify-between gap-4 text-xs text-[#4f46e5]">
-                    <span class="font-medium">
-                      {progress().percent != null
-                        ? `正在下载文件 ${progress().percent}%`
-                        : "正在下载文件..."}
-                    </span>
-                    <span class="tabular-nums">
-                      {formatFileSize(progress().receivedBytes)}
-                      <Show when={progress().totalBytes != null}>
-                        {` / ${formatFileSize(progress().totalBytes ?? 0)}`}
-                      </Show>
-                    </span>
-                  </div>
-                  <div class="mt-2 h-2 overflow-hidden rounded-full bg-[rgba(79,70,229,0.12)]">
-                    <div
-                      class={`h-full rounded-full bg-[#4f46e5] transition-[width] duration-200 ${
-                        progress().percent == null ? "animate-pulse w-1/3" : ""
-                      }`}
-                      style={
-                        progress().percent != null
-                          ? { width: `${progress().percent}%` }
-                          : undefined
-                      }
-                    />
-                  </div>
+          <Show when={!isPptExportResultStale()}>
+            <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)]">
+              <div class="flex items-center gap-4 p-4 bg-green-50 rounded-xl border border-[rgba(199,196,216,0.15)]">
+                <div class="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center text-green-600 text-lg font-bold">
+                  {FORMAT_ICONS[result().format as ExportFormat] ?? "F"}
                 </div>
-              )}
-            </Show>
-          </div>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-medium text-[#191c1e] truncate">{result().filename}</p>
+                  <p class="text-xs text-green-600">
+                    导出完成 &middot;{" "}
+                    {FORMAT_LABELS[result().format as ExportFormat] ??
+                      result().format.toUpperCase()}{" "}
+                    &middot; {formatFileSize(result().fileSize)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="px-4 py-2 text-sm font-medium text-[#4f46e5] bg-[#e2dfff] rounded-xl hover:bg-[#d4d0ff] transition-colors"
+                  onClick={triggerDownload}
+                  disabled={downloading()}
+                >
+                  {downloading() ? "下载中..." : "下载文件"}
+                </button>
+              </div>
+              <Show when={downloading() && downloadProgress()}>
+                {(progress) => (
+                  <div class="mt-3 rounded-xl border border-[rgba(79,70,229,0.12)] bg-indigo-50 px-4 py-3">
+                    <div class="flex items-center justify-between gap-4 text-xs text-[#4f46e5]">
+                      <span class="font-medium">
+                        {progress().percent != null
+                          ? `正在下载文件 ${progress().percent}%`
+                          : "正在下载文件..."}
+                      </span>
+                      <span class="tabular-nums">
+                        {formatFileSize(progress().receivedBytes)}
+                        <Show when={progress().totalBytes != null}>
+                          {` / ${formatFileSize(progress().totalBytes ?? 0)}`}
+                        </Show>
+                      </span>
+                    </div>
+                    <div class="mt-2 h-2 overflow-hidden rounded-full bg-[rgba(79,70,229,0.12)]">
+                      <div
+                        class={`h-full rounded-full bg-[#4f46e5] transition-[width] duration-200 ${
+                          progress().percent == null ? "animate-pulse w-1/3" : ""
+                        }`}
+                        style={
+                          progress().percent != null
+                            ? { width: `${progress().percent}%` }
+                            : undefined
+                        }
+                      />
+                    </div>
+                  </div>
+                )}
+              </Show>
+            </div>
+          </Show>
         )}
+      </Show>
+
+      <Show when={isPptExportResultStale()}>
+        <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)]">
+          <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            当前已切换 PPT 模板，请重新点击“导出并下载”生成新文件。下面不会再显示旧模板导出的结果。
+          </div>
+        </div>
       </Show>
 
       {/* Action buttons */}

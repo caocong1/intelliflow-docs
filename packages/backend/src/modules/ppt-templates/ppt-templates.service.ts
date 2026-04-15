@@ -1,9 +1,15 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { and, count, desc, eq } from "drizzle-orm";
 import Automizer from "pptx-automizer";
 import { db } from "../../db";
 import { pptTemplates } from "../../db/schema";
+import {
+  buildAvailableLayoutsFromProfile,
+  buildNativeTemplateProfile,
+  derivePlaceholderNamesFromLayoutPlaceholders,
+  type NativeTemplateProfile,
+} from "./native-template-profile";
 
 const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || "./data/workspaces";
 const TEMPLATE_DIR = join(WORKSPACE_ROOT, "uploads", "ppt-templates");
@@ -26,53 +32,7 @@ interface ParsedTemplateInfo {
   layouts: Map<string, Set<string>>; // layoutName → set of placeholder names
   allPlaceholders: Set<string>;
   warnings: string[];
-}
-
-function derivePlaceholderNamesFromLayoutPlaceholders(
-  layoutPlaceholders:
-    | Array<{
-        type?: string;
-      }>
-    | undefined,
-): Set<string> {
-  const derived = new Set<string>();
-  if (!layoutPlaceholders || layoutPlaceholders.length === 0) return derived;
-
-  let bodyCount = 0;
-  for (const placeholder of layoutPlaceholders) {
-    switch (placeholder.type) {
-      case "title":
-      case "ctrTitle":
-        derived.add("TITLE");
-        break;
-      case "subTitle":
-        derived.add("SUBTITLE");
-        break;
-      case "body":
-        bodyCount += 1;
-        derived.add("BODY");
-        break;
-      case "pic":
-        derived.add("IMAGE");
-        break;
-      case "tbl":
-        derived.add("TABLE");
-        break;
-      case "ftr":
-        derived.add("FOOTER");
-        break;
-      case "sldNum":
-        derived.add("PAGE_NUM");
-        break;
-    }
-  }
-
-  if (bodyCount >= 2) {
-    derived.add("LEFT");
-    derived.add("RIGHT");
-  }
-
-  return derived;
+  profile: NativeTemplateProfile | null;
 }
 
 /**
@@ -82,6 +42,7 @@ async function parsePptxTemplate(buffer: Buffer): Promise<ParsedTemplateInfo> {
   const layouts = new Map<string, Set<string>>();
   const allPlaceholders = new Set<string>();
   const warnings: string[] = [];
+  let profile: NativeTemplateProfile | null = null;
 
   try {
     const automizer = new Automizer({
@@ -94,10 +55,11 @@ async function parsePptxTemplate(buffer: Buffer): Promise<ParsedTemplateInfo> {
 
     if (!templateInfos || templateInfos.length === 0) {
       warnings.push("无法解析模板幻灯片信息");
-      return { layouts, allPlaceholders, warnings };
+      return { layouts, allPlaceholders, warnings, profile };
     }
 
     const tplInfo = templateInfos[0];
+    profile = buildNativeTemplateProfile(templateInfos as never);
 
     for (const slide of tplInfo.slides) {
       const layoutName = slide.info?.layoutName ?? `Slide ${slide.number}`;
@@ -143,7 +105,7 @@ async function parsePptxTemplate(buffer: Buffer): Promise<ParsedTemplateInfo> {
     );
   }
 
-  return { layouts, allPlaceholders, warnings };
+  return { layouts, allPlaceholders, warnings, profile };
 }
 
 /**
@@ -204,20 +166,21 @@ export async function uploadTemplate(input: {
   await writeFile(filePath, buffer);
 
   // Build availableLayouts summary
-  const availableLayouts: string[] = [];
-  for (const [layoutName, placeholders] of parsed.layouts) {
-    if (placeholders.size > 0) {
-      availableLayouts.push(
-        `${layoutName}:${[...placeholders].sort().join(",")}`,
-      );
-    }
-  }
+  const availableLayouts = parsed.profile
+    ? buildAvailableLayoutsFromProfile(parsed.profile)
+    : [...parsed.layouts.entries()]
+        .filter(([, placeholders]) => placeholders.size > 0)
+        .map(
+          ([layoutName, placeholders]) =>
+            `${layoutName}:${[...placeholders].sort().join(",")}`,
+        );
 
   // Create DB record
   const template = await createTemplate({
     name,
     description,
     type: "native_pptx",
+    themeConfig: parsed.profile,
     templateFilePath: filePath,
     availableLayouts,
     createdBy,
@@ -231,6 +194,7 @@ export async function uploadTemplate(input: {
       ),
       allPlaceholders: [...parsed.allPlaceholders],
       warnings: parsed.warnings,
+      profileSummary: parsed.profile?.summary ?? null,
     },
   };
 }
@@ -336,6 +300,34 @@ export async function getTemplate(id: string) {
 
   if (rows.length === 0) throw new Error("TEMPLATE_NOT_FOUND");
   return rows[0];
+}
+
+export async function reRecognizeNativeTemplate(id: string) {
+  const template = await getTemplate(id);
+  if (template.type !== "native_pptx" || !template.templateFilePath) {
+    throw new Error("TEMPLATE_NOT_NATIVE_PPTX");
+  }
+
+  const buffer = await readFile(template.templateFilePath);
+  const parsed = await parsePptxTemplate(buffer);
+  if (!parsed.profile) {
+    throw new Error("TEMPLATE_PROFILE_PARSE_FAILED");
+  }
+
+  const updated = await updateTemplate(id, {
+    themeConfig: parsed.profile,
+    availableLayouts: buildAvailableLayoutsFromProfile(parsed.profile),
+  });
+
+  return {
+    template: updated,
+    validation: {
+      layouts: Object.fromEntries([...parsed.layouts].map(([k, v]) => [k, [...v]])),
+      allPlaceholders: [...parsed.allPlaceholders],
+      warnings: parsed.warnings,
+      profileSummary: parsed.profile.summary,
+    },
+  };
 }
 
 export async function createTemplate(input: {

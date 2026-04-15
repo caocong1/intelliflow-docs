@@ -34,6 +34,11 @@ export type PptTemplateUploadResponse = {
     layouts: Record<string, string[]>;
     allPlaceholders: string[];
     warnings: string[];
+    profileSummary?: {
+      slideCount: number;
+      placeholderTags: string[];
+      recognizedRoleCounts: Record<string, number>;
+    } | null;
   };
 };
 
@@ -120,6 +125,10 @@ export async function uploadTemplate(
   form.append("name", name);
   if (description) form.append("description", description);
   return apiFetch("/upload", { method: "POST", body: form });
+}
+
+export function reRecognizeTemplate(id: string): Promise<PptTemplateUploadResponse> {
+  return apiFetch(`/${id}/re-recognize`, { method: "POST" });
 }
 
 export function setDefaultTemplate(id: string): Promise<PptTemplate> {

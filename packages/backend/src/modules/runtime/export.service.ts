@@ -28,6 +28,11 @@ import {
   getDefaultTemplate,
   getTemplate as getPptTemplate,
 } from "../ppt-templates/ppt-templates.service";
+import {
+  buildNativeTemplateProfile,
+  extractNativeTemplateProfile,
+  type NativeTemplateProfile,
+} from "../ppt-templates/native-template-profile";
 import type { ExportConfig, VariableRef, WorkflowNodeDef } from "@intelliflow/shared";
 
 // ─── Node config loader ─────────────────────────────────────────────────────
@@ -2312,6 +2317,7 @@ async function renderSlidesWithNativeTemplate(
   slides: Slide[],
   templateBuffer: Buffer,
   theme: PptTheme = PPT_THEME,
+  storedProfile?: NativeTemplateProfile | null,
 ): Promise<Buffer> {
   const { default: AutomizerCls, modify } = await import("pptx-automizer");
   const automizer = new AutomizerCls({
@@ -2323,7 +2329,9 @@ async function renderSlidesWithNativeTemplate(
 
   automizer.loadRoot(templateBuffer).load(templateBuffer, "__native_template__");
   const templateInfos = await automizer.setCreationIds();
-  const templateSlides = buildNativeTemplateSlides(templateInfos as NativeTemplateInfo[]);
+  const templateProfile =
+    storedProfile ?? buildNativeTemplateProfile(templateInfos as never);
+  const templateSlides = templateProfile.slides as unknown as NativeTemplateSlide[];
   const fallbackCanvas = pickFallbackTemplateSlide(templateSlides);
 
   if (templateSlides.length === 0 || !fallbackCanvas) {
@@ -2400,7 +2408,12 @@ async function generatePptBuffer(content: string, templateId?: string | null): P
     try {
       if (template.type === "native_pptx" && template.templateFilePath) {
         const templateBuffer = await readFile(template.templateFilePath);
-        return await renderSlidesWithNativeTemplate(slides, templateBuffer);
+        return await renderSlidesWithNativeTemplate(
+          slides,
+          templateBuffer,
+          PPT_THEME,
+          extractNativeTemplateProfile(template.themeConfig),
+        );
       }
 
       if (template.type === "code_theme" && template.themeConfig) {

@@ -10,6 +10,7 @@ import {
   createTheme,
   deleteTemplate,
   listTemplates,
+  reRecognizeTemplate,
   setDefaultTemplate,
   updateTemplate,
   uploadTemplate,
@@ -24,6 +25,30 @@ const TYPE_LABELS: Record<PptTemplateType, string> = {
   code_theme: "代码主题",
   native_pptx: "原生模板",
 };
+
+function getNativeTemplateRecognitionSummary(template: PptTemplate): string | null {
+  if (template.type !== "native_pptx" || !template.themeConfig || typeof template.themeConfig !== "object") {
+    return null;
+  }
+
+  const profile = template.themeConfig as {
+    kind?: string;
+    summary?: {
+      recognizedRoleCounts?: Record<string, number>;
+    };
+  };
+  if (profile.kind !== "native_template_profile_v1") return null;
+
+  const counts = profile.summary?.recognizedRoleCounts ?? {};
+  const parts = [
+    counts.title ? `封面 ${counts.title}` : null,
+    counts.content ? `正文 ${counts.content}` : null,
+    counts.two_column ? `双栏 ${counts.two_column}` : null,
+    counts.image ? `图片 ${counts.image}` : null,
+  ].filter(Boolean);
+
+  return parts.length > 0 ? parts.join(" · ") : "已生成模板画像";
+}
 
 export default function PptTemplateManagement() {
   const [templates, setTemplates] = createSignal<PptTemplate[]>([]);
@@ -218,6 +243,29 @@ export default function PptTemplateManagement() {
     }
   }
 
+  async function handleReRecognize(template: PptTemplate) {
+    setSubmitting(true);
+    try {
+      const result = await reRecognizeTemplate(template.id);
+      const roleSummary =
+        result.validation.profileSummary
+          ? Object.entries(result.validation.profileSummary.recognizedRoleCounts)
+              .map(([role, count]) => `${role}:${count}`)
+              .join(" / ")
+          : "";
+      showToast(roleSummary ? `模板识别完成，${roleSummary}` : "模板识别完成", "success");
+      if (result.validation.warnings.length > 0) {
+        showToast(`识别存在 ${result.validation.warnings.length} 条警告`, "error");
+      }
+      await fetchTemplates();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "模板识别失败";
+      showToast(msg, "error");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("zh-CN", {
       year: "numeric",
@@ -240,7 +288,14 @@ export default function PptTemplateManagement() {
     {
       key: "name",
       header: "名称",
-      render: (t) => <span class="font-medium text-slate-900">{t.name}</span>,
+      render: (t) => (
+        <div>
+          <span class="font-medium text-slate-900">{t.name}</span>
+          <Show when={getNativeTemplateRecognitionSummary(t)}>
+            {(summary) => <p class="text-xs text-slate-500 mt-1">{summary()}</p>}
+          </Show>
+        </div>
+      ),
     },
     {
       key: "type",
@@ -294,6 +349,15 @@ export default function PptTemplateManagement() {
           >
             编辑
           </button>
+          <Show when={t.type === "native_pptx"}>
+            <button
+              type="button"
+              onClick={() => void handleReRecognize(t)}
+              class={`${actionBtnClass} text-sky-600 hover:text-sky-800`}
+            >
+              重识别
+            </button>
+          </Show>
           <button
             type="button"
             onClick={() => setConfirmAction({ template: t, action: "toggle" })}

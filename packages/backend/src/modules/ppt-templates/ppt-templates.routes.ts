@@ -6,6 +6,7 @@ import {
   getDefaultTemplate,
   getTemplate,
   listTemplates,
+  reRecognizeNativeTemplate,
   setDefault,
   updateTemplate,
   uploadTemplate,
@@ -107,6 +108,30 @@ export const pptTemplateRoutes = new Elysia({ prefix: "/ppt-templates" })
         if (message === "TEMPLATE_NOT_FOUND") {
           set.status = 404;
           return { error: "PPT 模板不存在" };
+        }
+        throw err;
+      }
+    },
+    { params: t.Object({ id: t.String() }) },
+  )
+  .post(
+    "/:id/re-recognize",
+    async ({ params, set }) => {
+      try {
+        return await reRecognizeNativeTemplate(params.id);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message === "TEMPLATE_NOT_FOUND") {
+          set.status = 404;
+          return { error: "PPT 模板不存在" };
+        }
+        if (message === "TEMPLATE_NOT_NATIVE_PPTX") {
+          set.status = 400;
+          return { error: "仅原生 PPT 模板支持重新识别" };
+        }
+        if (message === "TEMPLATE_PROFILE_PARSE_FAILED") {
+          set.status = 400;
+          return { error: "模板识别失败，请检查模板文件结构" };
         }
         throw err;
       }

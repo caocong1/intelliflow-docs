@@ -28,6 +28,53 @@ interface ParsedTemplateInfo {
   warnings: string[];
 }
 
+function derivePlaceholderNamesFromLayoutPlaceholders(
+  layoutPlaceholders:
+    | Array<{
+        type?: string;
+      }>
+    | undefined,
+): Set<string> {
+  const derived = new Set<string>();
+  if (!layoutPlaceholders || layoutPlaceholders.length === 0) return derived;
+
+  let bodyCount = 0;
+  for (const placeholder of layoutPlaceholders) {
+    switch (placeholder.type) {
+      case "title":
+      case "ctrTitle":
+        derived.add("TITLE");
+        break;
+      case "subTitle":
+        derived.add("SUBTITLE");
+        break;
+      case "body":
+        bodyCount += 1;
+        derived.add("BODY");
+        break;
+      case "pic":
+        derived.add("IMAGE");
+        break;
+      case "tbl":
+        derived.add("TABLE");
+        break;
+      case "ftr":
+        derived.add("FOOTER");
+        break;
+      case "sldNum":
+        derived.add("PAGE_NUM");
+        break;
+    }
+  }
+
+  if (bodyCount >= 2) {
+    derived.add("LEFT");
+    derived.add("RIGHT");
+  }
+
+  return derived;
+}
+
 /**
  * Parse a .pptx buffer using pptx-automizer to extract layout names and {{XXX}} placeholders.
  */
@@ -79,6 +126,15 @@ async function parsePptxTemplate(buffer: Buffer): Promise<ParsedTemplateInfo> {
         } catch {
           // Some elements may not support getText
         }
+      }
+
+      // Fallback: derive logical placeholders from slide layout placeholder types.
+      const layoutDerived = derivePlaceholderNamesFromLayoutPlaceholders(
+        slide.info?.layoutPlaceholders,
+      );
+      for (const placeholder of layoutDerived) {
+        placeholderSet.add(placeholder);
+        allPlaceholders.add(placeholder);
       }
     }
   } catch (err) {

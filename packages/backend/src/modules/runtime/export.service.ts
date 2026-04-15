@@ -926,12 +926,18 @@ type TemplateModifyHelpers = {
   replaceText: (replace: { replace: string; by: { text: string } }) => unknown;
   setText: (text: string) => unknown;
   setMultiText: (paragraphs: TemplateTextParagraph[]) => unknown;
+  setTable?: (data: {
+    header?: { values: Array<string | number> };
+    body: Array<{ label?: string; values: Array<string | number> }>;
+  }) => unknown;
 };
 
 interface NativeTemplateSlot {
   selector: TemplateSelector;
   position: TemplatePosition;
   explicitTag?: TemplateSlotTag;
+  visualType?: string;
+  source?: "explicit" | "slide" | "layout";
 }
 
 interface NativeTemplateSlide {
@@ -957,10 +963,17 @@ type NativeTemplateElement = {
   name: string;
   nameIdx?: number;
   position: TemplatePosition;
+  type?: string;
   hasTextBody: boolean;
   getText: () => string[];
   getPlaceholderInfo?: () => { type?: string };
   visualType: string;
+};
+
+type NativeTemplateLayoutPlaceholder = {
+  type: string;
+  idx: number;
+  position?: TemplatePosition;
 };
 
 type NativeTemplateInfo = {
@@ -968,7 +981,10 @@ type NativeTemplateInfo = {
   slides: Array<{
     id: number;
     number: number;
-    info?: { layoutName?: string };
+    info?: {
+      layoutName?: string;
+      layoutPlaceholders?: NativeTemplateLayoutPlaceholder[];
+    };
     elements: NativeTemplateElement[];
   }>;
 };
@@ -1027,8 +1043,8 @@ function normalizeSlots(slots?: NativeTemplateSlot[]): NativeTemplateSlot[] {
 
 function sortSlotsByPosition(slots: NativeTemplateSlot[]): NativeTemplateSlot[] {
   return [...slots].sort((a, b) => {
-    if (a.position.x !== b.position.x) return a.position.x - b.position.x;
-    return a.position.y - b.position.y;
+    if (a.position.y !== b.position.y) return a.position.y - b.position.y;
+    return a.position.x - b.position.x;
   });
 }
 
@@ -1106,6 +1122,159 @@ function buildPlainParagraphs(lines: string[]): TemplateTextParagraph[] {
     },
     textRuns: [{ text: line }],
   }));
+}
+
+function toTemplateSlotTagFromPlaceholderType(
+  placeholderType: string,
+): TemplateSlotTag | null {
+  switch (placeholderType) {
+    case "title":
+    case "ctrTitle":
+      return "TITLE";
+    case "subTitle":
+      return "SUBTITLE";
+    case "body":
+      return "BODY";
+    case "ftr":
+      return "FOOTER";
+    case "sldNum":
+      return "PAGE_NUM";
+    case "tbl":
+      return "TABLE";
+    case "pic":
+      return "IMAGE";
+    default:
+      return null;
+  }
+}
+
+function getElementBoundingBox(position?: TemplatePosition | null) {
+  if (!position) return null;
+  return {
+    left: position.x,
+    right: position.x + position.cx,
+    top: position.y,
+    bottom: position.y + position.cy,
+    centerX: position.x + position.cx / 2,
+    centerY: position.y + position.cy / 2,
+    area: Math.max(position.cx, 1) * Math.max(position.cy, 1),
+  };
+}
+
+function computeBoxOverlapScore(
+  placeholderPosition?: TemplatePosition | null,
+  elementPosition?: TemplatePosition | null,
+) {
+  const placeholderBox = getElementBoundingBox(placeholderPosition);
+  const elementBox = getElementBoundingBox(elementPosition);
+  if (!placeholderBox || !elementBox) return -Infinity;
+
+  const intersectionWidth = Math.max(
+    0,
+    Math.min(placeholderBox.right, elementBox.right) -
+      Math.max(placeholderBox.left, elementBox.left),
+  );
+  const intersectionHeight = Math.max(
+    0,
+    Math.min(placeholderBox.bottom, elementBox.bottom) -
+      Math.max(placeholderBox.top, elementBox.top),
+  );
+  const intersectionArea = intersectionWidth * intersectionHeight;
+  const overlapRatio = intersectionArea / Math.max(placeholderBox.area, elementBox.area, 1);
+  const centerDistance = Math.hypot(
+    placeholderBox.centerX - elementBox.centerX,
+    placeholderBox.centerY - elementBox.centerY,
+  );
+  const distancePenalty =
+    centerDistance / Math.max(placeholderPosition?.cx ?? 1, placeholderPosition?.cy ?? 1, 1);
+
+  return overlapRatio * 100 - distancePenalty * 10;
+}
+
+function getPlaceholderTypeMatchBonus(
+  placeholderType: string,
+  element: NativeTemplateElement,
+) {
+  switch (placeholderType) {
+    case "title":
+    case "ctrTitle":
+    case "subTitle":
+    case "body":
+    case "ftr":
+    case "sldNum":
+      return element.hasTextBody ? 40 : -60;
+    case "pic":
+      return IMAGE_VISUAL_TYPES.has(element.visualType) ? 50 : -30;
+    case "tbl":
+      return element.visualType === "table" ? 55 : element.hasTextBody ? 15 : -30;
+    default:
+      return element.hasTextBody ? 10 : 0;
+  }
+}
+
+function deriveSlotsFromLayoutPlaceholders(
+  layoutPlaceholders: NativeTemplateLayoutPlaceholder[] | undefined,
+  elements: NativeTemplateElement[],
+): Partial<Record<TemplateSlotTag, NativeTemplateSlot[]>> {
+  if (!layoutPlaceholders || layoutPlaceholders.length === 0) return {};
+
+  const usedSelectors = new Set<string>();
+  const derived: Partial<Record<TemplateSlotTag, NativeTemplateSlot[]>> = {};
+  const placeholders = [...layoutPlaceholders].sort((a, b) => {
+    const ay = a.position?.y ?? 0;
+    const by = b.position?.y ?? 0;
+    if (ay !== by) return ay - by;
+    return (a.position?.x ?? 0) - (b.position?.x ?? 0);
+  });
+
+  for (const placeholder of placeholders) {
+    const mappedTag = toTemplateSlotTagFromPlaceholderType(placeholder.type);
+    if (!mappedTag || !placeholder.position) continue;
+
+    let bestElement: NativeTemplateElement | null = null;
+    let bestScore = -Infinity;
+
+    for (const element of elements) {
+      const selector = buildTemplateSelector(element);
+      const selectorId = selectorKey(selector);
+      if (usedSelectors.has(selectorId)) continue;
+
+      const score =
+        getPlaceholderTypeMatchBonus(placeholder.type, element) +
+        computeBoxOverlapScore(placeholder.position, element.position);
+      if (score > bestScore) {
+        bestScore = score;
+        bestElement = element;
+      }
+    }
+
+    if (!bestElement || bestScore < 10) continue;
+
+    const selector = buildTemplateSelector(bestElement);
+    usedSelectors.add(selectorKey(selector));
+
+    if (!derived[mappedTag]) {
+      derived[mappedTag] = [];
+    }
+    derived[mappedTag]?.push({
+      selector,
+      position: bestElement.position,
+      visualType: bestElement.visualType,
+      source: "layout",
+    });
+  }
+
+  const bodySlots = sortSlotsByPosition(derived.BODY ?? []);
+  if (bodySlots.length >= 2) {
+    derived.LEFT = [
+      { ...bodySlots[0] },
+    ];
+    derived.RIGHT = [
+      { ...bodySlots[1] },
+    ];
+  }
+
+  return derived;
 }
 
 /** Path B: Convert Markdown text to Slide array */
@@ -1339,11 +1508,20 @@ function buildNativeTemplateSlides(templateInfos: NativeTemplateInfo[]): NativeT
     const tableAnchors: NativeTemplateSlot[] = [];
     const imageAnchors: NativeTemplateSlot[] = [];
     const selectors: TemplateSelector[] = [];
+    const layoutDerivedSlots = deriveSlotsFromLayoutPlaceholders(
+      slide.info?.layoutPlaceholders,
+      slide.elements,
+    );
 
     for (const element of slide.elements) {
       const selector = buildTemplateSelector(element);
       const position = element.position;
-      const slot: NativeTemplateSlot = { selector, position };
+      const slot: NativeTemplateSlot = {
+        selector,
+        position,
+        visualType: element.visualType,
+        source: "slide",
+      };
       selectors.push(selector);
 
       if (element.hasTextBody) {
@@ -1352,7 +1530,7 @@ function buildNativeTemplateSlides(templateInfos: NativeTemplateInfo[]): NativeT
           if (!taggedSlots[tag]) {
             taggedSlots[tag] = [];
           }
-          taggedSlots[tag]?.push({ ...slot, explicitTag: tag });
+          taggedSlots[tag]?.push({ ...slot, explicitTag: tag, source: "explicit" });
         }
       }
 
@@ -1396,28 +1574,41 @@ function buildNativeTemplateSlides(templateInfos: NativeTemplateInfo[]): NativeT
       }
     }
 
-    const sortedBodySlots = sortSlotsByPosition(uniqueSlots(bodyFallback));
-    const titleSlot = pickFirstSlot(normalizeSlots(taggedSlots.TITLE), normalizeSlots(titleFallback));
+    const sortedBodySlots = sortSlotsByPosition(
+      uniqueSlots([
+        ...bodyFallback,
+        ...(layoutDerivedSlots.BODY ?? []),
+      ]),
+    );
+    const titleSlot = pickFirstSlot(
+      normalizeSlots(taggedSlots.TITLE),
+      normalizeSlots(titleFallback),
+      normalizeSlots(layoutDerivedSlots.TITLE),
+    );
     const subtitleSlot = pickFirstSlot(
       normalizeSlots(taggedSlots.SUBTITLE),
       normalizeSlots(subtitleFallback),
+      normalizeSlots(layoutDerivedSlots.SUBTITLE),
       sortedBodySlots,
     );
     const bodySlot = pickFirstSlot(normalizeSlots(taggedSlots.BODY), sortedBodySlots);
-    const leftSlot = pickFirstSlot(normalizeSlots(taggedSlots.LEFT), sortedBodySlots);
+    const leftSlot = pickFirstSlot(normalizeSlots(taggedSlots.LEFT), normalizeSlots(layoutDerivedSlots.LEFT), sortedBodySlots);
     const rightSlot = pickFirstSlot(
       normalizeSlots(taggedSlots.RIGHT),
+      normalizeSlots(layoutDerivedSlots.RIGHT),
       sortSlotsByPosition(
         sortedBodySlots.filter((slot) => selectorKey(slot.selector) !== selectorKey(leftSlot?.selector ?? "")),
       ),
     );
     const tableSlot = pickFirstSlot(
       normalizeSlots(taggedSlots.TABLE),
+      normalizeSlots(layoutDerivedSlots.TABLE),
       normalizeSlots(tableAnchors),
       bodySlot ? [bodySlot] : undefined,
     );
     const imageSlot = pickFirstSlot(
       normalizeSlots(taggedSlots.IMAGE),
+      normalizeSlots(layoutDerivedSlots.IMAGE),
       normalizeSlots(imageAnchors),
       bodySlot ? [bodySlot] : undefined,
     );
@@ -1439,8 +1630,16 @@ function buildNativeTemplateSlides(templateInfos: NativeTemplateInfo[]): NativeT
       imageSlot,
       captionSlot: pickFirstSlot(normalizeSlots(taggedSlots.CAPTION)),
       notesSlot: pickFirstSlot(normalizeSlots(taggedSlots.NOTES)),
-      footerSlot: pickFirstSlot(normalizeSlots(taggedSlots.FOOTER), normalizeSlots(footerFallback)),
-      pageNumSlot: pickFirstSlot(normalizeSlots(taggedSlots.PAGE_NUM), normalizeSlots(pageNumFallback)),
+      footerSlot: pickFirstSlot(
+        normalizeSlots(taggedSlots.FOOTER),
+        normalizeSlots(layoutDerivedSlots.FOOTER),
+        normalizeSlots(footerFallback),
+      ),
+      pageNumSlot: pickFirstSlot(
+        normalizeSlots(taggedSlots.PAGE_NUM),
+        normalizeSlots(layoutDerivedSlots.PAGE_NUM),
+        normalizeSlots(pageNumFallback),
+      ),
     };
   });
 }
@@ -1550,7 +1749,7 @@ function setTemplateText(
   value: string,
 ) {
   if (!slot) return;
-  if (slot.explicitTag) {
+  if (slot.explicitTag && slot.source === "explicit") {
     targetSlide.modifyElement(
       slot.selector,
       modify.replaceText({
@@ -1868,16 +2067,38 @@ function renderSlideWithNativeTemplate(
     case "table":
       if (templateSlide.tableSlot) {
         const tableBox = positionToBox(templateSlide.tableSlot.position);
-        targetSlide.removeElement(templateSlide.tableSlot.selector);
-        targetSlide.generate((pptSlide) => {
-          addTableToPptSlide(pptSlide, slide, theme, tableBox);
-        }, `native-table-${pageNumber}`);
+        if (
+          templateSlide.tableSlot.visualType === "table" &&
+          typeof modify.setTable === "function"
+        ) {
+          targetSlide.modifyElement(
+            templateSlide.tableSlot.selector,
+            modify.setTable({
+              header: {
+                values: slide.headers.map((header) =>
+                  truncate(stripMarkdownInline(header), MAX_CELL_CHARS),
+                ),
+              },
+              body: slide.rows.map((row, rowIdx) => ({
+                label: `row-${rowIdx + 1}`,
+                values: row.map((cell) => truncate(stripMarkdownInline(cell), MAX_CELL_CHARS)),
+              })),
+            }),
+          );
+        } else {
+          setTemplateText(targetSlide, modify, templateSlide.tableSlot, "");
+          targetSlide.generate((pptSlide) => {
+            addTableToPptSlide(pptSlide, slide, theme, tableBox);
+          }, `native-table-${pageNumber}`);
+        }
       }
       break;
     case "image":
       if (templateSlide.imageSlot) {
         const imageBox = positionToBox(templateSlide.imageSlot.position);
-        targetSlide.removeElement(templateSlide.imageSlot.selector);
+        if (templateSlide.imageSlot.visualType !== "picture") {
+          setTemplateText(targetSlide, modify, templateSlide.imageSlot, "");
+        }
         targetSlide.generate((pptSlide) => {
           addImageToPptSlide(
             pptSlide,

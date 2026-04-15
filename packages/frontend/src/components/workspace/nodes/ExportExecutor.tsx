@@ -94,6 +94,7 @@ export default function ExportExecutor(props: Props) {
   } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [pptTemplates] = createResource(fetchPptTemplates);
+  let pptTemplateSelectRef: HTMLSelectElement | undefined;
   const latestExportResult = createMemo(() => {
     const local = exportResult();
     if (local) return local;
@@ -162,7 +163,9 @@ export default function ExportExecutor(props: Props) {
 
     try {
       const runtimeTemplateId =
-        format() === "pptx" ? selectedPptTemplateId() ?? null : undefined;
+        format() === "pptx"
+          ? pptTemplateSelectRef?.value || selectedPptTemplateId() || null
+          : undefined;
       const result = await generateExport(
         props.documentId,
         props.nodeExecution.id,
@@ -463,6 +466,7 @@ export default function ExportExecutor(props: Props) {
           <div>
             <span class="block text-xs font-medium text-[#464555] mb-1">PPT 模板</span>
             <select
+              ref={pptTemplateSelectRef}
               value={selectedPptTemplateId() ?? ""}
               onChange={(e) => setSelectedPptTemplateId(e.currentTarget.value || null)}
               class="w-full px-3 py-2 text-sm border border-[rgba(199,196,216,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] bg-[#f7f9fb] text-[#191c1e]"

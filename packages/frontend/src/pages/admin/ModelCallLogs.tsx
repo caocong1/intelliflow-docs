@@ -31,6 +31,9 @@ const CALL_SOURCE_MAP: Record<string, { label: string; color: string }> = {
   model_test: { label: "模型测试", color: "bg-amber-50 text-amber-700" },
   provider_test: { label: "供应商测试", color: "bg-sky-50 text-sky-700" },
   prompt_optimize: { label: "提示词优化", color: "bg-teal-50 text-teal-700" },
+  inline_edit: { label: "内联编辑", color: "bg-purple-50 text-purple-700" },
+  workflow_generation: { label: "流程生成", color: "bg-fuchsia-50 text-fuchsia-700" },
+  ppt_export_planning: { label: "PPT 编排", color: "bg-orange-50 text-orange-700" },
 };
 
 function formatDuration(ms: number | null): string {
@@ -233,6 +236,9 @@ export default function ModelCallLogs() {
                 <option value="model_test">模型测试</option>
                 <option value="provider_test">供应商测试</option>
                 <option value="prompt_optimize">提示词优化</option>
+                <option value="inline_edit">内联编辑</option>
+                <option value="workflow_generation">流程生成</option>
+                <option value="ppt_export_planning">PPT 编排</option>
               </select>
             </label>
           </div>

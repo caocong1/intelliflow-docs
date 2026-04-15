@@ -38,6 +38,7 @@ export const modelCallLogRoutes = new Elysia({ prefix: "/admin/model-call-logs" 
               | "provider_test"
               | "prompt_optimize"
               | "inline_edit"
+              | "workflow_generation"
               | "ppt_export_planning",
           ),
         );

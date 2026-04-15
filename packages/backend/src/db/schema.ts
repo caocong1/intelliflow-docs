@@ -249,6 +249,7 @@ export const callSourceEnum = pgEnum("call_source", [
   "provider_test",
   "prompt_optimize",
   "inline_edit",
+  "workflow_generation",
   "ppt_export_planning",
 ]);
 

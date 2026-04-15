@@ -1,23 +1,18 @@
 import { For, Show, createSignal, createResource } from "solid-js";
 import type { ExportConfig, VariableRef, OutputDef } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
+import { listTemplates, type PptTemplate } from "../../../lib/api/ppt-templates";
 import VariablePicker from "../prompt/VariablePicker";
 
-interface PptTemplate {
-  id: string;
-  name: string;
-  type: "code_theme" | "native_pptx";
-  description: string | null;
-}
-
-async function fetchPptTemplates(): Promise<PptTemplate[]> {
-  const token = localStorage.getItem("auth_token");
-  const res = await fetch("/api/ppt-templates?isActive=true&limit=100", {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data ?? [];
+async function fetchPptTemplates(): Promise<{
+  templates: PptTemplate[];
+  defaultTemplate: PptTemplate | null;
+}> {
+  const res = await listTemplates(1, 100);
+  return {
+    templates: res.data,
+    defaultTemplate: res.data.find((tpl) => tpl.isDefault) ?? null,
+  };
 }
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
@@ -40,12 +35,14 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
   const [showPicker, setShowPicker] = createSignal(false);
   const [dragIndex, setDragIndex] = createSignal<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = createSignal<number | null>(null);
-  const [pptTemplates] = createResource(fetchPptTemplates);
+  const [pptTemplateState] = createResource(fetchPptTemplates);
 
   const mapping = () => props.config.contentMapping ?? [];
   const formats = () => props.config.formats ?? [];
   const hasPptx = () => formats().includes("pptx");
   const hasDocFormat = () => formats().includes("word") || formats().includes("pdf");
+  const defaultPptTemplate = () => pptTemplateState()?.defaultTemplate ?? null;
+  const defaultPptTemplateName = () => defaultPptTemplate()?.name ?? "";
 
   function addMapping(ref: VariableRef) {
     // Avoid duplicates
@@ -163,8 +160,8 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
                     bindings.word = val;
                     if (formats().includes("pdf")) bindings.pdf = val;
                   } else {
-                    delete bindings.word;
-                    delete bindings.pdf;
+                    bindings.word = undefined;
+                    bindings.pdf = undefined;
                   }
                   props.onChange({ ...props.config, templateBindings: bindings });
                 }}
@@ -188,17 +185,19 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
                   if (val) {
                     bindings.pptx = val;
                   } else {
-                    delete bindings.pptx;
+                    bindings.pptx = undefined;
                   }
                   props.onChange({ ...props.config, templateBindings: bindings });
                 }}
                 class="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
               >
-                <option value="">默认主题</option>
-                <Show when={pptTemplates.loading}>
+                <option value="">
+                  {defaultPptTemplate() ? `系统默认模板：${defaultPptTemplateName()}` : "内置默认主题"}
+                </option>
+                <Show when={pptTemplateState.loading}>
                   <option disabled>加载中…</option>
                 </Show>
-                <For each={pptTemplates() ?? []}>
+                <For each={pptTemplateState()?.templates ?? []}>
                   {(tpl) => (
                     <option value={tpl.id}>
                       {tpl.name}{tpl.type === "native_pptx" ? "（品牌模板）" : "（主题）"}
@@ -206,7 +205,15 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
                   )}
                 </For>
               </select>
-              <Show when={pptTemplates.error}>
+              <Show when={defaultPptTemplate()}>
+                <p class="text-xs text-slate-500 mt-1">
+                  未显式绑定时，将自动使用系统默认模板「{defaultPptTemplateName()}」。
+                </p>
+              </Show>
+              <Show when={!defaultPptTemplate() && !pptTemplateState.error}>
+                <p class="text-xs text-slate-500 mt-1">未显式绑定时，将回退到系统内置主题。</p>
+              </Show>
+              <Show when={pptTemplateState.error}>
                 <p class="text-xs text-amber-600 mt-1">PPT 模板加载失败，将使用默认主题</p>
               </Show>
             </div>

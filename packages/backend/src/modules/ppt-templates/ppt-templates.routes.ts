@@ -20,13 +20,15 @@ export const pptTemplateRoutes = new Elysia({ prefix: "/ppt-templates" })
       const page = Number(query.page) || 1;
       const limit = Math.min(Number(query.limit) || 20, 100);
       const type = query.type as "code_theme" | "native_pptx" | undefined;
-      return await listTemplates(page, limit, type);
+      const includeInactive = query.includeInactive === "true";
+      return await listTemplates(page, limit, type, includeInactive);
     },
     {
       query: t.Object({
         page: t.Optional(t.String()),
         limit: t.Optional(t.String()),
         type: t.Optional(t.Union([t.Literal("code_theme"), t.Literal("native_pptx")])),
+        includeInactive: t.Optional(t.String()),
       }),
     },
   )
@@ -121,6 +123,10 @@ export const pptTemplateRoutes = new Elysia({ prefix: "/ppt-templates" })
         if (message === "TEMPLATE_NOT_FOUND") {
           set.status = 404;
           return { error: "PPT 模板不存在" };
+        }
+        if (message === "INACTIVE_TEMPLATE_CANNOT_BE_DEFAULT") {
+          set.status = 400;
+          return { error: "停用模板不能设为默认模板" };
         }
         throw err;
       }

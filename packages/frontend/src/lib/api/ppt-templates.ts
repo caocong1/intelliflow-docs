@@ -16,9 +16,25 @@ export type PptTemplate = {
   updatedAt: string;
 };
 
+export type PptTemplatePagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
 export type PptTemplateListResponse = {
   data: PptTemplate[];
-  total: number;
+  pagination: PptTemplatePagination;
+};
+
+export type PptTemplateUploadResponse = {
+  template: PptTemplate;
+  validation: {
+    layouts: Record<string, string[]>;
+    allPlaceholders: string[];
+    warnings: string[];
+  };
 };
 
 function authHeaders(): Record<string, string> {
@@ -48,9 +64,11 @@ export function listTemplates(
   page = 1,
   limit = 20,
   type?: PptTemplateType,
+  options?: { includeInactive?: boolean },
 ): Promise<PptTemplateListResponse> {
   const params = new URLSearchParams({ page: String(page), limit: String(limit) });
   if (type) params.set("type", type);
+  if (options?.includeInactive) params.set("includeInactive", "true");
   return apiFetch(`?${params}`);
 }
 
@@ -96,7 +114,7 @@ export async function uploadTemplate(
   file: File,
   name: string,
   description?: string,
-): Promise<PptTemplate> {
+): Promise<PptTemplateUploadResponse> {
   const form = new FormData();
   form.append("file", file);
   form.append("name", name);

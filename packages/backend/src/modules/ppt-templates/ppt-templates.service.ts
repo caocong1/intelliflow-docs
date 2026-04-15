@@ -58,7 +58,8 @@ async function parsePptxTemplate(buffer: Buffer): Promise<ParsedTemplateInfo> {
       if (!layouts.has(layoutName)) {
         layouts.set(layoutName, new Set());
       }
-      const placeholderSet = layouts.get(layoutName)!;
+      const placeholderSet = layouts.get(layoutName);
+      if (!placeholderSet) continue;
 
       // Scan element text for {{XXX}} placeholders
       for (const element of slide.elements) {
@@ -68,9 +69,11 @@ async function parsePptxTemplate(buffer: Buffer): Promise<ParsedTemplateInfo> {
           for (const text of texts) {
             let match: RegExpExecArray | null;
             PLACEHOLDER_RE.lastIndex = 0;
-            while ((match = PLACEHOLDER_RE.exec(text)) !== null) {
+            match = PLACEHOLDER_RE.exec(text);
+            while (match !== null) {
               placeholderSet.add(match[1]);
               allPlaceholders.add(match[1]);
+              match = PLACEHOLDER_RE.exec(text);
             }
           }
         } catch {
@@ -231,13 +234,17 @@ export async function listTemplates(
   page: number,
   limit: number,
   type?: "code_theme" | "native_pptx",
+  includeInactive = false,
 ) {
   const offset = (page - 1) * limit;
 
-  const conditions = [eq(pptTemplates.isActive, true)];
+  const conditions = [];
+  if (!includeInactive) {
+    conditions.push(eq(pptTemplates.isActive, true));
+  }
   if (type) conditions.push(eq(pptTemplates.type, type));
 
-  const where = and(...conditions);
+  const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const [rows, total] = await Promise.all([
     db
@@ -322,7 +329,12 @@ export async function updateTemplate(
   if (input.themeConfig !== undefined) updateData.themeConfig = input.themeConfig;
   if (input.templateFilePath !== undefined) updateData.templateFilePath = input.templateFilePath;
   if (input.availableLayouts !== undefined) updateData.availableLayouts = input.availableLayouts;
-  if (input.isActive !== undefined) updateData.isActive = input.isActive;
+  if (input.isActive !== undefined) {
+    updateData.isActive = input.isActive;
+    if (!input.isActive) {
+      updateData.isDefault = false;
+    }
+  }
 
   const result = await db
     .update(pptTemplates)
@@ -358,12 +370,13 @@ export async function setDefault(id: string) {
   return await db.transaction(async (tx) => {
     // Verify target exists
     const target = await tx
-      .select({ id: pptTemplates.id })
+      .select({ id: pptTemplates.id, isActive: pptTemplates.isActive })
       .from(pptTemplates)
       .where(eq(pptTemplates.id, id))
       .limit(1);
 
     if (target.length === 0) throw new Error("TEMPLATE_NOT_FOUND");
+    if (!target[0].isActive) throw new Error("INACTIVE_TEMPLATE_CANNOT_BE_DEFAULT");
 
     // Clear all existing defaults
     await tx

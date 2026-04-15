@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { sanitizeFilename, assertWithinRoot } from "../../common/sanitize";
@@ -22,8 +23,11 @@ import PDFDocument from "pdfkit";
 import { db } from "../../db";
 import { documents, nodeExecutions, workflows } from "../../db/schema";
 import { getExportPath, insertDocumentFile } from "../files/files.service";
-import { resolveRef } from "./model-call.service";
-import { getTemplate as getPptTemplate } from "../ppt-templates/ppt-templates.service";
+import { resolveRef } from "./variable-resolution";
+import {
+  getDefaultTemplate,
+  getTemplate as getPptTemplate,
+} from "../ppt-templates/ppt-templates.service";
 import type { ExportConfig, VariableRef, WorkflowNodeDef } from "@intelliflow/shared";
 
 // ─── Node config loader ─────────────────────────────────────────────────────
@@ -31,7 +35,10 @@ import type { ExportConfig, VariableRef, WorkflowNodeDef } from "@intelliflow/sh
 /**
  * Load ExportConfig from the workflow definition stored in the database.
  */
-async function loadNodeConfig(documentId: string, nodeExecutionId: string): Promise<ExportConfig | null> {
+async function loadNodeConfig(
+  documentId: string,
+  nodeExecutionId: string,
+): Promise<ExportConfig | null> {
   // Get the current execution's nodeId
   const [exec] = await db
     .select({ nodeId: nodeExecutions.nodeId })
@@ -92,7 +99,9 @@ async function resolveContent(
       if (value !== undefined) {
         parts.push(value);
       } else {
-        console.warn(`[export] contentMapping: failed to resolve ref ${ref.nodeId}.${ref.outputId}, skipping`);
+        console.warn(
+          `[export] contentMapping: failed to resolve ref ${ref.nodeId}.${ref.outputId}, skipping`,
+        );
       }
     }
 
@@ -238,32 +247,32 @@ function createWordTable(headers: string[], rows: string[][]): Table {
 
   const headerRow = new TableRow({
     tableHeader: true,
-    children: headers.map((h) =>
-      new TableCell({
-        children: [new Paragraph({ children: parseInlineFormatting(h) })],
-        borders,
-        shading: { type: ShadingType.SOLID, color: "E8E8E8" },
-        width: { size: colWidth, type: WidthType.DXA },
-        verticalAlign: VerticalAlign.CENTER,
-      }),
-    ),
-  });
-
-  const dataRows = rows.map((row, rowIdx) =>
-    new TableRow({
-      children: row.map((cell) =>
+    children: headers.map(
+      (h) =>
         new TableCell({
-          children: [new Paragraph({ children: parseInlineFormatting(cell) })],
+          children: [new Paragraph({ children: parseInlineFormatting(h) })],
           borders,
-          shading:
-            rowIdx % 2 === 1
-              ? { type: ShadingType.SOLID, color: "F5F5F5" }
-              : undefined,
+          shading: { type: ShadingType.SOLID, color: "E8E8E8" },
           width: { size: colWidth, type: WidthType.DXA },
           verticalAlign: VerticalAlign.CENTER,
         }),
-      ),
-    }),
+    ),
+  });
+
+  const dataRows = rows.map(
+    (row, rowIdx) =>
+      new TableRow({
+        children: row.map(
+          (cell) =>
+            new TableCell({
+              children: [new Paragraph({ children: parseInlineFormatting(cell) })],
+              borders,
+              shading: rowIdx % 2 === 1 ? { type: ShadingType.SOLID, color: "F5F5F5" } : undefined,
+              width: { size: colWidth, type: WidthType.DXA },
+              verticalAlign: VerticalAlign.CENTER,
+            }),
+        ),
+      }),
   );
 
   return new Table({
@@ -276,9 +285,7 @@ function createCodeBlock(lines: string[]): Paragraph[] {
   return lines.map(
     (line) =>
       new Paragraph({
-        children: [
-          new TextRun({ text: line, font: { name: "Courier New" }, size: 18 }),
-        ],
+        children: [new TextRun({ text: line, font: { name: "Courier New" }, size: 18 })],
         shading: { type: ShadingType.SOLID, color: "F3F4F6" },
       }),
   );
@@ -525,7 +532,11 @@ function drawPdfTable(
         .font(isHeader ? "Helvetica-Bold" : "Helvetica")
         .fontSize(10)
         .fillColor("#333333")
-        .text(clean.trim(), x + 4, y + 6, { width: colWidth - 8, height: rowHeight - 8, align: "left" });
+        .text(clean.trim(), x + 4, y + 6, {
+          width: colWidth - 8,
+          height: rowHeight - 8,
+          align: "left",
+        });
     });
 
     y += rowHeight;
@@ -564,9 +575,12 @@ async function generatePdfBuffer(content: string): Promise<Buffer> {
         } else {
           for (const line of tableLines) {
             const clean = line.replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
-            doc.fontSize(12).font("Helvetica").text(clean.trim(), startX, doc.y, {
-              width: doc.page.width - margin * 2,
-            });
+            doc
+              .fontSize(12)
+              .font("Helvetica")
+              .text(clean.trim(), startX, doc.y, {
+                width: doc.page.width - margin * 2,
+              });
             doc.moveDown(0.3);
           }
         }
@@ -616,9 +630,12 @@ async function generatePdfBuffer(content: string): Promise<Buffer> {
 
         const indentPx = 20 + level * 20;
         const clean = orderedMatch[3].replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
-        doc.fontSize(12).font("Helvetica").text(`${orderedMatch[2]}. ${clean}`, startX + indentPx, doc.y, {
-          width: doc.page.width - margin * 2 - indentPx,
-        });
+        doc
+          .fontSize(12)
+          .font("Helvetica")
+          .text(`${orderedMatch[2]}. ${clean}`, startX + indentPx, doc.y, {
+            width: doc.page.width - margin * 2 - indentPx,
+          });
         doc.moveDown(0.3);
         return;
       }
@@ -632,7 +649,9 @@ async function generatePdfBuffer(content: string): Promise<Buffer> {
         else if (indent >= 5) level = 2;
 
         const indentPx = 20 + level * 20;
-        const clean = nestedBulletMatch[2].replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
+        const clean = nestedBulletMatch[2]
+          .replace(/\*\*(.+?)\*\*/g, "$1")
+          .replace(/\*(.+?)\*/g, "$1");
         doc
           .fontSize(12)
           .font("Helvetica")
@@ -645,10 +664,16 @@ async function generatePdfBuffer(content: string): Promise<Buffer> {
 
       // Top-level unordered list
       if (line.startsWith("- ") || line.startsWith("* ")) {
-        const clean = line.slice(2).replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
-        doc.fontSize(12).font("Helvetica").text(`  \u2022 ${clean}`, startX, doc.y, {
-          width: doc.page.width - margin * 2,
-        });
+        const clean = line
+          .slice(2)
+          .replace(/\*\*(.+?)\*\*/g, "$1")
+          .replace(/\*(.+?)\*/g, "$1");
+        doc
+          .fontSize(12)
+          .font("Helvetica")
+          .text(`  \u2022 ${clean}`, startX, doc.y, {
+            width: doc.page.width - margin * 2,
+          });
         doc.moveDown(0.3);
         return;
       }
@@ -659,27 +684,39 @@ async function generatePdfBuffer(content: string): Promise<Buffer> {
       const h3Match = line.match(/^### (.+)/);
 
       if (h1Match) {
-        doc.fontSize(22).font("Helvetica-Bold").text(h1Match[1], startX, doc.y, {
-          width: doc.page.width - margin * 2,
-        });
+        doc
+          .fontSize(22)
+          .font("Helvetica-Bold")
+          .text(h1Match[1], startX, doc.y, {
+            width: doc.page.width - margin * 2,
+          });
         doc.moveDown(0.5);
       } else if (h2Match) {
-        doc.fontSize(18).font("Helvetica-Bold").text(h2Match[1], startX, doc.y, {
-          width: doc.page.width - margin * 2,
-        });
+        doc
+          .fontSize(18)
+          .font("Helvetica-Bold")
+          .text(h2Match[1], startX, doc.y, {
+            width: doc.page.width - margin * 2,
+          });
         doc.moveDown(0.3);
       } else if (h3Match) {
-        doc.fontSize(14).font("Helvetica-Bold").text(h3Match[1], startX, doc.y, {
-          width: doc.page.width - margin * 2,
-        });
+        doc
+          .fontSize(14)
+          .font("Helvetica-Bold")
+          .text(h3Match[1], startX, doc.y, {
+            width: doc.page.width - margin * 2,
+          });
         doc.moveDown(0.2);
       } else if (line.trim() === "") {
         doc.moveDown(0.5);
       } else {
         const clean = line.replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
-        doc.fontSize(12).font("Helvetica").text(clean, startX, doc.y, {
-          width: doc.page.width - margin * 2,
-        });
+        doc
+          .fontSize(12)
+          .font("Helvetica")
+          .text(clean, startX, doc.y, {
+            width: doc.page.width - margin * 2,
+          });
         doc.moveDown(0.3);
       }
     };
@@ -815,8 +852,10 @@ function buildThemeFromConfig(themeConfig: Record<string, unknown>): PptTheme {
   if (themeConfig.fonts && typeof themeConfig.fonts === "object") {
     const fonts = themeConfig.fonts as Record<string, { face?: string; size?: number }>;
     for (const key of Object.keys(theme.fonts) as (keyof typeof theme.fonts)[]) {
-      if (fonts[key]?.face) theme.fonts[key].face = fonts[key].face!;
-      if (fonts[key]?.size) theme.fonts[key].size = fonts[key].size!;
+      const fontFace = fonts[key]?.face;
+      const fontSize = fonts[key]?.size;
+      if (fontFace) theme.fonts[key].face = fontFace;
+      if (fontSize) theme.fonts[key].size = fontSize;
     }
   }
 
@@ -829,9 +868,244 @@ const MAX_BULLET_CHARS = 120;
 const MAX_TABLE_COLS = 6;
 const MAX_TABLE_ROWS = 8;
 const MAX_CELL_CHARS = 50;
+const EMU_PER_INCH = 914400;
+
+const TEMPLATE_SLOT_KEYS = [
+  "TITLE",
+  "SUBTITLE",
+  "BODY",
+  "LEFT",
+  "RIGHT",
+  "TABLE",
+  "IMAGE",
+  "CAPTION",
+  "NOTES",
+  "FOOTER",
+  "PAGE_NUM",
+] as const;
+
+type TemplateSlotTag = (typeof TEMPLATE_SLOT_KEYS)[number];
+type TemplateSelector = string | { creationId?: string; name: string; nameIdx?: number };
+type TemplatePosition = { x: number; y: number; cx: number; cy: number };
+
+type TemplateTextParagraph = {
+  paragraph: {
+    level?: number;
+    bullet?: boolean;
+    alignment?: "l" | "ctr" | "r" | "just";
+    lineSpacing?: number;
+    spaceBefore?: number;
+    spaceAfter?: number;
+    indent?: number;
+    marginLeft?: number;
+  };
+  textRuns: Array<{
+    text: string;
+    style?: {
+      isBold?: boolean;
+    };
+  }>;
+};
+
+type PptCanvas = {
+  background?: { color: string };
+  addText: (...args: unknown[]) => void;
+  addTable: (...args: unknown[]) => void;
+  addShape: (...args: unknown[]) => void;
+  addImage: (...args: unknown[]) => void;
+  addNotes?: (notes: string) => void;
+};
+
+type TemplateSlideController = {
+  modifyElement: (selector: TemplateSelector, callback: unknown) => void;
+  removeElement: (selector: TemplateSelector) => void;
+  generate: (callback: (pptSlide: PptCanvas) => void, objectName?: string) => void;
+};
+
+type TemplateModifyHelpers = {
+  replaceText: (replace: { replace: string; by: { text: string } }) => unknown;
+  setText: (text: string) => unknown;
+  setMultiText: (paragraphs: TemplateTextParagraph[]) => unknown;
+};
+
+interface NativeTemplateSlot {
+  selector: TemplateSelector;
+  position: TemplatePosition;
+  explicitTag?: TemplateSlotTag;
+}
+
+interface NativeTemplateSlide {
+  slideId: number;
+  slideNumber: number;
+  layoutName: string;
+  selectors: TemplateSelector[];
+  titleSlot?: NativeTemplateSlot;
+  subtitleSlot?: NativeTemplateSlot;
+  bodySlot?: NativeTemplateSlot;
+  leftSlot?: NativeTemplateSlot;
+  rightSlot?: NativeTemplateSlot;
+  tableSlot?: NativeTemplateSlot;
+  imageSlot?: NativeTemplateSlot;
+  captionSlot?: NativeTemplateSlot;
+  notesSlot?: NativeTemplateSlot;
+  footerSlot?: NativeTemplateSlot;
+  pageNumSlot?: NativeTemplateSlot;
+}
+
+type NativeTemplateElement = {
+  creationId?: string;
+  name: string;
+  nameIdx?: number;
+  position: TemplatePosition;
+  hasTextBody: boolean;
+  getText: () => string[];
+  getPlaceholderInfo?: () => { type?: string };
+  visualType: string;
+};
+
+type NativeTemplateInfo = {
+  name: string;
+  slides: Array<{
+    id: number;
+    number: number;
+    info?: { layoutName?: string };
+    elements: NativeTemplateElement[];
+  }>;
+};
+
+const IMAGE_VISUAL_TYPES = new Set([
+  "picture",
+  "svgImage",
+  "imageFilledShape",
+  "bitmap",
+  "pictogram",
+  "3dModel",
+]);
 
 function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function selectorKey(selector: TemplateSelector): string {
+  if (typeof selector === "string") return selector;
+  return selector.creationId ?? `${selector.name}:${selector.nameIdx ?? 0}`;
+}
+
+function buildTemplateSelector(element: {
+  creationId?: string;
+  name: string;
+  nameIdx?: number;
+}): TemplateSelector {
+  if (element.creationId) {
+    return {
+      creationId: element.creationId,
+      name: element.name,
+      nameIdx: element.nameIdx,
+    };
+  }
+  if (element.nameIdx && element.nameIdx > 0) {
+    return { name: element.name, nameIdx: element.nameIdx };
+  }
+  return element.name;
+}
+
+function uniqueSlots(slots: NativeTemplateSlot[]): NativeTemplateSlot[] {
+  const seen = new Set<string>();
+  const unique: NativeTemplateSlot[] = [];
+  for (const slot of slots) {
+    const key = selectorKey(slot.selector);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(slot);
+  }
+  return unique;
+}
+
+function normalizeSlots(slots?: NativeTemplateSlot[]): NativeTemplateSlot[] {
+  return uniqueSlots(slots ?? []);
+}
+
+function sortSlotsByPosition(slots: NativeTemplateSlot[]): NativeTemplateSlot[] {
+  return [...slots].sort((a, b) => {
+    if (a.position.x !== b.position.x) return a.position.x - b.position.x;
+    return a.position.y - b.position.y;
+  });
+}
+
+function isTemplateTag(value: string): value is TemplateSlotTag {
+  return (TEMPLATE_SLOT_KEYS as readonly string[]).includes(value);
+}
+
+function extractTemplateTags(texts: string[]): TemplateSlotTag[] {
+  const tags: TemplateSlotTag[] = [];
+  for (const text of texts) {
+    const matches = text.matchAll(/\{\{([A-Z_]+)\}\}/g);
+    for (const match of matches) {
+      if (match[1] && isTemplateTag(match[1])) {
+        tags.push(match[1]);
+      }
+    }
+  }
+  return tags;
+}
+
+function emuToInches(value: number): number {
+  return value / EMU_PER_INCH;
+}
+
+function positionToBox(position: TemplatePosition): { x: number; y: number; w: number; h: number } {
+  return {
+    x: emuToInches(position.x),
+    y: emuToInches(position.y),
+    w: emuToInches(position.cx),
+    h: emuToInches(position.cy),
+  };
+}
+
+function resolveLocalImagePath(imageRef?: string): string | null {
+  if (!imageRef) return null;
+  const normalized = imageRef.startsWith("file://") ? imageRef.slice(7) : imageRef;
+  if (existsSync(normalized)) return normalized;
+
+  const cwdPath = join(process.cwd(), normalized);
+  if (existsSync(cwdPath)) return cwdPath;
+
+  return null;
+}
+
+function buildBulletParagraphs(items: string[]): TemplateTextParagraph[] {
+  return items.map((item) => {
+    const isBold = item.startsWith("**") && item.endsWith("**");
+    const cleanText = truncate(
+      stripMarkdownInline(isBold ? item.slice(2, -2) : item),
+      MAX_BULLET_CHARS,
+    );
+
+    return {
+      paragraph: {
+        bullet: true,
+        level: 0,
+        alignment: "l",
+        spaceAfter: 1200,
+      },
+      textRuns: [
+        {
+          text: cleanText,
+          style: isBold ? { isBold: true } : undefined,
+        },
+      ],
+    };
+  });
+}
+
+function buildPlainParagraphs(lines: string[]): TemplateTextParagraph[] {
+  return lines.map((line) => ({
+    paragraph: {
+      alignment: "l",
+      spaceAfter: 800,
+    },
+    textRuns: [{ text: line }],
+  }));
 }
 
 /** Path B: Convert Markdown text to Slide array */
@@ -850,9 +1124,7 @@ export function markdownToSlides(content: string): Slide[] {
     // Split into pages if too many bullets
     while (currentBullets.length > 0) {
       const batch = currentBullets.splice(0, MAX_BULLETS_PER_SLIDE);
-      const title = slides.some(
-        (s) => s.layout === "content" && s.title === currentTitle,
-      )
+      const title = slides.some((s) => s.layout === "content" && s.title === currentTitle)
         ? `${truncate(currentTitle, MAX_TITLE_CHARS - 4)} (续)`
         : truncate(currentTitle, MAX_TITLE_CHARS);
       slides.push({
@@ -1046,290 +1318,723 @@ export function tryParseSlideJson(content: string): SlidePresentation | null {
   return parsed as SlidePresentation;
 }
 
+function pickFirstSlot(...slotGroups: Array<NativeTemplateSlot[] | undefined>): NativeTemplateSlot | undefined {
+  for (const group of slotGroups) {
+    if (group && group.length > 0) return group[0];
+  }
+  return undefined;
+}
+
+function buildNativeTemplateSlides(templateInfos: NativeTemplateInfo[]): NativeTemplateSlide[] {
+  const templateInfo = templateInfos.find((info) => info.name === "__native_template__") ?? templateInfos.at(-1);
+  if (!templateInfo) return [];
+
+  return templateInfo.slides.map((slide) => {
+    const taggedSlots: Partial<Record<TemplateSlotTag, NativeTemplateSlot[]>> = {};
+    const titleFallback: NativeTemplateSlot[] = [];
+    const subtitleFallback: NativeTemplateSlot[] = [];
+    const bodyFallback: NativeTemplateSlot[] = [];
+    const footerFallback: NativeTemplateSlot[] = [];
+    const pageNumFallback: NativeTemplateSlot[] = [];
+    const tableAnchors: NativeTemplateSlot[] = [];
+    const imageAnchors: NativeTemplateSlot[] = [];
+    const selectors: TemplateSelector[] = [];
+
+    for (const element of slide.elements) {
+      const selector = buildTemplateSelector(element);
+      const position = element.position;
+      const slot: NativeTemplateSlot = { selector, position };
+      selectors.push(selector);
+
+      if (element.hasTextBody) {
+        const tags = extractTemplateTags(element.getText());
+        for (const tag of tags) {
+          if (!taggedSlots[tag]) {
+            taggedSlots[tag] = [];
+          }
+          taggedSlots[tag]?.push({ ...slot, explicitTag: tag });
+        }
+      }
+
+      let placeholderType: string | undefined;
+      try {
+        placeholderType = element.getPlaceholderInfo?.()?.type;
+      } catch {
+        placeholderType = undefined;
+      }
+
+      switch (placeholderType) {
+        case "title":
+        case "ctrTitle":
+          titleFallback.push(slot);
+          break;
+        case "subTitle":
+          subtitleFallback.push(slot);
+          break;
+        case "body":
+          bodyFallback.push(slot);
+          break;
+        case "ftr":
+          footerFallback.push(slot);
+          break;
+        case "sldNum":
+          pageNumFallback.push(slot);
+          break;
+        case "tbl":
+          tableAnchors.push(slot);
+          break;
+        case "pic":
+          imageAnchors.push(slot);
+          break;
+      }
+
+      if (element.visualType === "table") {
+        tableAnchors.push(slot);
+      }
+      if (IMAGE_VISUAL_TYPES.has(element.visualType)) {
+        imageAnchors.push(slot);
+      }
+    }
+
+    const sortedBodySlots = sortSlotsByPosition(uniqueSlots(bodyFallback));
+    const titleSlot = pickFirstSlot(normalizeSlots(taggedSlots.TITLE), normalizeSlots(titleFallback));
+    const subtitleSlot = pickFirstSlot(
+      normalizeSlots(taggedSlots.SUBTITLE),
+      normalizeSlots(subtitleFallback),
+      sortedBodySlots,
+    );
+    const bodySlot = pickFirstSlot(normalizeSlots(taggedSlots.BODY), sortedBodySlots);
+    const leftSlot = pickFirstSlot(normalizeSlots(taggedSlots.LEFT), sortedBodySlots);
+    const rightSlot = pickFirstSlot(
+      normalizeSlots(taggedSlots.RIGHT),
+      sortSlotsByPosition(
+        sortedBodySlots.filter((slot) => selectorKey(slot.selector) !== selectorKey(leftSlot?.selector ?? "")),
+      ),
+    );
+    const tableSlot = pickFirstSlot(
+      normalizeSlots(taggedSlots.TABLE),
+      normalizeSlots(tableAnchors),
+      bodySlot ? [bodySlot] : undefined,
+    );
+    const imageSlot = pickFirstSlot(
+      normalizeSlots(taggedSlots.IMAGE),
+      normalizeSlots(imageAnchors),
+      bodySlot ? [bodySlot] : undefined,
+    );
+
+    return {
+      slideId: slide.id as number,
+      slideNumber: slide.number as number,
+      layoutName: slide.info?.layoutName ?? `Slide ${slide.number}`,
+      selectors: uniqueSlots(selectors.map((selector) => ({
+        selector,
+        position: { x: 0, y: 0, cx: 0, cy: 0 },
+      }))).map((slot) => slot.selector),
+      titleSlot,
+      subtitleSlot,
+      bodySlot,
+      leftSlot,
+      rightSlot,
+      tableSlot,
+      imageSlot,
+      captionSlot: pickFirstSlot(normalizeSlots(taggedSlots.CAPTION)),
+      notesSlot: pickFirstSlot(normalizeSlots(taggedSlots.NOTES)),
+      footerSlot: pickFirstSlot(normalizeSlots(taggedSlots.FOOTER), normalizeSlots(footerFallback)),
+      pageNumSlot: pickFirstSlot(normalizeSlots(taggedSlots.PAGE_NUM), normalizeSlots(pageNumFallback)),
+    };
+  });
+}
+
+function layoutNameBonus(layoutName: string, layout: Slide["layout"]): number {
+  const name = layoutName.toLowerCase();
+  switch (layout) {
+    case "title":
+      return name.includes("title") || name.includes("cover") ? 6 : 0;
+    case "content":
+      return name.includes("content") || name.includes("body") ? 6 : 0;
+    case "two_column":
+      return name.includes("two") || name.includes("column") || name.includes("compare") ? 6 : 0;
+    case "table":
+      return name.includes("table") || name.includes("data") ? 6 : 0;
+    case "image":
+      return name.includes("image") || name.includes("photo") || name.includes("picture") ? 6 : 0;
+    case "blank":
+      return name.includes("blank") ? 6 : 0;
+  }
+}
+
+function scoreNativeTemplateSlide(templateSlide: NativeTemplateSlide, slide: Slide): number {
+  let score = layoutNameBonus(templateSlide.layoutName, slide.layout);
+
+  switch (slide.layout) {
+    case "title":
+      if (!templateSlide.titleSlot) return 0;
+      score += 40;
+      if (templateSlide.subtitleSlot) score += 10;
+      return score;
+    case "content":
+      if (!templateSlide.titleSlot || !templateSlide.bodySlot) return 0;
+      score += 60;
+      if (templateSlide.bodySlot.explicitTag === "BODY") score += 15;
+      return score;
+    case "two_column":
+      if (
+        !templateSlide.titleSlot ||
+        !templateSlide.leftSlot ||
+        !templateSlide.rightSlot ||
+        selectorKey(templateSlide.leftSlot.selector) === selectorKey(templateSlide.rightSlot.selector)
+      ) {
+        return 0;
+      }
+      score += 80;
+      if (templateSlide.leftSlot.explicitTag === "LEFT") score += 10;
+      if (templateSlide.rightSlot.explicitTag === "RIGHT") score += 10;
+      return score;
+    case "table":
+      if (!templateSlide.titleSlot || !templateSlide.tableSlot) return 0;
+      score += 70;
+      if (templateSlide.tableSlot.explicitTag === "TABLE") score += 15;
+      return score;
+    case "image":
+      if (!templateSlide.titleSlot || !templateSlide.imageSlot) return 0;
+      score += 70;
+      if (templateSlide.imageSlot.explicitTag === "IMAGE") score += 15;
+      return score;
+    case "blank":
+      score += 10;
+      if (
+        !templateSlide.bodySlot &&
+        !templateSlide.leftSlot &&
+        !templateSlide.rightSlot &&
+        !templateSlide.tableSlot &&
+        !templateSlide.imageSlot
+      ) {
+        score += 20;
+      }
+      return score;
+  }
+}
+
+function matchNativeTemplateSlide(
+  slide: Slide,
+  templateSlides: NativeTemplateSlide[],
+): NativeTemplateSlide | null {
+  const ranked = templateSlides
+    .map((templateSlide) => ({
+      templateSlide,
+      score: scoreNativeTemplateSlide(templateSlide, slide),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score || a.templateSlide.slideNumber - b.templateSlide.slideNumber);
+
+  return ranked[0]?.templateSlide ?? null;
+}
+
+function pickFallbackTemplateSlide(templateSlides: NativeTemplateSlide[]): NativeTemplateSlide | null {
+  if (templateSlides.length === 0) return null;
+
+  const ranked = [...templateSlides].sort((a, b) => {
+    const blankA = layoutNameBonus(a.layoutName, "blank");
+    const blankB = layoutNameBonus(b.layoutName, "blank");
+    if (blankA !== blankB) return blankB - blankA;
+    return a.selectors.length - b.selectors.length || a.slideNumber - b.slideNumber;
+  });
+
+  return ranked[0] ?? null;
+}
+
+function setTemplateText(
+  targetSlide: TemplateSlideController,
+  modify: TemplateModifyHelpers,
+  slot: NativeTemplateSlot | undefined,
+  value: string,
+) {
+  if (!slot) return;
+  if (slot.explicitTag) {
+    targetSlide.modifyElement(
+      slot.selector,
+      modify.replaceText({
+        replace: slot.explicitTag,
+        by: { text: value },
+      }),
+    );
+    return;
+  }
+  targetSlide.modifyElement(slot.selector, modify.setText(value));
+}
+
+function setTemplateParagraphs(
+  targetSlide: TemplateSlideController,
+  modify: TemplateModifyHelpers,
+  slot: NativeTemplateSlot | undefined,
+  paragraphs: TemplateTextParagraph[],
+) {
+  if (!slot) return;
+  if (paragraphs.length === 0) {
+    setTemplateText(targetSlide, modify, slot, "");
+    return;
+  }
+  targetSlide.modifyElement(slot.selector, modify.setMultiText(paragraphs));
+}
+
+function addTableToPptSlide(
+  pptSlide: PptCanvas,
+  slide: TableSlide,
+  theme: PptTheme,
+  box?: { x: number; y: number; w: number; h: number },
+) {
+  const width = box?.w ?? 11.0;
+  const colW = width / Math.max(slide.headers.length, 1);
+  const headerRow = slide.headers.map((header) => ({
+    text: truncate(stripMarkdownInline(header), MAX_CELL_CHARS),
+    options: {
+      bold: true as const,
+      fontSize: 11,
+      fontFace: theme.fonts.body.face,
+      fill: { color: theme.colors.tableHeader },
+      color: theme.colors.text,
+      align: "left" as const,
+      valign: "middle" as const,
+    },
+  }));
+  const dataRows = slide.rows.map((row, rowIdx) =>
+    row.map((cell) => ({
+      text: truncate(stripMarkdownInline(cell), MAX_CELL_CHARS),
+      options: {
+        fontSize: 10,
+        fontFace: theme.fonts.body.face,
+        fill: rowIdx % 2 === 1 ? { color: theme.colors.tableStripe } : undefined,
+        color: theme.colors.text,
+        align: "left" as const,
+        valign: "middle" as const,
+      },
+    })),
+  );
+
+  pptSlide.addTable([headerRow, ...dataRows], {
+    x: box?.x ?? 0.75,
+    y: box?.y ?? 1.5,
+    colW,
+    border: { type: "solid", pt: 0.5, color: "CCCCCC" },
+    autoPage: true,
+    autoPageRepeatHeader: true,
+  });
+}
+
+function addImageToPptSlide(
+  pptSlide: PptCanvas,
+  slide: ImageSlide,
+  theme: PptTheme,
+  box?: { x: number; y: number; w: number; h: number },
+  captionInSlot = false,
+) {
+  const imageBox = box ?? { x: 2.0, y: 1.5, w: 9.0, h: 5.0 };
+  const imagePath = resolveLocalImagePath(slide.imageRef);
+
+  if (imagePath) {
+    pptSlide.addImage({
+      path: imagePath,
+      x: imageBox.x,
+      y: imageBox.y,
+      w: imageBox.w,
+      h: imageBox.h,
+    });
+    if (!captionInSlot && slide.caption) {
+      pptSlide.addText(truncate(slide.caption, 100), {
+        x: imageBox.x,
+        y: imageBox.y + imageBox.h - 0.5,
+        w: imageBox.w,
+        h: 0.4,
+        fontSize: theme.fonts.caption.size,
+        fontFace: theme.fonts.caption.face,
+        color: theme.colors.textLight,
+        align: "center",
+        valign: "middle",
+      });
+    }
+    return;
+  }
+
+  pptSlide.addShape("rect" as PptxGenJS.ShapeType, {
+    x: imageBox.x,
+    y: imageBox.y,
+    w: imageBox.w,
+    h: imageBox.h,
+    fill: { color: "F3F4F6" },
+    line: { color: "D1D5DB", width: 1 },
+  });
+
+  if (!captionInSlot) {
+    pptSlide.addText(slide.caption || "[图片]", {
+      x: imageBox.x,
+      y: imageBox.y + imageBox.h / 2 - 0.4,
+      w: imageBox.w,
+      h: 0.8,
+      fontSize: theme.fonts.caption.size,
+      fontFace: theme.fonts.caption.face,
+      color: theme.colors.textLight,
+      align: "center",
+      valign: "middle",
+    });
+  }
+}
+
+function renderSlideWithTheme(pptSlide: PptCanvas, slide: Slide, theme: PptTheme = PPT_THEME) {
+  switch (slide.layout) {
+    case "title": {
+      pptSlide.background = { color: theme.colors.primary };
+      pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
+        x: 0.75,
+        y: 2.0,
+        w: 11.8,
+        h: 1.5,
+        fontSize: theme.fonts.title.size,
+        fontFace: theme.fonts.title.face,
+        bold: true,
+        color: "FFFFFF",
+        align: "center",
+        valign: "middle",
+      });
+      if (slide.subtitle) {
+        pptSlide.addText(truncate(slide.subtitle, 120), {
+          x: 0.75,
+          y: 3.8,
+          w: 11.8,
+          h: 1.0,
+          fontSize: theme.fonts.subtitle.size,
+          fontFace: theme.fonts.subtitle.face,
+          color: "CBD5E1",
+          align: "center",
+          valign: "middle",
+        });
+      }
+      break;
+    }
+    case "content": {
+      pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
+        x: 0.75,
+        y: 0.4,
+        w: 11.8,
+        h: 0.8,
+        fontSize: 24,
+        fontFace: theme.fonts.title.face,
+        bold: true,
+        color: theme.colors.text,
+      });
+      const bulletRows = slide.bullets.map((bullet) => {
+        const isBold = bullet.startsWith("**") && bullet.endsWith("**");
+        const text = isBold ? bullet.slice(2, -2) : stripMarkdownInline(bullet);
+        return {
+          text: truncate(text, MAX_BULLET_CHARS),
+          options: {
+            fontSize: theme.fonts.body.size,
+            fontFace: theme.fonts.body.face,
+            color: theme.colors.text,
+            bold: isBold,
+            bullet: true as const,
+            paraSpaceAfter: 6,
+          },
+        };
+      });
+      pptSlide.addText(bulletRows, {
+        x: 0.75,
+        y: 1.4,
+        w: 11.8,
+        h: 5.5,
+        valign: "top",
+        autoFit: true,
+      });
+      break;
+    }
+    case "two_column": {
+      pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
+        x: 0.75,
+        y: 0.4,
+        w: 11.8,
+        h: 0.8,
+        fontSize: 24,
+        fontFace: theme.fonts.title.face,
+        bold: true,
+        color: theme.colors.text,
+      });
+
+      const leftTitle = slide.left.title ? `${stripMarkdownInline(slide.left.title)}\n` : "";
+      const leftBullets = slide.left.bullets
+        .map((bullet) => `• ${truncate(stripMarkdownInline(bullet), 80)}`)
+        .join("\n");
+      pptSlide.addText(leftTitle + leftBullets, {
+        x: 0.75,
+        y: 1.5,
+        w: 5.5,
+        h: 5.0,
+        fontSize: theme.fonts.body.size,
+        fontFace: theme.fonts.body.face,
+        color: theme.colors.text,
+        valign: "top",
+        autoFit: true,
+      });
+
+      const rightTitle = slide.right.title ? `${stripMarkdownInline(slide.right.title)}\n` : "";
+      const rightBullets = slide.right.bullets
+        .map((bullet) => `• ${truncate(stripMarkdownInline(bullet), 80)}`)
+        .join("\n");
+      pptSlide.addText(rightTitle + rightBullets, {
+        x: 6.75,
+        y: 1.5,
+        w: 5.5,
+        h: 5.0,
+        fontSize: theme.fonts.body.size,
+        fontFace: theme.fonts.body.face,
+        color: theme.colors.text,
+        valign: "top",
+        autoFit: true,
+      });
+      break;
+    }
+    case "table": {
+      pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
+        x: 0.75,
+        y: 0.4,
+        w: 11.8,
+        h: 0.8,
+        fontSize: 24,
+        fontFace: theme.fonts.title.face,
+        bold: true,
+        color: theme.colors.text,
+      });
+      addTableToPptSlide(pptSlide, slide, theme);
+      break;
+    }
+    case "image": {
+      pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
+        x: 0.75,
+        y: 0.4,
+        w: 11.8,
+        h: 0.8,
+        fontSize: 24,
+        fontFace: theme.fonts.title.face,
+        bold: true,
+        color: theme.colors.text,
+      });
+      addImageToPptSlide(pptSlide, slide, theme);
+      break;
+    }
+    case "blank":
+    default:
+      break;
+  }
+}
+
+function addNotesToPptSlide(pptSlide: PptCanvas, slide: Slide) {
+  if ("notes" in slide && slide.notes && typeof pptSlide.addNotes === "function") {
+    pptSlide.addNotes(slide.notes.slice(0, 500));
+  }
+}
+
+function renderSlideWithNativeTemplate(
+  targetSlide: TemplateSlideController,
+  slide: Slide,
+  templateSlide: NativeTemplateSlide,
+  modify: TemplateModifyHelpers,
+  theme: PptTheme,
+  pageNumber: number,
+) {
+  setTemplateText(targetSlide, modify, templateSlide.titleSlot, "title" in slide ? truncate(slide.title, MAX_TITLE_CHARS) : "");
+  setTemplateText(targetSlide, modify, templateSlide.notesSlot, slide.notes?.slice(0, 500) ?? "");
+  setTemplateText(targetSlide, modify, templateSlide.footerSlot, "");
+  setTemplateText(targetSlide, modify, templateSlide.pageNumSlot, String(pageNumber));
+
+  switch (slide.layout) {
+    case "title":
+      setTemplateText(targetSlide, modify, templateSlide.subtitleSlot, slide.subtitle ? truncate(slide.subtitle, 120) : "");
+      break;
+    case "content":
+      setTemplateParagraphs(targetSlide, modify, templateSlide.bodySlot, buildBulletParagraphs(slide.bullets));
+      setTemplateText(targetSlide, modify, templateSlide.subtitleSlot, "");
+      break;
+    case "two_column": {
+      const leftParagraphs = [
+        ...(slide.left.title ? buildPlainParagraphs([truncate(stripMarkdownInline(slide.left.title), 80)]) : []),
+        ...buildBulletParagraphs(slide.left.bullets),
+      ];
+      const rightParagraphs = [
+        ...(slide.right.title ? buildPlainParagraphs([truncate(stripMarkdownInline(slide.right.title), 80)]) : []),
+        ...buildBulletParagraphs(slide.right.bullets),
+      ];
+      setTemplateParagraphs(targetSlide, modify, templateSlide.leftSlot, leftParagraphs);
+      setTemplateParagraphs(targetSlide, modify, templateSlide.rightSlot, rightParagraphs);
+      break;
+    }
+    case "table":
+      if (templateSlide.tableSlot) {
+        const tableBox = positionToBox(templateSlide.tableSlot.position);
+        targetSlide.removeElement(templateSlide.tableSlot.selector);
+        targetSlide.generate((pptSlide) => {
+          addTableToPptSlide(pptSlide, slide, theme, tableBox);
+        }, `native-table-${pageNumber}`);
+      }
+      break;
+    case "image":
+      if (templateSlide.imageSlot) {
+        const imageBox = positionToBox(templateSlide.imageSlot.position);
+        targetSlide.removeElement(templateSlide.imageSlot.selector);
+        targetSlide.generate((pptSlide) => {
+          addImageToPptSlide(
+            pptSlide,
+            slide,
+            theme,
+            imageBox,
+            Boolean(templateSlide.captionSlot),
+          );
+        }, `native-image-${pageNumber}`);
+      }
+      setTemplateText(targetSlide, modify, templateSlide.captionSlot, slide.caption ? truncate(slide.caption, 100) : "");
+      break;
+    case "blank":
+    default:
+      break;
+  }
+}
+
+function renderSlideOnFallbackCanvas(
+  targetSlide: TemplateSlideController,
+  slide: Slide,
+  canvasSlide: NativeTemplateSlide,
+  theme: PptTheme,
+  pageNumber: number,
+) {
+  for (const selector of canvasSlide.selectors) {
+    targetSlide.removeElement(selector);
+  }
+
+  targetSlide.generate((pptSlide) => {
+    renderSlideWithTheme(pptSlide, slide, theme);
+    addNotesToPptSlide(pptSlide, slide);
+  }, `native-fallback-${pageNumber}`);
+}
+
 /** Render Slide array to PPTX buffer using PptxGenJS */
 async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME): Promise<Buffer> {
   const pptx = new PptxGenJS();
-  pptx.layout = "LAYOUT_WIDE"; // 13.33 x 7.5 inches (16:9)
+  pptx.layout = "LAYOUT_WIDE";
 
   for (const slide of slides) {
-    const pptSlide = pptx.addSlide();
-
-    switch (slide.layout) {
-      case "title": {
-        pptSlide.background = { color: theme.colors.primary };
-        pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
-          x: 0.75,
-          y: 2.0,
-          w: 11.8,
-          h: 1.5,
-          fontSize: theme.fonts.title.size,
-          fontFace: theme.fonts.title.face,
-          bold: true,
-          color: "FFFFFF",
-          align: "center",
-          valign: "middle",
-        });
-        if (slide.subtitle) {
-          pptSlide.addText(truncate(slide.subtitle, 120), {
-            x: 0.75,
-            y: 3.8,
-            w: 11.8,
-            h: 1.0,
-            fontSize: theme.fonts.subtitle.size,
-            fontFace: theme.fonts.subtitle.face,
-            color: "CBD5E1",
-            align: "center",
-            valign: "middle",
-          });
-        }
-        break;
-      }
-
-      case "content": {
-        pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
-          x: 0.75,
-          y: 0.4,
-          w: 11.8,
-          h: 0.8,
-          fontSize: 24,
-          fontFace: theme.fonts.title.face,
-          bold: true,
-          color: theme.colors.text,
-        });
-        const bulletRows = slide.bullets.map((b) => {
-          const isBold = b.startsWith("**") && b.endsWith("**");
-          const text = isBold ? b.slice(2, -2) : stripMarkdownInline(b);
-          return {
-            text: truncate(text, MAX_BULLET_CHARS),
-            options: {
-              fontSize: theme.fonts.body.size,
-              fontFace: theme.fonts.body.face,
-              color: theme.colors.text,
-              bold: isBold,
-              bullet: true as const,
-              paraSpaceAfter: 6,
-            },
-          };
-        });
-        pptSlide.addText(bulletRows, {
-          x: 0.75,
-          y: 1.4,
-          w: 11.8,
-          h: 5.5,
-          valign: "top",
-          autoFit: true,
-        });
-        break;
-      }
-
-      case "two_column": {
-        pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
-          x: 0.75,
-          y: 0.4,
-          w: 11.8,
-          h: 0.8,
-          fontSize: 24,
-          fontFace: theme.fonts.title.face,
-          bold: true,
-          color: theme.colors.text,
-        });
-        // Left column
-        const leftTitle = slide.left.title ? `${stripMarkdownInline(slide.left.title)}\n` : "";
-        const leftBullets = slide.left.bullets.map((b) => `• ${truncate(stripMarkdownInline(b), 80)}`).join("\n");
-        pptSlide.addText(leftTitle + leftBullets, {
-          x: 0.75,
-          y: 1.5,
-          w: 5.5,
-          h: 5.0,
-          fontSize: theme.fonts.body.size,
-          fontFace: theme.fonts.body.face,
-          color: theme.colors.text,
-          valign: "top",
-          autoFit: true,
-        });
-        // Right column
-        const rightTitle = slide.right.title ? `${stripMarkdownInline(slide.right.title)}\n` : "";
-        const rightBullets = slide.right.bullets.map((b) => `• ${truncate(stripMarkdownInline(b), 80)}`).join("\n");
-        pptSlide.addText(rightTitle + rightBullets, {
-          x: 6.75,
-          y: 1.5,
-          w: 5.5,
-          h: 5.0,
-          fontSize: theme.fonts.body.size,
-          fontFace: theme.fonts.body.face,
-          color: theme.colors.text,
-          valign: "top",
-          autoFit: true,
-        });
-        break;
-      }
-
-      case "table": {
-        pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
-          x: 0.75,
-          y: 0.4,
-          w: 11.8,
-          h: 0.8,
-          fontSize: 24,
-          fontFace: theme.fonts.title.face,
-          bold: true,
-          color: theme.colors.text,
-        });
-        const colW = 11.0 / Math.max(slide.headers.length, 1);
-        const headerRow = slide.headers.map((h) => ({
-          text: truncate(stripMarkdownInline(h), MAX_CELL_CHARS),
-          options: {
-            bold: true as const,
-            fontSize: 11,
-            fontFace: theme.fonts.body.face,
-            fill: { color: theme.colors.tableHeader },
-            color: theme.colors.text,
-            align: "left" as const,
-            valign: "middle" as const,
-          },
-        }));
-        const dataRows = slide.rows.map((row, rowIdx) =>
-          row.map((cell) => ({
-            text: truncate(stripMarkdownInline(cell), MAX_CELL_CHARS),
-            options: {
-              fontSize: 10,
-              fontFace: theme.fonts.body.face,
-              fill: rowIdx % 2 === 1 ? { color: theme.colors.tableStripe } : undefined,
-              color: theme.colors.text,
-              align: "left" as const,
-              valign: "middle" as const,
-            },
-          })),
-        );
-        pptSlide.addTable([headerRow, ...dataRows], {
-          x: 0.75,
-          y: 1.5,
-          colW,
-          border: { type: "solid", pt: 0.5, color: "CCCCCC" },
-          autoPage: true,
-          autoPageRepeatHeader: true,
-        });
-        break;
-      }
-
-      case "image": {
-        pptSlide.addText(truncate(slide.title, MAX_TITLE_CHARS), {
-          x: 0.75,
-          y: 0.4,
-          w: 11.8,
-          h: 0.8,
-          fontSize: 24,
-          fontFace: theme.fonts.title.face,
-          bold: true,
-          color: theme.colors.text,
-        });
-        // Placeholder for image
-        pptSlide.addShape("rect" as PptxGenJS.ShapeType, {
-          x: 2.0,
-          y: 1.5,
-          w: 9.0,
-          h: 5.0,
-          fill: { color: "F3F4F6" },
-          line: { color: "D1D5DB", width: 1 },
-        });
-        pptSlide.addText(slide.caption || "[图片]", {
-          x: 2.0,
-          y: 3.5,
-          w: 9.0,
-          h: 1.0,
-          fontSize: theme.fonts.caption.size,
-          fontFace: theme.fonts.caption.face,
-          color: theme.colors.textLight,
-          align: "center",
-          valign: "middle",
-        });
-        break;
-      }
-
-      case "blank":
-      default:
-        // Empty slide
-        break;
-    }
-
-    // Add notes if present
-    if ("notes" in slide && slide.notes) {
-      pptSlide.addNotes(slide.notes.slice(0, 500));
-    }
+    const pptSlide = pptx.addSlide() as unknown as PptCanvas;
+    renderSlideWithTheme(pptSlide, slide, theme);
+    addNotesToPptSlide(pptSlide, slide);
   }
 
   const output = await pptx.write({ outputType: "nodebuffer" });
   return Buffer.from(output as ArrayBuffer);
 }
 
-/** Generate PPT buffer from content, optionally applying a PPT template */
-async function generatePptBuffer(content: string, templateId?: string | null): Promise<Buffer> {
-  // Try to load a PPT template if specified
-  if (templateId) {
+async function renderSlidesWithNativeTemplate(
+  slides: Slide[],
+  templateBuffer: Buffer,
+  theme: PptTheme = PPT_THEME,
+): Promise<Buffer> {
+  const { default: AutomizerCls, modify } = await import("pptx-automizer");
+  const automizer = new AutomizerCls({
+    templateDir: "",
+    outputDir: "",
+    removeExistingSlides: true,
+    useCreationIds: true,
+  });
+
+  automizer.loadRoot(templateBuffer).load(templateBuffer, "__native_template__");
+  const templateInfos = await automizer.setCreationIds();
+  const templateSlides = buildNativeTemplateSlides(templateInfos as NativeTemplateInfo[]);
+  const fallbackCanvas = pickFallbackTemplateSlide(templateSlides);
+
+  if (templateSlides.length === 0 || !fallbackCanvas) {
+    throw new Error("PPT 模板中没有可用的幻灯片布局");
+  }
+
+  slides.forEach((slide, index) => {
+    const matchedTemplateSlide = matchNativeTemplateSlide(slide, templateSlides);
+    const sourceSlide = matchedTemplateSlide ?? fallbackCanvas;
+
+    automizer.addSlide("__native_template__", sourceSlide.slideId, (targetSlide) => {
+      const templateTargetSlide = targetSlide as unknown as TemplateSlideController;
+      if (!matchedTemplateSlide) {
+        console.warn(
+          `[export] PPT template missing layout for "${slide.layout}", falling back to generated slide`,
+        );
+        renderSlideOnFallbackCanvas(templateTargetSlide, slide, sourceSlide, theme, index + 1);
+        return;
+      }
+
+      try {
+        renderSlideWithNativeTemplate(
+          templateTargetSlide,
+          slide,
+          matchedTemplateSlide,
+          modify,
+          theme,
+          index + 1,
+        );
+      } catch (err) {
+        console.warn(
+          `[export] Failed to render native PPT template slide "${matchedTemplateSlide.layoutName}", falling back to generated slide:`,
+          err instanceof Error ? err.message : err,
+        );
+        renderSlideOnFallbackCanvas(templateTargetSlide, slide, sourceSlide, theme, index + 1);
+      }
+    });
+  });
+
+  const zip = await automizer.getJSZip();
+  const output = await zip.generateAsync({ type: "nodebuffer" });
+  return Buffer.from(output);
+}
+
+async function resolvePptTemplate(templateId?: string | null) {
+  const defaultTemplate = await getDefaultTemplate();
+  const candidateIds = [...new Set([templateId, defaultTemplate?.id ?? null].filter(Boolean))] as string[];
+
+  for (const candidateId of candidateIds) {
     try {
-      const template = await getPptTemplate(templateId);
-
-      if (template.type === "native_pptx" && template.templateFilePath) {
-        // native_pptx: use pptx-automizer to load template and replace placeholders
-        const { default: AutomizerCls, modify: mod } = await import("pptx-automizer");
-        const templateBuffer = await readFile(template.templateFilePath);
-        const automizer = new AutomizerCls({ templateDir: "", outputDir: "" });
-        automizer.loadRoot(templateBuffer);
-
-        const structured = tryParseSlideJson(content);
-        const slides = structured ? structured.slides : markdownToSlides(content);
-
-        // For each slide, copy template slide 1 and replace {{TITLE}}/{{BODY}} placeholders
-        for (const slide of slides) {
-          const title = "title" in slide ? slide.title : "";
-          let body = "";
-          if (slide.layout === "content") {
-            body = slide.bullets.join("\n");
-          } else if (slide.layout === "two_column") {
-            body = [...slide.left.bullets, ...slide.right.bullets].join("\n");
-          } else if (slide.layout === "table") {
-            body = [slide.headers.join(" | "), ...slide.rows.map((r) => r.join(" | "))].join("\n");
-          } else if (slide.layout === "title") {
-            body = ("subtitle" in slide && slide.subtitle) || "";
-          }
-
-          const replaceTitle = mod.replaceText({ replace: "TITLE", by: { text: title } });
-          const replaceBody = mod.replaceText({ replace: "BODY", by: { text: body } });
-
-          automizer.addSlide("root", 1, (slideMod) => {
-            slideMod.modifyElement("{{TITLE}}", replaceTitle);
-            slideMod.modifyElement("{{BODY}}", replaceBody);
-          });
-        }
-
-        // Write to a temp file and read back as buffer
-        const tmpPath = join(getExportPath("_tmp"), `automizer-${Date.now()}.pptx`);
-        await mkdir(join(getExportPath("_tmp")), { recursive: true });
-        await automizer.write(tmpPath);
-        const output = await readFile(tmpPath);
-        // Clean up temp file (best-effort)
-        import("node:fs/promises").then((fs) => fs.unlink(tmpPath).catch(() => {}));
-        return output;
-      }
-
-      if (template.type === "code_theme" && template.themeConfig) {
-        // code_theme: merge themeConfig colors/fonts over PPT_THEME defaults
-        const theme = buildThemeFromConfig(template.themeConfig as Record<string, unknown>);
-        const structured = tryParseSlideJson(content);
-        const slides = structured ? structured.slides : markdownToSlides(content);
-        return renderSlidesToPptx(slides, theme);
-      }
+      return await getPptTemplate(candidateId);
     } catch (err) {
       console.warn(
-        `[export] Failed to load PPT template ${templateId}, falling back to default theme:`,
+        `[export] Failed to resolve PPT template ${candidateId}, trying next fallback:`,
         err instanceof Error ? err.message : err,
       );
     }
   }
 
-  // Default: no template or fallback after load failure
+  return null;
+}
+
+function resolveSlidesForPpt(content: string): Slide[] {
   const structured = tryParseSlideJson(content);
-  const slides = structured ? structured.slides : markdownToSlides(content);
+  return structured ? structured.slides : markdownToSlides(content);
+}
+
+/** Generate PPT buffer from content, optionally applying a PPT template */
+async function generatePptBuffer(content: string, templateId?: string | null): Promise<Buffer> {
+  const slides = resolveSlidesForPpt(content);
+  const template = await resolvePptTemplate(templateId);
+
+  if (template) {
+    try {
+      if (template.type === "native_pptx" && template.templateFilePath) {
+        const templateBuffer = await readFile(template.templateFilePath);
+        return await renderSlidesWithNativeTemplate(slides, templateBuffer);
+      }
+
+      if (template.type === "code_theme" && template.themeConfig) {
+        const theme = buildThemeFromConfig(template.themeConfig as Record<string, unknown>);
+        return await renderSlidesToPptx(slides, theme);
+      }
+    } catch (err) {
+      console.warn(
+        `[export] Failed to apply PPT template ${template.id}, falling back to default theme:`,
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
   return renderSlidesToPptx(slides);
 }
 

@@ -57,12 +57,15 @@ export default function PptTemplateManagement() {
 
   const pageSize = 20;
 
-  async function fetchTemplates() {
+  async function fetchTemplates(nextPage = page()) {
     setLoading(true);
     try {
-      const res = await listTemplates(page(), pageSize);
+      const res = await listTemplates(nextPage, pageSize, undefined, {
+        includeInactive: true,
+      });
       setTemplates(res.data);
-      setTotal(res.total);
+      setTotal(res.pagination.total);
+      setPage(res.pagination.page);
     } catch {
       showToast("加载模板列表失败", "error");
     } finally {
@@ -132,8 +135,11 @@ export default function PptTemplateManagement() {
     }
     setSubmitting(true);
     try {
-      await uploadTemplate(file, uploadName(), uploadDesc() || undefined);
+      const result = await uploadTemplate(file, uploadName(), uploadDesc() || undefined);
       showToast("模板上传成功", "success");
+      if (result.validation.warnings.length > 0) {
+        showToast(`模板已上传，但有 ${result.validation.warnings.length} 条校验警告`, "error");
+      }
       setShowUploadModal(false);
       await fetchTemplates();
     } catch (err: unknown) {
@@ -325,6 +331,10 @@ export default function PptTemplateManagement() {
     delete: (t) => `确定删除模板「${t.name}」？此操作不可撤销。`,
     setDefault: (t) => `确定将「${t.name}」设为默认模板？`,
   };
+  const confirmMessage = () => {
+    const action = confirmAction();
+    return action ? confirmMessages[action.action](action.template) : "";
+  };
 
   return (
     <div class="p-6">
@@ -366,8 +376,7 @@ export default function PptTemplateManagement() {
         pageSize={pageSize}
         total={total()}
         onPageChange={(p) => {
-          setPage(p);
-          fetchTemplates();
+          void fetchTemplates(p);
         }}
       />
 
@@ -474,9 +483,7 @@ export default function PptTemplateManagement() {
       {/* Confirm Modal */}
       <Modal isOpen={!!confirmAction()} onClose={() => setConfirmAction(null)} title="确认操作">
         <div class="space-y-4">
-          <p class="text-sm text-slate-700">
-            {confirmAction() ? confirmMessages[confirmAction()!.action](confirmAction()!.template) : ""}
-          </p>
+          <p class="text-sm text-slate-700">{confirmMessage()}</p>
           <div class="flex justify-end gap-3 pt-2">
             <button type="button" class={cancelBtnClass} onClick={() => setConfirmAction(null)}>取消</button>
             <button

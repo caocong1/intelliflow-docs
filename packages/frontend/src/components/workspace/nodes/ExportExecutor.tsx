@@ -1,7 +1,8 @@
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
-import { For, Show, createSignal, onMount } from "solid-js";
-import { api, generateExport, getExportPreview } from "../../../api/client";
+import { For, Show, createMemo, createResource, createSignal, onMount } from "solid-js";
+import { advanceNode, generateExport, getExportPreview } from "../../../api/client";
 import { downloadBlobResponse, type DownloadProgress } from "../../../lib/download";
+import { listTemplates, type PptTemplate } from "../../../lib/api/ppt-templates";
 import { sanitizeHtml } from "../../../lib/sanitize";
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
@@ -32,8 +33,13 @@ interface Props {
   config: ExportConfig;
   documentId: string;
   onDraftSave: (data: Record<string, unknown>) => void;
-  onExported?: () => Promise<void> | void;
+  onCompleted?: () => Promise<void> | void;
   readOnly: boolean;
+}
+
+async function fetchPptTemplates(): Promise<PptTemplate[]> {
+  const res = await listTemplates(1, 100, undefined, { includeInactive: false });
+  return res.data;
 }
 
 export default function ExportExecutor(props: Props) {
@@ -76,14 +82,35 @@ export default function ExportExecutor(props: Props) {
   const [previewContent, setPreviewContent] = createSignal("");
   const [previewLoading, setPreviewLoading] = createSignal(true);
   const [exporting, setExporting] = createSignal(false);
+  const [completing, setCompleting] = createSignal(false);
   const [downloading, setDownloading] = createSignal(false);
   const [downloadProgress, setDownloadProgress] = createSignal<DownloadProgress | null>(null);
+  const [selectedPptTemplateId, setSelectedPptTemplateId] = createSignal<string | null>(null);
   const [exportResult, setExportResult] = createSignal<{
     filename: string;
     format: string;
     fileSize: number;
   } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
+  const [pptTemplates] = createResource(fetchPptTemplates);
+  const latestExportResult = createMemo(() => {
+    const local = exportResult();
+    if (local) return local;
+    const output = props.nodeExecution.outputData as Record<string, unknown> | null;
+    if (
+      output &&
+      typeof output.filename === "string" &&
+      typeof output.format === "string" &&
+      typeof output.fileSize === "number"
+    ) {
+      return {
+        filename: output.filename,
+        format: output.format,
+        fileSize: output.fileSize,
+      };
+    }
+    return null;
+  });
 
   onMount(async () => {
     try {
@@ -119,11 +146,14 @@ export default function ExportExecutor(props: Props) {
     setError(null);
 
     try {
+      const runtimeTemplateId =
+        format() === "pptx" ? selectedPptTemplateId() ?? null : undefined;
       const result = await generateExport(
         props.documentId,
         props.nodeExecution.id,
         format(),
         filename(),
+        runtimeTemplateId,
       );
 
       if (result && !("error" in result)) {
@@ -134,7 +164,6 @@ export default function ExportExecutor(props: Props) {
         });
         setExporting(false);
         await triggerDownload();
-        await props.onExported?.();
       } else {
         const errMsg =
           typeof result === "object" && result !== null && "error" in result
@@ -146,6 +175,25 @@ export default function ExportExecutor(props: Props) {
       setError("导出失败，请重试");
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function handleComplete() {
+    if (completing()) return;
+    setCompleting(true);
+    setError(null);
+
+    try {
+      const result = await advanceNode(props.documentId, props.nodeExecution.id);
+      if (result && !("error" in result)) {
+        await props.onCompleted?.();
+      } else {
+        setError("完成导出失败，请重试");
+      }
+    } catch {
+      setError("完成导出失败，请重试");
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -394,6 +442,30 @@ export default function ExportExecutor(props: Props) {
             </span>
           </div>
         </div>
+
+        <Show when={format() === "pptx"}>
+          <div>
+            <span class="block text-xs font-medium text-[#464555] mb-1">PPT 模板</span>
+            <select
+              value={selectedPptTemplateId() ?? ""}
+              onChange={(e) => setSelectedPptTemplateId(e.currentTarget.value || null)}
+              class="w-full px-3 py-2 text-sm border border-[rgba(199,196,216,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] bg-[#f7f9fb] text-[#191c1e]"
+            >
+              <option value="">不套用模板</option>
+              <For each={pptTemplates() ?? []}>
+                {(template) => (
+                  <option value={template.id}>
+                    {template.name}
+                    {template.type === "native_pptx" ? "（原生模板）" : "（主题）"}
+                  </option>
+                )}
+              </For>
+            </select>
+            <p class="mt-1 text-xs text-[#6b7280]">
+              运行时可反复切换模板导出；确认满意后再点击“完成导出”结束本步骤。
+            </p>
+          </div>
+        </Show>
       </div>
 
       {/* Preview area */}
@@ -438,7 +510,7 @@ export default function ExportExecutor(props: Props) {
       </Show>
 
       {/* Export result */}
-      <Show when={exportResult()}>
+      <Show when={latestExportResult()}>
         {(result) => (
           <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)]">
             <div class="flex items-center gap-4 p-4 bg-green-50 rounded-xl border border-[rgba(199,196,216,0.15)]">
@@ -498,7 +570,15 @@ export default function ExportExecutor(props: Props) {
       </Show>
 
       {/* Action buttons */}
-      <div class="px-6 py-4 flex justify-end">
+      <div class="px-6 py-4 flex justify-end gap-3">
+        <button
+          type="button"
+          class="px-5 py-2.5 text-sm font-semibold text-[#3525cd] bg-white border border-[#c3c0ff] rounded-xl hover:bg-[#f8f7ff] transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+          disabled={completing() || !latestExportResult()}
+          onClick={handleComplete}
+        >
+          {completing() ? "完成中..." : "完成导出"}
+        </button>
         <button
           type="button"
           class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
@@ -521,7 +601,7 @@ export default function ExportExecutor(props: Props) {
               />
             </svg>
           </Show>
-          {exporting() ? "正在生成..." : downloading() ? "正在下载..." : "下载文件"}
+          {exporting() ? "正在生成..." : downloading() ? "正在下载..." : "导出并下载"}
         </button>
       </div>
     </div>

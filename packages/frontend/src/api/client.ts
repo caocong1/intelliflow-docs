@@ -162,8 +162,13 @@ export async function generateExport(
   nodeExecutionId: string,
   format: string,
   filename: string,
+  templateId?: string | null,
 ): Promise<{ filename: string; format: string; fileSize: number; storagePath: string } | null> {
-  const res = await runtimeOf(documentId).export[nodeExecutionId].generate.post({ format, filename });
+  const res = await runtimeOf(documentId).export[nodeExecutionId].generate.post({
+    format,
+    filename,
+    templateId,
+  });
   if ("data" in res) return res.data;
   return null;
 }

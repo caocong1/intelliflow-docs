@@ -805,7 +805,7 @@ export default function DocumentWorkspace() {
               config={getNodeConfig(nodeAccessor()) as ExportConfig}
               documentId={docId}
               onDraftSave={draftSave}
-              onExported={fetchRuntimeState}
+              onCompleted={fetchRuntimeState}
               readOnly={readOnly()}
             />
           );

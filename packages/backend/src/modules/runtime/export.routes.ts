@@ -2,7 +2,6 @@ import Elysia, { t } from "elysia";
 import { requireAuth } from "../auth/auth.guard";
 import { canEditDocument, isDocumentProjectMember } from "../versions/versions.service";
 import { downloadExport, generateExport, getExportPreview } from "./export.service";
-import { advanceNode } from "./runtime.service";
 
 export const exportRoutes = new Elysia({ prefix: "/runtime" })
   .use(requireAuth)
@@ -62,10 +61,8 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
           body.format,
           body.filename,
           userId,
+          body.templateId,
         );
-        // Export is the terminal user action for this node. Once the file is
-        // generated, advance the runtime so the document can leave in_progress.
-        await advanceNode(params.documentId, params.nodeExecutionId, userId);
         return result;
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
@@ -83,6 +80,7 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
           t.Literal("pptx"),
         ]),
         filename: t.String(),
+        templateId: t.Optional(t.Nullable(t.String())),
       }),
     },
   )

@@ -1,19 +1,7 @@
-import { For, Show, createSignal, createResource } from "solid-js";
+import { For, Show, createSignal } from "solid-js";
 import type { ExportConfig, VariableRef, OutputDef } from "@intelliflow/shared";
 import type { FlowNodeData } from "../../../lib/flow-engine/types";
-import { listTemplates, type PptTemplate } from "../../../lib/api/ppt-templates";
 import VariablePicker from "../prompt/VariablePicker";
-
-async function fetchPptTemplates(): Promise<{
-  templates: PptTemplate[];
-  defaultTemplate: PptTemplate | null;
-}> {
-  const res = await listTemplates(1, 100);
-  return {
-    templates: res.data,
-    defaultTemplate: res.data.find((tpl) => tpl.isDefault) ?? null,
-  };
-}
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
 
@@ -35,14 +23,11 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
   const [showPicker, setShowPicker] = createSignal(false);
   const [dragIndex, setDragIndex] = createSignal<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = createSignal<number | null>(null);
-  const [pptTemplateState] = createResource(fetchPptTemplates);
 
   const mapping = () => props.config.contentMapping ?? [];
   const formats = () => props.config.formats ?? [];
-  const hasPptx = () => formats().includes("pptx");
   const hasDocFormat = () => formats().includes("word") || formats().includes("pdf");
-  const defaultPptTemplate = () => pptTemplateState()?.defaultTemplate ?? null;
-  const defaultPptTemplateName = () => defaultPptTemplate()?.name ?? "";
+  const hasPptx = () => formats().includes("pptx");
 
   function addMapping(ref: VariableRef) {
     // Avoid duplicates
@@ -172,50 +157,11 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
             </div>
           </Show>
 
-          {/* PPT template dropdown */}
           <Show when={hasPptx()}>
             <div>
-              <label for="export-template-pptx" class="block text-xs font-medium text-gray-600 mb-1">PPT 模板</label>
-              <select
-                id="export-template-pptx"
-                value={props.config.templateBindings?.pptx ?? ""}
-                onChange={(e) => {
-                  const val = e.currentTarget.value || undefined;
-                  const bindings = { ...props.config.templateBindings };
-                  if (val) {
-                    bindings.pptx = val;
-                  } else {
-                    bindings.pptx = undefined;
-                  }
-                  props.onChange({ ...props.config, templateBindings: bindings });
-                }}
-                class="w-full text-xs px-2.5 py-1.5 border border-gray-300 rounded-md bg-white text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-400 cursor-pointer"
-              >
-                <option value="">
-                  {defaultPptTemplate() ? `系统默认模板：${defaultPptTemplateName()}` : "内置默认主题"}
-                </option>
-                <Show when={pptTemplateState.loading}>
-                  <option disabled>加载中…</option>
-                </Show>
-                <For each={pptTemplateState()?.templates ?? []}>
-                  {(tpl) => (
-                    <option value={tpl.id}>
-                      {tpl.name}{tpl.type === "native_pptx" ? "（品牌模板）" : "（主题）"}
-                    </option>
-                  )}
-                </For>
-              </select>
-              <Show when={defaultPptTemplate()}>
-                <p class="text-xs text-slate-500 mt-1">
-                  未显式绑定时，将自动使用系统默认模板「{defaultPptTemplateName()}」。
-                </p>
-              </Show>
-              <Show when={!defaultPptTemplate() && !pptTemplateState.error}>
-                <p class="text-xs text-slate-500 mt-1">未显式绑定时，将回退到系统内置主题。</p>
-              </Show>
-              <Show when={pptTemplateState.error}>
-                <p class="text-xs text-amber-600 mt-1">PPT 模板加载失败，将使用默认主题</p>
-              </Show>
+              <p class="text-xs text-slate-500 leading-5">
+                PPT 模板不再在流程里预绑定。用户执行到导出节点时，可按本次需要手动选择模板并多次导出下载。
+              </p>
             </div>
           </Show>
         </div>

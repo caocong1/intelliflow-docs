@@ -2440,6 +2440,7 @@ export async function generateExport(
   format: "word" | "pdf" | "markdown" | "pptx",
   filename: string,
   userId: string,
+  templateIdOverride?: string | null,
 ): Promise<{ filename: string; storagePath: string; fileSize: number; format: string }> {
   // Load export config for contentMapping
   const config = await loadNodeConfig(documentId, nodeExecutionId);
@@ -2466,7 +2467,10 @@ export async function generateExport(
       break;
     }
     case "pptx": {
-      const pptxTemplateId = config?.templateBindings?.pptx ?? config?.templateId ?? null;
+      const pptxTemplateId =
+        templateIdOverride !== undefined
+          ? templateIdOverride
+          : config?.templateBindings?.pptx ?? config?.templateId ?? null;
       buffer = await generatePptBuffer(content, pptxTemplateId);
       mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
       break;

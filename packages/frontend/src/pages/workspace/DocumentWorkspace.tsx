@@ -685,6 +685,7 @@ export default function DocumentWorkspace() {
               config={getNodeConfig(nodeAccessor()) as ExportConfig}
               documentId={docId}
               onDraftSave={draftSave}
+              onExported={fetchRuntimeState}
               readOnly={readOnly()}
             />
           );
@@ -940,381 +941,299 @@ export default function DocumentWorkspace() {
                     </Show>
                   </div>
                 </div>
-
               </div>
             </div>
 
             {/* Content + Sidebar layout */}
             <div class="flex flex-1 min-h-0">
               {/* Content area */}
-              <div
-                class="flex-1 overflow-y-auto px-6 py-6"
-                style={{ "padding-bottom": "2rem" }}
-              >
-              <div class="space-y-6">
-                <Switch>
-                  {/* Viewing completed node history */}
-                  <Match when={viewMode() === "history" ? viewedNode() : undefined}>
-                    {(viewed) => (
-                      <div class="space-y-4">
-                        <Show when={!readOnly()}>
-                          <h2 class="text-sm font-medium" style={{ color: "#191c1e" }}>
-                            历史记录: {viewed().nodeLabel}
-                          </h2>
-                        </Show>
-                        <CompletedViewRouter
-                          node={viewed()}
-                          config={getNodeConfig(viewed())}
-                          documentId={params.documentId}
-                          onFullscreen={(content, title) =>
-                            setFullscreenContent({ content, title })
-                          }
-                          onReexecute={() => {
-                            const idx = s().nodes.findIndex((n) => n.id === viewed().id);
-                            if (idx >= 0) setShowReexecDialog(idx);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </Match>
-
-                  {/* Failed node summary with retry — shown when generation failed */}
-                  <Match when={viewMode() === "current" && hasFailedNodes() && !isGenerating()}>
-                    <div class="space-y-6">
-                      {/* Failed banner */}
-                      <section
-                        class="rounded-xl p-6"
-                        style={{
-                          background: "#fef2f2",
-                          border: "1px solid rgba(220,38,38,0.15)",
-                        }}
-                      >
-                        <div class="flex items-start gap-4">
-                          <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                            <svg
-                              class="w-5 h-5 text-red-600"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              aria-hidden="true"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
-                              />
-                            </svg>
-                          </div>
-                          <div class="flex-1">
-                            <h3 class="text-lg font-bold" style={{ color: "#991b1b" }}>
-                              文档生成失败
-                            </h3>
-                            <p class="text-sm mt-1" style={{ color: "#b91c1c" }}>
-                              部分节点执行出错，请查看下方详情后重试。
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            class="px-5 py-2.5 rounded-lg text-sm font-bold text-white transition-all cursor-pointer border-0 flex items-center gap-2"
-                            style={{
-                              background: "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)",
-                              "box-shadow": "0 4px 12px rgba(79,70,229,0.2)",
-                            }}
-                            disabled={actionLoading()}
-                            onClick={handleRetryGeneration}
-                          >
-                            <svg
-                              class="w-4 h-4"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                              aria-hidden="true"
-                            >
-                              <path
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                stroke-width="2"
-                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                              />
-                            </svg>
-                            重新生成
-                          </button>
-                        </div>
-                      </section>
-
-                      {/* Failed node details */}
-                      <For each={s().nodes.filter((n) => n.status === "failed")}>
-                        {(node) => (
-                          <div
-                            class="rounded-xl p-5"
-                            style={{
-                              background: "#ffffff",
-                              border: "1px solid rgba(220,38,38,0.2)",
-                              "box-shadow": "0 2px 8px rgba(220,38,38,0.06)",
-                            }}
-                          >
-                            <div class="flex items-center gap-3 mb-3">
-                              <span
-                                class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                                style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}
-                              >
-                                失败
-                              </span>
-                              <span class="text-sm font-semibold" style={{ color: "#191c1e" }}>
-                                步骤 {node.stepOrder + 1}: {node.nodeLabel}
-                              </span>
-                              <span class="text-xs" style={{ color: "#464555" }}>
-                                ({node.nodeType})
-                              </span>
-                            </div>
-                            <Show when={node.errorMessage}>
-                              <div
-                                class="rounded-lg px-4 py-3 text-sm"
-                                style={{ background: "#fef2f2", color: "#991b1b" }}
-                              >
-                                {node.errorMessage}
-                              </div>
-                            </Show>
-                          </div>
-                        )}
-                      </For>
-
-                      {/* Completed nodes before failure */}
-                      <Show when={s().nodes.some((n) => n.status === "completed")}>
+              <div class="flex-1 overflow-y-auto px-6 py-6" style={{ "padding-bottom": "2rem" }}>
+                <div class="space-y-6">
+                  <Switch>
+                    {/* Viewing completed node history */}
+                    <Match when={viewMode() === "history" ? viewedNode() : undefined}>
+                      {(viewed) => (
                         <div class="space-y-4">
-                          <h3 class="text-sm font-medium" style={{ color: "#464555" }}>
-                            已完成的节点
-                          </h3>
-                          <For each={s().nodes.filter((n) => n.status === "completed")}>
-                            {(node) => (
-                              <CompletedNodeCard
-                                node={node}
-                                config={getNodeConfig(node)}
-                                isExpanded={expandedCompletedNode() === node.id}
-                                onToggle={() =>
-                                  setExpandedCompletedNode(
-                                    expandedCompletedNode() === node.id ? null : node.id,
-                                  )
-                                }
-                                onReexecute={() => {
-                                  const idx = s().nodes.findIndex((n) => n.id === node.id);
-                                  if (idx >= 0) setShowReexecDialog(idx);
-                                }}
-                                onFullscreen={(content, title) =>
-                                  setFullscreenContent({ content, title })
-                                }
-                                documentId={params.documentId}
-                              />
-                            )}
-                          </For>
-                        </div>
-                      </Show>
-                    </div>
-                  </Match>
-
-                  {/* Background generation in progress — show in-progress node executor */}
-                  <Match when={viewMode() === "current" && isGenerating()}>
-                    {(() => {
-                      const inProgressNode = () =>
-                        s().nodes.find((n) => n.status === "in_progress");
-                      return (
-                        <Show
-                          when={inProgressNode()}
-                          fallback={
-                            <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[120px] flex items-center justify-center">
-                              <div class="flex items-center gap-3">
-                                <span class="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-                                <span class="text-sm text-[#464555]">正在准备下一步...</span>
-                              </div>
-                            </div>
-                          }
-                        >
-                          {(node) => (
-                            <div class="space-y-6">{renderExecutor(node)}</div>
-                          )}
-                        </Show>
-                      );
-                    })()}
-                  </Match>
-
-                  {/* Blocked node — condition triggered, show block card with rollback */}
-                  <Match when={viewMode() === "current" && hasBlockedNodes() && !isGenerating()}>
-                    <div class="space-y-6">
-                      <For each={s().nodes.filter((n) => n.status === "blocked")}>
-                        {(node) => (
-                          <BlockedNodeCard
-                            node={node}
-                            onRollback={() => handleBlockedRollback(node.nodeId)}
+                          <Show when={!readOnly()}>
+                            <h2 class="text-sm font-medium" style={{ color: "#191c1e" }}>
+                              历史记录: {viewed().nodeLabel}
+                            </h2>
+                          </Show>
+                          <CompletedViewRouter
+                            node={viewed()}
+                            config={getNodeConfig(viewed())}
+                            documentId={params.documentId}
+                            onFullscreen={(content, title) =>
+                              setFullscreenContent({ content, title })
+                            }
+                            onReexecute={() => {
+                              const idx = s().nodes.findIndex((n) => n.id === viewed().id);
+                              if (idx >= 0) setShowReexecDialog(idx);
+                            }}
                           />
-                        )}
-                      </For>
-                    </div>
-                  </Match>
+                        </div>
+                      )}
+                    </Match>
 
-                  {/* Current in-progress node (manual step-by-step mode) */}
-                  <Match
-                    when={
-                      viewMode() === "current" &&
-                      !readOnly() &&
-                      !isGenerating() &&
-                      !hasFailedNodes() &&
-                      !hasBlockedNodes()
-                        ? currentNode()
-                        : undefined
-                    }
-                  >
-                    {(curNode) => (
+                    {/* Failed node summary with retry — shown when generation failed */}
+                    <Match when={viewMode() === "current" && hasFailedNodes() && !isGenerating()}>
                       <div class="space-y-6">
-                        {/* Node executor -- route by nodeType with real config */}
-                        {renderExecutor(curNode)}
-
-                        {/* (Inline editor removed) */}
-
-                        {/* Completed node history removed — stepper bar already shows progress */}
-                      </div>
-                    )}
-                  </Match>
-
-                  {/* All nodes completed -- read-only results dashboard */}
-                  <Match when={viewMode() === "current" && readOnly()}>
-                    {(() => {
-                      const nodes = s().nodes;
-                      const totalDuration = () =>
-                        formatDuration(nodes[0]?.startedAt, nodes[nodes.length - 1]?.completedAt);
-                      const exportNode = () => nodes.find((n) => n.nodeType === "export");
-                      const modelCallNode = () =>
-                        [...nodes].reverse().find((n) => n.nodeType === "model_call");
-                      const modelCallData = () =>
-                        modelCallNode()?.outputData as Record<string, unknown> | null;
-                      const selectedContent = () =>
-                        (modelCallData()?.selectedContent as string) ??
-                        (modelCallData()?.text as string) ??
-                        "";
-
-                      return (
-                        <div class="space-y-8">
-                          {/* HERO RESULTS CARD */}
-                          <section
-                            class="bg-white rounded-xl p-8"
-                            style={{ "box-shadow": "0 12px 40px rgba(25,28,30,0.06)" }}
-                          >
-                            <div class="flex items-start gap-5 mb-6">
-                              <div class="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                                <svg
-                                  class="w-7 h-7 text-emerald-600"
-                                  fill="currentColor"
-                                  viewBox="0 0 24 24"
-                                  aria-hidden="true"
-                                >
-                                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                                </svg>
-                              </div>
-                              <div>
-                                <h3 class="text-2xl font-extrabold text-[#191c1e] mb-1">
-                                  文档生成完成
-                                </h3>
-                                <p class="text-[#464555]">
-                                  所有 {nodes.length} 个节点已成功执行，文档已准备就绪。
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Stats pills */}
-                            <div class="flex flex-wrap gap-3 mb-6">
-                              <div class="bg-[#f2f4f6] px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium text-[#191c1e]">
-                                <svg
-                                  class="w-4 h-4 text-[#464555]"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  aria-hidden="true"
-                                >
-                                  <circle cx="12" cy="12" r="10" />
-                                  <polyline points="12 6 12 12 16 14" />
-                                </svg>
-                                总耗时 {totalDuration()}
-                              </div>
-                              <div class="bg-[#f2f4f6] px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium text-[#191c1e]">
-                                <svg
-                                  class="w-4 h-4 text-[#464555]"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
-                                  />
-                                </svg>
-                                节点数 {nodes.length}/{nodes.length}
-                              </div>
-                            </div>
-
-                            {/* Divider */}
-                            <div class="h-px bg-[rgba(199,196,216,0.2)] mb-6" />
-
-                            {/* Export hint — click stepper to access export */}
-                            <Show when={exportNode()}>
-                              <button
-                                type="button"
-                                class="w-full bg-[#f7f9fb] p-4 rounded-xl flex items-center justify-between hover:bg-[#eeebff] transition-colors group"
-                                onClick={() => {
-                                  const idx = nodes.findIndex((n) => n.nodeType === "export");
-                                  if (idx >= 0) handleStepperClick(idx);
-                                }}
+                        {/* Failed banner */}
+                        <section
+                          class="rounded-xl p-6"
+                          style={{
+                            background: "#fef2f2",
+                            border: "1px solid rgba(220,38,38,0.15)",
+                          }}
+                        >
+                          <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                              <svg
+                                class="w-5 h-5 text-red-600"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                aria-hidden="true"
                               >
-                                <div class="flex items-center gap-3">
-                                  <svg
-                                    class="w-5 h-5 text-[#4f46e5]"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                    stroke-width="1.8"
-                                    aria-hidden="true"
-                                  >
-                                    <path
-                                      stroke-linecap="round"
-                                      stroke-linejoin="round"
-                                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                                    />
-                                  </svg>
-                                  <span class="text-sm font-medium text-[#191c1e]">
-                                    选择格式并导出文档
-                                  </span>
-                                </div>
-                                <svg
-                                  class="w-4 h-4 text-[#464555] group-hover:translate-x-0.5 transition-transform"
-                                  fill="none"
-                                  viewBox="0 0 24 24"
-                                  stroke="currentColor"
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
                                   stroke-width="2"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    d="M9 5l7 7-7 7"
-                                  />
-                                </svg>
-                              </button>
-                            </Show>
-                          </section>
+                                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"
+                                />
+                              </svg>
+                            </div>
+                            <div class="flex-1">
+                              <h3 class="text-lg font-bold" style={{ color: "#991b1b" }}>
+                                文档生成失败
+                              </h3>
+                              <p class="text-sm mt-1" style={{ color: "#b91c1c" }}>
+                                部分节点执行出错，请查看下方详情后重试。
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              class="px-5 py-2.5 rounded-lg text-sm font-bold text-white transition-all cursor-pointer border-0 flex items-center gap-2"
+                              style={{
+                                background: "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)",
+                                "box-shadow": "0 4px 12px rgba(79,70,229,0.2)",
+                              }}
+                              disabled={actionLoading()}
+                              onClick={handleRetryGeneration}
+                            >
+                              <svg
+                                class="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                  stroke-width="2"
+                                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                                />
+                              </svg>
+                              重新生成
+                            </button>
+                          </div>
+                        </section>
 
-                          {/* CONTENT PREVIEW CARD */}
-                          <Show when={selectedContent()}>
+                        {/* Failed node details */}
+                        <For each={s().nodes.filter((n) => n.status === "failed")}>
+                          {(node) => (
+                            <div
+                              class="rounded-xl p-5"
+                              style={{
+                                background: "#ffffff",
+                                border: "1px solid rgba(220,38,38,0.2)",
+                                "box-shadow": "0 2px 8px rgba(220,38,38,0.06)",
+                              }}
+                            >
+                              <div class="flex items-center gap-3 mb-3">
+                                <span
+                                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ background: "rgba(220,38,38,0.08)", color: "#dc2626" }}
+                                >
+                                  失败
+                                </span>
+                                <span class="text-sm font-semibold" style={{ color: "#191c1e" }}>
+                                  步骤 {node.stepOrder + 1}: {node.nodeLabel}
+                                </span>
+                                <span class="text-xs" style={{ color: "#464555" }}>
+                                  ({node.nodeType})
+                                </span>
+                              </div>
+                              <Show when={node.errorMessage}>
+                                <div
+                                  class="rounded-lg px-4 py-3 text-sm"
+                                  style={{ background: "#fef2f2", color: "#991b1b" }}
+                                >
+                                  {node.errorMessage}
+                                </div>
+                              </Show>
+                            </div>
+                          )}
+                        </For>
+
+                        {/* Completed nodes before failure */}
+                        <Show when={s().nodes.some((n) => n.status === "completed")}>
+                          <div class="space-y-4">
+                            <h3 class="text-sm font-medium" style={{ color: "#464555" }}>
+                              已完成的节点
+                            </h3>
+                            <For each={s().nodes.filter((n) => n.status === "completed")}>
+                              {(node) => (
+                                <CompletedNodeCard
+                                  node={node}
+                                  config={getNodeConfig(node)}
+                                  isExpanded={expandedCompletedNode() === node.id}
+                                  onToggle={() =>
+                                    setExpandedCompletedNode(
+                                      expandedCompletedNode() === node.id ? null : node.id,
+                                    )
+                                  }
+                                  onReexecute={() => {
+                                    const idx = s().nodes.findIndex((n) => n.id === node.id);
+                                    if (idx >= 0) setShowReexecDialog(idx);
+                                  }}
+                                  onFullscreen={(content, title) =>
+                                    setFullscreenContent({ content, title })
+                                  }
+                                  documentId={params.documentId}
+                                />
+                              )}
+                            </For>
+                          </div>
+                        </Show>
+                      </div>
+                    </Match>
+
+                    {/* Background generation in progress — show in-progress node executor */}
+                    <Match when={viewMode() === "current" && isGenerating()}>
+                      {(() => {
+                        const inProgressNode = () =>
+                          s().nodes.find((n) => n.status === "in_progress");
+                        return (
+                          <Show
+                            when={inProgressNode()}
+                            fallback={
+                              <div class="bg-[#f7f9fb] rounded-xl p-4 min-h-[120px] flex items-center justify-center">
+                                <div class="flex items-center gap-3">
+                                  <span class="w-5 h-5 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                                  <span class="text-sm text-[#464555]">正在准备下一步...</span>
+                                </div>
+                              </div>
+                            }
+                          >
+                            {(node) => <div class="space-y-6">{renderExecutor(node)}</div>}
+                          </Show>
+                        );
+                      })()}
+                    </Match>
+
+                    {/* Blocked node — condition triggered, show block card with rollback */}
+                    <Match when={viewMode() === "current" && hasBlockedNodes() && !isGenerating()}>
+                      <div class="space-y-6">
+                        <For each={s().nodes.filter((n) => n.status === "blocked")}>
+                          {(node) => (
+                            <BlockedNodeCard
+                              node={node}
+                              onRollback={() => handleBlockedRollback(node.nodeId)}
+                            />
+                          )}
+                        </For>
+                      </div>
+                    </Match>
+
+                    {/* Current in-progress node (manual step-by-step mode) */}
+                    <Match
+                      when={
+                        viewMode() === "current" &&
+                        !readOnly() &&
+                        !isGenerating() &&
+                        !hasFailedNodes() &&
+                        !hasBlockedNodes()
+                          ? currentNode()
+                          : undefined
+                      }
+                    >
+                      {(curNode) => (
+                        <div class="space-y-6">
+                          {/* Node executor -- route by nodeType with real config */}
+                          {renderExecutor(curNode)}
+
+                          {/* (Inline editor removed) */}
+
+                          {/* Completed node history removed — stepper bar already shows progress */}
+                        </div>
+                      )}
+                    </Match>
+
+                    {/* All nodes completed -- read-only results dashboard */}
+                    <Match when={viewMode() === "current" && readOnly()}>
+                      {(() => {
+                        const nodes = s().nodes;
+                        const totalDuration = () =>
+                          formatDuration(nodes[0]?.startedAt, nodes[nodes.length - 1]?.completedAt);
+                        const exportNode = () => nodes.find((n) => n.nodeType === "export");
+                        const modelCallNode = () =>
+                          [...nodes].reverse().find((n) => n.nodeType === "model_call");
+                        const modelCallData = () =>
+                          modelCallNode()?.outputData as Record<string, unknown> | null;
+                        const selectedContent = () =>
+                          (modelCallData()?.selectedContent as string) ??
+                          (modelCallData()?.text as string) ??
+                          "";
+
+                        return (
+                          <div class="space-y-8">
+                            {/* HERO RESULTS CARD */}
                             <section
-                              class="bg-white rounded-xl overflow-hidden"
+                              class="bg-white rounded-xl p-8"
                               style={{ "box-shadow": "0 12px 40px rgba(25,28,30,0.06)" }}
                             >
-                              <div class="px-8 py-5 flex items-center justify-between bg-[rgba(242,244,246,0.3)]">
-                                <h3 class="text-lg font-bold text-[#191c1e] flex items-center gap-2">
+                              <div class="flex items-start gap-5 mb-6">
+                                <div class="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
                                   <svg
-                                    class="w-5 h-5 text-[#4f46e5]"
+                                    class="w-7 h-7 text-emerald-600"
+                                    fill="currentColor"
+                                    viewBox="0 0 24 24"
+                                    aria-hidden="true"
+                                  >
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <h3 class="text-2xl font-extrabold text-[#191c1e] mb-1">
+                                    文档生成完成
+                                  </h3>
+                                  <p class="text-[#464555]">
+                                    所有 {nodes.length} 个节点已成功执行，文档已准备就绪。
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Stats pills */}
+                              <div class="flex flex-wrap gap-3 mb-6">
+                                <div class="bg-[#f2f4f6] px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium text-[#191c1e]">
+                                  <svg
+                                    class="w-4 h-4 text-[#464555]"
+                                    fill="none"
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                    aria-hidden="true"
+                                  >
+                                    <circle cx="12" cy="12" r="10" />
+                                    <polyline points="12 6 12 12 16 14" />
+                                  </svg>
+                                  总耗时 {totalDuration()}
+                                </div>
+                                <div class="bg-[#f2f4f6] px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium text-[#191c1e]">
+                                  <svg
+                                    class="w-4 h-4 text-[#464555]"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -1324,28 +1243,47 @@ export default function DocumentWorkspace() {
                                     <path
                                       stroke-linecap="round"
                                       stroke-linejoin="round"
-                                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                    />
-                                    <path
-                                      stroke-linecap="round"
-                                      stroke-linejoin="round"
-                                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                      d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
                                     />
                                   </svg>
-                                  生成内容预览
-                                </h3>
+                                  节点数 {nodes.length}/{nodes.length}
+                                </div>
+                              </div>
+
+                              {/* Divider */}
+                              <div class="h-px bg-[rgba(199,196,216,0.2)] mb-6" />
+
+                              {/* Export hint — click stepper to access export */}
+                              <Show when={exportNode()}>
                                 <button
                                   type="button"
-                                  class="text-[#4f46e5] text-sm font-bold flex items-center gap-1 hover:underline"
-                                  onClick={() =>
-                                    setFullscreenContent({
-                                      content: selectedContent(),
-                                      title: "生成内容预览",
-                                    })
-                                  }
+                                  class="w-full bg-[#f7f9fb] p-4 rounded-xl flex items-center justify-between hover:bg-[#eeebff] transition-colors group"
+                                  onClick={() => {
+                                    const idx = nodes.findIndex((n) => n.nodeType === "export");
+                                    if (idx >= 0) handleStepperClick(idx);
+                                  }}
                                 >
+                                  <div class="flex items-center gap-3">
+                                    <svg
+                                      class="w-5 h-5 text-[#4f46e5]"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      stroke-width="1.8"
+                                      aria-hidden="true"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                                      />
+                                    </svg>
+                                    <span class="text-sm font-medium text-[#191c1e]">
+                                      选择格式并导出文档
+                                    </span>
+                                  </div>
                                   <svg
-                                    class="w-4 h-4"
+                                    class="w-4 h-4 text-[#464555] group-hover:translate-x-0.5 transition-transform"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -1355,87 +1293,144 @@ export default function DocumentWorkspace() {
                                     <path
                                       stroke-linecap="round"
                                       stroke-linejoin="round"
-                                      d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                                      d="M9 5l7 7-7 7"
                                     />
                                   </svg>
-                                  全屏查看
                                 </button>
-                              </div>
-                              <div class="px-8 py-6 relative">
-                                <div
-                                  class={`overflow-hidden ${previewExpanded() ? "" : "max-h-[360px]"}`}
-                                >
-                                  {renderMarkdown(selectedContent())}
-                                </div>
-                                <Show when={!previewExpanded()}>
-                                  <div
-                                    class="absolute bottom-0 left-0 right-0 h-32 flex items-end justify-center pb-6"
-                                    style={{
-                                      background:
-                                        "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%)",
-                                    }}
+                              </Show>
+                            </section>
+
+                            {/* CONTENT PREVIEW CARD */}
+                            <Show when={selectedContent()}>
+                              <section
+                                class="bg-white rounded-xl overflow-hidden"
+                                style={{ "box-shadow": "0 12px 40px rgba(25,28,30,0.06)" }}
+                              >
+                                <div class="px-8 py-5 flex items-center justify-between bg-[rgba(242,244,246,0.3)]">
+                                  <h3 class="text-lg font-bold text-[#191c1e] flex items-center gap-2">
+                                    <svg
+                                      class="w-5 h-5 text-[#4f46e5]"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      aria-hidden="true"
+                                    >
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                      />
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                      />
+                                    </svg>
+                                    生成内容预览
+                                  </h3>
+                                  <button
+                                    type="button"
+                                    class="text-[#4f46e5] text-sm font-bold flex items-center gap-1 hover:underline"
+                                    onClick={() =>
+                                      setFullscreenContent({
+                                        content: selectedContent(),
+                                        title: "生成内容预览",
+                                      })
+                                    }
                                   >
-                                    <button
-                                      type="button"
-                                      class="text-[#4f46e5] font-bold text-sm bg-white px-6 py-2 rounded-full border border-[rgba(79,70,229,0.2)]"
-                                      style={{ "box-shadow": "0 2px 8px rgba(25,28,30,0.06)" }}
-                                      onClick={() => setPreviewExpanded(true)}
+                                    <svg
+                                      class="w-4 h-4"
+                                      fill="none"
+                                      viewBox="0 0 24 24"
+                                      stroke="currentColor"
+                                      stroke-width="2"
+                                      aria-hidden="true"
                                     >
-                                      展开查看全部
-                                    </button>
+                                      <path
+                                        stroke-linecap="round"
+                                        stroke-linejoin="round"
+                                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                                      />
+                                    </svg>
+                                    全屏查看
+                                  </button>
+                                </div>
+                                <div class="px-8 py-6 relative">
+                                  <div
+                                    class={`overflow-hidden ${previewExpanded() ? "" : "max-h-[360px]"}`}
+                                  >
+                                    {renderMarkdown(selectedContent())}
                                   </div>
-                                </Show>
-                                <Show when={previewExpanded()}>
-                                  <div class="text-center mt-4">
-                                    <button
-                                      type="button"
-                                      class="text-[#464555] text-sm hover:text-[#191c1e] transition-colors"
-                                      onClick={() => setPreviewExpanded(false)}
+                                  <Show when={!previewExpanded()}>
+                                    <div
+                                      class="absolute bottom-0 left-0 right-0 h-32 flex items-end justify-center pb-6"
+                                      style={{
+                                        background:
+                                          "linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,1) 100%)",
+                                      }}
                                     >
-                                      收起
-                                    </button>
-                                  </div>
-                                </Show>
+                                      <button
+                                        type="button"
+                                        class="text-[#4f46e5] font-bold text-sm bg-white px-6 py-2 rounded-full border border-[rgba(79,70,229,0.2)]"
+                                        style={{ "box-shadow": "0 2px 8px rgba(25,28,30,0.06)" }}
+                                        onClick={() => setPreviewExpanded(true)}
+                                      >
+                                        展开查看全部
+                                      </button>
+                                    </div>
+                                  </Show>
+                                  <Show when={previewExpanded()}>
+                                    <div class="text-center mt-4">
+                                      <button
+                                        type="button"
+                                        class="text-[#464555] text-sm hover:text-[#191c1e] transition-colors"
+                                        onClick={() => setPreviewExpanded(false)}
+                                      >
+                                        收起
+                                      </button>
+                                    </div>
+                                  </Show>
+                                </div>
+                              </section>
+                            </Show>
+
+                            {/* EXECUTION DETAILS */}
+                            <section class="space-y-4">
+                              <div class="flex items-center gap-3">
+                                <h3 class="text-xl font-bold text-[#191c1e]">执行详情</h3>
+                                <span class="text-xs font-bold bg-[#e0e3e5] px-3 py-1 rounded-full text-[#464555]">
+                                  {nodes.length} 个节点
+                                </span>
+                              </div>
+                              <div class="space-y-4">
+                                <For each={nodes}>
+                                  {(node, index) => (
+                                    <CompletedNodeCard
+                                      node={node}
+                                      config={getNodeConfig(node)}
+                                      isExpanded={expandedCompletedNode() === node.id}
+                                      onToggle={() =>
+                                        setExpandedCompletedNode(
+                                          expandedCompletedNode() === node.id ? null : node.id,
+                                        )
+                                      }
+                                      onReexecute={() => setShowReexecDialog(index())}
+                                      onFullscreen={(content, title) =>
+                                        setFullscreenContent({ content, title })
+                                      }
+                                      documentId={params.documentId}
+                                    />
+                                  )}
+                                </For>
                               </div>
                             </section>
-                          </Show>
-
-                          {/* EXECUTION DETAILS */}
-                          <section class="space-y-4">
-                            <div class="flex items-center gap-3">
-                              <h3 class="text-xl font-bold text-[#191c1e]">执行详情</h3>
-                              <span class="text-xs font-bold bg-[#e0e3e5] px-3 py-1 rounded-full text-[#464555]">
-                                {nodes.length} 个节点
-                              </span>
-                            </div>
-                            <div class="space-y-4">
-                              <For each={nodes}>
-                                {(node, index) => (
-                                  <CompletedNodeCard
-                                    node={node}
-                                    config={getNodeConfig(node)}
-                                    isExpanded={expandedCompletedNode() === node.id}
-                                    onToggle={() =>
-                                      setExpandedCompletedNode(
-                                        expandedCompletedNode() === node.id ? null : node.id,
-                                      )
-                                    }
-                                    onReexecute={() => setShowReexecDialog(index())}
-                                    onFullscreen={(content, title) =>
-                                      setFullscreenContent({ content, title })
-                                    }
-                                    documentId={params.documentId}
-                                  />
-                                )}
-                              </For>
-                            </div>
-                          </section>
-                        </div>
-                      );
-                    })()}
-                  </Match>
-                </Switch>
-              </div>
+                          </div>
+                        );
+                      })()}
+                    </Match>
+                  </Switch>
+                </div>
               </div>
 
               {/* Right sidebar — Process Tracker + Actions */}
@@ -1451,7 +1446,10 @@ export default function DocumentWorkspace() {
                   class="px-2 pt-3 pb-1 flex-shrink-0"
                   style={{ "border-bottom": "1px solid rgba(199,196,216,0.15)" }}
                 >
-                  <span class="text-[11px] font-semibold tracking-wide" style={{ color: "#8b8a99" }}>
+                  <span
+                    class="text-[11px] font-semibold tracking-wide"
+                    style={{ color: "#8b8a99" }}
+                  >
                     流程进度
                   </span>
                 </div>

@@ -5,6 +5,7 @@ import type {
   ModelCallManualFeedback,
   ModelCallNamedOutputValue,
   ModelCallOutputData,
+  ModelCallOutputItem,
   ModelOutput,
   NamedOutputDef,
   NodeExecution,
@@ -30,6 +31,11 @@ type ExecutionPhase = "idle" | "streaming" | "polling" | "done";
 type ViewMode = "markdown" | "source";
 
 type ModelCallNamedOutput = ModelCallNamedOutputValue;
+type NamedOutputChangeParams = {
+  artifactId: string;
+  modelId: string;
+  newContent: string;
+};
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "等待中",
@@ -44,6 +50,14 @@ const ERROR_MESSAGES: Record<string, string> = {
   api_error: "API 调用失败",
   unavailable: "模型不可用",
 };
+
+function buildModelArtifactSegmentKey(modelId: string, artifactId: string): string {
+  return `model__${modelId}__artifact__${artifactId}`;
+}
+
+function buildSelectedArtifactSegmentKey(artifactId: string): string {
+  return `selected__artifact__${artifactId}`;
+}
 
 function cloneModelOutputs(models: Record<string, ModelOutput>): Record<string, ModelOutput> {
   return Object.fromEntries(
@@ -256,6 +270,108 @@ export function applyModelCallStreamEvent(
   }
 
   return current;
+}
+
+export function updateNamedOutputDraft(params: {
+  outputData: ModelCallOutputData | null;
+  artifactId: string;
+  modelId: string;
+  newContent: string;
+  selectionEnabled: boolean;
+  selectedModelIds: string[];
+  selectedModelId?: string | null;
+}): ModelCallOutputData {
+  const outputData = params.outputData ?? {};
+  const currentNamedOutputs = outputData.namedOutputs ?? {};
+  const currentNamedOutputsByModel = outputData.namedOutputsByModel ?? {};
+  const currentOutputItems = outputData.outputItems ?? {};
+
+  const nextNamedOutputs = { ...currentNamedOutputs };
+  const nextNamedOutputsByModel = { ...currentNamedOutputsByModel };
+  const nextOutputItems: Record<string, ModelCallOutputItem> = { ...currentOutputItems };
+
+  if (params.modelId === "selected") {
+    const existingSelectedArtifact = currentNamedOutputs[params.artifactId];
+    nextNamedOutputs[params.artifactId] = {
+      ...(existingSelectedArtifact ?? { format: "text" }),
+      content: params.newContent,
+    };
+
+    const selectedArtifactKey = buildSelectedArtifactSegmentKey(params.artifactId);
+    const existingSelectedItem = currentOutputItems[selectedArtifactKey];
+    if (existingSelectedItem) {
+      nextOutputItems[selectedArtifactKey] = {
+        ...existingSelectedItem,
+        content: params.newContent,
+      };
+    }
+
+    return {
+      ...outputData,
+      namedOutputs: nextNamedOutputs,
+      outputItems: nextOutputItems,
+    };
+  }
+
+  const currentModelArtifacts = currentNamedOutputsByModel[params.modelId] ?? {};
+  const existingModelArtifact =
+    currentModelArtifacts[params.artifactId] ?? currentNamedOutputs[params.artifactId];
+
+  nextNamedOutputsByModel[params.modelId] = {
+    ...currentModelArtifacts,
+    [params.artifactId]: {
+      ...(existingModelArtifact ?? { format: "text" }),
+      content: params.newContent,
+      modelId: currentModelArtifacts[params.artifactId]?.modelId ?? params.modelId,
+    },
+  };
+
+  const modelArtifactKey = buildModelArtifactSegmentKey(params.modelId, params.artifactId);
+  const existingModelArtifactItem = currentOutputItems[modelArtifactKey];
+  nextOutputItems[modelArtifactKey] = {
+    ...(existingModelArtifactItem ?? {
+      format: existingModelArtifact?.format ?? "text",
+      kind: "model_artifact",
+      modelId: params.modelId,
+      modelDisplayName: existingModelArtifact?.modelDisplayName,
+      artifactId: params.artifactId,
+    }),
+    content: params.newContent,
+    kind: "model_artifact",
+    modelId: params.modelId,
+    artifactId: params.artifactId,
+  };
+
+  const primarySelectedModelId = params.selectedModelId ?? params.selectedModelIds[0] ?? null;
+  const shouldMirrorToSelected =
+    params.modelId === primarySelectedModelId &&
+    (!params.selectionEnabled || params.selectedModelIds.length <= 1);
+
+  if (shouldMirrorToSelected) {
+    const existingSelectedArtifact =
+      currentNamedOutputs[params.artifactId] ??
+      nextNamedOutputsByModel[params.modelId][params.artifactId];
+    nextNamedOutputs[params.artifactId] = {
+      ...existingSelectedArtifact,
+      content: params.newContent,
+    };
+
+    const selectedArtifactKey = buildSelectedArtifactSegmentKey(params.artifactId);
+    const existingSelectedItem = currentOutputItems[selectedArtifactKey];
+    if (existingSelectedItem) {
+      nextOutputItems[selectedArtifactKey] = {
+        ...existingSelectedItem,
+        content: params.newContent,
+      };
+    }
+  }
+
+  return {
+    ...outputData,
+    namedOutputs: nextNamedOutputs,
+    namedOutputsByModel: nextNamedOutputsByModel,
+    outputItems: nextOutputItems,
+  };
 }
 
 // RECV-03: Cancel AI generation deferred to v2 per user decision
@@ -1001,30 +1117,16 @@ export default function ModelCallExecutor(props: Props) {
     setAiFixContent("");
   }
 
-  function handleNamedOutputChange(artifactId: string, newContent: string) {
-    // Update outputData namedOutputs via draft save
-    const od = currentOutputData();
-    const currentNamedOutputs = (od?.namedOutputs as Record<string, ModelCallNamedOutput>) ?? {};
-    const currentOutputItems = (od?.outputItems as Record<string, Record<string, unknown>>) ?? {};
-    const updated = {
-      ...currentNamedOutputs,
-      [artifactId]: { ...currentNamedOutputs[artifactId], content: newContent },
-    };
-    const selectedArtifactKey = `selected__artifact__${artifactId}`;
-    const updatedOutputItems = currentOutputItems[selectedArtifactKey]
-      ? {
-          ...currentOutputItems,
-          [selectedArtifactKey]: {
-            ...currentOutputItems[selectedArtifactKey],
-            content: newContent,
-          },
-        }
-      : currentOutputItems;
-    const nextOutputData = {
-      ...od,
-      namedOutputs: updated,
-      outputItems: updatedOutputItems,
-    };
+  function handleNamedOutputChange(params: NamedOutputChangeParams) {
+    const nextOutputData = updateNamedOutputDraft({
+      outputData: (currentOutputData() as ModelCallOutputData | null) ?? null,
+      artifactId: params.artifactId,
+      modelId: params.modelId,
+      newContent: params.newContent,
+      selectionEnabled: selectionEnabled(),
+      selectedModelIds: selectedModelIds(),
+      selectedModelId: selectedModelId(),
+    });
     setLocalOutputData(nextOutputData);
     props.onDraftSave(nextOutputData);
   }

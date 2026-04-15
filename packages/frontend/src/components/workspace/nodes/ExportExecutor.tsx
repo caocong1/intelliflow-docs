@@ -31,6 +31,7 @@ interface Props {
   config: ExportConfig;
   documentId: string;
   onDraftSave: (data: Record<string, unknown>) => void;
+  onExported?: () => Promise<void> | void;
   readOnly: boolean;
 }
 
@@ -53,8 +54,7 @@ export default function ExportExecutor(props: Props) {
   const availableFormats = (): ExportFormat[] => {
     const configured = props.config?.formats;
     if (configured && configured.length > 0) {
-      return configured
-        .map((f) => FORMAT_ALIASES[f] ?? f) as ExportFormat[];
+      return configured.map((f) => FORMAT_ALIASES[f] ?? f) as ExportFormat[];
     }
     // Backward compat: single format field
     const legacy = props.config?.format;
@@ -89,9 +89,10 @@ export default function ExportExecutor(props: Props) {
         setPreviewContent(result.content);
         setFilename(`${result.defaultFilename}${FORMAT_EXTENSIONS[format()]}`);
       } else {
-        const errMsg = typeof result === "object" && result !== null && "error" in result
-          ? (result as { error: string }).error
-          : "预览加载失败";
+        const errMsg =
+          typeof result === "object" && result !== null && "error" in result
+            ? (result as { error: string }).error
+            : "预览加载失败";
         setError(errMsg);
       }
     } catch {
@@ -127,11 +128,13 @@ export default function ExportExecutor(props: Props) {
           format: result.format,
           fileSize: result.fileSize,
         });
-        triggerDownload();
+        await triggerDownload();
+        await props.onExported?.();
       } else {
-        const errMsg = typeof result === "object" && result !== null && "error" in result
-          ? (result as { error: string }).error
-          : "导出失败，请重试";
+        const errMsg =
+          typeof result === "object" && result !== null && "error" in result
+            ? (result as { error: string }).error
+            : "导出失败，请重试";
         setError(errMsg);
       }
     } catch {
@@ -178,22 +181,29 @@ export default function ExportExecutor(props: Props) {
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g, "<em>$1</em>")
       .replace(/~~(.+?)~~/g, "<del>$1</del>")
-      .replace(/`(.+?)`/g, '<code class="px-1 py-0.5 bg-[#f1f3f5] rounded text-xs font-mono">$1</code>')
+      .replace(
+        /`(.+?)`/g,
+        '<code class="px-1 py-0.5 bg-[#f1f3f5] rounded text-xs font-mono">$1</code>',
+      )
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" class="text-[#4f46e5] underline">$1</a>');
   }
 
   function renderTableBlock(tableLines: string[]): string {
     const parseRow = (line: string) =>
-      line.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
-    const isSep = (line: string) =>
-      /^\|?[\s:]*-+[\s:]*(\|[\s:]*-+[\s:]*)*\|?$/.test(line.trim());
+      line
+        .trim()
+        .replace(/^\||\|$/g, "")
+        .split("|")
+        .map((c) => c.trim());
+    const isSep = (line: string) => /^\|?[\s:]*-+[\s:]*(\|[\s:]*-+[\s:]*)*\|?$/.test(line.trim());
 
     const hasSep = tableLines.length >= 2 && isSep(tableLines[1]);
     const headers = hasSep ? parseRow(tableLines[0]) : [];
     const dataLines = hasSep ? tableLines.slice(2) : tableLines;
     const rows = dataLines.filter((l) => !isSep(l)).map(parseRow);
 
-    let html = '<div class="overflow-x-auto my-3"><table class="w-full text-sm border-collapse border border-[rgba(199,196,216,0.3)]">';
+    let html =
+      '<div class="overflow-x-auto my-3"><table class="w-full text-sm border-collapse border border-[rgba(199,196,216,0.3)]">';
     if (headers.length > 0) {
       html += "<thead><tr>";
       for (const h of headers) {
@@ -216,7 +226,8 @@ export default function ExportExecutor(props: Props) {
   function renderLine(raw: string): string {
     // Blockquote — check before escaping since > becomes &gt;
     const bq = raw.match(/^>\s(.*)/);
-    if (bq) return `<blockquote class="pl-3 border-l-4 border-[rgba(199,196,216,0.4)] text-[#464555] my-1">${inlineFmt(esc(bq[1]))}</blockquote>`;
+    if (bq)
+      return `<blockquote class="pl-3 border-l-4 border-[rgba(199,196,216,0.4)] text-[#464555] my-1">${inlineFmt(esc(bq[1]))}</blockquote>`;
 
     const s = esc(raw);
     // Headers h1–h6

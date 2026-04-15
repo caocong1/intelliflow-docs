@@ -2,12 +2,18 @@
  * @vitest-environment jsdom
  */
 import type { ModelOutput } from "@intelliflow/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../../../lib/render-markdown", () => ({
+  renderMarkdown: (content: string) => content,
+}));
+
 import {
   applyModelCallStreamEvent,
   deriveModelCallExecutionPhase,
   hasInProgressModelOutputs,
   mergeModelOutputs,
+  updateNamedOutputDraft,
 } from "./ModelCallExecutor";
 
 const baseModel = (overrides: Partial<ModelOutput> = {}): ModelOutput => ({
@@ -211,6 +217,113 @@ describe("ModelCallExecutor helpers", () => {
       const merged = mergeModelOutputs(prev, incoming);
       expect(Object.keys(merged)).toEqual(["model-2"]);
       expect(merged["model-2"].content).toBe("fresh");
+    });
+  });
+
+  describe("updateNamedOutputDraft", () => {
+    it("updates model-scoped named outputs and keeps selected output in sync for single-model review", () => {
+      const next = updateNamedOutputDraft({
+        outputData: {
+          namedOutputs: {
+            slides_final: {
+              content: '{"title":"old selected"}',
+              format: "json",
+              modelId: "model-1",
+            },
+          },
+          namedOutputsByModel: {
+            "model-1": {
+              slides_final: {
+                content: '{"title":"old model"}',
+                format: "json",
+                modelId: "model-1",
+              },
+            },
+            "model-2": {
+              slides_final: {
+                content: '{"title":"other model"}',
+                format: "json",
+                modelId: "model-2",
+              },
+            },
+          },
+          outputItems: {
+            "model__model-1__artifact__slides_final": {
+              content: '{"title":"old model"}',
+              format: "json",
+              kind: "model_artifact",
+              modelId: "model-1",
+              artifactId: "slides_final",
+            },
+            "model__model-2__artifact__slides_final": {
+              content: '{"title":"other model"}',
+              format: "json",
+              kind: "model_artifact",
+              modelId: "model-2",
+              artifactId: "slides_final",
+            },
+          },
+        },
+        artifactId: "slides_final",
+        modelId: "model-1",
+        newContent: '{"title":"new model"}',
+        selectionEnabled: false,
+        selectedModelIds: ["model-1"],
+        selectedModelId: "model-1",
+      });
+
+      expect(next.namedOutputsByModel?.["model-1"]?.slides_final?.content).toBe(
+        '{"title":"new model"}',
+      );
+      expect(next.namedOutputsByModel?.["model-2"]?.slides_final?.content).toBe(
+        '{"title":"other model"}',
+      );
+      expect(next.namedOutputs?.slides_final?.content).toBe('{"title":"new model"}');
+      expect(next.outputItems?.["model__model-1__artifact__slides_final"]?.content).toBe(
+        '{"title":"new model"}',
+      );
+    });
+
+    it("updates selected named outputs without mutating model-specific artifacts", () => {
+      const next = updateNamedOutputDraft({
+        outputData: {
+          namedOutputs: {
+            summary: {
+              content: "old selected",
+              format: "markdown",
+              modelIds: ["model-1", "model-2"],
+            },
+          },
+          namedOutputsByModel: {
+            "model-1": {
+              summary: {
+                content: "model one",
+                format: "markdown",
+                modelId: "model-1",
+              },
+            },
+          },
+          outputItems: {
+            selected__artifact__summary: {
+              content: "old selected",
+              format: "markdown",
+              kind: "selected_artifact",
+              modelIds: ["model-1", "model-2"],
+              artifactId: "summary",
+            },
+          },
+        },
+        artifactId: "summary",
+        modelId: "selected",
+        newContent: "new selected",
+        selectionEnabled: true,
+        selectedModelIds: ["model-1", "model-2"],
+        selectedModelId: "model-1",
+      });
+
+      expect(next.namedOutputs?.summary?.content).toBe("new selected");
+      expect(next.outputItems?.selected__artifact__summary?.content).toBe("new selected");
+      expect(next.namedOutputsByModel?.["model-1"]?.summary?.content).toBe("model one");
     });
   });
 });

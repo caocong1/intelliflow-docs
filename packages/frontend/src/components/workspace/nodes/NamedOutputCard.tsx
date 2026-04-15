@@ -1,4 +1,4 @@
-import { Show, createSignal } from "solid-js";
+import { Show, createEffect, createSignal } from "solid-js";
 import { renderMarkdown } from "../../../lib/render-markdown";
 
 interface NamedOutputCardProps {
@@ -7,7 +7,11 @@ interface NamedOutputCardProps {
   content: string;
   format: string;
   modelId: string;
-  onContentChange?: (artifactId: string, newContent: string) => void;
+  onContentChange?: (params: {
+    artifactId: string;
+    modelId: string;
+    newContent: string;
+  }) => void;
   readonly?: boolean;
 }
 
@@ -24,8 +28,18 @@ export default function NamedOutputCard(props: NamedOutputCardProps) {
   const badge = () => FORMAT_BADGES[props.format] ?? FORMAT_BADGES.text;
   const isJson = () => props.format === "json";
 
+  createEffect(() => {
+    if (!editing()) {
+      setLocalContent(props.content);
+    }
+  });
+
   function handleSave() {
-    props.onContentChange?.(props.artifactId, localContent());
+    props.onContentChange?.({
+      artifactId: props.artifactId,
+      modelId: props.modelId,
+      newContent: localContent(),
+    });
     setEditing(false);
   }
 

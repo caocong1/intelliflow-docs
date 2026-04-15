@@ -937,13 +937,14 @@ interface NativeTemplateSlot {
   position: TemplatePosition;
   explicitTag?: TemplateSlotTag;
   visualType?: string;
-  source?: "explicit" | "slide" | "layout";
+  source?: "explicit" | "slide" | "layout" | "sample";
 }
 
 interface NativeTemplateSlide {
   slideId: number;
   slideNumber: number;
   layoutName: string;
+  hasFullBleedImage: boolean;
   selectors: TemplateSelector[];
   titleSlot?: NativeTemplateSlot;
   subtitleSlot?: NativeTemplateSlot;
@@ -1122,6 +1123,81 @@ function buildPlainParagraphs(lines: string[]): TemplateTextParagraph[] {
     },
     textRuns: [{ text: line }],
   }));
+}
+
+function normalizeTemplateText(text: string): string {
+  return text.replace(/\s+/g, "").toLowerCase();
+}
+
+function textMatchesAny(text: string, patterns: RegExp[]): boolean {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+const SAMPLE_TITLE_PATTERNS = [
+  /输入标题文字/i,
+  /过渡页标题/i,
+  /thankyou/i,
+  /谢谢观看/i,
+  /thanks/i,
+] as const;
+
+const SAMPLE_BODY_PATTERNS = [
+  /您的内容打在这里/i,
+  /只保留文字/i,
+  /复制您的文本/i,
+  /输入正文/i,
+  /输入内容/i,
+] as const;
+
+const SAMPLE_SUBTITLE_PATTERNS = [
+  /20xx/i,
+  /theme/i,
+  /businesspowerpoint/i,
+  /standardtemplate/i,
+  /20\d{2}/i,
+] as const;
+
+function deriveSlotsFromSampleTexts(
+  elements: NativeTemplateElement[],
+): Partial<Record<TemplateSlotTag, NativeTemplateSlot[]>> {
+  const derived: Partial<Record<TemplateSlotTag, NativeTemplateSlot[]>> = {};
+
+  for (const element of elements) {
+    if (!element.hasTextBody) continue;
+    const texts = element.getText();
+    const joined = normalizeTemplateText(texts.join(" "));
+    if (!joined) continue;
+
+    let mappedTag: TemplateSlotTag | null = null;
+    if (textMatchesAny(joined, [...SAMPLE_TITLE_PATTERNS])) {
+      mappedTag = "TITLE";
+    } else if (textMatchesAny(joined, [...SAMPLE_BODY_PATTERNS])) {
+      mappedTag = "BODY";
+    } else if (textMatchesAny(joined, [...SAMPLE_SUBTITLE_PATTERNS])) {
+      mappedTag = "SUBTITLE";
+    }
+
+    if (!mappedTag) continue;
+
+    if (!derived[mappedTag]) {
+      derived[mappedTag] = [];
+    }
+    derived[mappedTag]?.push({
+      selector: buildTemplateSelector(element),
+      position: element.position,
+      visualType: element.visualType,
+      source: "sample",
+    });
+  }
+
+  return derived;
+}
+
+function hasFullBleedImage(elements: NativeTemplateElement[]): boolean {
+  return elements.some((element) => {
+    if (!IMAGE_VISUAL_TYPES.has(element.visualType)) return false;
+    return element.position.x <= EMU_PER_INCH * 0.1 && element.position.y <= EMU_PER_INCH * 0.1;
+  });
 }
 
 function toTemplateSlotTagFromPlaceholderType(
@@ -1512,6 +1588,7 @@ function buildNativeTemplateSlides(templateInfos: NativeTemplateInfo[]): NativeT
       slide.info?.layoutPlaceholders,
       slide.elements,
     );
+    const sampleDerivedSlots = deriveSlotsFromSampleTexts(slide.elements);
 
     for (const element of slide.elements) {
       const selector = buildTemplateSelector(element);
@@ -1578,21 +1655,28 @@ function buildNativeTemplateSlides(templateInfos: NativeTemplateInfo[]): NativeT
       uniqueSlots([
         ...bodyFallback,
         ...(layoutDerivedSlots.BODY ?? []),
+        ...(sampleDerivedSlots.BODY ?? []),
       ]),
     );
     const titleSlot = pickFirstSlot(
       normalizeSlots(taggedSlots.TITLE),
+      normalizeSlots(sampleDerivedSlots.TITLE),
       normalizeSlots(titleFallback),
       normalizeSlots(layoutDerivedSlots.TITLE),
     );
     const subtitleSlot = pickFirstSlot(
       normalizeSlots(taggedSlots.SUBTITLE),
+      normalizeSlots(sampleDerivedSlots.SUBTITLE),
       normalizeSlots(subtitleFallback),
       normalizeSlots(layoutDerivedSlots.SUBTITLE),
       sortedBodySlots,
     );
     const bodySlot = pickFirstSlot(normalizeSlots(taggedSlots.BODY), sortedBodySlots);
-    const leftSlot = pickFirstSlot(normalizeSlots(taggedSlots.LEFT), normalizeSlots(layoutDerivedSlots.LEFT), sortedBodySlots);
+    const leftSlot = pickFirstSlot(
+      normalizeSlots(taggedSlots.LEFT),
+      normalizeSlots(layoutDerivedSlots.LEFT),
+      sortedBodySlots,
+    );
     const rightSlot = pickFirstSlot(
       normalizeSlots(taggedSlots.RIGHT),
       normalizeSlots(layoutDerivedSlots.RIGHT),
@@ -1617,6 +1701,7 @@ function buildNativeTemplateSlides(templateInfos: NativeTemplateInfo[]): NativeT
       slideId: slide.id as number,
       slideNumber: slide.number as number,
       layoutName: slide.info?.layoutName ?? `Slide ${slide.number}`,
+      hasFullBleedImage: hasFullBleedImage(slide.elements),
       selectors: uniqueSlots(selectors.map((selector) => ({
         selector,
         position: { x: 0, y: 0, cx: 0, cy: 0 },
@@ -1670,35 +1755,57 @@ function scoreNativeTemplateSlide(templateSlide: NativeTemplateSlide, slide: Sli
       if (!templateSlide.titleSlot) return 0;
       score += 40;
       if (templateSlide.subtitleSlot) score += 10;
+      if (templateSlide.hasFullBleedImage) score += 25;
       return score;
     case "content":
       if (!templateSlide.titleSlot || !templateSlide.bodySlot) return 0;
       score += 60;
       if (templateSlide.bodySlot.explicitTag === "BODY") score += 15;
+      if (templateSlide.hasFullBleedImage) score += 8;
       return score;
     case "two_column":
+      if (!templateSlide.titleSlot) return 0;
       if (
-        !templateSlide.titleSlot ||
-        !templateSlide.leftSlot ||
-        !templateSlide.rightSlot ||
-        selectorKey(templateSlide.leftSlot.selector) === selectorKey(templateSlide.rightSlot.selector)
+        templateSlide.leftSlot &&
+        templateSlide.rightSlot &&
+        selectorKey(templateSlide.leftSlot.selector) !== selectorKey(templateSlide.rightSlot.selector)
       ) {
-        return 0;
+        score += 80;
+        if (templateSlide.leftSlot.explicitTag === "LEFT") score += 10;
+        if (templateSlide.rightSlot.explicitTag === "RIGHT") score += 10;
+        return score;
       }
-      score += 80;
-      if (templateSlide.leftSlot.explicitTag === "LEFT") score += 10;
-      if (templateSlide.rightSlot.explicitTag === "RIGHT") score += 10;
-      return score;
+      if (templateSlide.bodySlot) {
+        score += 38;
+        return score;
+      }
+      return 0;
     case "table":
-      if (!templateSlide.titleSlot || !templateSlide.tableSlot) return 0;
-      score += 70;
-      if (templateSlide.tableSlot.explicitTag === "TABLE") score += 15;
-      return score;
+      if (!templateSlide.titleSlot) return 0;
+      if (templateSlide.tableSlot) {
+        score += 70;
+        if (templateSlide.tableSlot.explicitTag === "TABLE") score += 15;
+        return score;
+      }
+      if (templateSlide.bodySlot) {
+        score += 34;
+        return score;
+      }
+      return 0;
     case "image":
-      if (!templateSlide.titleSlot || !templateSlide.imageSlot) return 0;
-      score += 70;
-      if (templateSlide.imageSlot.explicitTag === "IMAGE") score += 15;
-      return score;
+      if (!templateSlide.titleSlot) return 0;
+      if (templateSlide.imageSlot) {
+        score += 70;
+        if (templateSlide.imageSlot.explicitTag === "IMAGE") score += 15;
+        if (templateSlide.hasFullBleedImage) score += 10;
+        return score;
+      }
+      if (templateSlide.bodySlot) {
+        score += 30;
+        if (templateSlide.hasFullBleedImage) score += 10;
+        return score;
+      }
+      return 0;
     case "blank":
       score += 10;
       if (
@@ -1774,6 +1881,24 @@ function setTemplateParagraphs(
     return;
   }
   targetSlide.modifyElement(slot.selector, modify.setMultiText(paragraphs));
+}
+
+function buildTableParagraphs(slide: TableSlide): TemplateTextParagraph[] {
+  const lines = [
+    slide.headers.map((header) => truncate(stripMarkdownInline(header), MAX_CELL_CHARS)).join(" | "),
+    ...slide.rows.map((row) =>
+      row.map((cell) => truncate(stripMarkdownInline(cell), MAX_CELL_CHARS)).join(" | "),
+    ),
+  ];
+  return buildPlainParagraphs(lines);
+}
+
+function buildImageParagraphs(slide: ImageSlide): TemplateTextParagraph[] {
+  const lines = [
+    slide.caption ? truncate(stripMarkdownInline(slide.caption), 100) : "[图片]",
+    slide.imageRef ? `图片来源: ${slide.imageRef}` : "图片将在此区域呈现",
+  ];
+  return buildPlainParagraphs(lines);
 }
 
 function addTableToPptSlide(
@@ -2052,6 +2177,26 @@ function renderSlideWithNativeTemplate(
       setTemplateText(targetSlide, modify, templateSlide.subtitleSlot, "");
       break;
     case "two_column": {
+      if (!templateSlide.leftSlot || !templateSlide.rightSlot) {
+        const fallbackParagraphs = [
+          ...(slide.left.title
+            ? buildPlainParagraphs([truncate(stripMarkdownInline(slide.left.title), 80)])
+            : []),
+          ...buildBulletParagraphs(slide.left.bullets),
+          ...(slide.right.title
+            ? buildPlainParagraphs([truncate(stripMarkdownInline(slide.right.title), 80)])
+            : []),
+          ...buildBulletParagraphs(slide.right.bullets),
+        ];
+        setTemplateParagraphs(
+          targetSlide,
+          modify,
+          templateSlide.bodySlot ?? templateSlide.subtitleSlot,
+          fallbackParagraphs,
+        );
+        break;
+      }
+
       const leftParagraphs = [
         ...(slide.left.title ? buildPlainParagraphs([truncate(stripMarkdownInline(slide.left.title), 80)]) : []),
         ...buildBulletParagraphs(slide.left.bullets),
@@ -2065,6 +2210,10 @@ function renderSlideWithNativeTemplate(
       break;
     }
     case "table":
+      if (!templateSlide.tableSlot && templateSlide.bodySlot) {
+        setTemplateParagraphs(targetSlide, modify, templateSlide.bodySlot, buildTableParagraphs(slide));
+        break;
+      }
       if (templateSlide.tableSlot) {
         const tableBox = positionToBox(templateSlide.tableSlot.position);
         if (
@@ -2094,6 +2243,16 @@ function renderSlideWithNativeTemplate(
       }
       break;
     case "image":
+      if (!templateSlide.imageSlot && templateSlide.bodySlot) {
+        setTemplateParagraphs(targetSlide, modify, templateSlide.bodySlot, buildImageParagraphs(slide));
+        setTemplateText(
+          targetSlide,
+          modify,
+          templateSlide.captionSlot,
+          slide.caption ? truncate(slide.caption, 100) : "",
+        );
+        break;
+      }
       if (templateSlide.imageSlot) {
         const imageBox = positionToBox(templateSlide.imageSlot.position);
         if (templateSlide.imageSlot.visualType !== "picture") {

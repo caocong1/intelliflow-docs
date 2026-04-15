@@ -2329,8 +2329,9 @@ async function renderSlidesWithNativeTemplate(
 
   automizer.loadRoot(templateBuffer).load(templateBuffer, "__native_template__");
   const templateInfos = await automizer.setCreationIds();
+  const liveProfile = buildNativeTemplateProfile(templateInfos as never);
   const templateProfile =
-    storedProfile ?? buildNativeTemplateProfile(templateInfos as never);
+    liveProfile.slides.length > 0 ? liveProfile : storedProfile ?? liveProfile;
   const templateSlides = templateProfile.slides as unknown as NativeTemplateSlide[];
   const fallbackCanvas = pickFallbackTemplateSlide(templateSlides);
 

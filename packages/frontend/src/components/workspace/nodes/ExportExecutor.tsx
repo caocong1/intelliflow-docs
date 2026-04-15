@@ -1,7 +1,7 @@
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { api, generateExport, getExportPreview } from "../../../api/client";
-import { downloadBlobResponse } from "../../../lib/download";
+import { downloadBlobResponse, type DownloadProgress } from "../../../lib/download";
 import { sanitizeHtml } from "../../../lib/sanitize";
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
@@ -76,6 +76,8 @@ export default function ExportExecutor(props: Props) {
   const [previewContent, setPreviewContent] = createSignal("");
   const [previewLoading, setPreviewLoading] = createSignal(true);
   const [exporting, setExporting] = createSignal(false);
+  const [downloading, setDownloading] = createSignal(false);
+  const [downloadProgress, setDownloadProgress] = createSignal<DownloadProgress | null>(null);
   const [exportResult, setExportResult] = createSignal<{
     filename: string;
     format: string;
@@ -112,6 +114,7 @@ export default function ExportExecutor(props: Props) {
   }
 
   async function handleExport() {
+    if (exporting() || downloading()) return;
     setExporting(true);
     setError(null);
 
@@ -129,6 +132,7 @@ export default function ExportExecutor(props: Props) {
           format: result.format,
           fileSize: result.fileSize,
         });
+        setExporting(false);
         await triggerDownload();
         await props.onExported?.();
       } else {
@@ -146,16 +150,29 @@ export default function ExportExecutor(props: Props) {
   }
 
   async function triggerDownload() {
+    if (downloading()) return;
     const url = `/api/runtime/${props.documentId}/export/${props.nodeExecution.id}/download`;
     const token = localStorage.getItem("auth_token");
-    const res = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) {
+    setDownloading(true);
+    setDownloadProgress(null);
+
+    try {
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) {
+        setError("下载失败，请重试");
+        return;
+      }
+      await downloadBlobResponse(res, filename() || exportResult()?.filename || "export", {
+        onProgress: (progress) => setDownloadProgress(progress),
+      });
+    } catch {
       setError("下载失败，请重试");
-      return;
+    } finally {
+      setDownloading(false);
+      setDownloadProgress(null);
     }
-    await downloadBlobResponse(res, filename() || exportResult()?.filename || "export");
   }
 
   function formatFileSize(bytes: number): string {
@@ -440,10 +457,42 @@ export default function ExportExecutor(props: Props) {
                 type="button"
                 class="px-4 py-2 text-sm font-medium text-[#4f46e5] bg-[#e2dfff] rounded-xl hover:bg-[#d4d0ff] transition-colors"
                 onClick={triggerDownload}
+                disabled={downloading()}
               >
-                下载文件
+                {downloading() ? "下载中..." : "下载文件"}
               </button>
             </div>
+            <Show when={downloading() && downloadProgress()}>
+              {(progress) => (
+                <div class="mt-3 rounded-xl border border-[rgba(79,70,229,0.12)] bg-indigo-50 px-4 py-3">
+                  <div class="flex items-center justify-between gap-4 text-xs text-[#4f46e5]">
+                    <span class="font-medium">
+                      {progress().percent != null
+                        ? `正在下载文件 ${progress().percent}%`
+                        : "正在下载文件..."}
+                    </span>
+                    <span class="tabular-nums">
+                      {formatFileSize(progress().receivedBytes)}
+                      <Show when={progress().totalBytes != null}>
+                        {` / ${formatFileSize(progress().totalBytes ?? 0)}`}
+                      </Show>
+                    </span>
+                  </div>
+                  <div class="mt-2 h-2 overflow-hidden rounded-full bg-[rgba(79,70,229,0.12)]">
+                    <div
+                      class={`h-full rounded-full bg-[#4f46e5] transition-[width] duration-200 ${
+                        progress().percent == null ? "animate-pulse w-1/3" : ""
+                      }`}
+                      style={
+                        progress().percent != null
+                          ? { width: `${progress().percent}%` }
+                          : undefined
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </Show>
           </div>
         )}
       </Show>
@@ -453,10 +502,10 @@ export default function ExportExecutor(props: Props) {
         <button
           type="button"
           class="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-[#3525cd] to-[#4f46e5] rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
-          disabled={exporting() || previewLoading() || !filename()}
+          disabled={exporting() || downloading() || previewLoading() || !filename()}
           onClick={handleExport}
         >
-          <Show when={!exporting()}>
+          <Show when={!exporting() && !downloading()}>
             <svg
               class="w-4 h-4"
               fill="none"
@@ -472,7 +521,7 @@ export default function ExportExecutor(props: Props) {
               />
             </svg>
           </Show>
-          {exporting() ? "正在生成..." : "下载文件"}
+          {exporting() ? "正在生成..." : downloading() ? "正在下载..." : "下载文件"}
         </button>
       </div>
     </div>

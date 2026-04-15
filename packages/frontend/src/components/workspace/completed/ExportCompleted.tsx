@@ -1,6 +1,6 @@
 import type { ExportConfig, NodeConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal } from "solid-js";
-import { downloadBlobResponse } from "../../../lib/download";
+import { downloadBlobResponse, type DownloadProgress } from "../../../lib/download";
 import { formatDuration, formatFileSize, formatTime } from "../../../lib/format-utils";
 
 interface Props {
@@ -32,6 +32,8 @@ const FORMAT_COLORS: Record<string, string> = {
 
 export default function ExportCompleted(props: Props) {
   const [configExpanded, setConfigExpanded] = createSignal(false);
+  const [downloading, setDownloading] = createSignal(false);
+  const [downloadProgress, setDownloadProgress] = createSignal<DownloadProgress | null>(null);
 
   const result = () =>
     props.node.outputData as {
@@ -54,17 +56,24 @@ export default function ExportCompleted(props: Props) {
 
   async function handleDownload() {
     const r = result();
-    if (!r) return;
+    if (!r || downloading()) return;
     const downloadUrl = `/api/runtime/${props.documentId}/export/${props.node.id}/download`;
     const token = localStorage.getItem("auth_token");
     try {
+      setDownloading(true);
+      setDownloadProgress(null);
       const res = await fetch(downloadUrl, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) return;
-      await downloadBlobResponse(res, r.filename);
+      await downloadBlobResponse(res, r.filename, {
+        onProgress: (progress) => setDownloadProgress(progress),
+      });
     } catch {
       // silently fail
+    } finally {
+      setDownloading(false);
+      setDownloadProgress(null);
     }
   }
 
@@ -179,8 +188,9 @@ export default function ExportCompleted(props: Props) {
                   <button
                     type="button"
                     onClick={handleDownload}
-                    class="flex items-center gap-2 px-5 py-2.5 text-[13px] font-semibold text-white rounded-xl shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-0"
+                    class="flex items-center gap-2 px-5 py-2.5 text-[13px] font-semibold text-white rounded-xl shadow-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer border-0 disabled:cursor-not-allowed disabled:opacity-50"
                     style={{ background: "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)" }}
+                    disabled={downloading()}
                   >
                     <svg
                       class="w-4 h-4"
@@ -196,7 +206,7 @@ export default function ExportCompleted(props: Props) {
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
                       />
                     </svg>
-                    下载文件
+                    {downloading() ? "下载中..." : "下载文件"}
                   </button>
                   <button
                     type="button"
@@ -220,6 +230,38 @@ export default function ExportCompleted(props: Props) {
                     复制全文
                   </button>
                 </div>
+
+                <Show when={downloading() && downloadProgress()}>
+                  {(progress) => (
+                    <div class="w-full max-w-sm rounded-xl border border-[rgba(79,70,229,0.12)] bg-indigo-50 px-4 py-3">
+                      <div class="flex items-center justify-between gap-4 text-xs text-[#4f46e5]">
+                        <span class="font-medium">
+                          {progress().percent != null
+                            ? `正在下载 ${progress().percent}%`
+                            : "正在下载文件..."}
+                        </span>
+                        <span class="tabular-nums">
+                          {formatFileSize(progress().receivedBytes)}
+                          <Show when={progress().totalBytes != null}>
+                            {` / ${formatFileSize(progress().totalBytes ?? 0)}`}
+                          </Show>
+                        </span>
+                      </div>
+                      <div class="mt-2 h-2 overflow-hidden rounded-full bg-[rgba(79,70,229,0.12)]">
+                        <div
+                          class={`h-full rounded-full bg-[#4f46e5] transition-[width] duration-200 ${
+                            progress().percent == null ? "animate-pulse w-1/3" : ""
+                          }`}
+                          style={
+                            progress().percent != null
+                              ? { width: `${progress().percent}%` }
+                              : undefined
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+                </Show>
               </div>
             </>
           )}

@@ -7,7 +7,7 @@ import {
   getFileExtColor,
 } from "../../lib/format-utils";
 import { renderMarkdown } from "../../lib/render-markdown";
-import { downloadBlobResponse } from "../../lib/download";
+import { downloadBlobResponse, type DownloadProgress } from "../../lib/download";
 
 interface Props {
   node: NodeExecution;
@@ -727,6 +727,8 @@ function renderRestore(data: Record<string, unknown>) {
 }
 
 function renderExport(data: Record<string, unknown>, documentId: string, nodeId: string) {
+  const [downloading, setDownloading] = createSignal(false);
+  const [downloadProgress, setDownloadProgress] = createSignal<DownloadProgress | null>(null);
   const filename = data.filename as string | undefined;
   const format = data.format as string | undefined;
   const fileSize = data.fileSize as number | undefined;
@@ -739,37 +741,78 @@ function renderExport(data: Record<string, unknown>, documentId: string, nodeId:
   };
 
   async function triggerDownload() {
+    if (downloading()) return;
     const url = `/api/runtime/${documentId}/export/${nodeId}/download`;
     const token = localStorage.getItem("auth_token");
-    const res = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) return;
-    await downloadBlobResponse(res, filename || "export");
+    try {
+      setDownloading(true);
+      setDownloadProgress(null);
+      const res = await fetch(url, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      await downloadBlobResponse(res, filename || "export", {
+        onProgress: (progress) => setDownloadProgress(progress),
+      });
+    } finally {
+      setDownloading(false);
+      setDownloadProgress(null);
+    }
   }
 
   return (
-    <div class="flex items-center gap-4 p-4 bg-[#f7f9fb] rounded-xl">
-      <div
-        class="w-10 h-10 rounded-lg bg-[#4f46e5] flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
-        style={{ "box-shadow": "0 4px 12px rgba(79,70,229,0.2)" }}
-      >
-        {FORMAT_ICONS[format ?? "markdown"] ?? "F"}
+    <div class="space-y-3 rounded-xl bg-[#f7f9fb] p-4">
+      <div class="flex items-center gap-4">
+        <div
+          class="w-10 h-10 rounded-lg bg-[#4f46e5] flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
+          style={{ "box-shadow": "0 4px 12px rgba(79,70,229,0.2)" }}
+        >
+          {FORMAT_ICONS[format ?? "markdown"] ?? "F"}
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-medium text-[#191c1e] truncate">{filename ?? "未知文件"}</p>
+          <p class="text-xs text-[#464555]">
+            {FORMAT_LABELS[format ?? ""] ?? format?.toUpperCase() ?? "文件"} ·{" "}
+            {fileSize != null ? formatFileSize(fileSize) : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          class="px-4 py-2 text-sm font-medium text-[#4f46e5] bg-[#e2dfff] rounded-xl hover:bg-[#d4d0ff] transition-colors flex-shrink-0 disabled:cursor-not-allowed disabled:opacity-50"
+          onClick={triggerDownload}
+          disabled={downloading()}
+        >
+          {downloading() ? "下载中..." : "下载"}
+        </button>
       </div>
-      <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium text-[#191c1e] truncate">{filename ?? "未知文件"}</p>
-        <p class="text-xs text-[#464555]">
-          {FORMAT_LABELS[format ?? ""] ?? format?.toUpperCase() ?? "文件"} ·{" "}
-          {fileSize != null ? formatFileSize(fileSize) : ""}
-        </p>
-      </div>
-      <button
-        type="button"
-        class="px-4 py-2 text-sm font-medium text-[#4f46e5] bg-[#e2dfff] rounded-xl hover:bg-[#d4d0ff] transition-colors flex-shrink-0"
-        onClick={triggerDownload}
-      >
-        下载
-      </button>
+
+      <Show when={downloading() && downloadProgress()}>
+        {(progress) => (
+          <div class="rounded-lg border border-[rgba(79,70,229,0.12)] bg-indigo-50 px-3 py-2.5">
+            <div class="flex items-center justify-between gap-3 text-[11px] text-[#4f46e5]">
+              <span class="font-medium">
+                {progress().percent != null ? `下载中 ${progress().percent}%` : "下载中..."}
+              </span>
+              <span class="tabular-nums">
+                {formatFileSize(progress().receivedBytes)}
+                <Show when={progress().totalBytes != null}>
+                  {` / ${formatFileSize(progress().totalBytes ?? 0)}`}
+                </Show>
+              </span>
+            </div>
+            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-[rgba(79,70,229,0.12)]">
+              <div
+                class={`h-full rounded-full bg-[#4f46e5] transition-[width] duration-200 ${
+                  progress().percent == null ? "animate-pulse w-1/3" : ""
+                }`}
+                style={
+                  progress().percent != null ? { width: `${progress().percent}%` } : undefined
+                }
+              />
+            </div>
+          </div>
+        )}
+      </Show>
     </div>
   );
 }

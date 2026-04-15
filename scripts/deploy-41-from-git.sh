@@ -16,6 +16,7 @@ REMOTE_USER="${REMOTE_USER:-u}"
 REMOTE_PATH="${REMOTE_PATH:-/home/u/intelliflow-docs}"
 SSH_PASSWORD="${SSH_PASSWORD- }"
 EXPECTED_HEAD="$(git -C "$ROOT_DIR" rev-parse HEAD)"
+BUN_BIN="${BUN_BIN:-/home/u/.bun/bin/bun}"
 
 echo "==> Deploying branch '$BRANCH' to ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_PATH}"
 echo "==> Expected remote head: $EXPECTED_HEAD"
@@ -23,12 +24,13 @@ echo "==> Expected remote head: $EXPECTED_HEAD"
 sshpass -p "$SSH_PASSWORD" ssh \
   -o StrictHostKeyChecking=no \
   "${REMOTE_USER}@${REMOTE_HOST}" \
-  bash -s -- "$REMOTE_PATH" "$BRANCH" "$EXPECTED_HEAD" <<'REMOTE_EOF'
+  bash -s -- "$REMOTE_PATH" "$BRANCH" "$EXPECTED_HEAD" "$BUN_BIN" <<'REMOTE_EOF'
 set -euo pipefail
 
 REPO_PATH="$1"
 BRANCH="$2"
 EXPECTED_HEAD="$3"
+BUN_BIN="$4"
 
 cd "$REPO_PATH"
 
@@ -94,12 +96,12 @@ echo "install=$needs_install db_push=$needs_db frontend_build=$needs_frontend ba
 
 if [[ "$needs_install" -eq 1 ]]; then
   echo "==> Running bun install --frozen-lockfile"
-  bun install --frozen-lockfile
+  "$BUN_BIN" install --frozen-lockfile
 fi
 
 if [[ "$needs_db" -eq 1 ]]; then
   echo "==> Running backend db:push"
-  bun run --filter @intelliflow/backend db:push
+  "$BUN_BIN" run --filter @intelliflow/backend db:push
 fi
 
 if [[ "$needs_frontend" -eq 1 ]]; then

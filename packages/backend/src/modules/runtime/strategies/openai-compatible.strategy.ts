@@ -1,5 +1,6 @@
 import type { SSEEvent } from "@intelliflow/shared";
 import type { ModelCallInput, ModelCallResult, ModelCallStrategy } from "./base.strategy";
+import { buildChatCompletionsUrl } from "./openai-compatible-url";
 
 /** OpenAI-compatible API strategy (also used for opencode type) */
 export class OpenAICompatibleStrategy implements ModelCallStrategy {
@@ -33,9 +34,7 @@ export class OpenAICompatibleStrategy implements ModelCallStrategy {
     if (model.topP != null) body.top_p = model.topP;
 
     const isOllama = model.providerType === "ollama";
-    const url = isOllama
-      ? `${model.baseUrl}/v1/chat/completions`
-      : `${model.baseUrl}/chat/completions`;
+    const url = buildChatCompletionsUrl(model.baseUrl, model.providerType);
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };

@@ -1,5 +1,9 @@
 import type { NodeConfig, OutputDef } from "@intelliflow/shared";
 
+function buildManualFeedbackSegmentKey(): string {
+  return "manual_feedback";
+}
+
 function buildModelArtifactSegmentKey(modelId: string, artifactId: string): string {
   return `model__${modelId}__artifact__${artifactId}`;
 }
@@ -57,7 +61,16 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
     case "model_call": {
       const modelIds = config.modelIds ?? [];
       const modelNames = config.modelNames ?? {};
-      const outputs: OutputDef[] = [];
+      const outputs: OutputDef[] = [
+        {
+          id: `${nodeId}-manual-feedback`,
+          name: "人工意见",
+          description: "当前节点保存的人工反馈意见",
+          segmentKey: buildManualFeedbackSegmentKey(),
+          category: "manual_feedback",
+          groupLabel: "人工意见",
+        },
+      ];
 
       if (config.namedOutputs && config.namedOutputs.length > 0) {
         for (const modelId of modelIds) {

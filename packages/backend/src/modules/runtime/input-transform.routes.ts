@@ -1,6 +1,6 @@
 import Elysia, { t } from "elysia";
 import { requireAuth } from "../auth/auth.guard";
-import { isDocumentProjectMember, canEditDocument } from "../versions/versions.service";
+import { canEditDocument } from "../versions/versions.service";
 import { confirmInputTransform, handleFileUpload } from "./input-transform.service";
 
 export const inputTransformRoutes = new Elysia({
@@ -13,7 +13,12 @@ export const inputTransformRoutes = new Elysia({
   .post(
     "/:documentId/input-transform/:nodeExecutionId/upload",
     async ({ params, body, user, set }) => {
-      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!user?.id) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, user.id);
       if (!canEdit) {
         set.status = 403;
         return { error: "仅文档创建者或项目负责人可上传文件" };
@@ -24,7 +29,7 @@ export const inputTransformRoutes = new Elysia({
           params.documentId,
           params.nodeExecutionId,
           body.file,
-          user!.id,
+          user.id,
         );
         return result;
       } catch (err: unknown) {
@@ -49,7 +54,12 @@ export const inputTransformRoutes = new Elysia({
   .post(
     "/:documentId/input-transform/:nodeExecutionId/confirm",
     async ({ params, body, user, set }) => {
-      const canEdit = await canEditDocument(params.documentId, user!.id);
+      if (!user?.id) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, user.id);
       if (!canEdit) {
         set.status = 403;
         return { error: "仅文档创建者或项目负责人可确认输入转换" };
@@ -64,8 +74,9 @@ export const inputTransformRoutes = new Elysia({
             fileId: string;
             name: string;
             parsedText: string;
+            slotId?: string;
           }>,
-          userId: user!.id,
+          userId: user.id,
         });
         return { success: true, nodeExecution: updated };
       } catch (err: unknown) {
@@ -86,6 +97,7 @@ export const inputTransformRoutes = new Elysia({
             fileId: t.String(),
             name: t.String(),
             parsedText: t.String(),
+            slotId: t.Optional(t.String()),
           }),
         ),
       }),

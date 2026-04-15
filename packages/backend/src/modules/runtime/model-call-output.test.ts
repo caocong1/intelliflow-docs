@@ -1,6 +1,10 @@
 import type { ModelOutput, NamedOutputDef } from "@intelliflow/shared";
 import { describe, expect, it } from "vitest";
-import { buildModelCallOutputData, buildSelectedModelOutputData, parseNamedOutputs } from "./model-call-output";
+import {
+  buildModelCallOutputData,
+  buildSelectedModelOutputData,
+  parseNamedOutputs,
+} from "./model-call-output";
 
 const namedOutputDefs: NamedOutputDef[] = [
   { id: "prd_v1", name: "PRD V1", format: "markdown" },
@@ -137,6 +141,46 @@ describe("model-call output helpers", () => {
           "### Alpha Model\n\n## Alpha Decision Log\n\n---\n\n### Beta Model\n\n## Beta Decision Log",
         format: "markdown",
         modelIds: ["alpha", "beta"],
+      },
+    });
+  });
+
+  it("preserves manual feedback and exposes it as a flattened output item", () => {
+    const models: Record<string, ModelOutput> = {
+      alpha: {
+        modelId: "alpha",
+        modelDisplayName: "Alpha Model",
+        content: buildDelimitedContent("Alpha"),
+        status: "completed",
+      },
+    };
+
+    const next = buildModelCallOutputData({
+      models,
+      config: {
+        namedOutputs: namedOutputDefs,
+        outputFormat: "markdown",
+      },
+      previousOutputData: {
+        manualFeedback: {
+          content: "请把 PRD 的风险说明写得更具体。",
+          updatedAt: "2026-04-14T10:00:00.000Z",
+          appliedAt: null,
+        },
+      },
+      markManualFeedbackApplied: true,
+    });
+
+    expect(next.outputData.manualFeedback).toEqual({
+      content: "请把 PRD 的风险说明写得更具体。",
+      updatedAt: "2026-04-14T10:00:00.000Z",
+      appliedAt: "2026-04-14T10:00:00.000Z",
+    });
+    expect(next.outputData.outputItems).toMatchObject({
+      manual_feedback: {
+        content: "请把 PRD 的风险说明写得更具体。",
+        format: "text",
+        kind: "manual_feedback",
       },
     });
   });

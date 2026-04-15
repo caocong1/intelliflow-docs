@@ -105,6 +105,7 @@ export interface OutputDef {
     | "file_slot"
     | "model"
     | "model_artifact"
+    | "manual_feedback"
     | "selected"
     | "selected_artifact"
     | "desensitized"
@@ -494,6 +495,48 @@ export interface ModelOutput {
   formatErrors?: string[];
 }
 
+/** User-authored feedback attached to a model_call node for re-generation */
+export interface ModelCallManualFeedback {
+  content: string;
+  updatedAt?: string | null;
+  /** When equal to updatedAt, the latest feedback has already been applied. */
+  appliedAt?: string | null;
+}
+
+/** Named output value stored in model_call outputData */
+export interface ModelCallNamedOutputValue {
+  content: string;
+  format: "text" | "json" | "markdown";
+  modelId?: string;
+  modelDisplayName?: string;
+  modelIds?: string[];
+}
+
+/** Flattened output item stored in model_call outputData */
+export interface ModelCallOutputItem {
+  content: string;
+  format: "text" | "json" | "markdown";
+  kind: "model" | "model_artifact" | "manual_feedback" | "selected" | "selected_artifact";
+  modelId?: string;
+  modelDisplayName?: string;
+  modelIds?: string[];
+  artifactId?: string;
+}
+
+/** Runtime outputData shape for model_call nodes */
+export interface ModelCallOutputData {
+  [key: string]: unknown;
+  models?: Record<string, ModelOutput>;
+  selectedModelIds?: string[];
+  selectedContent?: string;
+  text?: string;
+  namedOutputs?: Record<string, ModelCallNamedOutputValue>;
+  namedOutputsByModel?: Record<string, Record<string, ModelCallNamedOutputValue>>;
+  outputItems?: Record<string, ModelCallOutputItem>;
+  fallbackWarning?: boolean;
+  manualFeedback?: ModelCallManualFeedback;
+}
+
 /** SSE event types for model streaming */
 export type SSEEventType = "status" | "delta" | "complete" | "error";
 
@@ -610,7 +653,7 @@ export interface RestorationItem {
 /** 单个输入源的还原输出 */
 export interface RestoreSourceOutput {
   displayName: string;
-  originalText: string;   // 恢复前文本
+  originalText: string; // 恢复前文本
   restoredText: string;
 }
 
@@ -620,7 +663,7 @@ export interface RestoreOutputData {
   restoredText: string;
   restorations: RestorationItem[];
   sources: Record<string, RestoreSourceOutput>;
-  confirmedAt?: string;   // 确认时间戳
+  confirmedAt?: string; // 确认时间戳
 }
 
 /** 检测阶段临时状态（confirm 后被完整覆盖） */

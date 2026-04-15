@@ -1,6 +1,10 @@
 import type {
+  DocumentRuntimeState,
   ModelCallConfig,
   ModelCallLiveEvent,
+  ModelCallManualFeedback,
+  ModelCallNamedOutputValue,
+  ModelCallOutputData,
   ModelOutput,
   NamedOutputDef,
   NodeExecution,
@@ -25,13 +29,7 @@ type ExecutionPhase = "idle" | "streaming" | "polling" | "done";
 
 type ViewMode = "markdown" | "source";
 
-type ModelCallNamedOutput = {
-  content: string;
-  format: string;
-  modelId?: string;
-  modelDisplayName?: string;
-  modelIds?: string[];
-};
+type ModelCallNamedOutput = ModelCallNamedOutputValue;
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "等待中",
@@ -168,8 +166,31 @@ function getSelectedModelIdsFromOutputData(
   return [];
 }
 
+function getManualFeedback(
+  outputData: Record<string, unknown> | null,
+): ModelCallManualFeedback | null {
+  const raw = outputData?.manualFeedback;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+
+  const feedback = raw as Record<string, unknown>;
+  return {
+    content: typeof feedback.content === "string" ? feedback.content : "",
+    updatedAt: typeof feedback.updatedAt === "string" ? feedback.updatedAt : null,
+    appliedAt: typeof feedback.appliedAt === "string" ? feedback.appliedAt : null,
+  };
+}
+
+function hasPendingManualFeedback(outputData: Record<string, unknown> | null): boolean {
+  const feedback = getManualFeedback(outputData);
+  if (!feedback?.content.trim()) return false;
+  if (!feedback.updatedAt) return true;
+  return feedback.appliedAt !== feedback.updatedAt;
+}
+
 export function hasInProgressModelOutputs(models: Record<string, ModelOutput>): boolean {
-  return Object.values(models).some((model) => model.status === "pending" || model.status === "streaming");
+  return Object.values(models).some(
+    (model) => model.status === "pending" || model.status === "streaming",
+  );
 }
 
 export function deriveModelCallExecutionPhase(params: {
@@ -284,13 +305,17 @@ export default function ModelCallExecutor(props: Props) {
     getSelectedModelIdsFromOutputData(currentOutputData(), props.nodeExecution.selectedOutputKey),
   );
   const [selectedModelId, setSelectedModelId] = createSignal<string>(
-    getSelectedModelIdsFromOutputData(currentOutputData(), props.nodeExecution.selectedOutputKey)[0] ??
+    getSelectedModelIdsFromOutputData(
+      currentOutputData(),
+      props.nodeExecution.selectedOutputKey,
+    )[0] ??
       props.nodeExecution.selectedOutputKey ??
       "",
   );
   const [error, setError] = createSignal<string | null>(null);
   const [selectLoading, setSelectLoading] = createSignal(false);
   const [viewMode, setViewMode] = createSignal<ViewMode>("markdown");
+  const [manualFeedbackRegenerating, setManualFeedbackRegenerating] = createSignal(false);
 
   // ─── Format error + AI fix state ──────────────────────────────────────────
   const [editedContent, setEditedContent] = createSignal<Record<string, string>>({});
@@ -302,24 +327,27 @@ export default function ModelCallExecutor(props: Props) {
 
   // ─── Named outputs from outputData ────────────────────────────────────────
   const namedOutputs = () => {
-    const od = currentOutputData();
+    const od = currentOutputData() as ModelCallOutputData | null;
     return (od?.namedOutputs as Record<string, ModelCallNamedOutput>) ?? null;
   };
 
   const namedOutputsByModel = () => {
-    const od = currentOutputData();
+    const od = currentOutputData() as ModelCallOutputData | null;
     return (od?.namedOutputsByModel as Record<string, Record<string, ModelCallNamedOutput>>) ?? {};
   };
 
   const fallbackWarning = () => {
-    const od = currentOutputData();
+    const od = currentOutputData() as ModelCallOutputData | null;
     return (od?.fallbackWarning as boolean) ?? false;
   };
 
+  const manualFeedback = () => getManualFeedback(currentOutputData());
+  const manualFeedbackContent = () => manualFeedback()?.content ?? "";
+  const manualFeedbackPending = () => hasPendingManualFeedback(currentOutputData());
+
   const hasNamedOutputs = () => {
     return (
-      Object.keys(namedOutputs() ?? {}).length > 0 ||
-      Object.keys(namedOutputsByModel()).length > 0
+      Object.keys(namedOutputs() ?? {}).length > 0 || Object.keys(namedOutputsByModel()).length > 0
     );
   };
 
@@ -390,7 +418,11 @@ export default function ModelCallExecutor(props: Props) {
     }, 3000);
   }
 
-  function syncActiveTab(models: Record<string, ModelOutput>, preferredModelId?: string | null, force?: boolean) {
+  function syncActiveTab(
+    models: Record<string, ModelOutput>,
+    preferredModelId?: string | null,
+    force?: boolean,
+  ) {
     const keys = Object.keys(models);
     if (keys.length === 0) return;
     // Only override user selection when explicitly forced (e.g. snapshot with selectedModelId)
@@ -543,19 +575,39 @@ export default function ModelCallExecutor(props: Props) {
   });
 
   createEffect(() => {
-    if (!selectionEnabled()) {
-      props.registerConfirmAction?.(null);
-      return;
-    }
-
     props.registerConfirmAction?.(async () => {
-      if (selectedModelIds().length > 0) {
-        setError(null);
-        return true;
+      if (selectionEnabled() && selectedModelIds().length === 0) {
+        setError("请至少选择一个模型输出后再继续。");
+        return false;
       }
 
-      setError("请至少选择一个模型输出后再继续。");
-      return false;
+      if (manualFeedbackPending()) {
+        setError("已填写人工意见，请先按意见重生成当前节点后再继续。");
+        return false;
+      }
+
+      try {
+        const token = localStorage.getItem("auth_token");
+        const res = await fetch(
+          `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/validate-selection`,
+          {
+            method: "POST",
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          },
+        );
+
+        if (res.ok) {
+          setError(null);
+          return true;
+        }
+
+        const data = (await res.json()) as { error?: string; errors?: string[] };
+        setError(data.errors?.join("\n") ?? data.error ?? "当前输出校验失败，请检查后再继续。");
+        return false;
+      } catch {
+        setError("当前输出校验失败，请检查网络后重试。");
+        return false;
+      }
     });
   });
 
@@ -622,13 +674,46 @@ export default function ModelCallExecutor(props: Props) {
 
   // ─── SSE Streaming ─────────────────────────────────────────────────────────
 
-  async function startStreaming(url: string) {
+  async function refreshCurrentNodeOutputData() {
+    try {
+      const token = localStorage.getItem("auth_token");
+      const res = await fetch(`/api/runtime/${props.documentId}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!res.ok) return;
+
+      const runtime = (await res.json()) as DocumentRuntimeState;
+      const refreshedNode = runtime.nodes.find((node) => node.id === props.nodeExecution.id);
+      if (!refreshedNode) return;
+
+      const nextOutputData =
+        (refreshedNode.outputData as Record<string, unknown> | null) ?? currentOutputData();
+      setLocalOutputData(nextOutputData);
+
+      const nextSelectedIds = getSelectedModelIdsFromOutputData(
+        nextOutputData,
+        refreshedNode.selectedOutputKey,
+      );
+      setSelectedModelIds(nextSelectedIds);
+      setSelectedModelId(nextSelectedIds[0] ?? refreshedNode.selectedOutputKey ?? "");
+    } catch {
+      // Ignore runtime refresh failures; streaming output is still visible locally.
+    }
+  }
+
+  async function startStreaming(options: {
+    url: string;
+    method?: "GET" | "POST";
+    body?: unknown;
+  }) {
     abortController?.abort();
     abortController = new AbortController();
 
     try {
       await streamSSE({
-        url,
+        url: options.url,
+        method: options.method,
+        body: options.body,
         onStatus: (modelId, data) => {
           applyLiveEvent({
             type: "status",
@@ -670,6 +755,7 @@ export default function ModelCallExecutor(props: Props) {
     }
 
     setPhase("done");
+    await refreshCurrentNodeOutputData();
   }
 
   // ─── Error localization ─────────────────────────────────────────────────────
@@ -690,16 +776,73 @@ export default function ModelCallExecutor(props: Props) {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
+  function handleManualFeedbackChange(content: string) {
+    const od = (currentOutputData() as ModelCallOutputData | null) ?? {};
+    const previousFeedback = getManualFeedback(currentOutputData());
+    const nextManualFeedback: ModelCallManualFeedback =
+      previousFeedback?.content === content
+        ? previousFeedback
+        : {
+            content,
+            updatedAt: new Date().toISOString(),
+            appliedAt: null,
+          };
+
+    const nextOutputData: ModelCallOutputData = {
+      ...od,
+      manualFeedback: nextManualFeedback,
+      outputItems: {
+        ...(od.outputItems ?? {}),
+        manual_feedback: {
+          content,
+          format: "text",
+          kind: "manual_feedback",
+        },
+      },
+    };
+
+    setLocalOutputData(nextOutputData);
+    props.onDraftSave(nextOutputData);
+  }
+
+  async function handleRegenerateWithFeedback() {
+    const feedback = manualFeedbackContent();
+    if (!feedback.trim()) {
+      setError("请先填写人工意见，再按意见重生成。");
+      return;
+    }
+
+    setManualFeedbackRegenerating(true);
+    setError(null);
+    setPhase("streaming");
+    setModelOutputs({});
+
+    try {
+      await startStreaming({
+        url: `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/regenerate`,
+        method: "POST",
+        body: { manualFeedback: feedback },
+      });
+    } finally {
+      setManualFeedbackRegenerating(false);
+    }
+  }
+
   function handleStartGeneration() {
     // NEVER call execute if models already exist or backend is already running
     if (hasExistingOutput()) return;
-    if (props.backgroundMode && props.nodeExecution.status === "in_progress" && phase() === "polling") return;
+    if (
+      props.backgroundMode &&
+      props.nodeExecution.status === "in_progress" &&
+      phase() === "polling"
+    )
+      return;
 
     setPhase("streaming");
     setError(null);
     setModelOutputs({});
     const url = `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/execute`;
-    startStreaming(url);
+    void startStreaming({ url });
   }
 
   function handleRetry(modelId: string) {
@@ -717,7 +860,7 @@ export default function ModelCallExecutor(props: Props) {
     }));
 
     const url = `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/retry/${modelId}`;
-    startStreaming(url);
+    void startStreaming({ url });
   }
 
   async function handleSelect(modelId: string) {
@@ -862,13 +1005,25 @@ export default function ModelCallExecutor(props: Props) {
     // Update outputData namedOutputs via draft save
     const od = currentOutputData();
     const currentNamedOutputs = (od?.namedOutputs as Record<string, ModelCallNamedOutput>) ?? {};
+    const currentOutputItems = (od?.outputItems as Record<string, Record<string, unknown>>) ?? {};
     const updated = {
       ...currentNamedOutputs,
       [artifactId]: { ...currentNamedOutputs[artifactId], content: newContent },
     };
+    const selectedArtifactKey = `selected__artifact__${artifactId}`;
+    const updatedOutputItems = currentOutputItems[selectedArtifactKey]
+      ? {
+          ...currentOutputItems,
+          [selectedArtifactKey]: {
+            ...currentOutputItems[selectedArtifactKey],
+            content: newContent,
+          },
+        }
+      : currentOutputItems;
     const nextOutputData = {
       ...od,
       namedOutputs: updated,
+      outputItems: updatedOutputItems,
     };
     setLocalOutputData(nextOutputData);
     props.onDraftSave(nextOutputData);
@@ -883,7 +1038,10 @@ export default function ModelCallExecutor(props: Props) {
   function allCompleted(): boolean {
     const outputs = modelList();
     return (
-      outputs.length > 0 && outputs.every((m) => m.status === "completed" || m.status === "failed" || m.status === "format_error")
+      outputs.length > 0 &&
+      outputs.every(
+        (m) => m.status === "completed" || m.status === "failed" || m.status === "format_error",
+      )
     );
   }
 
@@ -955,7 +1113,11 @@ export default function ModelCallExecutor(props: Props) {
               stroke-width="2"
               aria-hidden="true"
             >
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
+              />
             </svg>
             {label}
           </span>
@@ -974,17 +1136,26 @@ export default function ModelCallExecutor(props: Props) {
         {/* Error box */}
         <div class="border border-red-300 bg-red-50 rounded-xl p-4">
           <div class="flex items-center gap-2 mb-2">
-            <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+            <svg
+              class="w-4 h-4 text-red-500 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
+              />
             </svg>
             <span class="text-sm font-medium text-red-700">JSON 格式验证失败</span>
           </div>
           <Show when={model.formatErrors && model.formatErrors.length > 0}>
             <ul class="list-disc list-inside space-y-1">
               <For each={model.formatErrors}>
-                {(err) => (
-                  <li class="text-xs text-red-600">{err}</li>
-                )}
+                {(err) => <li class="text-xs text-red-600">{err}</li>}
               </For>
             </ul>
           </Show>
@@ -1293,7 +1464,11 @@ export default function ModelCallExecutor(props: Props) {
                           <Show
                             when={model()?.content}
                             fallback={
-                              <Show when={model()?.status === "streaming" || model()?.status === "pending"}>
+                              <Show
+                                when={
+                                  model()?.status === "streaming" || model()?.status === "pending"
+                                }
+                              >
                                 <div class="flex items-center gap-2.5 py-2">
                                   <span class="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin flex-shrink-0" />
                                   <span class="text-sm text-[#464555]">正在生成中...</span>
@@ -1395,7 +1570,11 @@ export default function ModelCallExecutor(props: Props) {
                           <Show
                             when={model().content}
                             fallback={
-                              <Show when={model().status === "streaming" || model().status === "pending"}>
+                              <Show
+                                when={
+                                  model().status === "streaming" || model().status === "pending"
+                                }
+                              >
                                 <div class="flex items-center gap-2.5 py-2">
                                   <span class="w-4 h-4 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin flex-shrink-0" />
                                   <span class="text-sm text-[#464555]">正在生成中...</span>
@@ -1429,19 +1608,69 @@ export default function ModelCallExecutor(props: Props) {
           {/* Fallback warning */}
           <Show when={fallbackWarning() && phase() === "done"}>
             <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
-              <svg class="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+              <svg
+                class="w-4 h-4 text-amber-500 flex-shrink-0"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
+                />
               </svg>
               <span class="text-sm text-amber-700">模型未按预期格式输出，已合并为单个产物</span>
+            </div>
+          </Show>
+
+          <Show when={phase() === "done" && modelList().length > 0}>
+            <div class="border border-[rgba(199,196,216,0.35)] rounded-2xl p-4 space-y-3 bg-[#fcfcfe]">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div class="space-y-1">
+                  <div class="flex items-center gap-2">
+                    <h4 class="text-sm font-semibold text-[#191c1e]">人工意见</h4>
+                    <Show when={manualFeedbackPending()}>
+                      <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
+                        待重生成
+                      </span>
+                    </Show>
+                    <Show when={!manualFeedbackPending() && manualFeedbackContent().trim()}>
+                      <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
+                        已应用
+                      </span>
+                    </Show>
+                  </div>
+                  <p class="text-xs text-[#6b6a78]">
+                    在这里描述你希望模型如何修改当前节点输出。保存后，点击“按意见重生成”让当前
+                    节点按最新意见重新生成；未应用的意见不能直接继续。
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={manualFeedbackRegenerating() || !manualFeedbackContent().trim()}
+                  onClick={() => void handleRegenerateWithFeedback()}
+                >
+                  {manualFeedbackRegenerating() ? "重生成中..." : "按意见重生成"}
+                </button>
+              </div>
+
+              <textarea
+                value={manualFeedbackContent()}
+                onInput={(e) => handleManualFeedbackChange(e.currentTarget.value)}
+                placeholder="例如：保留整体结构，但把结论写得更保守；补充风险假设；统一术语；重新生成所有命名产物。"
+                class="w-full min-h-[120px] rounded-xl border border-[rgba(199,196,216,0.35)] bg-white px-4 py-3 text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-y"
+              />
             </div>
           </Show>
 
           {/* Named output cards */}
           <Show when={hasNamedOutputs() && phase() === "done"}>
             <div class="space-y-3">
-              <Show
-                when={selectionEnabled() && Object.keys(namedOutputs() ?? {}).length > 0}
-              >
+              <Show when={selectionEnabled() && Object.keys(namedOutputs() ?? {}).length > 0}>
                 <div class="space-y-2">
                   <div class="flex items-center justify-between">
                     <h4 class="text-sm font-semibold text-[#191c1e]">用户选择输出</h4>
@@ -1480,14 +1709,18 @@ export default function ModelCallExecutor(props: Props) {
                     const modelArtifacts = () => {
                       const artifacts = namedOutputsByModel()[model.modelId];
                       if (!artifacts) return [];
-                      return Object.entries(artifacts).filter(([artifactId]) => artifactId !== "_default");
+                      return Object.entries(artifacts).filter(
+                        ([artifactId]) => artifactId !== "_default",
+                      );
                     };
 
                     return (
                       <Show when={modelArtifacts().length > 0}>
                         <div class="space-y-2">
                           <div class="flex items-center gap-2">
-                            <h4 class="text-sm font-semibold text-[#191c1e]">{model.modelDisplayName}</h4>
+                            <h4 class="text-sm font-semibold text-[#191c1e]">
+                              {model.modelDisplayName}
+                            </h4>
                             <Show when={selectionEnabled() && isModelSelected(model.modelId)}>
                               <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 font-medium">
                                 已加入用户选择

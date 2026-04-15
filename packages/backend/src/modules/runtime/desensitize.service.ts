@@ -9,6 +9,7 @@ import type {
   NodeExecution,
   SourceOutput,
 } from "@intelliflow/shared";
+import { buildChatCompletionsUrl } from "./strategies/openai-compatible-url";
 
 type ConfirmedDesensitizeItem = {
   original: string;
@@ -138,9 +139,7 @@ async function detectViaModel(
 
   const { modelId, baseUrl, apiKey, providerType } = rows[0];
   const isOllama = providerType === "ollama";
-
-  const hasV1 = baseUrl.endsWith("/v1") || baseUrl.includes("/v1/");
-  const url = isOllama && !hasV1 ? `${baseUrl}/v1/chat/completions` : `${baseUrl}/chat/completions`;
+  const url = buildChatCompletionsUrl(baseUrl, providerType);
   console.log(
     `[desensitize] Starting model detection: model=${modelId}, url=${url}, textLength=${text.length}, categories=${categoryNames.join(",")}`,
   );

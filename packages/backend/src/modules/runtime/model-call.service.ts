@@ -29,7 +29,12 @@ import {
   scheduleFlush,
   setModelStatus,
 } from "./model-call-live-session";
-import { buildModelCallOutputData, buildSelectedModelOutputData } from "./model-call-output";
+import {
+  buildModelCallOutputData,
+  buildSelectedModelOutputData,
+  getModelCallManualFeedback,
+  getModelCallManualFeedbackValidationError,
+} from "./model-call-output";
 import { getStrategy } from "./strategies";
 import type { ModelCallInput } from "./strategies";
 
@@ -310,7 +315,14 @@ export async function resolvePromptTemplate(
           parts.push(`请输出 JSON 对象，包含以下字段：\n${fieldLines}`);
         }
 
-        // 3. Fallback placeholder (no prompt and no field description)
+        // 3. Per-artifact JSON Schema
+        if (o.format === "json" && o.jsonSchema) {
+          parts.push(
+            `请严格满足以下 JSON Schema：\n\`\`\`json\n${JSON.stringify(o.jsonSchema, null, 2)}\n\`\`\``,
+          );
+        }
+
+        // 4. Fallback placeholder (no prompt and no field description)
         if (parts.length === 0) {
           parts.push(`[${o.name}内容]`);
         }
@@ -324,6 +336,76 @@ export async function resolvePromptTemplate(
   return { resolved, mapping };
 }
 
+function appendManualFeedbackToPrompt(
+  resolvedPrompt: string,
+  manualFeedback: string | null | undefined,
+): string {
+  const normalized = manualFeedback?.trim();
+  if (!normalized) return resolvedPrompt;
+
+  return `${resolvedPrompt}\n\n---\n请严格落实以下人工意见后重新生成当前节点输出。只返回更新后的最终结果，不要解释修改过程。\n人工意见：\n${normalized}`;
+}
+
+export async function resolveModelCallExecutionPrompts(params: {
+  documentId: string;
+  nodeExecutionId: string;
+  config: ModelCallConfig;
+  manualFeedbackOverride?: string | null;
+}): Promise<{
+  resolvedPrompt: string;
+  resolvedSystemPrompt?: string;
+  variableMapping: Record<string, string>;
+}> {
+  const allExecs = await getUpstreamNodeExecutions(params.documentId);
+  const desensitizeRules = await getUpstreamDesensitizeRules(params.documentId);
+  const { resolved, mapping } = await resolvePromptTemplate(
+    params.config.promptTemplate,
+    params.documentId,
+    allExecs.map((e) => ({
+      nodeId: e.nodeId,
+      nodeLabel: e.nodeLabel,
+      outputData: e.outputData as Record<string, unknown> | null,
+    })),
+    desensitizeRules,
+    params.config,
+  );
+
+  const [currentExecution] = await db
+    .select({ outputData: nodeExecutions.outputData })
+    .from(nodeExecutions)
+    .where(eq(nodeExecutions.id, params.nodeExecutionId))
+    .limit(1);
+
+  const storedManualFeedback = getModelCallManualFeedback(
+    (currentExecution?.outputData as Record<string, unknown> | null) ?? null,
+  )?.content;
+  const resolvedPrompt = appendManualFeedbackToPrompt(
+    resolved,
+    params.manualFeedbackOverride ?? storedManualFeedback,
+  );
+
+  let resolvedSystemPrompt: string | undefined;
+  if (params.config.systemPromptTemplate) {
+    const { resolved: systemPrompt } = await resolvePromptTemplate(
+      params.config.systemPromptTemplate,
+      params.documentId,
+      allExecs.map((e) => ({
+        nodeId: e.nodeId,
+        nodeLabel: e.nodeLabel,
+        outputData: e.outputData as Record<string, unknown> | null,
+      })),
+      [],
+    );
+    resolvedSystemPrompt = systemPrompt;
+  }
+
+  return {
+    resolvedPrompt,
+    resolvedSystemPrompt,
+    variableMapping: mapping,
+  };
+}
+
 // ─── JSON Validation & Named Output Parsing ─────────────────────────────────
 
 /**
@@ -335,33 +417,155 @@ export function validateModelOutput(
   content: string,
   config: ModelCallConfig,
 ): { status: "completed" | "format_error"; errors?: string[] } {
-  if (config.outputFormat !== "json") {
-    return { status: "completed" };
+  const errors: string[] = [];
+  const namedOutputs = config.namedOutputs ?? [];
+  const jsonNamedOutputs = namedOutputs.filter((output) => output.format === "json");
+
+  if (jsonNamedOutputs.length > 0) {
+    const extracted = extractNamedOutputContents(content);
+
+    for (const output of jsonNamedOutputs) {
+      const artifactContent = extracted[output.id]?.trim() ?? "";
+      if (!artifactContent) {
+        errors.push(`命名产物 ${output.id} 缺失或为空`);
+        continue;
+      }
+
+      errors.push(
+        ...validateJsonStringAgainstSchema(
+          artifactContent,
+          output.jsonSchema,
+          `命名产物 ${output.id}`,
+        ),
+      );
+    }
+  } else if (config.outputFormat === "json") {
+    errors.push(...validateJsonStringAgainstSchema(content, config.jsonSchema, "节点输出"));
   }
 
-  // Layer 1: JSON syntax check
+  if (errors.length > 0) {
+    return { status: "format_error", errors };
+  }
+
+  return { status: "completed" };
+}
+
+function extractNamedOutputContents(rawContent: string): Record<string, string> {
+  const outputs: Record<string, string> = {};
+  const regex = /===OUTPUT:(\w+)===\n?([\s\S]*?)===END:\1===/g;
+  let match = regex.exec(rawContent);
+
+  while (match !== null) {
+    outputs[match[1]] = match[2]?.trim() ?? "";
+    match = regex.exec(rawContent);
+  }
+
+  return outputs;
+}
+
+function validateJsonStringAgainstSchema(
+  content: string,
+  jsonSchema: object | undefined,
+  label: string,
+): string[] {
   let parsed: unknown;
+
   try {
     parsed = JSON.parse(content);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
-    return { status: "format_error", errors: [`JSON 语法错误: ${message}`] };
+    return [`${label} JSON 语法错误: ${message}`];
   }
 
-  // Layer 2: JSON Schema validation
-  if (config.jsonSchema) {
-    const ajv = new Ajv({ allErrors: true });
-    const validate = ajv.compile(config.jsonSchema);
-    const valid = validate(parsed);
-    if (!valid && validate.errors) {
-      const schemaErrors = validate.errors.map(
-        (e) => `${e.instancePath || "/"}: ${e.message ?? "unknown error"}`,
-      );
-      return { status: "format_error", errors: schemaErrors };
+  if (!jsonSchema) {
+    return [];
+  }
+
+  const ajv = new Ajv({ allErrors: true });
+  const validate = ajv.compile(jsonSchema);
+  const valid = validate(parsed);
+  if (valid || !validate.errors) {
+    return [];
+  }
+
+  return validate.errors.map(
+    (e) => `${label} ${e.instancePath || "/"}: ${e.message ?? "unknown error"}`,
+  );
+}
+
+export function validateSelectedModelCallOutputData(
+  outputData: Record<string, unknown> | null,
+  config: ModelCallConfig,
+  selectedOutputKey?: string | null,
+): { status: "completed" | "format_error"; errors?: string[] } {
+  const errors: string[] = [];
+
+  if (!outputData) {
+    return { status: "format_error", errors: ["当前节点没有可校验的输出数据"] };
+  }
+
+  const manualFeedbackError = getModelCallManualFeedbackValidationError(outputData);
+  if (manualFeedbackError) {
+    errors.push(manualFeedbackError);
+  }
+
+  const selectedModelIds = Array.isArray(outputData.selectedModelIds)
+    ? outputData.selectedModelIds.filter(
+        (value): value is string => typeof value === "string" && value.length > 0,
+      )
+    : [];
+
+  if (config.enableUserSelectionOutput === true) {
+    if (selectedModelIds.length === 0) {
+      errors.push("请至少选择一个模型输出后再继续。");
     }
+  } else if (!selectedOutputKey && typeof outputData.selectedContent !== "string") {
+    errors.push("当前没有可推进的模型输出。");
   }
 
-  return { status: "completed" };
+  const jsonNamedOutputs = (config.namedOutputs ?? []).filter((output) => output.format === "json");
+  if (jsonNamedOutputs.length === 0) {
+    if (config.outputFormat === "json") {
+      const content =
+        typeof outputData.selectedContent === "string"
+          ? outputData.selectedContent
+          : typeof outputData.text === "string"
+            ? outputData.text
+            : "";
+
+      if (!content.trim()) {
+        errors.push("当前节点没有可校验的 JSON 输出。");
+      } else {
+        errors.push(...validateJsonStringAgainstSchema(content, config.jsonSchema, "节点输出"));
+      }
+    }
+
+    return errors.length > 0 ? { status: "format_error", errors } : { status: "completed" };
+  }
+
+  const namedOutputs =
+    (outputData.namedOutputs as Record<string, { content?: string }> | undefined) ?? {};
+
+  for (const output of jsonNamedOutputs) {
+    const namedOutput = namedOutputs[output.id];
+    const artifactContent =
+      typeof namedOutput?.content === "string" ? namedOutput.content.trim() : "";
+
+    if (!artifactContent) {
+      errors.push(`命名产物 ${output.id} 缺失或为空`);
+      continue;
+    }
+
+    errors.push(
+      ...validateJsonStringAgainstSchema(
+        artifactContent,
+        output.jsonSchema,
+        `命名产物 ${output.id}`,
+      ),
+    );
+  }
+
+  return errors.length > 0 ? { status: "format_error", errors } : { status: "completed" };
 }
 
 // ─── Model Execution ────────────────────────────────────────────────────────
@@ -381,6 +585,22 @@ export async function executeModelCall(
   userId?: string,
   config?: ModelCallConfig,
 ): Promise<ReadableStream<Uint8Array>> {
+  const [currentExecution] = await db
+    .select({
+      outputData: nodeExecutions.outputData,
+      selectedOutputKey: nodeExecutions.selectedOutputKey,
+    })
+    .from(nodeExecutions)
+    .where(eq(nodeExecutions.id, nodeExecutionId))
+    .limit(1);
+  const currentOutputData =
+    (currentExecution?.outputData as Record<string, unknown> | null) ?? null;
+  const currentSelectedModelIds = Array.isArray(currentOutputData?.selectedModelIds)
+    ? currentOutputData.selectedModelIds.filter(
+        (value): value is string => typeof value === "string" && value.length > 0,
+      )
+    : [];
+
   // Look up all models + providers
   const modelRows = await db
     .select({
@@ -425,7 +645,13 @@ export async function executeModelCall(
   await db
     .update(nodeExecutions)
     .set({
-      outputData: { models: initialModels },
+      outputData: buildModelCallOutputData({
+        models: initialModels,
+        config,
+        selectedModelIds: currentSelectedModelIds,
+        defaultSelectedModelId: currentExecution?.selectedOutputKey ?? null,
+        previousOutputData: currentOutputData,
+      }).outputData,
       updatedAt: new Date(),
     })
     .where(eq(nodeExecutions.id, nodeExecutionId));
@@ -587,8 +813,13 @@ export async function executeModelCall(
       const { outputData: outputDataPayload, selectedOutputKey } = buildModelCallOutputData({
         models: finalModels,
         config,
+        selectedModelIds: currentSelectedModelIds,
         defaultSelectedModelId:
-          config?.enableUserSelectionOutput === true ? null : firstCompletedModelId,
+          config?.enableUserSelectionOutput === true
+            ? (currentExecution?.selectedOutputKey ?? null)
+            : (currentExecution?.selectedOutputKey ?? firstCompletedModelId),
+        previousOutputData: currentOutputData,
+        markManualFeedbackApplied: true,
       });
 
       await db
@@ -619,6 +850,22 @@ export async function executeModelCallBackground(
   nodeExecutionId: string,
   userId: string,
 ): Promise<void> {
+  const [currentExecution] = await db
+    .select({
+      outputData: nodeExecutions.outputData,
+      selectedOutputKey: nodeExecutions.selectedOutputKey,
+    })
+    .from(nodeExecutions)
+    .where(eq(nodeExecutions.id, nodeExecutionId))
+    .limit(1);
+  const currentOutputData =
+    (currentExecution?.outputData as Record<string, unknown> | null) ?? null;
+  const currentSelectedModelIds = Array.isArray(currentOutputData?.selectedModelIds)
+    ? currentOutputData.selectedModelIds.filter(
+        (value): value is string => typeof value === "string" && value.length > 0,
+      )
+    : [];
+
   // Load node config to get model IDs and prompt
   const config = await getModelCallConfig(nodeExecutionId);
   if (!config || config.type !== "model_call") {
@@ -633,36 +880,12 @@ export async function executeModelCallBackground(
     throw new Error("No models configured for model_call node");
   }
 
-  // Resolve prompt
-  const allExecs = await getUpstreamNodeExecutions(documentId);
-  const desensitizeRules = await getUpstreamDesensitizeRules(documentId);
-  const { resolved: resolvedPrompt, mapping: variableMapping } = await resolvePromptTemplate(
-    mcConfig.promptTemplate,
-    documentId,
-    allExecs.map((e) => ({
-      nodeId: e.nodeId,
-      nodeLabel: e.nodeLabel,
-      outputData: e.outputData as Record<string, unknown> | null,
-    })),
-    desensitizeRules,
-    mcConfig,
-  );
-
-  // Resolve system prompt (no desensitize rules per user decision)
-  let resolvedSystemPrompt: string | undefined;
-  if (mcConfig.systemPromptTemplate) {
-    const { resolved } = await resolvePromptTemplate(
-      mcConfig.systemPromptTemplate,
+  const { resolvedPrompt, resolvedSystemPrompt, variableMapping } =
+    await resolveModelCallExecutionPrompts({
       documentId,
-      allExecs.map((e) => ({
-        nodeId: e.nodeId,
-        nodeLabel: e.nodeLabel,
-        outputData: e.outputData as Record<string, unknown> | null,
-      })),
-      [], // No desensitize rules — system prompt stays clean
-    );
-    resolvedSystemPrompt = resolved;
-  }
+      nodeExecutionId,
+      config: mcConfig,
+    });
 
   // Look up all models + providers
   const modelRows = await db
@@ -704,8 +927,13 @@ export async function executeModelCallBackground(
   await db
     .update(nodeExecutions)
     .set({
-      outputData: { models: initialModels },
-      selectedOutputKey: null,
+      outputData: buildModelCallOutputData({
+        models: initialModels,
+        config: mcConfig,
+        selectedModelIds: currentSelectedModelIds,
+        defaultSelectedModelId: currentExecution?.selectedOutputKey ?? null,
+        previousOutputData: currentOutputData,
+      }).outputData,
       updatedAt: new Date(),
     })
     .where(eq(nodeExecutions.id, nodeExecutionId));
@@ -725,7 +953,13 @@ export async function executeModelCallBackground(
     await db
       .update(nodeExecutions)
       .set({
-        outputData: { models: modelsSnapshot },
+        outputData: buildModelCallOutputData({
+          models: modelsSnapshot,
+          config: mcConfig,
+          selectedModelIds: currentSelectedModelIds,
+          defaultSelectedModelId: currentExecution?.selectedOutputKey ?? null,
+          previousOutputData: currentOutputData,
+        }).outputData,
         updatedAt: new Date(),
       })
       .where(eq(nodeExecutions.id, nodeExecutionId));
@@ -932,8 +1166,13 @@ export async function executeModelCallBackground(
     const { outputData: bgOutputData, selectedOutputKey } = buildModelCallOutputData({
       models: finalModels,
       config: mcConfig,
+      selectedModelIds: currentSelectedModelIds,
       defaultSelectedModelId:
-        mcConfig.enableUserSelectionOutput === true ? null : firstCompletedModelId,
+        mcConfig.enableUserSelectionOutput === true
+          ? (currentExecution?.selectedOutputKey ?? null)
+          : (currentExecution?.selectedOutputKey ?? firstCompletedModelId),
+      previousOutputData: currentOutputData,
+      markManualFeedbackApplied: true,
     });
 
     await db
@@ -981,13 +1220,22 @@ export async function retryModelCall(
 ): Promise<ReadableStream<Uint8Array>> {
   // Get current outputData to preserve other models
   const [exec] = await db
-    .select({ outputData: nodeExecutions.outputData })
+    .select({
+      outputData: nodeExecutions.outputData,
+      selectedOutputKey: nodeExecutions.selectedOutputKey,
+    })
     .from(nodeExecutions)
     .where(eq(nodeExecutions.id, nodeExecutionId))
     .limit(1);
 
   const currentOutput = (exec?.outputData as Record<string, unknown>) ?? {};
   const currentModels = (currentOutput.models as Record<string, ModelOutput>) ?? {};
+  const currentSelectedModelIds = Array.isArray(currentOutput.selectedModelIds)
+    ? currentOutput.selectedModelIds.filter(
+        (value): value is string => typeof value === "string" && value.length > 0,
+      )
+    : [];
+  const config = await getModelCallConfig(nodeExecutionId);
 
   // Look up model + provider
   const [model] = await db
@@ -1137,10 +1385,26 @@ export async function retryModelCall(
         });
       }
 
+      const { outputData: nextOutputData, selectedOutputKey } = buildModelCallOutputData({
+        models: currentModels,
+        config:
+          config?.type === "model_call"
+            ? {
+                namedOutputs: config.namedOutputs,
+                outputFormat: config.outputFormat,
+                enableUserSelectionOutput: config.enableUserSelectionOutput,
+              }
+            : undefined,
+        selectedModelIds: currentSelectedModelIds,
+        defaultSelectedModelId: exec?.selectedOutputKey ?? null,
+        previousOutputData: currentOutput,
+      });
+
       await db
         .update(nodeExecutions)
         .set({
-          outputData: { ...currentOutput, models: currentModels },
+          outputData: nextOutputData,
+          selectedOutputKey,
           updatedAt: new Date(),
         })
         .where(eq(nodeExecutions.id, nodeExecutionId));
@@ -1171,7 +1435,9 @@ export async function selectModelOutput(
   const outputData = (exec.outputData as Record<string, unknown>) ?? {};
   const modelsMap = (outputData.models as Record<string, ModelOutput>) ?? {};
   const config = await getModelCallConfig(nodeExecutionId);
-  const normalizedSelectedModelIds = selectedModelIds.filter((modelId) => Boolean(modelsMap[modelId]));
+  const normalizedSelectedModelIds = selectedModelIds.filter((modelId) =>
+    Boolean(modelsMap[modelId]),
+  );
   if (normalizedSelectedModelIds.length === 0) {
     throw new Error("Selected model output not found");
   }

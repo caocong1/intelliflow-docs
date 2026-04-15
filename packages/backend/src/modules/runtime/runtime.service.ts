@@ -1,11 +1,20 @@
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import type {
+  DocumentRuntimeState,
+  InputSource,
+  InputTransformConfig,
+  NodeConfig,
+  NodeExecution,
+  WorkflowEdgeDef,
+  WorkflowNodeDef,
+} from "@intelliflow/shared";
 import { and, asc, eq, gt, inArray, max, sql } from "drizzle-orm";
 import { db } from "../../db";
 import { backgroundTasks, documents, nodeExecutions, workflows } from "../../db/schema";
 import { createVersionSnapshot } from "../versions/versions.service";
 import { evaluateExecutionRule } from "./conditions.service";
-import type { DocumentRuntimeState, InputSource, InputTransformConfig, NodeExecution, WorkflowEdgeDef, WorkflowNodeDef, NodeConfig } from "@intelliflow/shared";
+import { getModelCallConfig, validateSelectedModelCallOutputData } from "./model-call.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -189,13 +198,44 @@ export async function advanceNode(
   documentId: string,
   nodeExecutionId: string,
   userId: string,
-  depth: number = 0,
+  depth = 0,
 ): Promise<DocumentRuntimeState> {
   // Prevent infinite loops from misconfigured conditions
   if (depth > 50) {
-    throw new Error("advanceNode recursion depth exceeded 50 — possible circular condition configuration");
+    throw new Error(
+      "advanceNode recursion depth exceeded 50 — possible circular condition configuration",
+    );
   }
   const now = new Date();
+
+  const [currentNode] = await db
+    .select({
+      nodeType: nodeExecutions.nodeType,
+      outputData: nodeExecutions.outputData,
+      selectedOutputKey: nodeExecutions.selectedOutputKey,
+    })
+    .from(nodeExecutions)
+    .where(eq(nodeExecutions.id, nodeExecutionId))
+    .limit(1);
+
+  if (!currentNode) {
+    throw new Error("Node execution not found");
+  }
+
+  if (currentNode.nodeType === "model_call") {
+    const config = await getModelCallConfig(nodeExecutionId);
+    if (config?.type === "model_call") {
+      const validation = validateSelectedModelCallOutputData(
+        (currentNode.outputData as Record<string, unknown> | null) ?? null,
+        config,
+        currentNode.selectedOutputKey,
+      );
+
+      if (validation.status === "format_error") {
+        throw new Error(validation.errors?.join("\n") ?? "当前模型输出校验失败");
+      }
+    }
+  }
 
   // Complete current node
   await db
@@ -233,7 +273,11 @@ export async function advanceNode(
           .set({ outputData: od, updatedAt: now })
           .where(eq(nodeExecutions.id, nodeExecutionId));
         // Re-read after update
-        const [updated] = await db.select().from(nodeExecutions).where(eq(nodeExecutions.id, nodeExecutionId)).limit(1);
+        const [updated] = await db
+          .select()
+          .from(nodeExecutions)
+          .where(eq(nodeExecutions.id, nodeExecutionId))
+          .limit(1);
         if (updated) Object.assign(completedNode, updated);
       }
     }
@@ -270,7 +314,9 @@ export async function advanceNode(
     const wfData = await getWorkflowForDocument(documentId);
     if (wfData && completedNode) {
       const nextNodeDef = wfData.nodes.find((n: WorkflowNodeDef) => n.id === nextNode.nodeId);
-      const nextConfig = nextNodeDef?.config as { type: string; inputSources?: InputSource[] } | undefined;
+      const nextConfig = nextNodeDef?.config as
+        | { type: string; inputSources?: InputSource[] }
+        | undefined;
       const inputSources = nextConfig?.inputSources;
 
       if (
@@ -416,8 +462,12 @@ export async function advanceNode(
           const fileslotMatch = resolvedOutputId.match(/-fileslot-(.+)$/);
           if (fileslotMatch) {
             const fileSlotId = fileslotMatch[1];
-            const fileSlots = upstreamOutput.fileSlots as Record<string, { text?: string; files?: Array<{ fileId: string; name: string }> }> | undefined;
-            const allFiles = upstreamOutput.files as Array<{ fileId: string; name: string; parsedText: string }> | undefined;
+            const fileSlots = upstreamOutput.fileSlots as
+              | Record<string, { text?: string; files?: Array<{ fileId: string; name: string }> }>
+              | undefined;
+            const allFiles = upstreamOutput.files as
+              | Array<{ fileId: string; name: string; parsedText: string }>
+              | undefined;
 
             if (fileSlots?.[fileSlotId]) {
               const slot = fileSlots[fileSlotId];
@@ -490,7 +540,9 @@ export async function advanceNode(
             if (hasExplicitFileSlots) {
               continue;
             }
-            const allFiles = upstreamOutput.files as Array<{ fileId: string; name: string; parsedText: string }> | undefined;
+            const allFiles = upstreamOutput.files as
+              | Array<{ fileId: string; name: string; parsedText: string }>
+              | undefined;
             if (allFiles?.length) {
               for (const file of allFiles) {
                 if (file.parsedText) {
@@ -508,7 +560,8 @@ export async function advanceNode(
           }
 
           // Fallback to combined text (last resort for unknown output patterns)
-          const fallback = (upstreamOutput.text as string) ?? (upstreamOutput.content as string) ?? "";
+          const fallback =
+            (upstreamOutput.text as string) ?? (upstreamOutput.content as string) ?? "";
           if (fallback) sources[src.outputId] = { displayName: src.displayName, text: fallback };
         }
 
@@ -528,17 +581,15 @@ export async function advanceNode(
       const freshExecs = await db
         .select()
         .from(nodeExecutions)
-        .where(
-          and(
-            eq(nodeExecutions.documentId, documentId),
-            eq(nodeExecutions.isCurrent, true),
-          ),
-        )
+        .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
         .orderBy(asc(nodeExecutions.stepOrder));
 
       const { triggered, reason } = evaluateExecutionRule(
         executionRule,
-        freshExecs.map((e) => ({ nodeId: e.nodeId, outputData: e.outputData as Record<string, unknown> | null })),
+        freshExecs.map((e) => ({
+          nodeId: e.nodeId,
+          outputData: e.outputData as Record<string, unknown> | null,
+        })),
       );
 
       if (triggered) {
@@ -556,7 +607,8 @@ export async function advanceNode(
 
           // Recursively advance to find the real next node
           return advanceNode(documentId, nextNode.id, userId, (depth ?? 0) + 1);
-        } else if (executionRule.action === "block") {
+        }
+        if (executionRule.action === "block") {
           // Mark as blocked — document stops here, frontend sees blocked node
           await db
             .update(nodeExecutions)
@@ -570,7 +622,9 @@ export async function advanceNode(
           const executions = await db
             .select()
             .from(nodeExecutions)
-            .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
+            .where(
+              and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)),
+            )
             .orderBy(asc(nodeExecutions.stepOrder));
           return buildRuntimeState(documentId, executions);
         }
@@ -587,7 +641,6 @@ export async function advanceNode(
         ...(nextInputData ? { inputData: nextInputData } : {}),
       })
       .where(eq(nodeExecutions.id, nextNode.id));
-
   } else {
     // No next node — document completed
     await db
@@ -617,12 +670,7 @@ export async function rollbackToNode(
   const affectedRows = await db
     .select()
     .from(nodeExecutions)
-    .where(
-      and(
-        eq(nodeExecutions.documentId, documentId),
-        eq(nodeExecutions.isCurrent, true),
-      ),
-    )
+    .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
     .orderBy(asc(nodeExecutions.stepOrder));
 
   const toRollback = affectedRows.filter((r) => r.stepOrder >= targetStepOrder);
@@ -789,7 +837,12 @@ async function buildRuntimeState(
 ): Promise<DocumentRuntimeState> {
   // Get workflow name and nodes
   const docRows = await db
-    .select({ documentTitle: documents.title, workflowName: workflows.name, nodes: workflows.nodes, projectId: documents.projectId })
+    .select({
+      documentTitle: documents.title,
+      workflowName: workflows.name,
+      nodes: workflows.nodes,
+      projectId: documents.projectId,
+    })
     .from(documents)
     .innerJoin(workflows, eq(documents.workflowId, workflows.id))
     .where(eq(documents.id, documentId))

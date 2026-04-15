@@ -512,6 +512,7 @@ export default function DocumentWorkspace() {
     if (!node) return;
 
     if (
+      node.nodeType === "input_transform" ||
       node.nodeType === "desensitize" ||
       node.nodeType === "restore" ||
       node.nodeType === "model_call"
@@ -639,6 +640,7 @@ export default function DocumentWorkspace() {
               documentId={docId}
               onDraftSave={draftSave}
               readOnly={readOnly()}
+              registerConfirmAction={handleManualConfirmRegistration}
             />
           );
         case "desensitize":

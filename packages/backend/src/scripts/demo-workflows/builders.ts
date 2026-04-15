@@ -60,6 +60,7 @@ export interface StageSpec {
   systemPromptTemplate?: string;
   modelMode?: "single" | "compare";
   compareModelCount?: number;
+  enableUserSelectionOutput?: boolean;
 }
 
 export interface RestoreSourceSpec {
@@ -73,9 +74,12 @@ export interface WorkflowBlueprint {
   preRestoreStages: StageSpec[];
   restoreSources: RestoreSourceSpec[];
   postRestoreStages?: StageSpec[];
+  includePrivacyChain?: boolean;
+  desensitizeAutoAdvance?: boolean;
+  restoreAutoAdvance?: boolean;
   exportRule?: NodeExecutionRule;
   exportContentMapping?: VariableRef[];
-  exportFormats?: Array<"word" | "pdf" | "markdown">;
+  exportFormats?: Array<"word" | "pdf" | "markdown" | "pptx">;
 }
 
 const X_STEP = 300;
@@ -347,6 +351,7 @@ export function jsonArtifact(
   name: string,
   outputPrompt: string,
   simpleFields?: SimpleFieldDef[],
+  jsonSchema?: object,
 ): NamedOutputDef {
   return {
     id,
@@ -354,6 +359,7 @@ export function jsonArtifact(
     format: "json",
     outputPrompt,
     simpleFields,
+    jsonSchema,
   };
 }
 
@@ -623,19 +629,67 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
     }
     case "model_call":
       if (config.namedOutputs && config.namedOutputs.length > 0) {
-        return config.namedOutputs.map((output) => ({
-          id: `${nodeId}-namedoutput-${output.id}`,
-          name: output.name,
-          description: `输出项: ${output.name}`,
-          segmentKey: output.id,
-        }));
+        const outputs: OutputDef[] = [
+          {
+            id: `${nodeId}-manual-feedback`,
+            name: "人工意见",
+            description: "当前节点保存的人工反馈意见",
+            segmentKey: "manual_feedback",
+            category: "manual_feedback",
+            groupLabel: "人工意见",
+          },
+          ...config.namedOutputs.map((output) => ({
+            id: `${nodeId}-namedoutput-${output.id}`,
+            name: output.name,
+            description: `输出项: ${output.name}`,
+            segmentKey: output.id,
+          })),
+        ];
+
+        if (config.enableUserSelectionOutput) {
+          outputs.push(
+            ...config.namedOutputs.map((output) => ({
+              id: `${nodeId}-selected-artifact-${output.id}`,
+              name: `用户选择 / ${output.name}`,
+              description: `用户选择输出: ${output.name}`,
+              segmentKey: `selected__artifact__${output.id}`,
+              category: "selected_artifact",
+              groupLabel: "用户选择输出",
+              artifactId: output.id,
+            })),
+          );
+        }
+
+        return outputs;
       }
-      return config.modelIds.map((modelId) => ({
-        id: `${nodeId}-model-${modelId}`,
-        name: config.modelNames?.[modelId] ?? modelId,
-        description: "模型生成输出",
-        segmentKey: modelId,
-      }));
+      return [
+        {
+          id: `${nodeId}-manual-feedback`,
+          name: "人工意见",
+          description: "当前节点保存的人工反馈意见",
+          segmentKey: "manual_feedback",
+          category: "manual_feedback",
+          groupLabel: "人工意见",
+        },
+        ...config.modelIds.map((modelId) => ({
+          id: `${nodeId}-model-${modelId}`,
+          name: config.modelNames?.[modelId] ?? modelId,
+          description: "模型生成输出",
+          segmentKey: modelId,
+        })),
+        ...(config.enableUserSelectionOutput
+          ? [
+              {
+                id: `${nodeId}-selected-output`,
+                name: "用户选择输出",
+                description: "模型生成输出",
+                segmentKey: "selected",
+                category: "selected",
+                groupLabel: "用户选择输出",
+              } satisfies OutputDef,
+            ]
+          : []),
+      ];
     case "desensitize":
       if (config.inputSources && config.inputSources.length > 0) {
         return config.inputSources.map((source) => ({
@@ -731,6 +785,7 @@ function buildStageNode(
       (stage.namedOutputs && stage.namedOutputs.length > 0 ? "text" : "markdown"),
     stepDescription: stage.stepDescription,
     namedOutputs: stage.namedOutputs,
+    enableUserSelectionOutput: stage.enableUserSelectionOutput,
     executionRule: stage.executionRule,
   };
 
@@ -742,6 +797,7 @@ export function buildWorkflowFromBlueprint(
   models: DemoModelSelection,
 ): { nodes: WorkflowNodeDef[]; edges: WorkflowEdgeDef[] } {
   const nodes: WorkflowNodeDef[] = [];
+  const includePrivacyChain = blueprint.includePrivacyChain !== false;
 
   nodes.push(
     makeNode(
@@ -756,41 +812,48 @@ export function buildWorkflowFromBlueprint(
     ),
   );
 
-  nodes.push(
-    makeNode(
-      "node_desens",
-      "信息脱敏",
-      "desensitize",
-      {
-        type: "desensitize",
-        categories: [...DESENSITIZE_CATEGORIES],
-        localModelId: models.desensitize.id,
-        inputSources: inputSourcesFromFields("node_input", blueprint.inputFields),
-      },
-      1,
-    ),
-  );
+  let cursor = 1;
+  if (includePrivacyChain) {
+    nodes.push(
+      makeNode(
+        "node_desens",
+        "信息脱敏",
+        "desensitize",
+        {
+          type: "desensitize",
+          categories: [...DESENSITIZE_CATEGORIES],
+          localModelId: models.desensitize.id,
+          inputSources: inputSourcesFromFields("node_input", blueprint.inputFields),
+          autoAdvance: blueprint.desensitizeAutoAdvance,
+        },
+        1,
+      ),
+    );
+    cursor = 2;
+  }
 
-  let cursor = 2;
   for (const stage of blueprint.preRestoreStages) {
     nodes.push(buildStageNode(stage, cursor, models));
     cursor += 1;
   }
 
-  nodes.push(
-    makeNode(
-      "node_restore",
-      "信息恢复",
-      "restore",
-      {
-        type: "restore",
-        pairedDesensitizeNodeId: "node_desens",
-        inputSources: blueprint.restoreSources,
-      },
-      cursor,
-    ),
-  );
-  cursor += 1;
+  if (includePrivacyChain) {
+    nodes.push(
+      makeNode(
+        "node_restore",
+        "信息恢复",
+        "restore",
+        {
+          type: "restore",
+          pairedDesensitizeNodeId: "node_desens",
+          inputSources: blueprint.restoreSources,
+          autoAdvance: blueprint.restoreAutoAdvance,
+        },
+        cursor,
+      ),
+    );
+    cursor += 1;
+  }
 
   for (const stage of blueprint.postRestoreStages ?? []) {
     nodes.push(buildStageNode(stage, cursor, models));

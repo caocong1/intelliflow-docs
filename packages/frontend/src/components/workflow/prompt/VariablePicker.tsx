@@ -165,6 +165,7 @@ const OUTPUT_GROUP_LABELS: Record<string, string> = {
   file_slot: "文件输入",
   model: "模型整体输出",
   model_artifact: "模型产物",
+  manual_feedback: "人工意见",
   selected: "用户选择输出",
   selected_artifact: "用户选择产物",
   desensitized: "脱敏输出",
@@ -306,10 +307,7 @@ function groupOutputs(outputs: OutputDef[]) {
     const key = `${output.category ?? "default"}::${output.groupLabel ?? ""}`;
     if (!groups.has(key)) {
       groups.set(key, {
-        title:
-          output.groupLabel ??
-          OUTPUT_GROUP_LABELS[output.category ?? ""] ??
-          "节点输出",
+        title: output.groupLabel ?? OUTPUT_GROUP_LABELS[output.category ?? ""] ?? "节点输出",
         outputs: [],
       });
     }
@@ -546,12 +544,15 @@ export default function VariablePicker(props: VariablePickerProps) {
                                             </span>
                                           </div>
                                           <Show when={output.description}>
-                                            <p class="text-xs text-slate-500 mt-1">{output.description}</p>
+                                            <p class="text-xs text-slate-500 mt-1">
+                                              {output.description}
+                                            </p>
                                           </Show>
                                           <div class="flex items-center gap-2 flex-wrap mt-2">
                                             <Show when={output.category}>
                                               <span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                                                {OUTPUT_GROUP_LABELS[output.category ?? ""] ?? output.category}
+                                                {OUTPUT_GROUP_LABELS[output.category ?? ""] ??
+                                                  output.category}
                                               </span>
                                             </Show>
                                             <Show when={output.groupLabel}>
@@ -577,7 +578,9 @@ export default function VariablePicker(props: VariablePickerProps) {
                                         nodeId={node.id}
                                         segmentKey={output.segmentKey || output.id}
                                         level={0}
-                                        onSelectField={(fieldPath) => handleSelectField(node, output, fieldPath)}
+                                        onSelectField={(fieldPath) =>
+                                          handleSelectField(node, output, fieldPath)
+                                        }
                                       />
                                     </div>
                                   </Show>

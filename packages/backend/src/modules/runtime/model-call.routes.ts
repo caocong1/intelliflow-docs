@@ -1,22 +1,3 @@
-import Elysia, { t } from "elysia";
-import { requireAuth } from "../auth/auth.guard";
-import { isDocumentProjectMember, canEditDocument } from "../versions/versions.service";
-import {
-  executeModelCall,
-  getModelCallConfig,
-  getUpstreamDesensitizeRules,
-  getUpstreamNodeExecutions,
-  resolvePromptTemplate,
-  retryModelCall,
-  selectModelOutput,
-  validateModelOutput,
-} from "./model-call.service";
-import { getStrategy } from "./strategies";
-import type { ModelCallInput } from "./strategies";
-import { models, providers } from "../../db/schema";
-import { db } from "../../db";
-import { nodeExecutions } from "../../db/schema";
-import { eq } from "drizzle-orm";
 import type {
   ModelCallConfig,
   ModelCallLiveEvent,
@@ -24,8 +5,30 @@ import type {
   ModelOutput,
   NodeExecutionStatus,
 } from "@intelliflow/shared";
+import { eq } from "drizzle-orm";
+import Elysia, { t } from "elysia";
+import { db } from "../../db";
+import { models, providers } from "../../db/schema";
+import { nodeExecutions } from "../../db/schema";
+import { requireAuth } from "../auth/auth.guard";
+import { canEditDocument, isDocumentProjectMember } from "../versions/versions.service";
 import { buildSnapshotEvent, getSession, subscribe } from "./model-call-live-session";
+import {
+  buildModelCallOutputData,
+  upsertModelCallManualFeedbackInOutputData,
+} from "./model-call-output";
 import { buildModelCallSnapshotPayload, getModelOutputsForDisplay } from "./model-call-state";
+import {
+  executeModelCall,
+  getModelCallConfig,
+  resolveModelCallExecutionPrompts,
+  retryModelCall,
+  selectModelOutput,
+  validateModelOutput,
+  validateSelectedModelCallOutputData,
+} from "./model-call.service";
+import { getStrategy } from "./strategies";
+import type { ModelCallInput } from "./strategies";
 
 function encodeSseEvent(event: ModelCallLiveEvent): string {
   return `data: ${JSON.stringify(event)}\n\n`;
@@ -43,6 +46,22 @@ function buildSnapshotFromExecution(params: {
     errorMessage: params.errorMessage,
     selectedOutputKey: params.selectedOutputKey,
   });
+}
+
+function getCurrentSelectionState(
+  outputData: Record<string, unknown>,
+  selectedOutputKey: string | null,
+): { selectedModelIds?: string[]; defaultSelectedModelId?: string | null } {
+  const selectedModelIds = Array.isArray(outputData.selectedModelIds)
+    ? outputData.selectedModelIds.filter(
+        (value): value is string => typeof value === "string" && value.length > 0,
+      )
+    : undefined;
+
+  return {
+    selectedModelIds,
+    defaultSelectedModelId: selectedModelIds?.[0] ?? selectedOutputKey,
+  };
 }
 
 export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
@@ -74,45 +93,24 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         }
 
         const mcConfig = config as ModelCallConfig;
-        const modelIds = mcConfig.modelIds.length > 0
-          ? mcConfig.modelIds
-          : mcConfig.modelId ? [mcConfig.modelId] : [];
+        const modelIds =
+          mcConfig.modelIds.length > 0
+            ? mcConfig.modelIds
+            : mcConfig.modelId
+              ? [mcConfig.modelId]
+              : [];
 
         if (modelIds.length === 0) {
           set.status = 400;
           return { error: "该节点未配置模型" };
         }
 
-        // Resolve prompt
-        const allExecs = await getUpstreamNodeExecutions(params.documentId);
-        const desensitizeRules = await getUpstreamDesensitizeRules(params.documentId);
-        const { resolved: resolvedPrompt, mapping: variableMapping } = await resolvePromptTemplate(
-          mcConfig.promptTemplate,
-          params.documentId,
-          allExecs.map((e) => ({
-            nodeId: e.nodeId,
-            nodeLabel: e.nodeLabel,
-            outputData: e.outputData as Record<string, unknown> | null,
-          })),
-          desensitizeRules,
-          mcConfig,
-        );
-
-        // Resolve system prompt (no desensitize rules)
-        let resolvedSystemPrompt: string | undefined;
-        if (mcConfig.systemPromptTemplate) {
-          const { resolved } = await resolvePromptTemplate(
-            mcConfig.systemPromptTemplate,
-            params.documentId,
-            allExecs.map((e) => ({
-              nodeId: e.nodeId,
-              nodeLabel: e.nodeLabel,
-              outputData: e.outputData as Record<string, unknown> | null,
-            })),
-            [],  // No desensitize rules for system prompt
-          );
-          resolvedSystemPrompt = resolved;
-        }
+        const { resolvedPrompt, resolvedSystemPrompt, variableMapping } =
+          await resolveModelCallExecutionPrompts({
+            documentId: params.documentId,
+            nodeExecutionId: params.nodeExecutionId,
+            config: mcConfig,
+          });
 
         // Execute and return SSE stream
         const stream = await executeModelCall(
@@ -172,35 +170,12 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         }
 
         const mcConfig = config as ModelCallConfig;
-        const allExecs = await getUpstreamNodeExecutions(params.documentId);
-        const desensitizeRules = await getUpstreamDesensitizeRules(params.documentId);
-        const { resolved: resolvedPrompt, mapping: variableMapping } = await resolvePromptTemplate(
-          mcConfig.promptTemplate,
-          params.documentId,
-          allExecs.map((e) => ({
-            nodeId: e.nodeId,
-            nodeLabel: e.nodeLabel,
-            outputData: e.outputData as Record<string, unknown> | null,
-          })),
-          desensitizeRules,
-          mcConfig,
-        );
-
-        // Resolve system prompt (no desensitize rules)
-        let resolvedSystemPrompt: string | undefined;
-        if (mcConfig.systemPromptTemplate) {
-          const { resolved } = await resolvePromptTemplate(
-            mcConfig.systemPromptTemplate,
-            params.documentId,
-            allExecs.map((e) => ({
-              nodeId: e.nodeId,
-              nodeLabel: e.nodeLabel,
-              outputData: e.outputData as Record<string, unknown> | null,
-            })),
-            [],  // No desensitize rules for system prompt
-          );
-          resolvedSystemPrompt = resolved;
-        }
+        const { resolvedPrompt, resolvedSystemPrompt, variableMapping } =
+          await resolveModelCallExecutionPrompts({
+            documentId: params.documentId,
+            nodeExecutionId: params.nodeExecutionId,
+            config: mcConfig,
+          });
 
         const stream = await retryModelCall(
           params.documentId,
@@ -228,7 +203,120 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       }
     },
     {
-      params: t.Object({ documentId: t.String(), nodeExecutionId: t.String(), modelId: t.String() }),
+      params: t.Object({
+        documentId: t.String(),
+        nodeExecutionId: t.String(),
+        modelId: t.String(),
+      }),
+    },
+  )
+
+  // ─── Regenerate current node with manual feedback ──────────────────────────
+
+  .post(
+    "/:documentId/model-call/:nodeExecutionId/regenerate",
+    async ({ params, body, user, set }) => {
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, userId);
+      if (!canEdit) {
+        set.status = 403;
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
+      }
+
+      try {
+        const config = await getModelCallConfig(params.nodeExecutionId);
+        if (!config || config.type !== "model_call") {
+          set.status = 404;
+          return { error: "未找到模型调用节点配置" };
+        }
+
+        const mcConfig = config as ModelCallConfig;
+        const modelIds =
+          mcConfig.modelIds.length > 0
+            ? mcConfig.modelIds
+            : mcConfig.modelId
+              ? [mcConfig.modelId]
+              : [];
+
+        if (modelIds.length === 0) {
+          set.status = 400;
+          return { error: "该节点未配置模型" };
+        }
+
+        const [exec] = await db
+          .select({ outputData: nodeExecutions.outputData })
+          .from(nodeExecutions)
+          .where(eq(nodeExecutions.id, params.nodeExecutionId))
+          .limit(1);
+
+        if (!exec) {
+          set.status = 404;
+          return { error: "未找到节点执行记录" };
+        }
+
+        const manualFeedback = body.manualFeedback.trim();
+        if (!manualFeedback) {
+          set.status = 400;
+          return { error: "请先填写人工意见，再按意见重生成。" };
+        }
+
+        const updatedAt = new Date();
+        const nextOutputData = upsertModelCallManualFeedbackInOutputData({
+          outputData: (exec.outputData as Record<string, unknown> | null) ?? null,
+          content: body.manualFeedback,
+          updatedAt: updatedAt.toISOString(),
+        });
+
+        await db
+          .update(nodeExecutions)
+          .set({
+            outputData: nextOutputData,
+            updatedAt,
+          })
+          .where(eq(nodeExecutions.id, params.nodeExecutionId));
+
+        const { resolvedPrompt, resolvedSystemPrompt, variableMapping } =
+          await resolveModelCallExecutionPrompts({
+            documentId: params.documentId,
+            nodeExecutionId: params.nodeExecutionId,
+            config: mcConfig,
+            manualFeedbackOverride: body.manualFeedback,
+          });
+
+        const stream = await executeModelCall(
+          params.documentId,
+          params.nodeExecutionId,
+          modelIds,
+          resolvedPrompt,
+          mcConfig.promptTemplate,
+          mcConfig.systemPromptTemplate,
+          resolvedSystemPrompt,
+          variableMapping,
+          userId,
+          mcConfig,
+        );
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        set.status = 400;
+        return { error: message };
+      }
+    },
+    {
+      params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
+      body: t.Object({ manualFeedback: t.String() }),
     },
   )
 
@@ -281,6 +369,70 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
     },
   )
 
+  // ─── Validate currently selected output before advance ─────────────────────
+
+  .post(
+    "/:documentId/model-call/:nodeExecutionId/validate-selection",
+    async ({ params, user, set }) => {
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, userId);
+      if (!canEdit) {
+        set.status = 403;
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
+      }
+
+      try {
+        const [exec] = await db
+          .select({
+            outputData: nodeExecutions.outputData,
+            selectedOutputKey: nodeExecutions.selectedOutputKey,
+          })
+          .from(nodeExecutions)
+          .where(eq(nodeExecutions.id, params.nodeExecutionId))
+          .limit(1);
+
+        if (!exec) {
+          set.status = 404;
+          return { error: "未找到节点执行记录" };
+        }
+
+        const config = await getModelCallConfig(params.nodeExecutionId);
+        if (!config || config.type !== "model_call") {
+          set.status = 404;
+          return { error: "未找到模型调用节点配置" };
+        }
+
+        const validation = validateSelectedModelCallOutputData(
+          (exec.outputData as Record<string, unknown> | null) ?? null,
+          config,
+          exec.selectedOutputKey,
+        );
+
+        if (validation.status === "format_error") {
+          set.status = 400;
+          return {
+            error: validation.errors?.join("\n") ?? "当前输出校验失败",
+            errors: validation.errors,
+          };
+        }
+
+        return { success: true };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        set.status = 400;
+        return { error: message };
+      }
+    },
+    {
+      params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
+    },
+  )
+
   // ─── Status polling fallback ────────────────────────────────────────────────
 
   .get(
@@ -330,7 +482,8 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           });
 
           const initialEvent: ModelCallLiveEvent | null =
-            sessionSnapshot ?? (fallbackSnapshot ? { type: "snapshot", data: fallbackSnapshot } : null);
+            sessionSnapshot ??
+            (fallbackSnapshot ? { type: "snapshot", data: fallbackSnapshot } : null);
 
           if (initialEvent) {
             controller.enqueue(encoder.encode(encodeSseEvent(initialEvent)));
@@ -445,7 +598,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       try {
         // Load node execution
         const [exec] = await db
-          .select({ outputData: nodeExecutions.outputData })
+          .select({
+            outputData: nodeExecutions.outputData,
+            selectedOutputKey: nodeExecutions.selectedOutputKey,
+          })
           .from(nodeExecutions)
           .where(eq(nodeExecutions.id, params.nodeExecutionId))
           .limit(1);
@@ -486,10 +642,20 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
           formatErrors: validation.errors,
         };
 
+        const selectionState = getCurrentSelectionState(outputData, exec.selectedOutputKey);
+        const { outputData: nextOutputData, selectedOutputKey } = buildModelCallOutputData({
+          models: modelsMap,
+          config: mcConfig,
+          selectedModelIds: selectionState.selectedModelIds,
+          defaultSelectedModelId: selectionState.defaultSelectedModelId ?? params.modelId,
+          previousOutputData: outputData,
+        });
+
         await db
           .update(nodeExecutions)
           .set({
-            outputData: { ...outputData, models: modelsMap },
+            outputData: nextOutputData,
+            selectedOutputKey,
             updatedAt: new Date(),
           })
           .where(eq(nodeExecutions.id, params.nodeExecutionId));
@@ -502,7 +668,11 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       }
     },
     {
-      params: t.Object({ documentId: t.String(), nodeExecutionId: t.String(), modelId: t.String() }),
+      params: t.Object({
+        documentId: t.String(),
+        nodeExecutionId: t.String(),
+        modelId: t.String(),
+      }),
       body: t.Optional(t.Object({ content: t.Optional(t.String()) })),
     },
   )
@@ -527,7 +697,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       try {
         // Load node execution
         const [exec] = await db
-          .select({ outputData: nodeExecutions.outputData })
+          .select({
+            outputData: nodeExecutions.outputData,
+            selectedOutputKey: nodeExecutions.selectedOutputKey,
+          })
           .from(nodeExecutions)
           .where(eq(nodeExecutions.id, params.nodeExecutionId))
           .limit(1);
@@ -563,8 +736,23 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         if (mcConfig.jsonSchema) {
           repairPrompt += `期望的 JSON Schema：\n\`\`\`json\n${JSON.stringify(mcConfig.jsonSchema, null, 2)}\n\`\`\`\n\n`;
         }
+        const jsonNamedOutputs = (mcConfig.namedOutputs ?? []).filter(
+          (output) => output.format === "json",
+        );
+        if (jsonNamedOutputs.length > 0) {
+          repairPrompt += "命名产物 JSON 约束：\n";
+          repairPrompt += jsonNamedOutputs
+            .map((output) => {
+              const schemaText = output.jsonSchema
+                ? `\nSchema:\n\`\`\`json\n${JSON.stringify(output.jsonSchema, null, 2)}\n\`\`\``
+                : "";
+              return `- ${output.id}${schemaText}`;
+            })
+            .join("\n\n");
+          repairPrompt += "\n\n";
+        }
         repairPrompt += `需要修复的内容：\n\`\`\`\n${brokenContent}\n\`\`\`\n\n`;
-        repairPrompt += "请只返回修复后的 JSON，不要包含任何解释或 markdown 代码块标记。";
+        repairPrompt += "请只返回修复后的内容本身，不要包含任何解释或 markdown 代码块标记。";
 
         // Look up the model + provider
         const [model] = await db
@@ -653,10 +841,20 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
                 formatErrors: validation.errors,
               };
 
+              const selectionState = getCurrentSelectionState(outputData, exec.selectedOutputKey);
+              const { outputData: nextOutputData, selectedOutputKey } = buildModelCallOutputData({
+                models: modelsMap,
+                config: mcConfig,
+                selectedModelIds: selectionState.selectedModelIds,
+                defaultSelectedModelId: selectionState.defaultSelectedModelId ?? params.modelId,
+                previousOutputData: outputData,
+              });
+
               await db
                 .update(nodeExecutions)
                 .set({
-                  outputData: { ...outputData, models: modelsMap },
+                  outputData: nextOutputData,
+                  selectedOutputKey,
                   updatedAt: new Date(),
                 })
                 .where(eq(nodeExecutions.id, params.nodeExecutionId));
@@ -693,6 +891,10 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
       }
     },
     {
-      params: t.Object({ documentId: t.String(), nodeExecutionId: t.String(), modelId: t.String() }),
+      params: t.Object({
+        documentId: t.String(),
+        nodeExecutionId: t.String(),
+        modelId: t.String(),
+      }),
     },
   );

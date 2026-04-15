@@ -8,7 +8,8 @@
   "scripts": {
     "dev": "bun --env-file=../../.env --watch src/index.ts",
     "db:push": "bun --env-file=../../.env drizzle-kit push",
-    "db:seed": "bun --env-file=../../.env src/db/seed.ts"
+    "db:seed": "bun --env-file=../../.env src/db/seed.ts",
+    "seed:ppt-workflow": "bun --env-file=../../.env src/scripts/seed-ppt-generation-workflow.ts"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.81",

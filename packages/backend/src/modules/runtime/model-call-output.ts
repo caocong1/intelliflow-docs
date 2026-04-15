@@ -1,22 +1,110 @@
-import type { ModelCallConfig, ModelOutput, NamedOutputDef } from "@intelliflow/shared";
+import type {
+  ModelCallConfig,
+  ModelCallManualFeedback,
+  ModelCallNamedOutputValue,
+  ModelCallOutputData,
+  ModelCallOutputItem,
+  ModelOutput,
+  NamedOutputDef,
+} from "@intelliflow/shared";
 
-type NamedOutputValue = {
-  content: string;
-  format: string;
-  modelId?: string;
-  modelDisplayName?: string;
-  modelIds?: string[];
-};
+type NamedOutputValue = ModelCallNamedOutputValue;
+type OutputItem = ModelCallOutputItem;
 
-type OutputItem = {
+export const MODEL_CALL_MANUAL_FEEDBACK_SEGMENT_KEY = "manual_feedback";
+
+function normalizeManualFeedback(value: unknown): ModelCallManualFeedback | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  const raw = value as Record<string, unknown>;
+  return {
+    content: typeof raw.content === "string" ? raw.content : "",
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : null,
+    appliedAt: typeof raw.appliedAt === "string" ? raw.appliedAt : null,
+  };
+}
+
+export function getModelCallManualFeedback(
+  outputData: Record<string, unknown> | null | undefined,
+): ModelCallManualFeedback | null {
+  return normalizeManualFeedback(outputData?.manualFeedback);
+}
+
+export function hasPendingModelCallManualFeedback(
+  outputData: Record<string, unknown> | null | undefined,
+): boolean {
+  const feedback = getModelCallManualFeedback(outputData);
+  if (!feedback?.content.trim()) return false;
+  if (!feedback.updatedAt) return true;
+  return feedback.appliedAt !== feedback.updatedAt;
+}
+
+export function getModelCallManualFeedbackValidationError(
+  outputData: Record<string, unknown> | null | undefined,
+): string | null {
+  if (!hasPendingModelCallManualFeedback(outputData)) {
+    return null;
+  }
+
+  return "已填写人工意见，请先按意见重生成当前节点后再继续。";
+}
+
+function applyManualFeedbackToOutputData(params: {
+  outputData: ModelCallOutputData;
+  outputItems: Record<string, OutputItem>;
+  previousOutputData?: Record<string, unknown> | null;
+  markApplied?: boolean;
+}) {
+  const manualFeedback = getModelCallManualFeedback(params.previousOutputData);
+  if (!manualFeedback) return;
+
+  const nextManualFeedback: ModelCallManualFeedback =
+    params.markApplied && manualFeedback.updatedAt
+      ? {
+          ...manualFeedback,
+          appliedAt: manualFeedback.updatedAt,
+        }
+      : manualFeedback;
+
+  params.outputData.manualFeedback = nextManualFeedback;
+  params.outputItems[MODEL_CALL_MANUAL_FEEDBACK_SEGMENT_KEY] = {
+    content: nextManualFeedback.content,
+    format: "text",
+    kind: "manual_feedback",
+  };
+}
+
+export function upsertModelCallManualFeedbackInOutputData(params: {
+  outputData: Record<string, unknown> | null | undefined;
   content: string;
-  format: string;
-  kind: "model" | "model_artifact" | "selected" | "selected_artifact";
-  modelId?: string;
-  modelDisplayName?: string;
-  modelIds?: string[];
-  artifactId?: string;
-};
+  updatedAt: string;
+}): Record<string, unknown> {
+  const previousFeedback = getModelCallManualFeedback(params.outputData);
+  const nextManualFeedback: ModelCallManualFeedback = {
+    content: params.content,
+    updatedAt: params.updatedAt,
+    appliedAt:
+      params.content.trim().length > 0 && previousFeedback?.content === params.content
+        ? (previousFeedback.appliedAt ?? null)
+        : null,
+  };
+
+  const currentOutputItems =
+    (params.outputData?.outputItems as Record<string, OutputItem> | undefined) ?? {};
+
+  return {
+    ...(params.outputData ?? {}),
+    manualFeedback: nextManualFeedback,
+    outputItems: {
+      ...currentOutputItems,
+      [MODEL_CALL_MANUAL_FEEDBACK_SEGMENT_KEY]: {
+        content: nextManualFeedback.content,
+        format: "text",
+        kind: "manual_feedback",
+      },
+    },
+  };
+}
 
 function isSelectableStatus(status: ModelOutput["status"]): boolean {
   return status === "completed" || status === "format_error";
@@ -132,12 +220,12 @@ export function parseNamedOutputs(
   rawContent: string,
   expectedDefs: NamedOutputDef[],
 ): {
-  namedOutputs: Record<string, { content: string; format: string }>;
+  namedOutputs: Record<string, { content: string; format: NamedOutputDef["format"] }>;
   fallback: boolean;
 } {
   const expectedIds = expectedDefs.map((d) => d.id);
   const formatMap = new Map(expectedDefs.map((d) => [d.id, d.format]));
-  const result: Record<string, { content: string; format: string }> = {};
+  const result: Record<string, { content: string; format: NamedOutputDef["format"] }> = {};
 
   const regex = /===OUTPUT:(\w+)===\n?([\s\S]*?)===END:\1===/g;
   let match: RegExpExecArray | null;
@@ -168,6 +256,8 @@ export function buildModelCallOutputData(params: {
   config?: Pick<ModelCallConfig, "namedOutputs" | "outputFormat" | "enableUserSelectionOutput">;
   selectedModelIds?: string[];
   defaultSelectedModelId?: string | null;
+  previousOutputData?: Record<string, unknown> | null;
+  markManualFeedbackApplied?: boolean;
 }): {
   outputData: Record<string, unknown>;
   selectedOutputKey: string | null;
@@ -177,10 +267,17 @@ export function buildModelCallOutputData(params: {
   const defaultFormat = params.config?.outputFormat ?? "text";
   const enableUserSelection = params.config?.enableUserSelectionOutput ?? false;
   const outputItems: Record<string, OutputItem> = {};
-  const outputData: Record<string, unknown> = {
+  const outputData: ModelCallOutputData = {
     models: params.models,
     outputItems,
   };
+
+  applyManualFeedbackToOutputData({
+    outputData,
+    outputItems,
+    previousOutputData: params.previousOutputData,
+    markApplied: params.markManualFeedbackApplied,
+  });
 
   for (const model of Object.values(params.models)) {
     outputItems[model.modelId] = {
@@ -219,11 +316,15 @@ export function buildModelCallOutputData(params: {
     }
   }
 
-  const normalizedSelectedModelIds = normalizeSelectedModelIds(params.selectedModelIds, params.models);
+  const normalizedSelectedModelIds = normalizeSelectedModelIds(
+    params.selectedModelIds,
+    params.models,
+  );
   const fallbackPrimarySelectedModelId =
     params.defaultSelectedModelId && params.models[params.defaultSelectedModelId]
       ? params.defaultSelectedModelId
-      : Object.values(params.models).find((model) => isSelectableStatus(model.status))?.modelId ?? null;
+      : (Object.values(params.models).find((model) => isSelectableStatus(model.status))?.modelId ??
+        null);
 
   if (enableUserSelection) {
     outputData.selectedModelIds = normalizedSelectedModelIds;
@@ -352,5 +453,6 @@ export function buildSelectedModelOutputData(
     config,
     selectedModelIds,
     defaultSelectedModelId: selectedModelIds[0] ?? null,
+    previousOutputData: outputData,
   });
 }

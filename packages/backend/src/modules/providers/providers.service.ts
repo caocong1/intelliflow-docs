@@ -1,6 +1,7 @@
 import { count, desc, eq } from "drizzle-orm";
 import { db } from "../../db";
 import { models, modelCallLogs, providers } from "../../db/schema";
+import { buildChatCompletionsUrl } from "../runtime/strategies/openai-compatible-url";
 
 export type ProviderRow = {
   id: string;
@@ -222,7 +223,7 @@ export async function testProviderConnection(
       });
     } else if (provider.type === "ollama") {
       // Ollama: OpenAI-compatible at /v1/chat/completions, no auth needed
-      response = await fetch(`${provider.baseUrl}/v1/chat/completions`, {
+      response = await fetch(buildChatCompletionsUrl(provider.baseUrl, provider.type), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -236,7 +237,7 @@ export async function testProviderConnection(
       });
     } else {
       // openai_compatible / opencode: POST /chat/completions
-      response = await fetch(`${provider.baseUrl}/chat/completions`, {
+      response = await fetch(buildChatCompletionsUrl(provider.baseUrl, provider.type), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

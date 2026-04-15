@@ -1,5 +1,5 @@
 import type { FormFieldDef, InputTransformConfig, NodeExecution } from "@intelliflow/shared";
-import { For, Show, createEffect, createSignal } from "solid-js";
+import { For, Show, createEffect, createSignal, onCleanup } from "solid-js";
 
 interface UploadedFile {
   fileId: string;
@@ -21,6 +21,7 @@ interface Props {
   documentId: string;
   onDraftSave: (data: Record<string, unknown>) => void;
   readOnly: boolean;
+  registerConfirmAction?: (action: (() => Promise<boolean>) | null) => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -85,6 +86,8 @@ export default function InputTransformExecutor(props: Props) {
   );
   const [dragOver, setDragOver] = createSignal(false);
   const [confirmError, setConfirmError] = createSignal<string | null>(null);
+
+  onCleanup(() => props.registerConfirmAction?.(null));
 
   // Initialize default values for fields that have defaultValue/defaultValues
   createEffect(() => {
@@ -317,11 +320,11 @@ export default function InputTransformExecutor(props: Props) {
     scheduleDraftSave();
   }
 
-  async function handleConfirm() {
+  async function handleConfirm(): Promise<boolean> {
     // Validate all fields first
     if (!validateAllFields()) {
       setConfirmError("请修正表单中的错误后再提交");
-      return;
+      return false;
     }
 
     setConfirmError(null);
@@ -352,15 +355,27 @@ export default function InputTransformExecutor(props: Props) {
       if (!res.ok) {
         const err = await res.json();
         setConfirmError(err.error ?? "确认失败");
-        return;
+        return false;
       }
 
       // Trigger page-level advance after confirm succeeds
       // The parent DocumentWorkspace handles advancing via its own handleAdvance
+      return true;
     } catch {
       setConfirmError("网络错误，请重试");
+      return false;
     }
   }
+
+  createEffect(() => {
+    props.registerConfirmAction?.(
+      props.readOnly
+        ? null
+        : async () => {
+            return handleConfirm();
+          },
+    );
+  });
 
   /** Merge accepted file types from all file-type fields */
   const acceptedTypes = () => {

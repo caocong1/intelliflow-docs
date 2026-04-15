@@ -43,6 +43,25 @@ function formatDuration(ms: number): string {
   return `${minutes}分${seconds}秒`;
 }
 
+export function shouldPauseBackgroundAfterExecution(
+  nodeType: WorkflowNodeDef["type"],
+  config: NodeConfig,
+): boolean {
+  if (nodeType === "export" || nodeType === "model_call") {
+    return true;
+  }
+
+  if (nodeType === "desensitize") {
+    return !(config as DesensitizeConfig).autoAdvance;
+  }
+
+  if (nodeType === "restore") {
+    return !(config as RestoreConfig).autoAdvance;
+  }
+
+  return false;
+}
+
 /**
  * Fetch document title and project info for notification content.
  */
@@ -356,11 +375,7 @@ export async function executeDocumentPipeline(
       }
 
       // Interactive nodes: pause pipeline and return control to user
-      if (
-        exec.nodeType === "export" ||
-        exec.nodeType === "restore" ||
-        (exec.nodeType === "desensitize" && !(nodeDef.config as DesensitizeConfig).autoAdvance)
-      ) {
+      if (shouldPauseBackgroundAfterExecution(exec.nodeType, nodeDef.config as NodeConfig)) {
         // Interactive node is already in_progress with fresh outputData — don't advance
         const progress = Math.round(((i + 1) / totalNodes) * 100);
         await db
@@ -369,18 +384,8 @@ export async function executeDocumentPipeline(
           .where(eq(backgroundTasks.id, task.id));
         break;
       }
-      if (exec.nodeType === "model_call") {
-        // Model finished — stay in_progress with output for user review/edit
-        // User will click "确认并继续" to advance
-        const progress = Math.round(((i + 1) / totalNodes) * 100);
-        await db
-          .update(backgroundTasks)
-          .set({ progress, updatedAt: new Date() })
-          .where(eq(backgroundTasks.id, task.id));
-        break;
-      }
 
-      // Auto nodes (desensitize, input_transform): advance and continue
+      // Auto nodes (input_transform, auto desensitize, auto restore): advance and continue
       await advanceNode(documentId, exec.id, userId);
 
       // Update progress

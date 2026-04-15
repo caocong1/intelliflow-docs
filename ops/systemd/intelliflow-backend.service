@@ -1,0 +1,18 @@
+[Unit]
+Description=IntelliFlow Backend Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=u
+Group=u
+WorkingDirectory=/home/u/intelliflow-docs
+Environment=PATH=/home/u/.bun/bin:/home/u/.nvm/versions/node/v20.12.2/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/home/u/.bun/bin/bun --env-file=/home/u/intelliflow-docs/.env packages/backend/src/index.ts
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target

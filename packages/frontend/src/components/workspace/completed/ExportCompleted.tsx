@@ -41,6 +41,10 @@ export default function ExportCompleted(props: Props) {
       format: string;
       fileSize: number;
       filePath?: string;
+      templateId?: string | null;
+      renderMode?: string;
+      warnings?: string[];
+      compositionSummary?: Record<string, unknown> | null;
     } | null;
 
   const config = () => props.config as ExportConfig | undefined;
@@ -261,6 +265,39 @@ export default function ExportCompleted(props: Props) {
                       </div>
                     </div>
                   )}
+                </Show>
+
+                <Show when={r().format === "pptx" && (r().renderMode || r().warnings?.length || r().compositionSummary)}>
+                  <div class="w-full max-w-2xl rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 space-y-2">
+                    <Show when={r().renderMode}>
+                      <p class="text-xs text-slate-600">
+                        <span class="font-medium text-slate-700">渲染模式：</span>
+                        {r().renderMode}
+                      </p>
+                    </Show>
+                    <Show when={r().compositionSummary}>
+                      <p class="text-xs text-slate-600">
+                        <span class="font-medium text-slate-700">编排摘要：</span>
+                        来源 {(r().compositionSummary?.source as string) ?? "-"}
+                        {" · "}
+                        页数 {(r().compositionSummary?.totalSlides as number) ?? "-"}
+                        <Show when={typeof r().compositionSummary?.matchedSlides === "number"}>
+                          {` · 模板命中 ${r().compositionSummary?.matchedSlides as number}`}
+                        </Show>
+                      </p>
+                    </Show>
+                    <Show when={r().warnings && r().warnings!.length > 0}>
+                      <div class="space-y-1">
+                        <For each={r().warnings}>
+                          {(warning) => (
+                            <div class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                              {warning}
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
                 </Show>
               </div>
             </>

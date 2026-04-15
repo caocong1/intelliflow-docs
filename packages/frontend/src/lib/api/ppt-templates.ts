@@ -1,4 +1,67 @@
 export type PptTemplateType = "code_theme" | "native_pptx";
+export type PptTemplateSemanticRole =
+  | "cover"
+  | "toc"
+  | "section_break"
+  | "bullet_list"
+  | "comparison"
+  | "timeline"
+  | "table"
+  | "image_focus"
+  | "summary"
+  | "qna"
+  | "closing";
+
+export type PptTemplateSlotBindingKey =
+  | "titleSlot"
+  | "subtitleSlot"
+  | "bodySlot"
+  | "leftSlot"
+  | "rightSlot"
+  | "tableSlot"
+  | "imageSlot"
+  | "captionSlot"
+  | "notesSlot"
+  | "footerSlot"
+  | "pageNumSlot";
+
+export type PptTemplateProfileSlide = {
+  slideId: number;
+  slideNumber: number;
+  layoutName: string;
+  roleHints: string[];
+  semanticRole: PptTemplateSemanticRole | null;
+  semanticRoleSource: "auto" | "manual";
+  semanticRoleConfidence: number;
+  contentDensity: "sparse" | "medium" | "dense";
+  autoUse: boolean;
+  sampleTextSummary: string[];
+  slotOverrides?: Partial<Record<PptTemplateSlotBindingKey, PptTemplateSlotBindingKey | "__NONE__">>;
+  titleSlot?: unknown;
+  subtitleSlot?: unknown;
+  bodySlot?: unknown;
+  leftSlot?: unknown;
+  rightSlot?: unknown;
+  tableSlot?: unknown;
+  imageSlot?: unknown;
+  captionSlot?: unknown;
+  notesSlot?: unknown;
+  footerSlot?: unknown;
+  pageNumSlot?: unknown;
+};
+
+export type PptTemplateProfile = {
+  kind: "native_template_profile_v2";
+  version: 2;
+  summary: {
+    slideCount: number;
+    placeholderTags: string[];
+    recognizedRoleCounts: Record<string, number>;
+    semanticRoleCounts: Partial<Record<PptTemplateSemanticRole, number>>;
+    editableSlideCount: number;
+  };
+  slides: PptTemplateProfileSlide[];
+};
 
 export type PptTemplate = {
   id: string;
@@ -38,6 +101,7 @@ export type PptTemplateUploadResponse = {
       slideCount: number;
       placeholderTags: string[];
       recognizedRoleCounts: Record<string, number>;
+      semanticRoleCounts?: Partial<Record<PptTemplateSemanticRole, number>>;
     } | null;
   };
 };
@@ -79,6 +143,10 @@ export function listTemplates(
 
 export function getTemplate(id: string): Promise<PptTemplate> {
   return apiFetch(`/${id}`);
+}
+
+export function getTemplateProfile(id: string): Promise<PptTemplateProfile> {
+  return apiFetch(`/${id}/profile`);
 }
 
 export function createTheme(body: {
@@ -129,6 +197,17 @@ export async function uploadTemplate(
 
 export function reRecognizeTemplate(id: string): Promise<PptTemplateUploadResponse> {
   return apiFetch(`/${id}/re-recognize`, { method: "POST" });
+}
+
+export function updateTemplateProfile(
+  id: string,
+  profile: PptTemplateProfile,
+): Promise<PptTemplateProfile> {
+  return apiFetch(`/${id}/profile`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(profile),
+  });
 }
 
 export function setDefaultTemplate(id: string): Promise<PptTemplate> {

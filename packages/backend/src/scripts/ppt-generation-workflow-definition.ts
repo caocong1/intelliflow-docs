@@ -900,6 +900,7 @@ export function buildPresentationWorkflowDefinition(
           ],
           extraRules: [
             "slides_draft 必须严格符合 SlidePresentation JSON Schema。",
+            "每页尽量显式填写 semanticRole，至少覆盖封面、目录、过渡页、总结页和结尾页。",
             "这一阶段重点是先成稿，不要把所有保守判断都拖到待确认，除非确实缺证据。",
             "draft_risks 必须明确指出页数失控、重复页、信息堆积、证据不足和叙事跳跃的问题。",
           ],
@@ -960,6 +961,7 @@ export function buildPresentationWorkflowDefinition(
           ],
           extraRules: [
             "slides_final 必须严格符合 SlidePresentation JSON Schema。",
+            "优先保留并修正 semanticRole，不要让关键页面退化成普通 bullet_list。",
             "必须把流程中形成的用户意见和取舍痕迹体现在最终结构中，而不是回退到最初发散状态。",
             "如果初稿问题已修复，polish_notes 必须明确说明修复了什么。",
             "最终内容必须可直接转成 PPT，避免长段落、重复页、过载表格和无依据结论。",
@@ -1010,6 +1012,7 @@ export function buildPresentationWorkflowDefinition(
           ],
           extraRules: [
             "slides_compact 必须严格符合 SlidePresentation JSON Schema。",
+            "压缩页数时仍需保持 semanticRole 的完整性，不能删除目录、过渡页、总结页或结尾页的角色信息。",
             "优先处理重复页、目录与正文重复、结论页与正文重复、同义反复的 bullet。",
             "如果合并了页面或删掉了页面，compression_notes 必须明确说明页码变化。",
             "不能为了压缩而删除关键结论或关键证据。",
@@ -1136,6 +1139,7 @@ export function buildPresentationWorkflowDefinition(
           ],
           extraRules: [
             "slides_ready 必须严格符合 SlidePresentation JSON Schema。",
+            "关键页必须有明确 semanticRole，至少包括 cover、toc、section_break、summary、closing。",
             "重点强化封面、目录、结论、行动建议和章节过渡页，不要对普通内容页做无谓重写。",
             "若页级审校指出弱结论或标题不清，必须优先在关键页修正。",
             "不能为了强化关键页而破坏页数预算、主线顺序和事实表达。",

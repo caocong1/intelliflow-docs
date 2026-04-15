@@ -249,6 +249,7 @@ export const callSourceEnum = pgEnum("call_source", [
   "provider_test",
   "prompt_optimize",
   "inline_edit",
+  "ppt_export_planning",
 ]);
 
 export const modelCallLogs = pgTable("model_call_logs", {

@@ -1,5 +1,5 @@
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
-import { For, Show, createEffect, createMemo, createResource, createSignal, onMount } from "solid-js";
+import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup, onMount } from "solid-js";
 import { advanceNode, generateExport, getExportPreview } from "../../../api/client";
 import { downloadBlobResponse, type DownloadProgress } from "../../../lib/download";
 import { listTemplates, type PptTemplate } from "../../../lib/api/ppt-templates";
@@ -27,6 +27,8 @@ const FORMAT_ICONS: Record<ExportFormat, string> = {
   markdown: "M",
   pptx: "S",
 };
+
+const PPT_EXPORT_STAGES = ["内容编排中", "模板匹配中", "导出生成中"] as const;
 
 interface Props {
   nodeExecution: NodeExecution;
@@ -86,15 +88,20 @@ export default function ExportExecutor(props: Props) {
   const [downloading, setDownloading] = createSignal(false);
   const [downloadProgress, setDownloadProgress] = createSignal<DownloadProgress | null>(null);
   const [selectedPptTemplateId, setSelectedPptTemplateId] = createSignal<string | null>(null);
+  const [pptExportStageIndex, setPptExportStageIndex] = createSignal(0);
   const [exportResult, setExportResult] = createSignal<{
     filename: string;
     format: string;
     fileSize: number;
     templateId?: string | null;
+    renderMode?: string;
+    warnings?: string[];
+    compositionSummary?: Record<string, unknown> | null;
   } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [pptTemplates] = createResource(fetchPptTemplates);
   let pptTemplateSelectRef: HTMLSelectElement | undefined;
+  let pptStageTimer: ReturnType<typeof setInterval> | undefined;
   const latestExportResult = createMemo(() => {
     const local = exportResult();
     if (local) return local;
@@ -110,6 +117,14 @@ export default function ExportExecutor(props: Props) {
         format: output.format,
         fileSize: output.fileSize,
         templateId: typeof output.templateId === "string" ? output.templateId : null,
+        renderMode: typeof output.renderMode === "string" ? output.renderMode : undefined,
+        warnings: Array.isArray(output.warnings)
+          ? output.warnings.filter((item): item is string => typeof item === "string")
+          : undefined,
+        compositionSummary:
+          output.compositionSummary && typeof output.compositionSummary === "object"
+            ? (output.compositionSummary as Record<string, unknown>)
+            : null,
       };
     }
     return null;
@@ -148,6 +163,10 @@ export default function ExportExecutor(props: Props) {
     }
   });
 
+  onCleanup(() => {
+    stopPptExportStages();
+  });
+
   function handleFormatChange(newFormat: ExportFormat) {
     setFormat(newFormat);
     const currentName = filename();
@@ -156,10 +175,28 @@ export default function ExportExecutor(props: Props) {
     setExportResult(null);
   }
 
+  function startPptExportStages() {
+    setPptExportStageIndex(0);
+    if (pptStageTimer) clearInterval(pptStageTimer);
+    pptStageTimer = setInterval(() => {
+      setPptExportStageIndex((current) => Math.min(current + 1, PPT_EXPORT_STAGES.length - 1));
+    }, 900);
+  }
+
+  function stopPptExportStages() {
+    if (pptStageTimer) {
+      clearInterval(pptStageTimer);
+      pptStageTimer = undefined;
+    }
+  }
+
   async function handleExport() {
     if (exporting() || downloading()) return;
     setExporting(true);
     setError(null);
+    if (format() === "pptx") {
+      startPptExportStages();
+    }
 
     try {
       const runtimeTemplateId =
@@ -179,7 +216,13 @@ export default function ExportExecutor(props: Props) {
           filename: result.filename,
           format: result.format,
           fileSize: result.fileSize,
-          templateId: runtimeTemplateId ?? null,
+          templateId: result.templateId ?? runtimeTemplateId ?? null,
+          renderMode: result.renderMode,
+          warnings: result.warnings,
+          compositionSummary:
+            result.compositionSummary && typeof result.compositionSummary === "object"
+              ? result.compositionSummary
+              : null,
         });
         setExporting(false);
         await triggerDownload();
@@ -193,6 +236,7 @@ export default function ExportExecutor(props: Props) {
     } catch {
       setError("导出失败，请重试");
     } finally {
+      stopPptExportStages();
       setExporting(false);
     }
   }
@@ -529,6 +573,31 @@ export default function ExportExecutor(props: Props) {
         </div>
       </Show>
 
+      <Show when={format() === "pptx" && exporting()}>
+        <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)]">
+          <div class="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-4">
+            <p class="text-sm font-medium text-[#3525cd]">
+              {PPT_EXPORT_STAGES[pptExportStageIndex()]}
+            </p>
+            <div class="mt-3 grid gap-2 md:grid-cols-3">
+              <For each={PPT_EXPORT_STAGES}>
+                {(stage, index) => (
+                  <div
+                    class={`rounded-lg border px-3 py-2 text-xs ${
+                      index() <= pptExportStageIndex()
+                        ? "border-indigo-200 bg-white text-[#3525cd]"
+                        : "border-transparent bg-[rgba(79,70,229,0.06)] text-[#6b7280]"
+                    }`}
+                  >
+                    {stage}
+                  </div>
+                )}
+              </For>
+            </div>
+          </div>
+        </div>
+      </Show>
+
       {/* Export result */}
       <Show when={latestExportResult()}>
         {(result) => (
@@ -546,6 +615,11 @@ export default function ExportExecutor(props: Props) {
                       result().format.toUpperCase()}{" "}
                     &middot; {formatFileSize(result().fileSize)}
                   </p>
+                  <Show when={result().renderMode}>
+                    <p class="mt-1 text-[11px] text-slate-500">
+                      渲染模式：{result().renderMode}
+                    </p>
+                  </Show>
                 </div>
                 <button
                   type="button"
@@ -586,6 +660,32 @@ export default function ExportExecutor(props: Props) {
                     </div>
                   </div>
                 )}
+              </Show>
+              <Show when={result().format === "pptx" && (result().warnings?.length || result().compositionSummary)}>
+                <div class="mt-3 space-y-2 rounded-xl border border-[rgba(199,196,216,0.2)] bg-[#f7f9fb] px-4 py-3">
+                  <Show when={result().compositionSummary}>
+                    <div class="text-xs text-slate-600">
+                      <span class="font-medium text-slate-700">编排摘要：</span>
+                      来源 {(result().compositionSummary?.source as string) ?? "-"}
+                      {" · "}
+                      页数 {(result().compositionSummary?.totalSlides as number) ?? "-"}
+                      <Show when={typeof result().compositionSummary?.matchedSlides === "number"}>
+                        {` · 模板命中 ${result().compositionSummary?.matchedSlides as number}`}
+                      </Show>
+                    </div>
+                  </Show>
+                  <Show when={result().warnings && result().warnings!.length > 0}>
+                    <div class="space-y-1">
+                      <For each={result().warnings}>
+                        {(warning) => (
+                          <div class="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                            {warning}
+                          </div>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </div>
               </Show>
             </div>
           </Show>

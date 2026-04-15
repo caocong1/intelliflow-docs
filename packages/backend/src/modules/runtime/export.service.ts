@@ -31,9 +31,21 @@ import {
 import {
   buildNativeTemplateProfile,
   extractNativeTemplateProfile,
+  mergeNativeTemplateProfiles,
   type NativeTemplateProfile,
 } from "../ppt-templates/native-template-profile";
 import type { ExportConfig, VariableRef, WorkflowNodeDef } from "@intelliflow/shared";
+import { composeDeckWithAi } from "./ppt-export-ai.service";
+import {
+  assignTemplateSequence,
+  buildDeckCompositionSummary,
+  buildDeckCompositionWarnings,
+  normalizeSlidesForDeck,
+  type DeckAssignment,
+  type DeckCompositionSummary,
+  type DeckSource,
+} from "./ppt-deck-composition";
+import type { SlideSemanticRole } from "../../../../shared/src/slide-types";
 
 // ─── Node config loader ─────────────────────────────────────────────────────
 
@@ -774,42 +786,43 @@ import PptxGenJS from "pptxgenjs";
 import { validateSlidePresentation } from "./slide-schema";
 
 // Slide schema types
-interface TitleSlide {
+interface SlideCommonFields {
+  semanticRole?: SlideSemanticRole;
+  sectionKey?: string;
+  visualIntent?: string;
+  notes?: string;
+}
+
+interface TitleSlide extends SlideCommonFields {
   layout: "title";
   title: string;
   subtitle?: string;
-  notes?: string;
 }
-interface ContentSlide {
+interface ContentSlide extends SlideCommonFields {
   layout: "content";
   title: string;
   bullets: string[];
-  notes?: string;
 }
-interface TwoColumnSlide {
+interface TwoColumnSlide extends SlideCommonFields {
   layout: "two_column";
   title: string;
   left: { title?: string; bullets: string[] };
   right: { title?: string; bullets: string[] };
-  notes?: string;
 }
-interface TableSlide {
+interface TableSlide extends SlideCommonFields {
   layout: "table";
   title: string;
   headers: string[];
   rows: string[][];
-  notes?: string;
 }
-interface ImageSlide {
+interface ImageSlide extends SlideCommonFields {
   layout: "image";
   title: string;
   imageRef?: string;
   caption?: string;
-  notes?: string;
 }
-interface BlankSlide {
+interface BlankSlide extends SlideCommonFields {
   layout: "blank";
-  notes?: string;
 }
 
 type Slide = TitleSlide | ContentSlide | TwoColumnSlide | TableSlide | ImageSlide | BlankSlide;
@@ -951,6 +964,25 @@ interface NativeTemplateSlide {
   layoutName: string;
   hasFullBleedImage: boolean;
   selectors: TemplateSelector[];
+  semanticRole?: SlideSemanticRole | null;
+  contentDensity?: "sparse" | "medium" | "dense";
+  autoUse?: boolean;
+  slotOverrides?: Partial<
+    Record<
+      | "titleSlot"
+      | "subtitleSlot"
+      | "bodySlot"
+      | "leftSlot"
+      | "rightSlot"
+      | "tableSlot"
+      | "imageSlot"
+      | "captionSlot"
+      | "notesSlot"
+      | "footerSlot"
+      | "pageNumSlot",
+      string
+    >
+  >;
   titleSlot?: NativeTemplateSlot;
   subtitleSlot?: NativeTemplateSlot;
   bodySlot?: NativeTemplateSlot;
@@ -1842,9 +1874,10 @@ function matchNativeTemplateSlide(
 }
 
 function pickFallbackTemplateSlide(templateSlides: NativeTemplateSlide[]): NativeTemplateSlide | null {
-  if (templateSlides.length === 0) return null;
+  const candidates = templateSlides.filter((slide) => slide.autoUse !== false);
+  if (candidates.length === 0) return null;
 
-  const ranked = [...templateSlides].sort((a, b) => {
+  const ranked = [...candidates].sort((a, b) => {
     const blankA = layoutNameBonus(a.layoutName, "blank");
     const blankB = layoutNameBonus(b.layoutName, "blank");
     if (blankA !== blankB) return blankB - blankA;
@@ -1852,6 +1885,29 @@ function pickFallbackTemplateSlide(templateSlides: NativeTemplateSlide[]): Nativ
   });
 
   return ranked[0] ?? null;
+}
+
+function resolveTemplateSlot(
+  templateSlide: NativeTemplateSlide,
+  slotName:
+    | "titleSlot"
+    | "subtitleSlot"
+    | "bodySlot"
+    | "leftSlot"
+    | "rightSlot"
+    | "tableSlot"
+    | "imageSlot"
+    | "captionSlot"
+    | "notesSlot"
+    | "footerSlot"
+    | "pageNumSlot",
+): NativeTemplateSlot | undefined {
+  const override = templateSlide.slotOverrides?.[slotName];
+  if (override === "__NONE__") return undefined;
+  if (override && override in templateSlide) {
+    return templateSlide[override as keyof NativeTemplateSlide] as NativeTemplateSlot | undefined;
+  }
+  return templateSlide[slotName];
 }
 
 function setTemplateText(
@@ -2168,21 +2224,33 @@ function renderSlideWithNativeTemplate(
   theme: PptTheme,
   pageNumber: number,
 ) {
-  setTemplateText(targetSlide, modify, templateSlide.titleSlot, "title" in slide ? truncate(slide.title, MAX_TITLE_CHARS) : "");
-  setTemplateText(targetSlide, modify, templateSlide.notesSlot, slide.notes?.slice(0, 500) ?? "");
-  setTemplateText(targetSlide, modify, templateSlide.footerSlot, "");
-  setTemplateText(targetSlide, modify, templateSlide.pageNumSlot, String(pageNumber));
+  const titleSlot = resolveTemplateSlot(templateSlide, "titleSlot");
+  const subtitleSlot = resolveTemplateSlot(templateSlide, "subtitleSlot");
+  const bodySlot = resolveTemplateSlot(templateSlide, "bodySlot");
+  const leftSlot = resolveTemplateSlot(templateSlide, "leftSlot");
+  const rightSlot = resolveTemplateSlot(templateSlide, "rightSlot");
+  const tableSlot = resolveTemplateSlot(templateSlide, "tableSlot");
+  const imageSlot = resolveTemplateSlot(templateSlide, "imageSlot");
+  const captionSlot = resolveTemplateSlot(templateSlide, "captionSlot");
+  const notesSlot = resolveTemplateSlot(templateSlide, "notesSlot");
+  const footerSlot = resolveTemplateSlot(templateSlide, "footerSlot");
+  const pageNumSlot = resolveTemplateSlot(templateSlide, "pageNumSlot");
+
+  setTemplateText(targetSlide, modify, titleSlot, "title" in slide ? truncate(slide.title, MAX_TITLE_CHARS) : "");
+  setTemplateText(targetSlide, modify, notesSlot, slide.notes?.slice(0, 500) ?? "");
+  setTemplateText(targetSlide, modify, footerSlot, "");
+  setTemplateText(targetSlide, modify, pageNumSlot, String(pageNumber));
 
   switch (slide.layout) {
     case "title":
-      setTemplateText(targetSlide, modify, templateSlide.subtitleSlot, slide.subtitle ? truncate(slide.subtitle, 120) : "");
+      setTemplateText(targetSlide, modify, subtitleSlot, slide.subtitle ? truncate(slide.subtitle, 120) : "");
       break;
     case "content":
-      setTemplateParagraphs(targetSlide, modify, templateSlide.bodySlot, buildBulletParagraphs(slide.bullets));
-      setTemplateText(targetSlide, modify, templateSlide.subtitleSlot, "");
+      setTemplateParagraphs(targetSlide, modify, bodySlot, buildBulletParagraphs(slide.bullets));
+      setTemplateText(targetSlide, modify, subtitleSlot, "");
       break;
     case "two_column": {
-      if (!templateSlide.leftSlot || !templateSlide.rightSlot) {
+      if (!leftSlot || !rightSlot) {
         const fallbackParagraphs = [
           ...(slide.left.title
             ? buildPlainParagraphs([truncate(stripMarkdownInline(slide.left.title), 80)])
@@ -2196,7 +2264,7 @@ function renderSlideWithNativeTemplate(
         setTemplateParagraphs(
           targetSlide,
           modify,
-          templateSlide.bodySlot ?? templateSlide.subtitleSlot,
+          bodySlot ?? subtitleSlot,
           fallbackParagraphs,
         );
         break;
@@ -2210,23 +2278,23 @@ function renderSlideWithNativeTemplate(
         ...(slide.right.title ? buildPlainParagraphs([truncate(stripMarkdownInline(slide.right.title), 80)]) : []),
         ...buildBulletParagraphs(slide.right.bullets),
       ];
-      setTemplateParagraphs(targetSlide, modify, templateSlide.leftSlot, leftParagraphs);
-      setTemplateParagraphs(targetSlide, modify, templateSlide.rightSlot, rightParagraphs);
+      setTemplateParagraphs(targetSlide, modify, leftSlot, leftParagraphs);
+      setTemplateParagraphs(targetSlide, modify, rightSlot, rightParagraphs);
       break;
     }
     case "table":
-      if (!templateSlide.tableSlot && templateSlide.bodySlot) {
-        setTemplateParagraphs(targetSlide, modify, templateSlide.bodySlot, buildTableParagraphs(slide));
+      if (!tableSlot && bodySlot) {
+        setTemplateParagraphs(targetSlide, modify, bodySlot, buildTableParagraphs(slide));
         break;
       }
-      if (templateSlide.tableSlot) {
-        const tableBox = positionToBox(templateSlide.tableSlot.position);
+      if (tableSlot) {
+        const tableBox = positionToBox(tableSlot.position);
         if (
-          templateSlide.tableSlot.visualType === "table" &&
+          tableSlot.visualType === "table" &&
           typeof modify.setTable === "function"
         ) {
           targetSlide.modifyElement(
-            templateSlide.tableSlot.selector,
+            tableSlot.selector,
             modify.setTable({
               header: {
                 values: slide.headers.map((header) =>
@@ -2240,7 +2308,7 @@ function renderSlideWithNativeTemplate(
             }),
           );
         } else {
-          setTemplateText(targetSlide, modify, templateSlide.tableSlot, "");
+          setTemplateText(targetSlide, modify, tableSlot, "");
           targetSlide.generate((pptSlide) => {
             addTableToPptSlide(pptSlide, slide, theme, tableBox);
           }, `native-table-${pageNumber}`);
@@ -2248,20 +2316,20 @@ function renderSlideWithNativeTemplate(
       }
       break;
     case "image":
-      if (!templateSlide.imageSlot && templateSlide.bodySlot) {
-        setTemplateParagraphs(targetSlide, modify, templateSlide.bodySlot, buildImageParagraphs(slide));
+      if (!imageSlot && bodySlot) {
+        setTemplateParagraphs(targetSlide, modify, bodySlot, buildImageParagraphs(slide));
         setTemplateText(
           targetSlide,
           modify,
-          templateSlide.captionSlot,
+          captionSlot,
           slide.caption ? truncate(slide.caption, 100) : "",
         );
         break;
       }
-      if (templateSlide.imageSlot) {
-        const imageBox = positionToBox(templateSlide.imageSlot.position);
-        if (templateSlide.imageSlot.visualType !== "picture") {
-          setTemplateText(targetSlide, modify, templateSlide.imageSlot, "");
+      if (imageSlot) {
+        const imageBox = positionToBox(imageSlot.position);
+        if (imageSlot.visualType !== "picture") {
+          setTemplateText(targetSlide, modify, imageSlot, "");
         }
         targetSlide.generate((pptSlide) => {
           addImageToPptSlide(
@@ -2269,11 +2337,11 @@ function renderSlideWithNativeTemplate(
             slide,
             theme,
             imageBox,
-            Boolean(templateSlide.captionSlot),
+            Boolean(captionSlot),
           );
         }, `native-image-${pageNumber}`);
       }
-      setTemplateText(targetSlide, modify, templateSlide.captionSlot, slide.caption ? truncate(slide.caption, 100) : "");
+      setTemplateText(targetSlide, modify, captionSlot, slide.caption ? truncate(slide.caption, 100) : "");
       break;
     case "blank":
     default:
@@ -2313,25 +2381,74 @@ async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME):
   return Buffer.from(output as ArrayBuffer);
 }
 
+async function createEmptyRootBuffer(): Promise<Buffer> {
+  const emptyRoot = new PptxGenJS();
+  emptyRoot.layout = "LAYOUT_WIDE";
+  const emptyRootOutput = await emptyRoot.write({ outputType: "nodebuffer" });
+  return Buffer.from(emptyRootOutput as ArrayBuffer);
+}
+
+async function trimLeadingRenderedSlides(
+  buffer: Buffer,
+  expectedSlideCount: number,
+): Promise<Buffer> {
+  const { default: AutomizerCls } = await import("pptx-automizer");
+  const rootBuffer = await createEmptyRootBuffer();
+  const inspector = new AutomizerCls({
+    templateDir: "",
+    outputDir: "",
+    removeExistingSlides: true,
+    useCreationIds: false,
+  });
+
+  inspector.loadRoot(rootBuffer).load(buffer, "__rendered__");
+  const infos = await inspector.setCreationIds();
+  const renderedInfo = infos.find((info) => info.name === "__rendered__") ?? infos[0];
+  const renderedSlides = renderedInfo?.slides ?? [];
+  const extraLeadingSlides = renderedSlides.length - expectedSlideCount;
+  if (extraLeadingSlides <= 0) return buffer;
+
+  const trimmer = new AutomizerCls({
+    templateDir: "",
+    outputDir: "",
+    removeExistingSlides: true,
+    useCreationIds: false,
+  });
+  trimmer.loadRoot(rootBuffer).load(buffer, "__rendered__");
+  renderedSlides.slice(extraLeadingSlides).forEach((slide) => {
+    trimmer.addSlide("__rendered__", slide.number);
+  });
+
+  const zip = await trimmer.getJSZip();
+  const output = await zip.generateAsync({ type: "nodebuffer" });
+  return Buffer.from(output);
+}
+
 async function renderSlidesWithNativeTemplate(
-  slides: Slide[],
+  assignments: DeckAssignment[],
   templateBuffer: Buffer,
   theme: PptTheme = PPT_THEME,
   storedProfile?: NativeTemplateProfile | null,
 ): Promise<Buffer> {
   const { default: AutomizerCls, modify } = await import("pptx-automizer");
+  const rootBuffer = await createEmptyRootBuffer();
+  const useCreationIds = Boolean(
+    storedProfile?.slides.some((slide) => slide.slideId !== slide.slideNumber),
+  );
   const automizer = new AutomizerCls({
     templateDir: "",
     outputDir: "",
     removeExistingSlides: true,
-    useCreationIds: true,
+    useCreationIds,
   });
 
-  automizer.loadRoot(templateBuffer).load(templateBuffer, "__native_template__");
+  automizer.loadRoot(rootBuffer).load(templateBuffer, "__native_template__");
   const templateInfos = await automizer.setCreationIds();
   const liveProfile = buildNativeTemplateProfile(templateInfos as never);
-  const templateProfile =
-    liveProfile.slides.length > 0 ? liveProfile : storedProfile ?? liveProfile;
+  const templateProfile = mergeNativeTemplateProfiles(
+    liveProfile.slides.length > 0 ? liveProfile : storedProfile ?? liveProfile,
+    storedProfile,
+  );
   const templateSlides = templateProfile.slides as unknown as NativeTemplateSlide[];
   const fallbackCanvas = pickFallbackTemplateSlide(templateSlides);
 
@@ -2339,42 +2456,54 @@ async function renderSlidesWithNativeTemplate(
     throw new Error("PPT 模板中没有可用的幻灯片布局");
   }
 
-  slides.forEach((slide, index) => {
-    const matchedTemplateSlide = matchNativeTemplateSlide(slide, templateSlides);
+  assignments.forEach((assignment) => {
+    const matchedTemplateSlide = assignment.templateSlide as unknown as NativeTemplateSlide | null;
     const sourceSlide = matchedTemplateSlide ?? fallbackCanvas;
 
     automizer.addSlide("__native_template__", sourceSlide.slideId, (targetSlide) => {
       const templateTargetSlide = targetSlide as unknown as TemplateSlideController;
       if (!matchedTemplateSlide) {
         console.warn(
-          `[export] PPT template missing layout for "${slide.layout}", falling back to generated slide`,
+          `[export] PPT template missing layout for page ${assignment.pageNumber}, falling back to generated slide`,
         );
-        renderSlideOnFallbackCanvas(templateTargetSlide, slide, sourceSlide, theme, index + 1);
+        renderSlideOnFallbackCanvas(
+          templateTargetSlide,
+          assignment.slide,
+          sourceSlide,
+          theme,
+          assignment.pageNumber,
+        );
         return;
       }
 
       try {
         renderSlideWithNativeTemplate(
           templateTargetSlide,
-          slide,
+          assignment.slide,
           matchedTemplateSlide,
           modify,
           theme,
-          index + 1,
+          assignment.pageNumber,
         );
       } catch (err) {
         console.warn(
           `[export] Failed to render native PPT template slide "${matchedTemplateSlide.layoutName}", falling back to generated slide:`,
           err instanceof Error ? err.message : err,
         );
-        renderSlideOnFallbackCanvas(templateTargetSlide, slide, sourceSlide, theme, index + 1);
+        renderSlideOnFallbackCanvas(
+          templateTargetSlide,
+          assignment.slide,
+          sourceSlide,
+          theme,
+          assignment.pageNumber,
+        );
       }
     });
   });
 
   const zip = await automizer.getJSZip();
   const output = await zip.generateAsync({ type: "nodebuffer" });
-  return Buffer.from(output);
+  return trimLeadingRenderedSlides(Buffer.from(output), assignments.length);
 }
 
 async function resolvePptTemplate(templateId?: string | null) {
@@ -2395,31 +2524,127 @@ async function resolvePptTemplate(templateId?: string | null) {
   return null;
 }
 
-function resolveSlidesForPpt(content: string): Slide[] {
+type PptBufferResult = {
+  buffer: Buffer;
+  renderMode: string;
+  warnings: string[];
+  compositionSummary: DeckCompositionSummary;
+  templateId: string | null;
+};
+
+type PptCompositionResult = {
+  slides: Slide[];
+  source: DeckSource;
+  warnings: string[];
+};
+
+async function buildDeckComposition(
+  content: string,
+  templateProfile: NativeTemplateProfile | null,
+  documentId: string,
+  nodeExecutionId: string,
+  userId: string,
+): Promise<PptCompositionResult> {
   const structured = tryParseSlideJson(content);
-  return structured ? structured.slides : markdownToSlides(content);
+  if (structured) {
+    return {
+      slides: normalizeSlidesForDeck(structured.slides as Slide[]),
+      source: "structured",
+      warnings: [],
+    };
+  }
+
+  const aiResult = await composeDeckWithAi({
+    content,
+    templateProfile,
+    documentId,
+    nodeExecutionId,
+    userId,
+  });
+
+  if (aiResult.presentation) {
+    return {
+      slides: normalizeSlidesForDeck(aiResult.presentation.slides as Slide[]),
+      source: "ai",
+      warnings: aiResult.warning ? [aiResult.warning] : [],
+    };
+  }
+
+  return {
+    slides: normalizeSlidesForDeck(markdownToSlides(content)),
+    source: "markdown",
+    warnings: aiResult.warning ? [aiResult.warning] : [],
+  };
 }
 
 /** Generate PPT buffer from content, optionally applying a PPT template */
-async function generatePptBuffer(content: string, templateId?: string | null): Promise<Buffer> {
-  const slides = resolveSlidesForPpt(content);
-  const template = await resolvePptTemplate(templateId);
+async function generatePptBuffer(params: {
+  content: string;
+  templateId?: string | null;
+  documentId: string;
+  nodeExecutionId: string;
+  userId: string;
+}): Promise<PptBufferResult> {
+  const template = await resolvePptTemplate(params.templateId);
+  const templateProfile = extractNativeTemplateProfile(template?.themeConfig);
+  const composition = await buildDeckComposition(
+    params.content,
+    templateProfile,
+    params.documentId,
+    params.nodeExecutionId,
+    params.userId,
+  );
 
   if (template) {
     try {
       if (template.type === "native_pptx" && template.templateFilePath) {
         const templateBuffer = await readFile(template.templateFilePath);
-        return await renderSlidesWithNativeTemplate(
-          slides,
+        const assignments = assignTemplateSequence(
+          composition.slides,
+          (templateProfile?.slides ?? []) as NativeTemplateProfile["slides"],
+        );
+        const buffer = await renderSlidesWithNativeTemplate(
+          assignments,
           templateBuffer,
           PPT_THEME,
-          extractNativeTemplateProfile(template.themeConfig),
+          templateProfile,
         );
+        const compositionSummary = buildDeckCompositionSummary({
+          source: composition.source,
+          slides: composition.slides,
+          assignments,
+        });
+        const warnings = [
+          ...composition.warnings,
+          ...buildDeckCompositionWarnings({
+            source: composition.source,
+            usedAi: composition.source === "ai",
+            aiFailed: composition.source === "markdown",
+            assignments,
+          }),
+        ];
+        return {
+          buffer,
+          renderMode: `native_template_${composition.source}`,
+          warnings: [...new Set(warnings)],
+          compositionSummary,
+          templateId: template.id,
+        };
       }
 
       if (template.type === "code_theme" && template.themeConfig) {
         const theme = buildThemeFromConfig(template.themeConfig as Record<string, unknown>);
-        return await renderSlidesToPptx(slides, theme);
+        const buffer = await renderSlidesToPptx(composition.slides, theme);
+        return {
+          buffer,
+          renderMode: `code_theme_${composition.source}`,
+          warnings: [...new Set(composition.warnings)],
+          compositionSummary: buildDeckCompositionSummary({
+            source: composition.source,
+            slides: composition.slides,
+          }),
+          templateId: template.id,
+        };
       }
     } catch (err) {
       console.warn(
@@ -2429,8 +2654,21 @@ async function generatePptBuffer(content: string, templateId?: string | null): P
     }
   }
 
-  return renderSlidesToPptx(slides);
+  return {
+    buffer: await renderSlidesToPptx(composition.slides),
+    renderMode: `default_theme_${composition.source}`,
+    warnings: [...new Set(composition.warnings)],
+    compositionSummary: buildDeckCompositionSummary({
+      source: composition.source,
+      slides: composition.slides,
+    }),
+    templateId: template?.id ?? null,
+  };
 }
+
+export const __pptExportTestUtils = {
+  renderSlidesWithNativeTemplate,
+};
 
 // ─── Public API ──────────────────────────────────────────────────────────────
 
@@ -2441,7 +2679,16 @@ export async function generateExport(
   filename: string,
   userId: string,
   templateIdOverride?: string | null,
-): Promise<{ filename: string; storagePath: string; fileSize: number; format: string }> {
+): Promise<{
+  filename: string;
+  storagePath: string;
+  fileSize: number;
+  format: string;
+  templateId?: string | null;
+  renderMode?: string;
+  warnings?: string[];
+  compositionSummary?: DeckCompositionSummary;
+}> {
   // Load export config for contentMapping
   const config = await loadNodeConfig(documentId, nodeExecutionId);
   const content = await resolveContent(documentId, nodeExecutionId, config?.contentMapping);
@@ -2450,6 +2697,9 @@ export async function generateExport(
   let buffer: Buffer;
   let mimeType: string;
   let appliedTemplateId: string | null = null;
+  let renderMode: string | undefined;
+  let warnings: string[] | undefined;
+  let compositionSummary: DeckCompositionSummary | undefined;
 
   switch (format) {
     case "word": {
@@ -2472,8 +2722,18 @@ export async function generateExport(
         templateIdOverride !== undefined
           ? templateIdOverride
           : config?.templateBindings?.pptx ?? config?.templateId ?? null;
-      appliedTemplateId = pptxTemplateId;
-      buffer = await generatePptBuffer(content, pptxTemplateId);
+      const pptResult = await generatePptBuffer({
+        content,
+        templateId: pptxTemplateId,
+        documentId,
+        nodeExecutionId,
+        userId,
+      });
+      appliedTemplateId = pptResult.templateId ?? pptxTemplateId ?? null;
+      buffer = pptResult.buffer;
+      renderMode = pptResult.renderMode;
+      warnings = pptResult.warnings;
+      compositionSummary = pptResult.compositionSummary;
       mimeType = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
       break;
     }
@@ -2511,13 +2771,33 @@ export async function generateExport(
         filename,
         storagePath,
         fileSize,
-        ...(format === "pptx" ? { templateId: appliedTemplateId } : {}),
+        ...(format === "pptx"
+          ? {
+              templateId: appliedTemplateId,
+              renderMode,
+              warnings,
+              compositionSummary,
+            }
+          : {}),
       },
       updatedAt: now,
     })
     .where(eq(nodeExecutions.id, nodeExecutionId));
 
-  return { filename, storagePath, fileSize, format };
+  return {
+    filename,
+    storagePath,
+    fileSize,
+    format,
+    ...(format === "pptx"
+      ? {
+          templateId: appliedTemplateId,
+          renderMode,
+          warnings,
+          compositionSummary,
+        }
+      : {}),
+  };
 }
 
 export async function getExportPreview(

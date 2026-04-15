@@ -1,3 +1,8 @@
+import {
+  SLIDE_SEMANTIC_ROLES,
+  type SlideSemanticRole,
+} from "../../../../shared/src/slide-types";
+
 const TEMPLATE_SLOT_KEYS = [
   "TITLE",
   "SUBTITLE",
@@ -10,6 +15,20 @@ const TEMPLATE_SLOT_KEYS = [
   "NOTES",
   "FOOTER",
   "PAGE_NUM",
+] as const;
+
+export const TEMPLATE_SLOT_BINDING_KEYS = [
+  "titleSlot",
+  "subtitleSlot",
+  "bodySlot",
+  "leftSlot",
+  "rightSlot",
+  "tableSlot",
+  "imageSlot",
+  "captionSlot",
+  "notesSlot",
+  "footerSlot",
+  "pageNumSlot",
 ] as const;
 
 const IMAGE_VISUAL_TYPES = new Set([
@@ -27,7 +46,7 @@ const SAMPLE_TITLE_PATTERNS = [
   /thankyou/i,
   /谢谢观看/i,
   /thanks/i,
-] as const;
+];
 
 const SAMPLE_BODY_PATTERNS = [
   /您的内容打在这里/i,
@@ -35,7 +54,7 @@ const SAMPLE_BODY_PATTERNS = [
   /复制您的文本/i,
   /输入正文/i,
   /输入内容/i,
-] as const;
+];
 
 const SAMPLE_SUBTITLE_PATTERNS = [
   /20xx/i,
@@ -43,9 +62,13 @@ const SAMPLE_SUBTITLE_PATTERNS = [
   /businesspowerpoint/i,
   /standardtemplate/i,
   /20\d{2}/i,
-] as const;
+];
+
+const NO_OVERRIDE = "__NONE__" as const;
 
 export type TemplateSlotTag = (typeof TEMPLATE_SLOT_KEYS)[number];
+export type TemplateSlotBindingKey = (typeof TEMPLATE_SLOT_BINDING_KEYS)[number];
+export type TemplateSlotOverrideValue = TemplateSlotBindingKey | typeof NO_OVERRIDE;
 export type TemplateSelector =
   | string
   | {
@@ -64,6 +87,15 @@ export type NativeTemplateSlot = {
   source?: "explicit" | "slide" | "layout" | "sample";
 };
 
+export type NativeTemplateDensity = "sparse" | "medium" | "dense";
+
+export type NativeTemplateSemanticRoleSource = "auto" | "manual";
+
+export type NativeTemplateSemanticRoleCandidate = {
+  role: SlideSemanticRole;
+  score: number;
+};
+
 export type NativeTemplateProfileSlide = {
   slideId: number;
   slideNumber: number;
@@ -71,6 +103,14 @@ export type NativeTemplateProfileSlide = {
   hasFullBleedImage: boolean;
   selectors: TemplateSelector[];
   roleHints: Array<"title" | "content" | "two_column" | "table" | "image" | "blank">;
+  semanticRole: SlideSemanticRole | null;
+  semanticRoleSource: NativeTemplateSemanticRoleSource;
+  semanticRoleConfidence: number;
+  semanticRoleCandidates: NativeTemplateSemanticRoleCandidate[];
+  contentDensity: NativeTemplateDensity;
+  autoUse: boolean;
+  sampleTextSummary: string[];
+  slotOverrides?: Partial<Record<TemplateSlotBindingKey, TemplateSlotOverrideValue>>;
   titleSlot?: NativeTemplateSlot;
   subtitleSlot?: NativeTemplateSlot;
   bodySlot?: NativeTemplateSlot;
@@ -85,14 +125,39 @@ export type NativeTemplateProfileSlide = {
 };
 
 export type NativeTemplateProfile = {
-  kind: "native_template_profile_v1";
-  version: 1;
+  kind: "native_template_profile_v2";
+  version: 2;
   summary: {
     slideCount: number;
     placeholderTags: TemplateSlotTag[];
     recognizedRoleCounts: Record<string, number>;
+    semanticRoleCounts: Partial<Record<SlideSemanticRole, number>>;
+    editableSlideCount: number;
   };
   slides: NativeTemplateProfileSlide[];
+};
+
+type NativeTemplateProfileV1 = {
+  kind: "native_template_profile_v1";
+  version: 1;
+  summary?: {
+    slideCount?: number;
+    placeholderTags?: TemplateSlotTag[];
+    recognizedRoleCounts?: Record<string, number>;
+  };
+  slides: Array<
+    Omit<
+      NativeTemplateProfileSlide,
+      | "semanticRole"
+      | "semanticRoleSource"
+      | "semanticRoleConfidence"
+      | "semanticRoleCandidates"
+      | "contentDensity"
+      | "autoUse"
+      | "sampleTextSummary"
+      | "slotOverrides"
+    >
+  >;
 };
 
 export type NativeTemplateElement = {
@@ -428,7 +493,18 @@ function hasFullBleedImage(elements: NativeTemplateElement[]): boolean {
 }
 
 function classifySlideRoles(
-  slide: Omit<NativeTemplateProfileSlide, "roleHints">,
+  slide: Omit<
+    NativeTemplateProfileSlide,
+    | "roleHints"
+    | "semanticRole"
+    | "semanticRoleSource"
+    | "semanticRoleConfidence"
+    | "semanticRoleCandidates"
+    | "contentDensity"
+    | "autoUse"
+    | "sampleTextSummary"
+    | "slotOverrides"
+  >,
 ): NativeTemplateProfileSlide["roleHints"] {
   const roles: NativeTemplateProfileSlide["roleHints"] = [];
 
@@ -487,6 +563,120 @@ function collectSlideSlotTags(slide: NativeTemplateProfileSlide): TemplateSlotTa
   return [...new Set(tags)];
 }
 
+function truncate(text: string, limit = 80): string {
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit - 1)}…`;
+}
+
+function summarizeTexts(elements: NativeTemplateElement[]): string[] {
+  const texts: string[] = [];
+  for (const element of elements) {
+    if (!element.hasTextBody) continue;
+    try {
+      for (const text of element.getText()) {
+        const trimmed = text.replace(/\s+/g, " ").trim();
+        if (!trimmed) continue;
+        texts.push(trimmed);
+      }
+    } catch {
+      // ignore text extraction errors
+    }
+  }
+  return [...new Set(texts)].slice(0, 6).map((text) => truncate(text, 90));
+}
+
+function measureContentDensity(summary: string[], roleHints: string[]): NativeTemplateDensity {
+  const totalChars = summary.join("").length;
+  if (roleHints.includes("table") || totalChars > 220 || summary.length >= 5) {
+    return "dense";
+  }
+  if (roleHints.includes("content") || roleHints.includes("two_column") || totalChars > 80) {
+    return "medium";
+  }
+  return "sparse";
+}
+
+function inferSemanticRole(
+  slide: {
+    slideNumber: number;
+    roleHints: NativeTemplateProfileSlide["roleHints"];
+    layoutName: string;
+    hasFullBleedImage: boolean;
+    sampleTextSummary: string[];
+  },
+  totalSlides: number,
+): {
+  role: SlideSemanticRole | null;
+  confidence: number;
+  candidates: NativeTemplateSemanticRoleCandidate[];
+} {
+  const scores = new Map<SlideSemanticRole, number>();
+  const text = normalizeTemplateText(
+    [slide.layoutName, ...slide.sampleTextSummary].join(" "),
+  );
+
+  const addScore = (role: SlideSemanticRole, score: number) => {
+    scores.set(role, (scores.get(role) ?? 0) + score);
+  };
+
+  if (slide.slideNumber === 1) addScore("cover", 70);
+  if (slide.slideNumber === totalSlides) addScore("closing", 45);
+  if (slide.hasFullBleedImage) addScore("image_focus", 20);
+  if (slide.roleHints.includes("title")) addScore("section_break", 24);
+  if (slide.roleHints.includes("content")) addScore("bullet_list", 30);
+  if (slide.roleHints.includes("two_column")) addScore("comparison", 34);
+  if (slide.roleHints.includes("table")) addScore("table", 34);
+  if (slide.roleHints.includes("image")) addScore("image_focus", 32);
+  if (slide.roleHints.includes("blank")) addScore("section_break", 22);
+
+  if (/目录|contents|agenda|tableofcontents/.test(text)) addScore("toc", 120);
+  if (/thank|thanks|谢谢观看|感谢聆听|感谢/.test(text)) addScore("closing", 120);
+  if (/q&a|qa|答疑|问答|常见问题/.test(text)) addScore("qna", 115);
+  if (/总结|结论|summary|takeaway|核心原则/.test(text)) addScore("summary", 110);
+  if (/时间轴|timeline|历程|阶段|里程碑|roadmap|milestone/.test(text)) addScore("timeline", 115);
+  if (/对比|vs|compare|comparison|优势/.test(text)) addScore("comparison", 100);
+  if (/过渡页|chapter|part|section|篇章/.test(text)) addScore("section_break", 100);
+  if (/封面|businesspowerpoint|standardtemplate|商业计划书/.test(text)) addScore("cover", 110);
+
+  if (scores.size === 0) {
+    addScore("bullet_list", 20);
+  }
+
+  const candidates = [...scores.entries()]
+    .map(([role, score]) => ({ role, score }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+  const best = candidates[0] ?? null;
+  return {
+    role: best?.role ?? null,
+    confidence: best ? Math.min(1, best.score / 120) : 0,
+    candidates,
+  };
+}
+
+function buildSummary(slides: NativeTemplateProfileSlide[]): NativeTemplateProfile["summary"] {
+  const placeholderTags = [...new Set(slides.flatMap((slide) => collectSlideSlotTags(slide)))].sort();
+  const recognizedRoleCounts: Record<string, number> = {};
+  const semanticRoleCounts: Partial<Record<SlideSemanticRole, number>> = {};
+
+  for (const slide of slides) {
+    for (const role of slide.roleHints) {
+      recognizedRoleCounts[role] = (recognizedRoleCounts[role] ?? 0) + 1;
+    }
+    if (slide.semanticRole) {
+      semanticRoleCounts[slide.semanticRole] = (semanticRoleCounts[slide.semanticRole] ?? 0) + 1;
+    }
+  }
+
+  return {
+    slideCount: slides.length,
+    placeholderTags,
+    recognizedRoleCounts,
+    semanticRoleCounts,
+    editableSlideCount: slides.filter((slide) => slide.autoUse).length,
+  };
+}
+
 export function buildAvailableLayoutsFromProfile(
   profile: NativeTemplateProfile,
 ): string[] {
@@ -518,7 +708,9 @@ export function buildNativeTemplateProfile(
   const templateInfo =
     templateInfos.find((info) => info.name === "__native_template__") ??
     [...templateInfos].sort((a, b) => (b.slides?.length ?? 0) - (a.slides?.length ?? 0))[0];
-  const slides: NativeTemplateProfileSlide[] = (templateInfo?.slides ?? []).map((slide) => {
+  const rawSlides = templateInfo?.slides ?? [];
+
+  const slides: NativeTemplateProfileSlide[] = rawSlides.map((slide) => {
     const taggedSlots: Partial<Record<TemplateSlotTag, NativeTemplateSlot[]>> = {};
     const titleFallback: NativeTemplateSlot[] = [];
     const subtitleFallback: NativeTemplateSlot[] = [];
@@ -602,7 +794,7 @@ export function buildNativeTemplateProfile(
     );
 
     const baseSlide = {
-      slideId: slide.id,
+      slideId: slide.id ?? slide.number,
       slideNumber: slide.number,
       layoutName: slide.info?.layoutName ?? `Slide ${slide.number}`,
       hasFullBleedImage: hasFullBleedImage(slide.elements),
@@ -636,11 +828,15 @@ export function buildNativeTemplateProfile(
         normalizeSlots(layoutDerivedSlots.RIGHT),
         sortSlotsByPosition(
           sortedBodySlots.filter(
-            (slot) => selectorKey(slot.selector) !== selectorKey(pickFirstSlot(
-              normalizeSlots(taggedSlots.LEFT),
-              normalizeSlots(layoutDerivedSlots.LEFT),
-              sortedBodySlots,
-            )?.selector ?? ""),
+            (slot) =>
+              selectorKey(slot.selector) !==
+              selectorKey(
+                pickFirstSlot(
+                  normalizeSlots(taggedSlots.LEFT),
+                  normalizeSlots(layoutDerivedSlots.LEFT),
+                  sortedBodySlots,
+                )?.selector ?? "",
+              ),
           ),
         ),
       ),
@@ -666,41 +862,159 @@ export function buildNativeTemplateProfile(
         normalizeSlots(layoutDerivedSlots.PAGE_NUM),
         normalizeSlots(pageNumFallback),
       ),
-    } satisfies Omit<NativeTemplateProfileSlide, "roleHints">;
+    };
+
+    const roleHints = classifySlideRoles(baseSlide);
+    const sampleTextSummary = summarizeTexts(slide.elements);
+    const inferred = inferSemanticRole(
+      {
+        slideNumber: slide.number,
+        roleHints,
+        layoutName: baseSlide.layoutName,
+        hasFullBleedImage: baseSlide.hasFullBleedImage,
+        sampleTextSummary,
+      },
+      rawSlides.length,
+    );
 
     return {
       ...baseSlide,
-      roleHints: classifySlideRoles(baseSlide),
+      roleHints,
+      semanticRole: inferred.role,
+      semanticRoleSource: "auto",
+      semanticRoleConfidence: inferred.confidence,
+      semanticRoleCandidates: inferred.candidates,
+      contentDensity: measureContentDensity(sampleTextSummary, roleHints),
+      autoUse: true,
+      sampleTextSummary,
+      slotOverrides: undefined,
     };
   });
 
-  const placeholderTags = [...new Set(slides.flatMap((slide) => collectSlideSlotTags(slide)))].sort();
-  const recognizedRoleCounts: Record<string, number> = {};
-  for (const slide of slides) {
-    for (const role of slide.roleHints) {
-      recognizedRoleCounts[role] = (recognizedRoleCounts[role] ?? 0) + 1;
-    }
-  }
-
   return {
-    kind: "native_template_profile_v1",
-    version: 1,
-    summary: {
-      slideCount: slides.length,
-      placeholderTags,
-      recognizedRoleCounts,
-    },
+    kind: "native_template_profile_v2",
+    version: 2,
+    summary: buildSummary(slides),
     slides,
   };
+}
+
+function rebuildProfile(slides: NativeTemplateProfileSlide[]): NativeTemplateProfile {
+  return {
+    kind: "native_template_profile_v2",
+    version: 2,
+    summary: buildSummary(slides),
+    slides,
+  };
+}
+
+function migrateLegacyProfile(profile: NativeTemplateProfileV1): NativeTemplateProfile {
+  const totalSlides = profile.slides.length;
+  const slides: NativeTemplateProfileSlide[] = profile.slides.map((slide) => {
+    const inferred = inferSemanticRole(
+      {
+        slideNumber: slide.slideNumber,
+        roleHints: slide.roleHints,
+        layoutName: slide.layoutName,
+        hasFullBleedImage: slide.hasFullBleedImage,
+        sampleTextSummary: [],
+      },
+      totalSlides,
+    );
+
+    return {
+      ...slide,
+      semanticRole: inferred.role,
+      semanticRoleSource: "auto",
+      semanticRoleConfidence: inferred.confidence,
+      semanticRoleCandidates: inferred.candidates,
+      contentDensity: measureContentDensity([], slide.roleHints),
+      autoUse: true,
+      sampleTextSummary: [],
+      slotOverrides: undefined,
+    };
+  });
+
+  return rebuildProfile(slides);
+}
+
+export function mergeNativeTemplateProfiles(
+  autoProfile: NativeTemplateProfile,
+  existingProfile?: NativeTemplateProfile | null,
+): NativeTemplateProfile {
+  if (!existingProfile) return autoProfile;
+
+  const existingBySlideNumber = new Map(
+    existingProfile.slides.map((slide) => [slide.slideNumber, slide]),
+  );
+  const existingByLayoutName = new Map(
+    existingProfile.slides.map((slide) => [slide.layoutName, slide]),
+  );
+
+  const mergedSlides = autoProfile.slides.map((slide) => {
+    const existing =
+      existingBySlideNumber.get(slide.slideNumber) ??
+      existingByLayoutName.get(slide.layoutName);
+    if (!existing) return slide;
+
+    const semanticRole =
+      existing.semanticRoleSource === "manual" ? existing.semanticRole : slide.semanticRole;
+    const semanticRoleSource =
+      existing.semanticRoleSource === "manual" ? "manual" : slide.semanticRoleSource;
+    const semanticRoleConfidence =
+      existing.semanticRoleSource === "manual"
+        ? Math.max(existing.semanticRoleConfidence ?? 0.95, 0.95)
+        : slide.semanticRoleConfidence;
+
+    return {
+      ...slide,
+      semanticRole,
+      semanticRoleSource,
+      semanticRoleConfidence,
+      autoUse: typeof existing.autoUse === "boolean" ? existing.autoUse : slide.autoUse,
+      slotOverrides: existing.slotOverrides ?? slide.slotOverrides,
+    };
+  });
+
+  return rebuildProfile(mergedSlides);
 }
 
 export function extractNativeTemplateProfile(
   themeConfig: unknown,
 ): NativeTemplateProfile | null {
   if (!themeConfig || typeof themeConfig !== "object") return null;
-  const candidate = themeConfig as Partial<NativeTemplateProfile>;
-  if (candidate.kind !== "native_template_profile_v1") return null;
-  if (candidate.version !== 1) return null;
-  if (!Array.isArray(candidate.slides)) return null;
-  return candidate as NativeTemplateProfile;
+  const candidate = themeConfig as
+    | Partial<NativeTemplateProfile>
+    | Partial<NativeTemplateProfileV1>;
+
+  if (candidate.kind === "native_template_profile_v2" && candidate.version === 2) {
+    if (!Array.isArray(candidate.slides)) return null;
+    return rebuildProfile(candidate.slides as NativeTemplateProfileSlide[]);
+  }
+
+  if (candidate.kind === "native_template_profile_v1" && candidate.version === 1) {
+    if (!Array.isArray(candidate.slides)) return null;
+    return migrateLegacyProfile(candidate as NativeTemplateProfileV1);
+  }
+
+  return null;
+}
+
+export function normalizeProfileAfterManualEdit(
+  profile: NativeTemplateProfile,
+): NativeTemplateProfile {
+  const slides = profile.slides.map((slide) => ({
+    ...slide,
+    semanticRoleSource: slide.semanticRoleSource ?? "auto",
+    semanticRoleConfidence:
+      typeof slide.semanticRoleConfidence === "number" ? slide.semanticRoleConfidence : 0.5,
+    semanticRoleCandidates: Array.isArray(slide.semanticRoleCandidates)
+      ? slide.semanticRoleCandidates
+      : [],
+    contentDensity: slide.contentDensity ?? "medium",
+    autoUse: slide.autoUse !== false,
+    sampleTextSummary: Array.isArray(slide.sampleTextSummary) ? slide.sampleTextSummary : [],
+  }));
+
+  return rebuildProfile(slides);
 }

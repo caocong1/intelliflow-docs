@@ -163,7 +163,16 @@ export async function generateExport(
   format: string,
   filename: string,
   templateId?: string | null,
-): Promise<{ filename: string; format: string; fileSize: number; storagePath: string } | null> {
+): Promise<{
+  filename: string;
+  format: string;
+  fileSize: number;
+  storagePath: string;
+  templateId?: string | null;
+  renderMode?: string;
+  warnings?: string[];
+  compositionSummary?: Record<string, unknown>;
+} | null> {
   const res = await runtimeOf(documentId).export[nodeExecutionId].generate.post({
     format,
     filename,

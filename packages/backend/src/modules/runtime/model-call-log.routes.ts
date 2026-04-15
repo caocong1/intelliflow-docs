@@ -29,7 +29,18 @@ export const modelCallLogRoutes = new Elysia({ prefix: "/admin/model-call-logs" 
       }
 
       if (query.callSource) {
-        conditions.push(eq(modelCallLogs.callSource, query.callSource as "runtime" | "model_test" | "provider_test" | "prompt_optimize"));
+        conditions.push(
+          eq(
+            modelCallLogs.callSource,
+            query.callSource as
+              | "runtime"
+              | "model_test"
+              | "provider_test"
+              | "prompt_optimize"
+              | "inline_edit"
+              | "ppt_export_planning",
+          ),
+        );
       }
 
       if (query.userId) {

@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { markdownToSlides, tryParseSlideJson } from "./export.service";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import Automizer from "pptx-automizer";
+import PptxGenJS from "pptxgenjs";
+import { buildNativeTemplateProfile } from "../ppt-templates/native-template-profile";
+import { normalizeSlidesForDeck, assignTemplateSequence } from "./ppt-deck-composition";
+import { __pptExportTestUtils, markdownToSlides, tryParseSlideJson } from "./export.service";
 
 // ─── markdownToSlides ────────────────────────────────────────────────────────
 
@@ -162,11 +169,12 @@ describe("tryParseSlideJson", () => {
   test("JSON with metadata is accepted", () => {
     const json = JSON.stringify({
       metadata: { aspectRatio: "16:9" },
-      slides: [{ layout: "title", title: "Test" }],
+      slides: [{ layout: "title", title: "Test", semanticRole: "cover" }],
     });
     const result = tryParseSlideJson(json);
     expect(result).not.toBeNull();
     expect(result!.metadata?.aspectRatio).toBe("16:9");
+    expect(result!.slides[0].semanticRole).toBe("cover");
   });
 });
 
@@ -210,7 +218,7 @@ describe("PPT buffer generation", () => {
   test("slide JSON input produces valid slides", () => {
     const json = JSON.stringify({
       slides: [
-        { layout: "title", title: "Presentation" },
+        { layout: "title", title: "Presentation", semanticRole: "cover" },
         { layout: "content", title: "Points", bullets: ["A", "B", "C"] },
         { layout: "table", title: "Data", headers: ["X", "Y"], rows: [["1", "2"]] },
       ],
@@ -218,5 +226,63 @@ describe("PPT buffer generation", () => {
     const result = tryParseSlideJson(json);
     expect(result).not.toBeNull();
     expect(result!.slides.length).toBe(3);
+  });
+
+  test("native template rendering does not keep original sample slides", async () => {
+    const template = new PptxGenJS();
+    template.layout = "LAYOUT_WIDE";
+
+    const cover = template.addSlide();
+    cover.addText("输入标题文字", { x: 0.8, y: 1.2, w: 10, h: 0.8, fontSize: 24 });
+    cover.addText("20XX", { x: 0.8, y: 2.4, w: 6, h: 0.5, fontSize: 12 });
+
+    const body = template.addSlide();
+    body.addText("输入标题文字", { x: 0.8, y: 0.6, w: 10, h: 0.8, fontSize: 20 });
+    body.addText("您的内容打在这里，或者通过复制您的文本后，在此框中选择粘贴，并选择只保留文字", {
+      x: 0.8,
+      y: 1.6,
+      w: 10,
+      h: 3.5,
+      fontSize: 14,
+    });
+
+    const templateBuffer = Buffer.from(
+      (await template.write({ outputType: "nodebuffer" })) as ArrayBuffer,
+    );
+
+    const automizer = new Automizer({
+      templateDir: "",
+      outputDir: "",
+      useCreationIds: true,
+    });
+    automizer.loadRoot(templateBuffer).load(templateBuffer, "__native_template__");
+    const templateInfos = await automizer.setCreationIds();
+    const profile = buildNativeTemplateProfile(templateInfos as never);
+
+    const slides = normalizeSlidesForDeck([
+      { layout: "title", title: "新封面", subtitle: "副标题" },
+      { layout: "content", title: "新正文", bullets: ["要点 1", "要点 2"] },
+    ]);
+    const assignments = assignTemplateSequence(slides, profile.slides);
+
+    const rendered = await __pptExportTestUtils.renderSlidesWithNativeTemplate(
+      assignments,
+      templateBuffer,
+      undefined,
+      profile,
+    );
+    const tempDir = await mkdtemp(join(tmpdir(), "ppt-render-test-"));
+    const filePath = join(tempDir, "rendered.pptx");
+    await writeFile(filePath, rendered);
+    const unzipResult = Bun.spawnSync(["unzip", "-l", filePath], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const listing = Buffer.from(unzipResult.stdout).toString("utf8");
+    const slideFiles = listing
+      .split("\n")
+      .filter((line) => /ppt\/slides\/slide\d+\.xml/.test(line));
+
+    expect(slideFiles).toHaveLength(2);
   });
 });

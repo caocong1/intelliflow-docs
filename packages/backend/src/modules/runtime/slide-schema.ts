@@ -1,8 +1,12 @@
 import Ajv from "ajv";
+import { SLIDE_SEMANTIC_ROLES } from "../../../../shared/src/slide-types";
 
 // ─── SlidePresentation JSON Schema (ajv format) ─────────────────────────────
 
 const slideBaseProperties = {
+  semanticRole: { type: "string", enum: [...SLIDE_SEMANTIC_ROLES] },
+  sectionKey: { type: "string", maxLength: 120 },
+  visualIntent: { type: "string", maxLength: 120 },
   notes: { type: "string", maxLength: 500 },
 };
 

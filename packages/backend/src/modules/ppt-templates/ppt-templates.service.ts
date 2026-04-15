@@ -9,6 +9,9 @@ import {
   buildNativeTemplateProfile,
   derivePlaceholderNamesFromLayoutPlaceholders,
   type NativeTemplateProfile,
+  extractNativeTemplateProfile,
+  mergeNativeTemplateProfiles,
+  normalizeProfileAfterManualEdit,
 } from "./native-template-profile";
 
 const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || "./data/workspaces";
@@ -314,9 +317,12 @@ export async function reRecognizeNativeTemplate(id: string) {
     throw new Error("TEMPLATE_PROFILE_PARSE_FAILED");
   }
 
+  const existingProfile = extractNativeTemplateProfile(template.themeConfig);
+  const mergedProfile = mergeNativeTemplateProfiles(parsed.profile, existingProfile);
+
   const updated = await updateTemplate(id, {
-    themeConfig: parsed.profile,
-    availableLayouts: buildAvailableLayoutsFromProfile(parsed.profile),
+    themeConfig: mergedProfile,
+    availableLayouts: buildAvailableLayoutsFromProfile(mergedProfile),
   });
 
   return {
@@ -325,9 +331,46 @@ export async function reRecognizeNativeTemplate(id: string) {
       layouts: Object.fromEntries([...parsed.layouts].map(([k, v]) => [k, [...v]])),
       allPlaceholders: [...parsed.allPlaceholders],
       warnings: parsed.warnings,
-      profileSummary: parsed.profile.summary,
+      profileSummary: mergedProfile.summary,
     },
   };
+}
+
+export async function getTemplateProfile(id: string): Promise<NativeTemplateProfile> {
+  const template = await getTemplate(id);
+  if (template.type !== "native_pptx") {
+    throw new Error("TEMPLATE_NOT_NATIVE_PPTX");
+  }
+
+  const profile = extractNativeTemplateProfile(template.themeConfig);
+  if (!profile) {
+    throw new Error("TEMPLATE_PROFILE_NOT_FOUND");
+  }
+
+  return normalizeProfileAfterManualEdit(profile);
+}
+
+export async function updateTemplateProfile(
+  id: string,
+  profileInput: unknown,
+): Promise<NativeTemplateProfile> {
+  const template = await getTemplate(id);
+  if (template.type !== "native_pptx") {
+    throw new Error("TEMPLATE_NOT_NATIVE_PPTX");
+  }
+
+  const profile = extractNativeTemplateProfile(profileInput);
+  if (!profile) {
+    throw new Error("INVALID_TEMPLATE_PROFILE");
+  }
+
+  const normalized = normalizeProfileAfterManualEdit(profile);
+  await updateTemplate(id, {
+    themeConfig: normalized,
+    availableLayouts: buildAvailableLayoutsFromProfile(normalized),
+  });
+
+  return normalized;
 }
 
 export async function createTemplate(input: {

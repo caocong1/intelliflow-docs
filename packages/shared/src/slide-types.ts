@@ -1,6 +1,29 @@
 // ─── Slide Schema types (canonical, shared between frontend & backend) ───────
 // See docs/design/ppt-export-design.md §4 for full specification.
 
+export const SLIDE_SEMANTIC_ROLES = [
+  "cover",
+  "toc",
+  "section_break",
+  "bullet_list",
+  "comparison",
+  "timeline",
+  "table",
+  "image_focus",
+  "summary",
+  "qna",
+  "closing",
+] as const;
+
+export type SlideSemanticRole = (typeof SLIDE_SEMANTIC_ROLES)[number];
+
+export interface SlideCommonFields {
+  semanticRole?: SlideSemanticRole;
+  sectionKey?: string;
+  visualIntent?: string;
+  notes?: string;
+}
+
 export interface SlidePresentation {
   metadata?: {
     aspectRatio?: "16:9" | "4:3";
@@ -17,51 +40,52 @@ export type Slide =
   | ImageSlide
   | BlankSlide;
 
-export interface TitleSlide {
+export interface TitleSlide extends SlideCommonFields {
   layout: "title";
   title: string; // max 60 chars
   subtitle?: string; // max 120 chars
-  notes?: string; // max 500 chars
 }
 
-export interface ContentSlide {
+export interface ContentSlide extends SlideCommonFields {
   layout: "content";
   title: string; // max 50 chars
   bullets: string[]; // max 8 items, each max 120 chars
-  notes?: string;
 }
 
-export interface TwoColumnSlide {
+export interface TwoColumnSlide extends SlideCommonFields {
   layout: "two_column";
   title: string; // max 50 chars
   left: { title?: string; bullets: string[] }; // max 5 items, 80 chars/item
   right: { title?: string; bullets: string[] }; // max 5 items, 80 chars/item
-  notes?: string;
 }
 
-export interface TableSlide {
+export interface TableSlide extends SlideCommonFields {
   layout: "table";
   title: string; // max 50 chars
   headers: string[]; // max 6 columns, 30 chars/col
   rows: string[][]; // max 8 rows, 50 chars/cell
-  notes?: string;
 }
 
-export interface ImageSlide {
+export interface ImageSlide extends SlideCommonFields {
   layout: "image";
   title: string;
   imageRef?: string;
   caption?: string; // max 100 chars
-  notes?: string;
 }
 
-export interface BlankSlide {
+export interface BlankSlide extends SlideCommonFields {
   layout: "blank";
   elements?: unknown[];
-  notes?: string;
 }
 
 /** JSON Schema for SlidePresentation — usable as a model call JSON Schema preset */
+const sharedSlideProperties = {
+  semanticRole: { type: "string", enum: [...SLIDE_SEMANTIC_ROLES] },
+  sectionKey: { type: "string", maxLength: 120 },
+  visualIntent: { type: "string", maxLength: 120 },
+  notes: { type: "string", maxLength: 500 },
+} as const;
+
 export const slidePresentationJsonSchema = {
   type: "object",
   properties: {
@@ -84,7 +108,7 @@ export const slidePresentationJsonSchema = {
               layout: { const: "title" },
               title: { type: "string", maxLength: 60 },
               subtitle: { type: "string", maxLength: 120 },
-              notes: { type: "string", maxLength: 500 },
+              ...sharedSlideProperties,
             },
             required: ["layout", "title"],
             additionalProperties: false,
@@ -94,7 +118,7 @@ export const slidePresentationJsonSchema = {
               layout: { const: "content" },
               title: { type: "string", maxLength: 50 },
               bullets: { type: "array", maxItems: 8, items: { type: "string", maxLength: 120 } },
-              notes: { type: "string", maxLength: 500 },
+              ...sharedSlideProperties,
             },
             required: ["layout", "title", "bullets"],
             additionalProperties: false,
@@ -121,7 +145,7 @@ export const slidePresentationJsonSchema = {
                 required: ["bullets"],
                 additionalProperties: false,
               },
-              notes: { type: "string", maxLength: 500 },
+              ...sharedSlideProperties,
             },
             required: ["layout", "title", "left", "right"],
             additionalProperties: false,
@@ -136,7 +160,7 @@ export const slidePresentationJsonSchema = {
                 maxItems: 8,
                 items: { type: "array", items: { type: "string", maxLength: 50 } },
               },
-              notes: { type: "string", maxLength: 500 },
+              ...sharedSlideProperties,
             },
             required: ["layout", "title", "headers", "rows"],
             additionalProperties: false,
@@ -147,7 +171,7 @@ export const slidePresentationJsonSchema = {
               title: { type: "string" },
               imageRef: { type: "string" },
               caption: { type: "string", maxLength: 100 },
-              notes: { type: "string", maxLength: 500 },
+              ...sharedSlideProperties,
             },
             required: ["layout", "title"],
             additionalProperties: false,
@@ -156,7 +180,7 @@ export const slidePresentationJsonSchema = {
             properties: {
               layout: { const: "blank" },
               elements: { type: "array" },
-              notes: { type: "string", maxLength: 500 },
+              ...sharedSlideProperties,
             },
             required: ["layout"],
             additionalProperties: false,

@@ -5,10 +5,12 @@ import {
   deleteTemplate,
   getDefaultTemplate,
   getTemplate,
+  getTemplateProfile,
   listTemplates,
   reRecognizeNativeTemplate,
   setDefault,
   updateTemplate,
+  updateTemplateProfile,
   uploadTemplate,
   validateThemeConfig,
 } from "./ppt-templates.service";
@@ -48,6 +50,57 @@ export const pptTemplateRoutes = new Elysia({ prefix: "/ppt-templates" })
       }
     },
     { params: t.Object({ id: t.String() }) },
+  )
+  .get(
+    "/:id/profile",
+    async ({ params, set }) => {
+      try {
+        return await getTemplateProfile(params.id);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message === "TEMPLATE_NOT_FOUND") {
+          set.status = 404;
+          return { error: "PPT 模板不存在" };
+        }
+        if (message === "TEMPLATE_NOT_NATIVE_PPTX") {
+          set.status = 400;
+          return { error: "仅原生 PPT 模板支持模板画像" };
+        }
+        if (message === "TEMPLATE_PROFILE_NOT_FOUND") {
+          set.status = 404;
+          return { error: "模板画像不存在，请先重新识别模板" };
+        }
+        throw err;
+      }
+    },
+    { params: t.Object({ id: t.String() }) },
+  )
+  .put(
+    "/:id/profile",
+    async ({ params, body, set }) => {
+      try {
+        return await updateTemplateProfile(params.id, body);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message === "TEMPLATE_NOT_FOUND") {
+          set.status = 404;
+          return { error: "PPT 模板不存在" };
+        }
+        if (message === "TEMPLATE_NOT_NATIVE_PPTX") {
+          set.status = 400;
+          return { error: "仅原生 PPT 模板支持模板画像" };
+        }
+        if (message === "INVALID_TEMPLATE_PROFILE") {
+          set.status = 400;
+          return { error: "模板画像格式不合法" };
+        }
+        throw err;
+      }
+    },
+    {
+      params: t.Object({ id: t.String() }),
+      body: t.Any(),
+    },
   )
   .post(
     "/",

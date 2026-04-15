@@ -1,8 +1,16 @@
-import type { ModelCallConfig, NamedOutputDef, NodeConfig, NodeExecution } from "@intelliflow/shared";
-import { For, Show, createSignal } from "solid-js";
+import type {
+  ModelCallConfig,
+  NamedOutputDef,
+  NodeConfig,
+  NodeExecution,
+} from "@intelliflow/shared";
+import { For, Show, createEffect, createMemo, createSignal } from "solid-js";
 import { formatDuration, formatShortTime } from "../../../lib/format-utils";
 import { renderMarkdown } from "../../../lib/render-markdown";
-import NamedOutputCard from "../nodes/NamedOutputCard";
+import NamedOutputsBrowser, {
+  type NamedOutputBrowserSelection,
+  type NamedOutputBrowserSource,
+} from "../shared/NamedOutputsBrowser";
 
 interface ModelOutput {
   content: string;
@@ -13,6 +21,8 @@ interface ModelOutput {
   completedAt?: string;
   tokenUsage?: { input: number; output: number };
 }
+
+type ContentScope = "artifacts" | "responses";
 
 interface Props {
   node: NodeExecution;
@@ -62,15 +72,71 @@ export default function ModelCallCompleted(props: Props) {
     );
   };
 
-  const namedOutputDefs = (): NamedOutputDef[] => {
-    return (cfg() as ModelCallConfig | undefined)?.namedOutputs ?? [];
-  };
-
+  const namedOutputDefs = (): NamedOutputDef[] => cfg()?.namedOutputs ?? [];
   const fallbackWarning = () => od()?.fallbackWarning ?? false;
+  const singleSelectedModelId = createMemo(() => {
+    if (!(cfg()?.enableUserSelectionOutput ?? false)) return null;
+
+    const ids = (od()?.selectedModelIds ?? []).filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
+
+    if (ids.length === 1) return ids[0];
+    if (ids.length === 0 && props.node.selectedOutputKey) return props.node.selectedOutputKey;
+    return null;
+  });
+  const mergeSelectedSourceIntoModel = createMemo(() => {
+    const modelId = singleSelectedModelId();
+    if (!modelId) return false;
+
+    const selectedArtifacts = Object.entries(od()?.namedOutputs ?? {}).filter(
+      ([artifactId]) => artifactId !== "_default",
+    );
+    if (selectedArtifacts.length === 0) return false;
+
+    const modelArtifacts = Object.entries(od()?.namedOutputsByModel?.[modelId] ?? {}).filter(
+      ([artifactId]) => artifactId !== "_default",
+    );
+    if (modelArtifacts.length === 0) return false;
+
+    const modelArtifactIds = new Set(modelArtifacts.map(([artifactId]) => artifactId));
+    return selectedArtifacts.every(([artifactId]) => modelArtifactIds.has(artifactId));
+  });
+  const initialArtifactSourceId = createMemo(() => {
+    if (mergeSelectedSourceIntoModel() && singleSelectedModelId()) {
+      return `model:${singleSelectedModelId()}`;
+    }
+
+    const selectedArtifacts = Object.entries(od()?.namedOutputs ?? {}).filter(
+      ([artifactId]) => artifactId !== "_default",
+    );
+    if ((cfg()?.enableUserSelectionOutput ?? false) && selectedArtifacts.length > 0) {
+      return "selected";
+    }
+
+    const selectedKey = props.node.selectedOutputKey;
+    if (selectedKey) {
+      return `model:${selectedKey}`;
+    }
+
+    return undefined;
+  });
 
   const [viewMode, setViewMode] = createSignal<"markdown" | "source">("markdown");
   const [selectedModelId, setSelectedModelId] = createSignal(initialModelId());
-  const [copied, setCopied] = createSignal(false);
+  const [contentScope, setContentScope] = createSignal<ContentScope>(
+    hasNamedOutputs() ? "artifacts" : "responses",
+  );
+  const [activeArtifactSelection, setActiveArtifactSelection] =
+    createSignal<NamedOutputBrowserSelection | null>(null);
+
+  createEffect(() => {
+    const nodeId = props.node.id;
+    void nodeId;
+    setSelectedModelId(initialModelId());
+    setContentScope(hasNamedOutputs() ? "artifacts" : "responses");
+    setActiveArtifactSelection(null);
+  });
 
   const activeModel = () => {
     const models = od()?.models;
@@ -78,53 +144,127 @@ export default function ModelCallCompleted(props: Props) {
     return models[selectedModelId()] ?? null;
   };
 
-  const content = () => activeModel()?.content ?? od()?.selectedContent ?? "";
+  const responseContent = () => activeModel()?.content ?? od()?.selectedContent ?? "";
 
-  const charCount = () => content().length;
+  const artifactSources = createMemo<NamedOutputBrowserSource[]>(() => {
+    const defs = new Map(namedOutputDefs().map((def) => [def.id, def]));
+    const selectedArtifacts = Object.entries(od()?.namedOutputs ?? {}).filter(
+      ([artifactId]) => artifactId !== "_default",
+    );
+    const sources: NamedOutputBrowserSource[] = [];
 
+    const appendSource = (
+      id: string,
+      label: string,
+      artifacts: Array<[string, { content: string; format: string; modelId?: string }]>,
+      options?: { meta?: string; tone?: "default" | "selected"; fallbackModelId?: string },
+    ) => {
+      if (artifacts.length === 0) return;
+      sources.push({
+        id,
+        label,
+        meta: options?.meta,
+        tone: options?.tone,
+        artifacts: artifacts.map(([artifactId, artifact]) => ({
+          artifactId,
+          artifactName: defs.get(artifactId)?.name ?? artifactId,
+          content: artifact.content,
+          format: artifact.format,
+          modelId: artifact.modelId ?? options?.fallbackModelId ?? "selected",
+          readonly: true,
+        })),
+      });
+    };
+
+    if (
+      (cfg()?.enableUserSelectionOutput ?? false) &&
+      selectedArtifacts.length > 0 &&
+      !mergeSelectedSourceIntoModel()
+    ) {
+      appendSource("selected", "用户选择输出", selectedArtifacts, {
+        meta: `已选 ${(od()?.selectedModelIds ?? []).length} 个模型`,
+        tone: "selected",
+        fallbackModelId: "selected",
+      });
+    }
+
+    const outputsByModel = od()?.namedOutputsByModel ?? {};
+    for (const model of modelEntries()) {
+      const modelArtifacts = Object.entries(outputsByModel[model.key] ?? {}).filter(
+        ([artifactId]) => artifactId !== "_default",
+      );
+      const mergedSelectedModel =
+        mergeSelectedSourceIntoModel() && model.key === singleSelectedModelId();
+      appendSource(`model:${model.key}`, model.modelDisplayName, modelArtifacts, {
+        meta: mergedSelectedModel
+          ? "当前采用输出"
+          : model.key === props.node.selectedOutputKey
+            ? "当前选中模型"
+            : undefined,
+        fallbackModelId: model.key,
+      });
+    }
+
+    if (sources.length === 0 && selectedArtifacts.length > 0) {
+      appendSource("default", "输出物", selectedArtifacts, {
+        tone: "selected",
+        fallbackModelId: props.node.selectedOutputKey ?? "selected",
+      });
+    }
+
+    return sources;
+  });
+
+  const showArtifactBrowser = () => hasNamedOutputs() && contentScope() === "artifacts";
+  const activeContent = () => {
+    if (showArtifactBrowser()) {
+      return activeArtifactSelection()?.content ?? "";
+    }
+    return responseContent();
+  };
+  const activeTitle = () => {
+    const selection = activeArtifactSelection();
+    if (showArtifactBrowser() && selection) {
+      return `${title()} · ${selection.artifactName}`;
+    }
+    return title();
+  };
+
+  const charCount = () => activeContent().length;
   const duration = () => formatDuration(props.node.startedAt, props.node.completedAt);
-
   const completionTime = () => formatShortTime(props.node.completedAt);
 
   const displayName = () => {
+    if (showArtifactBrowser()) {
+      return activeArtifactSelection()?.sourceLabel ?? "输出物";
+    }
     const model = activeModel();
     if (model?.modelDisplayName) return model.modelDisplayName;
-    const cfgVal = cfg();
-    if (cfgVal?.displayName) return cfgVal.displayName;
+    if (cfg()?.displayName) return cfg()?.displayName;
     return "模型调用";
   };
 
   const title = () => props.node.nodeLabel || "模型调用";
 
-  function handleCopy() {
-    navigator.clipboard.writeText(content()).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  }
-
   function handleFullscreen() {
-    props.onFullscreen?.(content(), title());
+    props.onFullscreen?.(activeContent(), activeTitle());
   }
 
   return (
     <div class="rounded-2xl overflow-hidden bg-white shadow-[0_12px_40px_rgba(25,28,30,0.06)]">
-      {/* Purple gradient header */}
       <div
         class="relative flex-shrink-0"
         style={{ background: "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)" }}
       >
         <div class="px-8 pt-8 pb-6">
           <div class="flex items-start justify-between gap-4">
-            {/* Left: icon + title info */}
             <div class="flex items-center gap-4">
-              {/* Sparkles icon in frosted circle */}
               <div
-                class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full"
                 style={{ background: "rgba(255,255,255,0.15)", "backdrop-filter": "blur(4px)" }}
               >
                 <svg
-                  class="w-6 h-6 text-white"
+                  class="h-6 w-6 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -138,27 +278,24 @@ export default function ModelCallCompleted(props: Props) {
               </div>
 
               <div>
-                <h3 class="text-white font-bold text-xl leading-tight">{title()}</h3>
-                <div class="flex items-center gap-2 mt-1.5 flex-wrap">
-                  {/* 模型调用 badge */}
+                <h3 class="text-xl font-bold leading-tight text-white">{title()}</h3>
+                <div class="mt-1.5 flex flex-wrap items-center gap-2">
                   <span
-                    class="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    class="rounded-full px-2 py-0.5 text-[10px] font-bold"
                     style={{ background: "rgba(255,255,255,0.2)", color: "white" }}
                   >
                     模型调用
                   </span>
-                  {/* 已完成 status */}
                   <span
-                    class="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1"
+                    class="flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
                     style={{ background: "rgba(52,211,153,0.25)", color: "#6effd4" }}
                   >
                     <span
-                      class="w-1.5 h-1.5 rounded-full inline-block"
+                      class="inline-block h-1.5 w-1.5 rounded-full"
                       style={{ background: "#6effd4" }}
                     />
                     已完成
                   </span>
-                  {/* Duration */}
                   <span class="text-[11px]" style={{ color: "rgba(255,255,255,0.65)" }}>
                     {duration()}
                   </span>
@@ -166,62 +303,94 @@ export default function ModelCallCompleted(props: Props) {
               </div>
             </div>
 
-            {/* Right: 渲染/源码 segmented control */}
-            <div
-              class="flex items-center rounded-lg p-0.5 flex-shrink-0"
-              style={{ background: "rgba(255,255,255,0.15)" }}
-            >
-              <button
-                type="button"
-                class="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-                style={
-                  viewMode() === "markdown"
-                    ? { background: "white", color: "#3525cd" }
-                    : { background: "transparent", color: "rgba(255,255,255,0.75)" }
-                }
-                onClick={() => setViewMode("markdown")}
-              >
-                渲染
-              </button>
-              <button
-                type="button"
-                class="px-3 py-1.5 rounded-md text-xs font-medium transition-all"
-                style={
-                  viewMode() === "source"
-                    ? { background: "white", color: "#3525cd" }
-                    : { background: "transparent", color: "rgba(255,255,255,0.75)" }
-                }
-                onClick={() => setViewMode("source")}
-              >
-                源码
-              </button>
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <Show when={hasNamedOutputs()}>
+                <div
+                  class="flex items-center rounded-lg p-0.5"
+                  style={{ background: "rgba(255,255,255,0.15)" }}
+                >
+                  <button
+                    type="button"
+                    class="rounded-md px-3 py-1.5 text-xs font-medium transition-all"
+                    style={
+                      contentScope() === "artifacts"
+                        ? { background: "white", color: "#3525cd" }
+                        : { background: "transparent", color: "rgba(255,255,255,0.75)" }
+                    }
+                    onClick={() => setContentScope("artifacts")}
+                  >
+                    输出物
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md px-3 py-1.5 text-xs font-medium transition-all"
+                    style={
+                      contentScope() === "responses"
+                        ? { background: "white", color: "#3525cd" }
+                        : { background: "transparent", color: "rgba(255,255,255,0.75)" }
+                    }
+                    onClick={() => setContentScope("responses")}
+                  >
+                    模型响应
+                  </button>
+                </div>
+              </Show>
+
+              <Show when={!showArtifactBrowser()}>
+                <div
+                  class="flex items-center rounded-lg p-0.5"
+                  style={{ background: "rgba(255,255,255,0.15)" }}
+                >
+                  <button
+                    type="button"
+                    class="rounded-md px-3 py-1.5 text-xs font-medium transition-all"
+                    style={
+                      viewMode() === "markdown"
+                        ? { background: "white", color: "#3525cd" }
+                        : { background: "transparent", color: "rgba(255,255,255,0.75)" }
+                    }
+                    onClick={() => setViewMode("markdown")}
+                  >
+                    渲染
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-md px-3 py-1.5 text-xs font-medium transition-all"
+                    style={
+                      viewMode() === "source"
+                        ? { background: "white", color: "#3525cd" }
+                        : { background: "transparent", color: "rgba(255,255,255,0.75)" }
+                    }
+                    onClick={() => setViewMode("source")}
+                  >
+                    源码
+                  </button>
+                </div>
+              </Show>
             </div>
           </div>
         </div>
 
-        {/* Info bar */}
         <div
-          class="px-8 py-3 flex items-center gap-4 flex-wrap"
+          class="flex flex-wrap items-center gap-4 px-8 py-3"
           style={{
             background: "rgba(0,0,0,0.12)",
             "border-top": "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          {/* Model name pill */}
           <span
-            class="text-xs font-medium px-3 py-1 rounded-full"
+            class="rounded-full px-3 py-1 text-xs font-medium"
             style={{ background: "rgba(255,255,255,0.18)", color: "white" }}
           >
             {displayName()}
           </span>
 
-          {/* Character count */}
           <span
             class="flex items-center gap-1.5 text-xs"
             style={{ color: "rgba(255,255,255,0.7)" }}
           >
             <svg
-              class="w-3.5 h-3.5"
+              class="h-3.5 w-3.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -237,13 +406,12 @@ export default function ModelCallCompleted(props: Props) {
             {charCount().toLocaleString()} 字符
           </span>
 
-          {/* Completion time */}
           <span
             class="flex items-center gap-1.5 text-xs"
             style={{ color: "rgba(255,255,255,0.7)" }}
           >
             <svg
-              class="w-3.5 h-3.5"
+              class="h-3.5 w-3.5"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -257,34 +425,27 @@ export default function ModelCallCompleted(props: Props) {
           </span>
         </div>
 
-        {/* Multi-model tabs (inside header area) */}
-        <Show when={modelEntries().length > 1}>
+        <Show when={modelEntries().length > 1 && !showArtifactBrowser()}>
           <div
-            class="px-8 flex items-center gap-1 overflow-x-auto"
+            class="flex items-center gap-1 overflow-x-auto px-8"
             style={{ "border-top": "1px solid rgba(255,255,255,0.08)" }}
           >
             <For each={modelEntries()}>
               {(model) => (
                 <button
                   type="button"
-                  class="px-4 py-2.5 text-xs font-medium border-b-2 transition-all whitespace-nowrap flex items-center gap-1.5"
+                  class="flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2.5 text-xs font-medium transition-all"
                   style={
                     selectedModelId() === model.key
-                      ? {
-                          "border-color": "white",
-                          color: "white",
-                        }
-                      : {
-                          "border-color": "transparent",
-                          color: "rgba(255,255,255,0.55)",
-                        }
+                      ? { "border-color": "white", color: "white" }
+                      : { "border-color": "transparent", color: "rgba(255,255,255,0.55)" }
                   }
                   onClick={() => setSelectedModelId(model.key)}
                 >
                   {model.modelDisplayName}
                   <Show when={model.key === props.node.selectedOutputKey}>
                     <span
-                      class="text-[9px] px-1.5 py-0.5 rounded font-bold"
+                      class="rounded px-1.5 py-0.5 text-[9px] font-bold"
                       style={{ background: "rgba(52,211,153,0.3)", color: "#6effd4" }}
                     >
                       选中
@@ -292,7 +453,7 @@ export default function ModelCallCompleted(props: Props) {
                   </Show>
                   <Show when={model.status === "format_error"}>
                     <span
-                      class="text-[9px] px-1.5 py-0.5 rounded font-bold"
+                      class="rounded px-1.5 py-0.5 text-[9px] font-bold"
                       style={{ background: "rgba(239,68,68,0.3)", color: "#fca5a5" }}
                     >
                       格式错误
@@ -305,207 +466,126 @@ export default function ModelCallCompleted(props: Props) {
         </Show>
       </div>
 
-      {/* Content area */}
       <div>
-        <div class="max-w-4xl mx-auto px-12 py-10 space-y-4">
-          {/* Fallback warning */}
+        <div class="mx-auto max-w-5xl space-y-4 px-8 py-8">
           <Show when={fallbackWarning()}>
-            <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
-              <svg class="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z" />
+            <div class="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <svg
+                class="h-4 w-4 flex-shrink-0 text-amber-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
+                />
               </svg>
               <span class="text-sm text-amber-700">模型未按预期格式输出，已合并为单个产物</span>
             </div>
           </Show>
 
-          {/* Named output cards mode */}
-          <Show when={hasNamedOutputs()}>
+          <Show when={showArtifactBrowser()}>
             <div class="space-y-3">
-              <Show
-                when={
-                  (cfg()?.enableUserSelectionOutput ?? false) &&
-                  Object.keys(od()?.namedOutputs ?? {}).length > 0
-                }
-              >
-                <div class="space-y-2">
-                  <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-[#191c1e]">用户选择输出</h4>
-                    <span class="text-xs text-[#464555]">
-                      已选 {(od()?.selectedModelIds ?? []).length} 个模型
-                    </span>
-                  </div>
-                  <For each={Object.entries(od()?.namedOutputs ?? {})}>
-                    {([artifactId, artifact]) => {
-                      const def = namedOutputDefs().find((d) => d.id === artifactId);
-                      return (
-                        <NamedOutputCard
-                          artifactId={artifactId}
-                          artifactName={def?.name ?? artifactId}
-                          content={artifact.content}
-                          format={artifact.format}
-                          modelId="selected"
-                          readonly={true}
-                        />
-                      );
-                    }}
-                  </For>
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 class="text-sm font-semibold text-[#191c1e]">输出物浏览</h4>
+                  <p class="mt-1 text-xs text-[#6b6a78]">
+                    切换来源和输出物，只保留一个主预览窗口。
+                  </p>
                 </div>
-              </Show>
+                <div class="flex flex-wrap items-center gap-2">
+                  <Show when={artifactSources().length > 0}>
+                    <span class="rounded-full bg-[rgba(79,70,229,0.08)] px-3 py-1 text-xs font-medium text-[#4f46e5]">
+                      {artifactSources().length} 个来源
+                    </span>
+                  </Show>
+                  <Show when={props.onFullscreen}>
+                    <button
+                      type="button"
+                      class="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(79,70,229,0.18)] bg-white px-3 py-2 text-xs font-medium text-[#4f46e5] transition-colors hover:bg-[rgba(79,70,229,0.04)]"
+                      onClick={handleFullscreen}
+                    >
+                      <svg
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                        />
+                      </svg>
+                      全屏查看
+                    </button>
+                  </Show>
+                </div>
+              </div>
 
-              <Show when={Object.keys(od()?.namedOutputsByModel ?? {}).length > 0}>
-                <For each={modelEntries()}>
-                  {(model) => {
-                    const modelArtifacts = () =>
-                      Object.entries(od()?.namedOutputsByModel?.[model.key] ?? {}).filter(
-                        ([artifactId]) => artifactId !== "_default",
-                      );
-
-                    return (
-                      <Show when={modelArtifacts().length > 0}>
-                        <div class="space-y-2">
-                          <h4 class="text-sm font-semibold text-[#191c1e]">{model.modelDisplayName}</h4>
-                          <For each={modelArtifacts()}>
-                            {([artifactId, artifact]) => {
-                              const def = namedOutputDefs().find((d) => d.id === artifactId);
-                              return (
-                                <NamedOutputCard
-                                  artifactId={artifactId}
-                                  artifactName={def?.name ?? artifactId}
-                                  content={artifact.content}
-                                  format={artifact.format}
-                                  modelId={artifact.modelId ?? model.key}
-                                  readonly={true}
-                                />
-                              );
-                            }}
-                          </For>
-                        </div>
-                      </Show>
-                    );
-                  }}
-                </For>
-              </Show>
-
-              <Show
-                when={
-                  Object.keys(od()?.namedOutputsByModel ?? {}).length === 0 &&
-                  Object.keys(od()?.namedOutputs ?? {}).length > 0
-                }
-              >
-                <For each={Object.entries(od()?.namedOutputs ?? {})}>
-                  {([artifactId, artifact]) => {
-                    const def = namedOutputDefs().find((d) => d.id === artifactId);
-                    return (
-                      <NamedOutputCard
-                        artifactId={artifactId}
-                        artifactName={def?.name ?? artifactId}
-                        content={artifact.content}
-                        format={artifact.format}
-                        modelId={artifact.modelId ?? "selected"}
-                        readonly={true}
-                      />
-                    );
-                  }}
-                </For>
-              </Show>
+              <NamedOutputsBrowser
+                sources={artifactSources()}
+                initialSourceId={initialArtifactSourceId()}
+                emptyMessage="暂无可展示的输出物"
+                onSelectionChange={setActiveArtifactSelection}
+              />
             </div>
           </Show>
 
-          {/* Standard content (when no named outputs) */}
-          <Show when={!hasNamedOutputs()}>
-            <Show
-              when={viewMode() === "markdown"}
-              fallback={
-                <pre class="text-sm font-mono text-[#464555] whitespace-pre-wrap leading-relaxed bg-[#f7f9fb] rounded-xl p-6 overflow-x-auto">
-                  {content() || "(无内容)"}
-                </pre>
-              }
-            >
-              <div class="prose-editorial">{renderMarkdown(content())}</div>
-            </Show>
+          <Show when={!showArtifactBrowser()}>
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 class="text-sm font-semibold text-[#191c1e]">模型响应预览</h4>
+                  <p class="mt-1 text-xs text-[#6b6a78]">
+                    当前展示 {viewMode() === "markdown" ? "渲染内容" : "源码内容"}。
+                  </p>
+                </div>
+                <Show when={props.onFullscreen}>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-xl border border-[rgba(79,70,229,0.18)] bg-white px-3 py-2 text-xs font-medium text-[#4f46e5] transition-colors hover:bg-[rgba(79,70,229,0.04)]"
+                    onClick={handleFullscreen}
+                  >
+                    <svg
+                      class="h-3.5 w-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                      />
+                    </svg>
+                    全屏查看
+                  </button>
+                </Show>
+              </div>
+
+              <Show
+                when={viewMode() === "markdown"}
+                fallback={
+                  <pre class="overflow-x-auto rounded-xl bg-[#f7f9fb] p-6 font-mono text-sm leading-relaxed text-[#464555] whitespace-pre-wrap">
+                    {responseContent() || "(无内容)"}
+                  </pre>
+                }
+              >
+                <div class="prose-editorial rounded-2xl bg-white p-2">
+                  {renderMarkdown(responseContent())}
+                </div>
+              </Show>
+            </div>
           </Show>
-        </div>
-      </div>
-
-      {/* Floating action bar */}
-      <div class="fixed bottom-10 right-12 z-50">
-        <div
-          class="flex items-center gap-1 bg-white rounded-2xl px-2 py-2"
-          style={{ "box-shadow": "0 12px 40px rgba(25,28,30,0.14)" }}
-        >
-          {/* Copy */}
-          <button
-            type="button"
-            class="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#464555] rounded-xl hover:bg-[#f2f4f6] transition-colors"
-            onClick={handleCopy}
-          >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
-            {copied() ? "已复制" : "复制"}
-          </button>
-
-          <div class="w-px h-5 bg-[#e6e8ea]" />
-
-          {/* Fullscreen */}
-          <button
-            type="button"
-            class="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#464555] rounded-xl hover:bg-[#f2f4f6] transition-colors"
-            onClick={handleFullscreen}
-          >
-            <svg
-              class="w-4 h-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
-              />
-            </svg>
-            全屏
-          </button>
-
-          <div class="w-px h-5 bg-[#e6e8ea]" />
-
-          {/* Re-execute */}
-          <button
-            type="button"
-            class="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white rounded-xl transition-all hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)" }}
-            onClick={() => props.onReexecute?.()}
-          >
-            <svg
-              class="w-3.5 h-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              stroke-width="2.5"
-              aria-hidden="true"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-            重新执行
-          </button>
         </div>
       </div>
     </div>

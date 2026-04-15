@@ -80,10 +80,72 @@ const NODE_STYLES: Record<
 
 const DEFAULT_STYLE = NODE_STYLES.input_transform;
 
+function getSkipBadge(node: NodeExecution): {
+  label: string;
+  bg: string;
+  text: string;
+  border: string;
+} | null {
+  if (node.status !== "skipped") return null;
+
+  const skipType = (node.outputData as Record<string, unknown> | null)?.skipType;
+  if (skipType === "conditional") {
+    return {
+      label: "条件跳过",
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-200",
+    };
+  }
+  if (skipType === "automatic") {
+    return {
+      label: "自动跳过",
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      border: "border-amber-200",
+    };
+  }
+  return {
+    label: "用户跳过",
+    bg: "bg-amber-50",
+    text: "text-amber-700",
+    border: "border-amber-200",
+  };
+}
+
+function getSkipBindingSummary(node: NodeExecution): string | null {
+  const skipBindings =
+    ((node.outputData as Record<string, unknown> | null)?.skipBindings as
+      | Record<string, { mode?: string }>
+      | undefined) ?? {};
+
+  const bindings = Object.values(skipBindings);
+  if (bindings.length === 0) return null;
+
+  const inheritCount = bindings.filter((binding) => binding?.mode === "inherit").length;
+  const emptyCount = bindings.filter((binding) => binding?.mode === "empty").length;
+  const parts: string[] = [];
+  if (inheritCount > 0) parts.push(`继承 ${inheritCount} 项`);
+  if (emptyCount > 0) parts.push(`置空 ${emptyCount} 项`);
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+function getSkipSummary(node: NodeExecution): string {
+  const data = node.outputData as Record<string, unknown> | null;
+  const skipReason = data?.skipReason;
+  if (typeof skipReason === "string" && skipReason.trim()) return skipReason;
+
+  const bindingSummary = getSkipBindingSummary(node);
+  if (bindingSummary) return `按预设跳过 · ${bindingSummary}`;
+
+  return "按预设跳过";
+}
+
 /** Extract summary preview text for collapsed state */
 function getSummaryPreview(node: NodeExecution): string {
   const data = node.outputData as Record<string, unknown> | null;
   if (!data) return "";
+  if (node.status === "skipped") return getSkipSummary(node);
 
   switch (node.nodeType) {
     case "input_transform": {
@@ -154,6 +216,9 @@ export default function CompletedNodeCard(props: Props) {
   const style = () => NODE_STYLES[props.node.nodeType] ?? DEFAULT_STYLE;
   const duration = () => formatDuration(props.node.startedAt, props.node.completedAt);
   const modelInfo = () => getModelInfo(props.node);
+  const skipBadge = () => getSkipBadge(props.node);
+  const skipBindingSummary = () => getSkipBindingSummary(props.node);
+  const isSkipped = () => props.node.status === "skipped";
 
   function handleCopyContent() {
     const data = props.node.outputData as Record<string, unknown> | null;
@@ -174,7 +239,12 @@ export default function CompletedNodeCard(props: Props) {
   return (
     <div
       class={`bg-white rounded-xl overflow-hidden transition-all border-l-4 ${style().borderColor}`}
-      style={{ "box-shadow": "0 12px 40px rgba(25,28,30,0.06)" }}
+      style={{
+        background: isSkipped() ? "#fffdf7" : "#ffffff",
+        "box-shadow": isSkipped()
+          ? "0 12px 40px rgba(245,158,11,0.08)"
+          : "0 12px 40px rgba(25,28,30,0.06)",
+      }}
     >
       {/* Collapsed header */}
       <button
@@ -234,13 +304,27 @@ export default function CompletedNodeCard(props: Props) {
                 {duration()}
               </span>
               <span class="text-[#c7c4d8]">|</span>
-              <span class="truncate italic">{getSummaryPreview(props.node)}</span>
+              <span
+                class={`truncate ${isSkipped() ? "not-italic text-amber-700 font-medium" : "italic"}`}
+              >
+                {getSummaryPreview(props.node)}
+              </span>
             </div>
           </div>
         </div>
 
         {/* Right side */}
         <div class="flex items-center gap-3 flex-shrink-0 ml-4">
+          <Show when={skipBadge()}>
+            {(badge) => (
+              <span
+                class={`${badge().bg} ${badge().text} ${badge().border} hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold border`}
+              >
+                {badge().label}
+              </span>
+            )}
+          </Show>
+
           {/* Hover actions for model_call */}
           <Show when={props.node.nodeType === "model_call"}>
             <div class="hidden group-hover:flex items-center gap-1">
@@ -322,6 +406,44 @@ export default function CompletedNodeCard(props: Props) {
       <Show when={props.isExpanded}>
         <div class="px-5 pb-5 space-y-4">
           <div class="h-px bg-[rgba(199,196,216,0.15)]" />
+
+          <Show when={skipBadge()}>
+            {(badge) => (
+              <section class={`${badge().bg} ${badge().border} rounded-xl border px-4 py-3`}>
+                <div class="flex items-start gap-3">
+                  <div
+                    class={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${badge().bg} ${badge().text}`}
+                  >
+                    <svg
+                      class="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M9 12h6m-6 0l2.5-2.5M9 12l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
+                    </svg>
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <p class={`text-sm font-semibold ${badge().text}`}>{badge().label}</p>
+                      <Show when={skipBindingSummary()}>
+                        <span class="text-xs text-[#7c6a2a]">{skipBindingSummary()}</span>
+                      </Show>
+                    </div>
+                    <p class="mt-1 text-sm text-[#7c6a2a] leading-6">
+                      {getSkipSummary(props.node)}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            )}
+          </Show>
 
           {/* Type-specific expanded content */}
           {renderExpandedContent(

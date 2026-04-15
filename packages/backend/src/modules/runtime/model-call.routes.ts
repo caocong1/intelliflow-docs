@@ -19,6 +19,7 @@ import {
 } from "./model-call-output";
 import { buildModelCallSnapshotPayload, getModelOutputsForDisplay } from "./model-call-state";
 import {
+  appendTransientPromptToResolvedPrompt,
   executeModelCall,
   getModelCallConfig,
   resolveModelCallExecutionPrompts,
@@ -176,12 +177,13 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
             nodeExecutionId: params.nodeExecutionId,
             config: mcConfig,
           });
+        const effectivePrompt = appendTransientPromptToResolvedPrompt(resolvedPrompt, null);
 
         const stream = await retryModelCall(
           params.documentId,
           params.nodeExecutionId,
           params.modelId,
-          resolvedPrompt,
+          effectivePrompt,
           mcConfig.promptTemplate,
           mcConfig.systemPromptTemplate,
           resolvedSystemPrompt,
@@ -207,6 +209,77 @@ export const modelCallRoutes = new Elysia({ prefix: "/runtime" })
         documentId: t.String(),
         nodeExecutionId: t.String(),
         modelId: t.String(),
+      }),
+    },
+  )
+
+  .post(
+    "/:documentId/model-call/:nodeExecutionId/retry/:modelId",
+    async ({ params, body, user, set }) => {
+      const userId = user?.id;
+      if (!userId) {
+        set.status = 401;
+        return { error: "未登录" };
+      }
+
+      const canEdit = await canEditDocument(params.documentId, userId);
+      if (!canEdit) {
+        set.status = 403;
+        return { error: "仅文档创建者或项目负责人可执行此操作" };
+      }
+
+      try {
+        const config = await getModelCallConfig(params.nodeExecutionId);
+        if (!config || config.type !== "model_call") {
+          set.status = 404;
+          return { error: "未找到模型调用节点配置" };
+        }
+
+        const mcConfig = config as ModelCallConfig;
+        const { resolvedPrompt, resolvedSystemPrompt, variableMapping } =
+          await resolveModelCallExecutionPrompts({
+            documentId: params.documentId,
+            nodeExecutionId: params.nodeExecutionId,
+            config: mcConfig,
+          });
+        const effectivePrompt = appendTransientPromptToResolvedPrompt(
+          resolvedPrompt,
+          body.additionalPrompt,
+        );
+
+        const stream = await retryModelCall(
+          params.documentId,
+          params.nodeExecutionId,
+          params.modelId,
+          effectivePrompt,
+          mcConfig.promptTemplate,
+          mcConfig.systemPromptTemplate,
+          resolvedSystemPrompt,
+          variableMapping,
+          userId,
+        );
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+          },
+        });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        set.status = 400;
+        return { error: message };
+      }
+    },
+    {
+      params: t.Object({
+        documentId: t.String(),
+        nodeExecutionId: t.String(),
+        modelId: t.String(),
+      }),
+      body: t.Object({
+        additionalPrompt: t.Optional(t.String()),
       }),
     },
   )

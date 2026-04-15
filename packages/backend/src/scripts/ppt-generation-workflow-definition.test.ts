@@ -76,6 +76,15 @@ describe("presentation workflow definition", () => {
     expect(restoreNode).toBeUndefined();
 
     expect(
+      workflow.nodes.filter((node) => node.type === "input_transform").map((node) => node.id),
+    ).toEqual([
+      "node_input",
+      "node_strategy_feedback",
+      "node_structure_feedback",
+      "node_final_feedback",
+    ]);
+
+    expect(
       workflow.nodes.filter((node) => node.type === "model_call").map((node) => node.id),
     ).toEqual([
       "node_intake",
@@ -92,6 +101,22 @@ describe("presentation workflow definition", () => {
       "node_keypage",
       "node_governance",
     ]);
+
+    for (const nodeId of [
+      "node_strategy_feedback",
+      "node_structure_feedback",
+      "node_final_feedback",
+    ]) {
+      const node = workflow.nodes.find((item) => item.id === nodeId);
+      expect(node?.config.type).toBe("input_transform");
+      if (node?.config.type === "input_transform") {
+        expect(node.config.skippable).toBe(true);
+        expect(node.config.stepDescription).toBeTruthy();
+        expect(node.config.skipStrategy?.bindings).toBeTruthy();
+        expect(node.config.formFields).toHaveLength(1);
+        expect(node.config.formFields[0]?.required).toBe(false);
+      }
+    }
 
     for (const nodeId of [
       "node_intake",
@@ -111,8 +136,12 @@ describe("presentation workflow definition", () => {
       const node = workflow.nodes.find((item) => item.id === nodeId);
       expect(node?.config.type).toBe("model_call");
       if (node?.config.type === "model_call") {
-        expect(node.config.modelIds).toHaveLength(4);
-        expect(node.config.enableUserSelectionOutput).toBe(true);
+        expect(node.config.modelIds).toHaveLength(
+          ["node_strategy", "node_draft", "node_keypage"].includes(nodeId) ? 4 : 2,
+        );
+        expect(node.config.enableUserSelectionOutput).toBe(
+          ["node_strategy", "node_draft", "node_keypage"].includes(nodeId),
+        );
       }
     }
 
@@ -129,6 +158,9 @@ describe("presentation workflow definition", () => {
     const layoutNode = workflow.nodes.find((node) => node.id === "node_layout");
     expect(layoutNode?.config.type).toBe("model_call");
     if (layoutNode?.config.type === "model_call") {
+      expect(layoutNode.outputs.some((output) => output.category === "selected_artifact")).toBe(
+        false,
+      );
       const pageBlueprints = layoutNode.config.namedOutputs?.find(
         (output) => output.id === "page_blueprints",
       );
@@ -199,6 +231,9 @@ describe("presentation workflow definition", () => {
     const governanceNode = workflow.nodes.find((node) => node.id === "node_governance");
     expect(governanceNode?.config.type).toBe("model_call");
     if (governanceNode?.config.type === "model_call") {
+      expect(governanceNode.outputs.some((output) => output.category === "selected_artifact")).toBe(
+        false,
+      );
       const claimMap = governanceNode.config.namedOutputs?.find(
         (output) => output.id === "claim_map",
       );
@@ -214,6 +249,7 @@ describe("presentation workflow definition", () => {
     const exportNode = workflow.nodes.find((node) => node.id === "node_export");
     expect(exportNode?.config.type).toBe("export");
     if (exportNode?.config.type === "export") {
+      expect(exportNode.config.stepDescription).toBeTruthy();
       expect(exportNode.config.formats).toEqual(["pptx"]);
       expect(exportNode.config.contentMapping).toEqual([
         {
@@ -237,5 +273,10 @@ describe("presentation workflow definition", () => {
         ],
       });
     }
+
+    const strategyNode = workflow.nodes.find((node) => node.id === "node_strategy");
+    expect(strategyNode?.outputs.some((output) => output.category === "selected_artifact")).toBe(
+      true,
+    );
   });
 });

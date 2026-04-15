@@ -11,6 +11,7 @@ import type { FlowNodeData, FlowEdgeData } from "../../../lib/flow-engine/types"
 import { deriveOutputs } from "../../../lib/flow-engine/derive-outputs";
 import RuntimeSettings from "./RuntimeSettings";
 import ExecutionRuleEditor from "./ExecutionRuleEditor";
+import SkipStrategyEditor from "./SkipStrategyEditor";
 import InputTransformConfigPanel from "./InputTransformConfig";
 import DesensitizeConfigPanel from "./DesensitizeConfig";
 import RestoreConfigPanel from "./RestoreConfig";
@@ -109,7 +110,9 @@ export default function ConfigPanel(props: ConfigPanelProps) {
     setIsDragging(false);
     document.body.style.cursor = "";
     document.body.style.userSelect = "";
-    try { localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidth())); } catch {}
+    try {
+      localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidth()));
+    } catch {}
   }
 
   onMount(() => {
@@ -163,7 +166,11 @@ export default function ConfigPanel(props: ConfigPanelProps) {
       class={`flex-shrink-0 bg-white border-l border-slate-200 flex flex-col overflow-hidden relative ${
         isOpen() ? "" : "w-0"
       }`}
-      style={isOpen() ? { width: `${panelWidth()}px`, transition: isDragging() ? "none" : "width 200ms" } : { transition: "width 200ms" }}
+      style={
+        isOpen()
+          ? { width: `${panelWidth()}px`, transition: isDragging() ? "none" : "width 200ms" }
+          : { transition: "width 200ms" }
+      }
     >
       {/* Drag handle */}
       <Show when={isOpen()}>
@@ -178,7 +185,9 @@ export default function ConfigPanel(props: ConfigPanelProps) {
         {(node) => (
           <>
             {/* Panel Header */}
-            <div class={`flex items-center gap-2 px-4 py-3 border-b border-slate-100 border-l-4 ${NODE_TYPE_COLORS[nodeType()] ?? "border-slate-400"}`}>
+            <div
+              class={`flex items-center gap-2 px-4 py-3 border-b border-slate-100 border-l-4 ${NODE_TYPE_COLORS[nodeType()] ?? "border-slate-400"}`}
+            >
               <span class="text-lg leading-none flex-shrink-0">
                 {NODE_TYPE_ICONS[nodeType()] ?? "⚙️"}
               </span>
@@ -195,16 +204,29 @@ export default function ConfigPanel(props: ConfigPanelProps) {
                 class="flex-shrink-0 p-1 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-slate-400 rounded"
                 title="关闭配置面板"
               >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <svg
+                  class="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
                   <title>关闭</title>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
 
             {/* Node Type Label */}
             <div class="px-4 py-1.5 bg-slate-50 border-b border-slate-100">
-              <span class="text-xs text-slate-400">{NODE_TYPE_LABELS[nodeType()] ?? nodeType()}</span>
+              <span class="text-xs text-slate-400">
+                {NODE_TYPE_LABELS[nodeType()] ?? nodeType()}
+              </span>
             </div>
 
             {/* Panel Body (scrollable) */}
@@ -253,11 +275,46 @@ export default function ConfigPanel(props: ConfigPanelProps) {
                 </Match>
               </Switch>
 
-              {/* Runtime Settings — not applicable to input_transform (user must fill form) */}
-              <Show when={nodeConfig() && nodeConfig()?.type !== "input_transform" && nodeConfig()?.type !== "export"}>
+              <Show when={nodeConfig() && nodeType() !== "model_call"}>
+                <div class="mt-4 border-t border-slate-100 pt-4">
+                  <label class="text-sm font-medium text-gray-700 mb-1 block">
+                    步骤描述
+                    <input
+                      type="text"
+                      value={
+                        (nodeConfig() as { stepDescription?: string } | undefined)
+                          ?.stepDescription ?? ""
+                      }
+                      onInput={(e) => {
+                        const current = nodeConfig() as Record<string, unknown>;
+                        handleConfigChange({
+                          ...current,
+                          stepDescription: e.currentTarget.value || undefined,
+                        });
+                      }}
+                      placeholder="可选：描述此步骤的用途与用户需要注意的点"
+                      class="mt-1 w-full px-3 py-1.5 text-sm font-normal border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+                    />
+                  </label>
+                </div>
+              </Show>
+
+              {/* Runtime Settings */}
+              <Show when={nodeConfig() && nodeConfig()?.type !== "export"}>
                 <RuntimeSettings
                   config={nodeConfig() as unknown as NodeConfig}
                   onChange={handleRuntimeChange}
+                />
+              </Show>
+
+              <Show when={nodeConfig() && nodeConfig()?.type !== "export"}>
+                <SkipStrategyEditor
+                  currentNodeId={props.selectedNode!.id}
+                  config={nodeConfig() as unknown as NodeConfig}
+                  upstreamNodes={upstreamNodes()}
+                  onChange={(config) =>
+                    handleConfigChange(config as unknown as Record<string, unknown>)
+                  }
                 />
               </Show>
 
@@ -277,7 +334,9 @@ export default function ConfigPanel(props: ConfigPanelProps) {
 
               {/* Auto-derived outputs — read-only display */}
               <div class="mt-4 border-t border-slate-100 pt-4">
-                <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">节点输出</h4>
+                <h4 class="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">
+                  节点输出
+                </h4>
                 <Show
                   when={derivedOutputs().length > 0}
                   fallback={

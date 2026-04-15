@@ -99,13 +99,7 @@ function NodeIcon(props: { nodeType: WorkflowNodeType }) {
 function NodeIconSmall(props: { nodeType: WorkflowNodeType }) {
   const d = nodeTypeIcons[props.nodeType] ?? nodeTypeIcons.model_call;
   return (
-    <svg
-      class="w-3 h-3"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      aria-hidden="true"
-    >
+    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d={d} />
     </svg>
   );
@@ -124,10 +118,32 @@ function getCircleStyle(
 }
 
 function getLineStyle(status: string, _nextStatus: string): string {
-  if (status === "completed" || status === "skipped") return "#22c55e";
+  if (status === "completed") return "#22c55e";
+  if (status === "skipped") return "#f59e0b";
   if (status === "blocked") return "#ef4444";
   if (status === "in_progress") return "#c7c4d8";
   return "#e0e3e5";
+}
+
+function isNodeClickable(status: NodeExecution["status"]): boolean {
+  return (
+    status === "completed" ||
+    status === "skipped" ||
+    status === "in_progress" ||
+    status === "failed" ||
+    status === "blocked"
+  );
+}
+
+function getNodeStatusLabel(node: NodeExecution): { text: string; color: string } | null {
+  if (node.status === "blocked") return { text: "已阻断", color: "#dc2626" };
+  if (node.status === "skipped") {
+    const skipType = (node.outputData as Record<string, unknown> | null)?.skipType;
+    if (skipType === "conditional") return { text: "条件跳过", color: "#d97706" };
+    if (skipType === "automatic") return { text: "自动跳过", color: "#d97706" };
+    return { text: "已跳过", color: "#d97706" };
+  }
+  return null;
 }
 
 // ─── Vertical (sidebar) layout ─────────────────────────────────────
@@ -142,10 +158,7 @@ function VerticalStepper(props: StepperBarProps) {
         {(node, index) => {
           const isActive = () => index() === props.currentIndex;
           const circleStyle = () => getCircleStyle(node.status, isActive());
-          const isClickable =
-            node.status === "completed" ||
-            node.status === "skipped" ||
-            node.status === "in_progress";
+          const isClickable = isNodeClickable(node.status);
           const nextNode = () => props.nodes[index() + 1];
           const isLast = () => index() === props.nodes.length - 1;
 
@@ -154,6 +167,8 @@ function VerticalStepper(props: StepperBarProps) {
               <button
                 type="button"
                 class="flex items-center gap-2.5 bg-transparent border-0 py-1 px-1.5 rounded-lg w-full text-left group"
+                data-step-status={node.status}
+                aria-current={isActive() ? "step" : undefined}
                 style={{
                   cursor: isClickable ? "pointer" : "default",
                   background: isActive() ? "rgba(79,70,229,0.06)" : "transparent",
@@ -201,8 +216,10 @@ function VerticalStepper(props: StepperBarProps) {
                   </span>
                   <span class="text-[10px] leading-tight" style={{ color: "#8b8a99" }}>
                     {nodeTypeLabels[node.nodeType] ?? node.nodeType}
-                    <Show when={node.status === "blocked"}>
-                      <span style={{ color: "#dc2626" }}> (已阻断)</span>
+                    <Show when={getNodeStatusLabel(node)}>
+                      {(statusLabel) => (
+                        <span style={{ color: statusLabel().color }}> ({statusLabel().text})</span>
+                      )}
                     </Show>
                   </span>
                 </div>
@@ -289,10 +306,7 @@ function HorizontalStepper(props: StepperBarProps) {
         {(node, index) => {
           const isActive = () => index() === props.currentIndex;
           const circleStyle = () => getCircleStyle(node.status, isActive());
-          const isClickable =
-            node.status === "completed" ||
-            node.status === "skipped" ||
-            node.status === "in_progress";
+          const isClickable = isNodeClickable(node.status);
           const nextNode = () => props.nodes[index() + 1];
           const isLast = () => index() === props.nodes.length - 1;
 
@@ -302,6 +316,8 @@ function HorizontalStepper(props: StepperBarProps) {
               <button
                 type="button"
                 class="flex flex-col items-center bg-transparent border-0 p-0 group"
+                data-step-status={node.status}
+                aria-current={isActive() ? "step" : undefined}
                 style={{ cursor: isClickable ? "pointer" : "default", "min-width": "5rem" }}
                 onClick={() => {
                   if (isClickable) props.onNodeClick(index());
@@ -314,9 +330,7 @@ function HorizontalStepper(props: StepperBarProps) {
                   style={{
                     background: circleStyle().bg,
                     color: circleStyle().color,
-                    "box-shadow": circleStyle().ring
-                      ? "0 0 0 4px rgba(99,102,241,0.2)"
-                      : "none",
+                    "box-shadow": circleStyle().ring ? "0 0 0 4px rgba(99,102,241,0.2)" : "none",
                     transform: isClickable ? undefined : "none",
                   }}
                   onMouseEnter={(e) => {
@@ -345,14 +359,16 @@ function HorizontalStepper(props: StepperBarProps) {
                   {node.nodeLabel}
                 </span>
 
-                {/* Status label for blocked nodes */}
-                <Show when={node.status === "blocked"}>
-                  <span
-                    class="text-[10px] text-center font-medium"
-                    style={{ color: "#dc2626" }}
-                  >
-                    (已阻断)
-                  </span>
+                {/* Status label for blocked / skipped nodes */}
+                <Show when={getNodeStatusLabel(node)}>
+                  {(statusLabel) => (
+                    <span
+                      class="text-[10px] text-center font-medium"
+                      style={{ color: statusLabel().color }}
+                    >
+                      ({statusLabel().text})
+                    </span>
+                  )}
                 </Show>
 
                 {/* Node type badge */}
@@ -399,9 +415,7 @@ function HorizontalStepper(props: StepperBarProps) {
                   ? "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)"
                   : "#e6e8ea",
                 color: isResultActive() ? "#ffffff" : "#464555",
-                "box-shadow": isResultActive()
-                  ? "0 0 0 4px rgba(99,102,241,0.2)"
-                  : "none",
+                "box-shadow": isResultActive() ? "0 0 0 4px rgba(99,102,241,0.2)" : "none",
               }}
               onMouseEnter={(e) => {
                 (e.currentTarget as HTMLElement).style.transform = "scale(1.08)";

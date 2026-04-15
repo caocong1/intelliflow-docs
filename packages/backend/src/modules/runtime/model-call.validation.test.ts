@@ -25,25 +25,16 @@ vi.mock("./model-call-output", () => ({
   buildModelCallOutputData: vi.fn(),
   buildSelectedModelOutputData: vi.fn(),
   getModelCallManualFeedback: vi.fn(),
-  getModelCallManualFeedbackValidationError: vi.fn((outputData: Record<string, unknown> | null) => {
-    const feedback = outputData?.manualFeedback as
-      | { content?: string; updatedAt?: string | null; appliedAt?: string | null }
-      | undefined;
-    if (!feedback?.content?.trim()) return null;
-    if (!feedback.updatedAt || feedback.appliedAt !== feedback.updatedAt) {
-      return "已填写人工意见，请先按意见重生成当前节点后再继续。";
-    }
-    return null;
-  }),
 }));
 vi.mock("./strategies", () => ({ getStrategy: vi.fn() }));
 
 import type { ModelCallConfig } from "@intelliflow/shared";
 import {
-  resolveRef,
+  appendTransientPromptToResolvedPrompt,
   validateModelOutput,
   validateSelectedModelCallOutputData,
 } from "./model-call.service";
+import { resolveRef } from "./variable-resolution";
 
 const config: ModelCallConfig = {
   type: "model_call",
@@ -162,7 +153,7 @@ describe("validateSelectedModelCallOutputData", () => {
     expect(result.errors).toContain("请至少选择一个模型输出后再继续。");
   });
 
-  it("requires manual feedback to be applied before advance", () => {
+  it("does not block advance when legacy manual feedback exists", () => {
     const result = validateSelectedModelCallOutputData(
       {
         selectedContent: "{}",
@@ -181,8 +172,16 @@ describe("validateSelectedModelCallOutputData", () => {
       "model-a",
     );
 
-    expect(result.status).toBe("format_error");
-    expect(result.errors).toContain("已填写人工意见，请先按意见重生成当前节点后再继续。");
+    expect(result.status).toBe("completed");
+  });
+});
+
+describe("appendTransientPromptToResolvedPrompt", () => {
+  it("appends one-off retry requirements without affecting empty prompts", () => {
+    expect(appendTransientPromptToResolvedPrompt("base prompt", "")).toBe("base prompt");
+    expect(appendTransientPromptToResolvedPrompt("base prompt", "补充风险说明")).toContain(
+      "补充风险说明",
+    );
   });
 });
 

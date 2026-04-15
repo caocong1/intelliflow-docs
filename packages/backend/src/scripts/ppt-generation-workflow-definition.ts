@@ -1,5 +1,11 @@
 import { slidePresentationJsonSchema } from "../../../shared/src/slide-types";
 import type {
+  InputTransformConfig,
+  OutputDef,
+  WorkflowEdgeDef,
+  WorkflowNodeDef,
+} from "@intelliflow/shared";
+import type {
   DemoDocumentTypeDefinition,
   DemoModelSelection,
   DemoWorkflowDefinition,
@@ -11,6 +17,7 @@ import {
   buildSystemPrompt,
   buildWorkflowFromBlueprint,
   conditionRef,
+  deriveOutputs,
   fileField,
   inputVar,
   jsonArtifact,
@@ -28,6 +35,15 @@ export const PRESENTATION_DOCUMENT_TYPE: DemoDocumentTypeDefinition = {
 };
 
 export const PRESENTATION_WORKFLOW_NAME = "通用 PPT 生成与质检 Agent 流程";
+
+const STRATEGY_FEEDBACK_NODE_ID = "node_strategy_feedback";
+const STRATEGY_FEEDBACK_KEY = "strategy_feedback";
+const STRUCTURE_FEEDBACK_NODE_ID = "node_structure_feedback";
+const STRUCTURE_FEEDBACK_KEY = "structure_feedback";
+const FINAL_FEEDBACK_NODE_ID = "node_final_feedback";
+const FINAL_FEEDBACK_KEY = "final_feedback";
+const PPT_WORKFLOW_X_STEP = 300;
+const USER_SELECTION_CHECKPOINT_NODE_IDS = new Set(["node_strategy", "node_draft", "node_keypage"]);
 
 const deckSpecJsonSchema = {
   type: "object",
@@ -385,6 +401,81 @@ function manualFeedbackVar(nodeId: string) {
   return templateVar(nodeId, "manual_feedback");
 }
 
+function feedbackVar(nodeId: string, outputId: string) {
+  return templateVar(nodeId, outputId);
+}
+
+function buildOptionalFeedbackNode(params: {
+  id: string;
+  label: string;
+  fieldKey: string;
+  fieldLabel: string;
+  stepDescription: string;
+}): WorkflowNodeDef {
+  const field = textareaField(params.fieldKey, params.fieldLabel, false);
+  const config: InputTransformConfig = {
+    type: "input_transform",
+    formFields: [field],
+    stepDescription: params.stepDescription,
+    skippable: true,
+    skipStrategy: {
+      bindings: {
+        [params.fieldKey]: { mode: "empty" },
+      },
+    },
+  };
+  const outputs: OutputDef[] = [
+    {
+      id: `${params.id}-field-${params.fieldKey}`,
+      name: params.fieldLabel,
+      segmentKey: params.fieldKey,
+      description: `用户输入项: ${params.fieldLabel}`,
+    },
+  ];
+
+  return {
+    id: params.id,
+    type: "input_transform",
+    label: params.label,
+    position: { x: 0, y: 0 },
+    config,
+    outputs,
+  };
+}
+
+function insertNodeAfter(
+  nodes: WorkflowNodeDef[],
+  targetNodeId: string,
+  insertedNode: WorkflowNodeDef,
+): WorkflowNodeDef[] {
+  const index = nodes.findIndex((node) => node.id === targetNodeId);
+  if (index < 0) {
+    throw new Error(`无法在 PPT 流程中找到节点 ${targetNodeId}`);
+  }
+
+  const next = [...nodes];
+  next.splice(index + 1, 0, insertedNode);
+  return next;
+}
+
+function rebuildLinearFlow(nodes: WorkflowNodeDef[]): {
+  nodes: WorkflowNodeDef[];
+  edges: WorkflowEdgeDef[];
+} {
+  const linearNodes = nodes.map((node, index) => ({
+    ...node,
+    position: { x: index * PPT_WORKFLOW_X_STEP, y: 0 },
+  }));
+
+  const linearEdges: WorkflowEdgeDef[] = linearNodes.slice(0, -1).map((node, index) => ({
+    id: `edge-${node.id}-${linearNodes[index + 1].id}`,
+    source: node.id,
+    target: linearNodes[index + 1].id,
+  }));
+
+  return { nodes: linearNodes, edges: linearEdges };
+}
+
 export function buildPresentationWorkflowDefinition(
   models: DemoModelSelection,
 ): DemoWorkflowDefinition {
@@ -410,7 +501,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("需求解构委员会"),
         stepDescription: "多模型并行解构需求、识别边界和缺口",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "需求解构委员会",
@@ -458,7 +549,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("资料提炼委员会"),
         stepDescription: "多模型并行提炼证据、洞察和可讲述素材",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "资料提炼委员会",
@@ -555,7 +646,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("叙事架构委员会"),
         stepDescription: "多模型并行生成叙事主线、章节骨架和标题方向",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "叙事架构委员会",
@@ -570,6 +661,7 @@ export function buildPresentationWorkflowDefinition(
                 "### 证据映射\n{{node_research.evidence_map}}",
                 "### 洞察卡片\n{{node_research.insight_cards}}",
                 "### 前置疑问\n{{node_intake.intake_open_questions}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_strategy")}\n${manualFeedbackVar("node_research")}\n${manualFeedbackVar("node_intake")}`,
               ),
             ),
@@ -605,7 +697,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("结构委员会"),
         stepDescription: "多模型并行生成结构化逐页大纲、样张与视觉约束",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "结构委员会",
@@ -621,6 +713,7 @@ export function buildPresentationWorkflowDefinition(
                 "### 章节骨架\n{{node_storyline.section_plan}}",
                 "### 标题方向\n{{node_storyline.title_options}}",
                 "### 资料提炼摘要\n{{node_research.source_digest}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_storyline")}\n${manualFeedbackVar("node_strategy")}\n${manualFeedbackVar("node_research")}`,
               ),
             ),
@@ -660,7 +753,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("页面编排委员会"),
         stepDescription: "多模型并行补充结构化页面蓝图、讲稿提示和风险清单",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "页面编排委员会",
@@ -675,6 +768,7 @@ export function buildPresentationWorkflowDefinition(
                 "### 逐页大纲\n{{node_outline.slide_outline}}",
                 "### 关键页样张\n{{node_outline.sample_script}}",
                 "### 视觉约束\n{{node_outline.visual_guardrails}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_outline")}\n${manualFeedbackVar("node_storyline")}\n${manualFeedbackVar("node_strategy")}`,
               ),
             ),
@@ -713,7 +807,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("视觉资产委员会"),
         stepDescription: "多模型并行规划图表、图片、表格和素材降级策略",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "视觉资产委员会",
@@ -728,6 +822,8 @@ export function buildPresentationWorkflowDefinition(
                 "### 证据映射\n{{node_research.evidence_map}}",
                 "### 洞察卡片\n{{node_research.insight_cards}}",
                 "### 风险观察\n{{node_layout.risk_watchlist}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
+                `### 结构校准意见\n${feedbackVar(STRUCTURE_FEEDBACK_NODE_ID, STRUCTURE_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_layout")}\n${manualFeedbackVar("node_outline")}`,
               ),
             ),
@@ -796,6 +892,8 @@ export function buildPresentationWorkflowDefinition(
                 "### 视觉资产风险\n{{node_visual.asset_risks}}",
                 "### 讲述提示\n{{node_layout.speaker_notes_brief}}",
                 "### 风险观察\n{{node_layout.risk_watchlist}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
+                `### 结构校准意见\n${feedbackVar(STRUCTURE_FEEDBACK_NODE_ID, STRUCTURE_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_visual")}\n${manualFeedbackVar("node_layout")}\n${manualFeedbackVar("node_outline")}\n${manualFeedbackVar("node_storyline")}\n${manualFeedbackVar("node_strategy")}`,
               ),
             ),
@@ -835,7 +933,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("精修委员会"),
         stepDescription: "多模型并行将初稿打磨成可导出的最终幻灯片版本",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "精修委员会",
@@ -854,6 +952,8 @@ export function buildPresentationWorkflowDefinition(
                 "### 页面蓝图\n{{node_layout.page_blueprints}}",
                 "### 视觉约束\n{{node_outline.visual_guardrails}}",
                 "### 成功标准\n{{node_strategy.success_criteria}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
+                `### 结构校准意见\n${feedbackVar(STRUCTURE_FEEDBACK_NODE_ID, STRUCTURE_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_draft")}\n${manualFeedbackVar("node_visual")}\n${manualFeedbackVar("node_layout")}\n${manualFeedbackVar("node_outline")}`,
               ),
             ),
@@ -887,7 +987,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("去重压缩委员会"),
         stepDescription: "多模型并行压缩重复页、重复表达和超长内容",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "去重压缩委员会",
@@ -902,6 +1002,8 @@ export function buildPresentationWorkflowDefinition(
                 "### 成功标准\n{{node_strategy.success_criteria}}",
                 "### 演示策略\n{{node_strategy.deck_spec}}",
                 "### 视觉资产计划\n{{node_visual.asset_plan}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
+                `### 结构校准意见\n${feedbackVar(STRUCTURE_FEEDBACK_NODE_ID, STRUCTURE_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_polish")}\n${manualFeedbackVar("node_draft")}`,
               ),
             ),
@@ -937,7 +1039,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("页级审校委员会"),
         stepDescription: "多模型并行逐页检查信息过载、重复页、弱结论和版式失衡",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "页级审校委员会",
@@ -953,6 +1055,8 @@ export function buildPresentationWorkflowDefinition(
                 "### 页面蓝图\n{{node_layout.page_blueprints}}",
                 "### 视觉资产计划\n{{node_visual.asset_plan}}",
                 "### 成功标准\n{{node_strategy.success_criteria}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
+                `### 结构校准意见\n${feedbackVar(STRUCTURE_FEEDBACK_NODE_ID, STRUCTURE_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_dedup")}\n${manualFeedbackVar("node_polish")}\n${manualFeedbackVar("node_visual")}`,
               ),
             ),
@@ -1023,6 +1127,9 @@ export function buildPresentationWorkflowDefinition(
                 "### 演示策略\n{{node_strategy.deck_spec}}",
                 "### 标题方向\n{{node_storyline.title_options}}",
                 "### 关键页样张\n{{node_outline.sample_script}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
+                `### 结构校准意见\n${feedbackVar(STRUCTURE_FEEDBACK_NODE_ID, STRUCTURE_FEEDBACK_KEY)}`,
+                `### 终稿校准意见\n${feedbackVar(FINAL_FEEDBACK_NODE_ID, FINAL_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_page_audit")}\n${manualFeedbackVar("node_dedup")}\n${manualFeedbackVar("node_polish")}\n${manualFeedbackVar("node_storyline")}`,
               ),
             ),
@@ -1058,7 +1165,7 @@ export function buildPresentationWorkflowDefinition(
         systemPromptTemplate: buildSystemPrompt("治理门委员会"),
         stepDescription: "多模型并行做导出前门控和交付说明",
         modelMode: "compare",
-        compareModelCount: 4,
+        compareModelCount: 2,
         enableUserSelectionOutput: true,
         promptTemplate: buildRolePrompt({
           role: "治理门委员会",
@@ -1079,6 +1186,9 @@ export function buildPresentationWorkflowDefinition(
                 "### 成功标准\n{{node_strategy.success_criteria}}",
                 "### 视觉资产风险\n{{node_visual.asset_risks}}",
                 "### 风险观察\n{{node_layout.risk_watchlist}}",
+                `### 策略校准意见\n${feedbackVar(STRATEGY_FEEDBACK_NODE_ID, STRATEGY_FEEDBACK_KEY)}`,
+                `### 结构校准意见\n${feedbackVar(STRUCTURE_FEEDBACK_NODE_ID, STRUCTURE_FEEDBACK_KEY)}`,
+                `### 终稿校准意见\n${feedbackVar(FINAL_FEEDBACK_NODE_ID, FINAL_FEEDBACK_KEY)}`,
                 `### 上游人工意见\n${manualFeedbackVar("node_keypage")}\n${manualFeedbackVar("node_page_audit")}\n${manualFeedbackVar("node_polish")}\n${manualFeedbackVar("node_draft")}\n${manualFeedbackVar("node_visual")}\n${manualFeedbackVar("node_layout")}`,
               ),
             ),
@@ -1191,16 +1301,87 @@ export function buildPresentationWorkflowDefinition(
     exportFormats: ["pptx"],
   };
 
-  const { nodes, edges } = buildWorkflowFromBlueprint(blueprint, models);
+  const { nodes } = buildWorkflowFromBlueprint(blueprint, models);
+
+  const nodesWithGuidance = nodes.map((node) => {
+    if (node.config.type === "model_call") {
+      return {
+        ...node,
+        config: {
+          ...node.config,
+          enableUserSelectionOutput: USER_SELECTION_CHECKPOINT_NODE_IDS.has(node.id),
+        },
+      };
+    }
+    if (node.id === "node_input" && node.config.type === "input_transform") {
+      return {
+        ...node,
+        config: {
+          ...node.config,
+          stepDescription:
+            "填写 PPT 目标、对象和约束；如有参考材料可一并上传，材料不全也可以先启动流程。",
+        },
+      };
+    }
+    if (node.id === "node_export" && node.config.type === "export") {
+      return {
+        ...node,
+        config: {
+          ...node.config,
+          stepDescription: "治理门通过后即可导出 PPTX；如仍被门控阻断，请先回退修正上游内容。",
+        },
+      };
+    }
+    return node;
+  });
+
+  const strategyFeedbackNode = buildOptionalFeedbackNode({
+    id: STRATEGY_FEEDBACK_NODE_ID,
+    label: "策略校准输入",
+    fieldKey: STRATEGY_FEEDBACK_KEY,
+    fieldLabel: "策略校准意见",
+    stepDescription: "可选填写对受众、页数、重点章节和整体方向的补充要求；如无意见可直接跳过。",
+  });
+  const structureFeedbackNode = buildOptionalFeedbackNode({
+    id: STRUCTURE_FEEDBACK_NODE_ID,
+    label: "结构校准输入",
+    fieldKey: STRUCTURE_FEEDBACK_KEY,
+    fieldLabel: "结构校准意见",
+    stepDescription:
+      "可选填写对目录结构、页序、合页拆页和重点页面编排的修正意见；如无意见可直接跳过。",
+  });
+  const finalFeedbackNode = buildOptionalFeedbackNode({
+    id: FINAL_FEEDBACK_NODE_ID,
+    label: "终稿校准输入",
+    fieldKey: FINAL_FEEDBACK_KEY,
+    fieldLabel: "终稿校准意见",
+    stepDescription: "可选填写对终稿风格、重点表达和交付风险的最后要求；如无意见可直接跳过。",
+  });
+
+  const nodesWithFeedback = insertNodeAfter(
+    insertNodeAfter(
+      insertNodeAfter(nodesWithGuidance, "node_strategy", strategyFeedbackNode),
+      "node_layout",
+      structureFeedbackNode,
+    ),
+    "node_page_audit",
+    finalFeedbackNode,
+  );
+  const { nodes: optimizedNodes, edges: optimizedEdges } = rebuildLinearFlow(
+    nodesWithFeedback.map((node) => ({
+      ...node,
+      outputs: deriveOutputs(node.id, node.config),
+    })),
+  );
 
   return {
     documentTypeCode: PRESENTATION_DOCUMENT_TYPE.code,
     name: PRESENTATION_WORKFLOW_NAME,
     description:
-      "15 节点旗舰流程，覆盖需求解构、资料提炼、策略、叙事、结构化规划、视觉资产规划、初稿生成、精修、去重压缩、页级审校、关键页强化、治理门控与 PPT 导出。",
+      "18 节点旗舰流程，覆盖需求解构、资料提炼、策略、叙事、结构化规划、视觉资产规划、初稿生成、精修、去重压缩、页级审校、关键页强化、治理门控与 PPT 导出，并新增 3 个可跳过的人工校准输入节点。",
     isDefault: true,
     category: "flagship",
-    nodes,
-    edges,
+    nodes: optimizedNodes,
+    edges: optimizedEdges,
   };
 }

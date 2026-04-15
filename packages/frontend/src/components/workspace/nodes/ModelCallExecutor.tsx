@@ -2,7 +2,6 @@ import type {
   DocumentRuntimeState,
   ModelCallConfig,
   ModelCallLiveEvent,
-  ModelCallManualFeedback,
   ModelCallNamedOutputValue,
   ModelCallOutputData,
   ModelCallOutputItem,
@@ -10,11 +9,25 @@ import type {
   NamedOutputDef,
   NodeExecution,
 } from "@intelliflow/shared";
-import { For, Index, Match, Show, Switch, createEffect, createSignal, onCleanup } from "solid-js";
+import {
+  For,
+  Index,
+  Match,
+  Show,
+  Switch,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from "solid-js";
 import { renderMarkdown } from "../../../lib/render-markdown";
 import { streamSSE } from "../../../lib/sse-stream";
+import Modal from "../../ui/Modal";
+import NamedOutputsBrowser, {
+  type NamedOutputBrowserSelection,
+  type NamedOutputBrowserSource,
+} from "../shared/NamedOutputsBrowser";
 import ModelCompareView from "./ModelCompareView";
-import NamedOutputCard from "./NamedOutputCard";
 
 interface Props {
   nodeExecution: NodeExecution;
@@ -29,12 +42,18 @@ interface Props {
 type ExecutionPhase = "idle" | "streaming" | "polling" | "done";
 
 type ViewMode = "markdown" | "source";
+type ContentScope = "artifacts" | "responses";
 
 type ModelCallNamedOutput = ModelCallNamedOutputValue;
 type NamedOutputChangeParams = {
   artifactId: string;
   modelId: string;
   newContent: string;
+};
+
+type RetryDialogState = {
+  modelId: string;
+  modelDisplayName: string;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -178,27 +197,6 @@ function getSelectedModelIdsFromOutputData(
   }
 
   return [];
-}
-
-function getManualFeedback(
-  outputData: Record<string, unknown> | null,
-): ModelCallManualFeedback | null {
-  const raw = outputData?.manualFeedback;
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-
-  const feedback = raw as Record<string, unknown>;
-  return {
-    content: typeof feedback.content === "string" ? feedback.content : "",
-    updatedAt: typeof feedback.updatedAt === "string" ? feedback.updatedAt : null,
-    appliedAt: typeof feedback.appliedAt === "string" ? feedback.appliedAt : null,
-  };
-}
-
-function hasPendingManualFeedback(outputData: Record<string, unknown> | null): boolean {
-  const feedback = getManualFeedback(outputData);
-  if (!feedback?.content.trim()) return false;
-  if (!feedback.updatedAt) return true;
-  return feedback.appliedAt !== feedback.updatedAt;
 }
 
 export function hasInProgressModelOutputs(models: Record<string, ModelOutput>): boolean {
@@ -431,7 +429,13 @@ export default function ModelCallExecutor(props: Props) {
   const [error, setError] = createSignal<string | null>(null);
   const [selectLoading, setSelectLoading] = createSignal(false);
   const [viewMode, setViewMode] = createSignal<ViewMode>("markdown");
-  const [manualFeedbackRegenerating, setManualFeedbackRegenerating] = createSignal(false);
+  const [contentScope, setContentScope] = createSignal<ContentScope>("responses");
+  const [contentScopeTouched, setContentScopeTouched] = createSignal(false);
+  const [activeArtifactSelection, setActiveArtifactSelection] =
+    createSignal<NamedOutputBrowserSelection | null>(null);
+  const [retryDialog, setRetryDialog] = createSignal<RetryDialogState | null>(null);
+  const [retryPrompt, setRetryPrompt] = createSignal("");
+  const [retrySubmitting, setRetrySubmitting] = createSignal(false);
 
   // ─── Format error + AI fix state ──────────────────────────────────────────
   const [editedContent, setEditedContent] = createSignal<Record<string, string>>({});
@@ -457,10 +461,6 @@ export default function ModelCallExecutor(props: Props) {
     return (od?.fallbackWarning as boolean) ?? false;
   };
 
-  const manualFeedback = () => getManualFeedback(currentOutputData());
-  const manualFeedbackContent = () => manualFeedback()?.content ?? "";
-  const manualFeedbackPending = () => hasPendingManualFeedback(currentOutputData());
-
   const hasNamedOutputs = () => {
     return (
       Object.keys(namedOutputs() ?? {}).length > 0 || Object.keys(namedOutputsByModel()).length > 0
@@ -472,6 +472,144 @@ export default function ModelCallExecutor(props: Props) {
   };
 
   const selectionEnabled = () => props.config.enableUserSelectionOutput ?? false;
+  const singleSelectedModelId = createMemo(() => {
+    if (!selectionEnabled()) return null;
+
+    const ids = selectedModelIds().filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
+
+    if (ids.length === 1) return ids[0];
+    if (ids.length === 0 && props.nodeExecution.selectedOutputKey) {
+      return props.nodeExecution.selectedOutputKey;
+    }
+    return null;
+  });
+  const mergeSelectedSourceIntoModel = createMemo(() => {
+    const modelId = singleSelectedModelId();
+    if (!modelId) return false;
+
+    const selectedArtifacts = Object.entries(namedOutputs() ?? {}).filter(
+      ([artifactId]) => artifactId !== "_default",
+    );
+    if (selectedArtifacts.length === 0) return false;
+
+    const modelArtifacts = Object.entries(namedOutputsByModel()[modelId] ?? {}).filter(
+      ([artifactId]) => artifactId !== "_default",
+    );
+    if (modelArtifacts.length === 0) return false;
+
+    const modelArtifactIds = new Set(modelArtifacts.map(([artifactId]) => artifactId));
+    return selectedArtifacts.every(([artifactId]) => modelArtifactIds.has(artifactId));
+  });
+  const initialArtifactSourceId = createMemo(() => {
+    if (mergeSelectedSourceIntoModel() && singleSelectedModelId()) {
+      return `model:${singleSelectedModelId()}`;
+    }
+
+    const selectedArtifacts = Object.entries(namedOutputs() ?? {}).filter(
+      ([artifactId]) => artifactId !== "_default",
+    );
+    if (selectionEnabled() && selectedArtifacts.length > 0) {
+      return "selected";
+    }
+
+    const selectedKey = selectedModelId() || props.nodeExecution.selectedOutputKey;
+    if (selectedKey) {
+      return `model:${selectedKey}`;
+    }
+
+    return undefined;
+  });
+  const showArtifactBrowser = () =>
+    hasNamedOutputs() && phase() === "done" && contentScope() === "artifacts";
+  const artifactRetryTarget = createMemo(() => {
+    const selection = activeArtifactSelection();
+    if (!selection || selection.modelId === "selected") return null;
+    return {
+      modelId: selection.modelId,
+      modelDisplayName: selection.sourceLabel,
+    };
+  });
+
+  const artifactSources = createMemo<NamedOutputBrowserSource[]>(() => {
+    const defs = new Map(namedOutputDefs().map((def) => [def.id, def]));
+    const selectedArtifacts = Object.entries(namedOutputs() ?? {}).filter(
+      ([artifactId]) => artifactId !== "_default",
+    );
+    const sources: NamedOutputBrowserSource[] = [];
+
+    const appendSource = (
+      id: string,
+      label: string,
+      artifacts: Array<[string, ModelCallNamedOutput]>,
+      options?: {
+        meta?: string;
+        tone?: "default" | "selected";
+        fallbackModelId?: string;
+        readonly?: boolean;
+      },
+    ) => {
+      if (artifacts.length === 0) return;
+      sources.push({
+        id,
+        label,
+        meta: options?.meta,
+        tone: options?.tone,
+        artifacts: artifacts.map(([artifactId, artifact]) => ({
+          artifactId,
+          artifactName: defs.get(artifactId)?.name ?? artifactId,
+          content: artifact.content,
+          format: artifact.format,
+          modelId: artifact.modelId ?? options?.fallbackModelId ?? "selected",
+          readonly: options?.readonly ?? props.readOnly,
+        })),
+      });
+    };
+
+    if (selectionEnabled() && selectedArtifacts.length > 0 && !mergeSelectedSourceIntoModel()) {
+      appendSource("selected", "用户选择输出", selectedArtifacts, {
+        meta: `已选 ${selectedModelIds().length} 个模型`,
+        tone: "selected",
+        fallbackModelId: "selected",
+        readonly: props.readOnly,
+      });
+    }
+
+    const outputsByModel = namedOutputsByModel();
+    for (const model of modelList().filter(
+      (entry) => entry.status === "completed" || entry.status === "format_error",
+    )) {
+      const modelArtifacts = Object.entries(outputsByModel[model.modelId] ?? {}).filter(
+        ([artifactId]) => artifactId !== "_default",
+      );
+      const mergedSelectedModel =
+        mergeSelectedSourceIntoModel() && model.modelId === singleSelectedModelId();
+      appendSource(`model:${model.modelId}`, model.modelDisplayName, modelArtifacts, {
+        meta: selectionEnabled()
+          ? mergedSelectedModel
+            ? "当前采用输出"
+            : isModelSelected(model.modelId)
+              ? "已加入用户选择"
+              : undefined
+          : model.modelId === selectedModelId()
+            ? "当前选中模型"
+            : undefined,
+        fallbackModelId: model.modelId,
+        readonly: props.readOnly,
+      });
+    }
+
+    if (sources.length === 0 && selectedArtifacts.length > 0) {
+      appendSource("default", "输出物", selectedArtifacts, {
+        tone: "selected",
+        fallbackModelId: selectedModelId() || "selected",
+        readonly: props.readOnly,
+      });
+    }
+
+    return sources;
+  });
 
   let abortController: AbortController | null = null;
   let liveAbortController: AbortController | null = null;
@@ -691,14 +829,21 @@ export default function ModelCallExecutor(props: Props) {
   });
 
   createEffect(() => {
+    if (!hasNamedOutputs()) {
+      if (contentScope() !== "responses") setContentScope("responses");
+      if (contentScopeTouched()) setContentScopeTouched(false);
+      return;
+    }
+
+    if (phase() === "done" && !contentScopeTouched() && contentScope() !== "artifacts") {
+      setContentScope("artifacts");
+    }
+  });
+
+  createEffect(() => {
     props.registerConfirmAction?.(async () => {
       if (selectionEnabled() && selectedModelIds().length === 0) {
         setError("请至少选择一个模型输出后再继续。");
-        return false;
-      }
-
-      if (manualFeedbackPending()) {
-        setError("已填写人工意见，请先按意见重生成当前节点后再继续。");
         return false;
       }
 
@@ -892,56 +1037,16 @@ export default function ModelCallExecutor(props: Props) {
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  function handleManualFeedbackChange(content: string) {
-    const od = (currentOutputData() as ModelCallOutputData | null) ?? {};
-    const previousFeedback = getManualFeedback(currentOutputData());
-    const nextManualFeedback: ModelCallManualFeedback =
-      previousFeedback?.content === content
-        ? previousFeedback
-        : {
-            content,
-            updatedAt: new Date().toISOString(),
-            appliedAt: null,
-          };
-
-    const nextOutputData: ModelCallOutputData = {
-      ...od,
-      manualFeedback: nextManualFeedback,
-      outputItems: {
-        ...(od.outputItems ?? {}),
-        manual_feedback: {
-          content,
-          format: "text",
-          kind: "manual_feedback",
-        },
-      },
-    };
-
-    setLocalOutputData(nextOutputData);
-    props.onDraftSave(nextOutputData);
+  function openRetryDialog(modelId: string, modelDisplayName: string) {
+    setRetryDialog({ modelId, modelDisplayName });
+    setRetryPrompt("");
+    setError(null);
   }
 
-  async function handleRegenerateWithFeedback() {
-    const feedback = manualFeedbackContent();
-    if (!feedback.trim()) {
-      setError("请先填写人工意见，再按意见重生成。");
-      return;
-    }
-
-    setManualFeedbackRegenerating(true);
-    setError(null);
-    setPhase("streaming");
-    setModelOutputs({});
-
-    try {
-      await startStreaming({
-        url: `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/regenerate`,
-        method: "POST",
-        body: { manualFeedback: feedback },
-      });
-    } finally {
-      setManualFeedbackRegenerating(false);
-    }
+  function closeRetryDialog() {
+    if (retrySubmitting()) return;
+    setRetryDialog(null);
+    setRetryPrompt("");
   }
 
   function handleStartGeneration() {
@@ -961,8 +1066,11 @@ export default function ModelCallExecutor(props: Props) {
     void startStreaming({ url });
   }
 
-  function handleRetry(modelId: string) {
+  async function handleRetry(modelId: string, additionalPrompt?: string) {
     setError(null);
+    setContentScopeTouched(true);
+    setContentScope("responses");
+    setShowCompare(false);
     setPhase("streaming");
     // Reset this model to streaming
     setModelOutputs((prev) => ({
@@ -976,7 +1084,25 @@ export default function ModelCallExecutor(props: Props) {
     }));
 
     const url = `/api/runtime/${props.documentId}/model-call/${props.nodeExecution.id}/retry/${modelId}`;
-    void startStreaming({ url });
+    await startStreaming({
+      url,
+      method: "POST",
+      body: additionalPrompt?.trim() ? { additionalPrompt: additionalPrompt.trim() } : {},
+    });
+  }
+
+  async function handleRetryDialogSubmit() {
+    const dialog = retryDialog();
+    if (!dialog) return;
+
+    setRetrySubmitting(true);
+    try {
+      setRetryDialog(null);
+      await handleRetry(dialog.modelId, retryPrompt());
+      setRetryPrompt("");
+    } finally {
+      setRetrySubmitting(false);
+    }
   }
 
   async function handleSelect(modelId: string) {
@@ -1129,6 +1255,14 @@ export default function ModelCallExecutor(props: Props) {
     });
     setLocalOutputData(nextOutputData);
     props.onDraftSave(nextOutputData);
+  }
+
+  function handleScopeChange(scope: ContentScope) {
+    setContentScopeTouched(true);
+    if (scope === "artifacts") {
+      setShowCompare(false);
+    }
+    setContentScope(scope);
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -1352,14 +1486,50 @@ export default function ModelCallExecutor(props: Props) {
       "";
 
     return (
-      <div class="space-y-3">
-        <div class="flex items-center gap-2">
-          <h3 class="text-sm font-semibold text-[#191c1e]">模型输出</h3>
-          <Show when={output}>
-            <span class="text-xs text-[#464555]">({output?.modelDisplayName})</span>
-          </Show>
-        </div>
-        <div class="bg-[#f7f9fb] rounded-xl p-4">{renderMarkdown(content)}</div>
+      <div class="space-y-4">
+        <Show
+          when={artifactSources().length > 0}
+          fallback={
+            <div class="space-y-3">
+              <div class="flex items-center gap-2">
+                <h3 class="text-sm font-semibold text-[#191c1e]">模型输出</h3>
+                <Show when={output}>
+                  <span class="text-xs text-[#464555]">({output?.modelDisplayName})</span>
+                </Show>
+              </div>
+              <div class="rounded-xl bg-[#f7f9fb] p-4">{renderMarkdown(content)}</div>
+            </div>
+          }
+        >
+          <div class="space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-sm font-semibold text-[#191c1e]">输出物</h3>
+                <p class="mt-1 text-xs text-[#6b6a78]">切换来源和输出物查看最终结果。</p>
+              </div>
+              <button
+                type="button"
+                class="rounded-lg border border-[rgba(199,196,216,0.3)] px-3 py-1.5 text-xs font-medium text-[#464555] transition-colors hover:bg-[#f7f9fb]"
+                onClick={() => {
+                  setContentScopeTouched(true);
+                  setContentScope((scope) => (scope === "artifacts" ? "responses" : "artifacts"));
+                }}
+              >
+                {contentScope() === "artifacts" ? "查看模型响应" : "查看输出物"}
+              </button>
+            </div>
+            <Show
+              when={contentScope() === "artifacts"}
+              fallback={<div class="rounded-xl bg-[#f7f9fb] p-4">{renderMarkdown(content)}</div>}
+            >
+              <NamedOutputsBrowser
+                sources={artifactSources()}
+                initialSourceId={initialArtifactSourceId()}
+                emptyMessage="暂无可展示的输出物"
+              />
+            </Show>
+          </div>
+        </Show>
       </div>
     );
   }
@@ -1369,7 +1539,7 @@ export default function ModelCallExecutor(props: Props) {
   return (
     <div class="bg-white rounded-2xl shadow-[0_12px_40px_rgba(25,28,30,0.06)] overflow-hidden">
       {/* Header */}
-      <div class="bg-gradient-to-r from-[#f2f4f6] to-white px-6 py-5 flex items-center justify-between">
+      <div class="flex items-center justify-between bg-gradient-to-r from-[#f2f4f6] to-white px-6 py-5">
         <div class="flex items-center gap-3">
           <div class="w-10 h-10 rounded-xl bg-[#e2dfff] flex items-center justify-center flex-shrink-0">
             <svg
@@ -1392,38 +1562,70 @@ export default function ModelCallExecutor(props: Props) {
               {props.config.displayName ?? "模型调用"}
             </h3>
             <p class="text-xs text-[#464555] mt-0.5">
-              {isMultiModel() ? "多模型对比模式" : "单模型模式"}
+              {showArtifactBrowser()
+                ? "输出物浏览"
+                : isMultiModel()
+                  ? "多模型对比模式"
+                  : "单模型模式"}
             </p>
           </div>
         </div>
 
-        {/* View toggle (Markdown / source) */}
-        <Show when={phase() !== "idle" && modelList().length > 0}>
-          <div class="flex items-center gap-1 bg-[#eceef0] rounded-lg p-0.5">
-            <button
-              type="button"
-              class={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                viewMode() === "markdown"
-                  ? "bg-white text-[#191c1e] shadow-sm"
-                  : "text-[#464555] hover:text-[#191c1e]"
-              }`}
-              onClick={() => setViewMode("markdown")}
-            >
-              Markdown 视图
-            </button>
-            <button
-              type="button"
-              class={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                viewMode() === "source"
-                  ? "bg-white text-[#191c1e] shadow-sm"
-                  : "text-[#464555] hover:text-[#191c1e]"
-              }`}
-              onClick={() => setViewMode("source")}
-            >
-              源码视图
-            </button>
-          </div>
-        </Show>
+        <div class="flex flex-wrap items-center justify-end gap-2">
+          <Show when={hasNamedOutputs() && phase() === "done"}>
+            <div class="flex items-center gap-1 rounded-lg bg-[#eceef0] p-0.5">
+              <button
+                type="button"
+                class={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  contentScope() === "artifacts"
+                    ? "bg-white text-[#191c1e] shadow-sm"
+                    : "text-[#464555] hover:text-[#191c1e]"
+                }`}
+                onClick={() => handleScopeChange("artifacts")}
+              >
+                输出物
+              </button>
+              <button
+                type="button"
+                class={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  contentScope() === "responses"
+                    ? "bg-white text-[#191c1e] shadow-sm"
+                    : "text-[#464555] hover:text-[#191c1e]"
+                }`}
+                onClick={() => handleScopeChange("responses")}
+              >
+                模型响应
+              </button>
+            </div>
+          </Show>
+
+          <Show when={phase() !== "idle" && modelList().length > 0 && !showArtifactBrowser()}>
+            <div class="flex items-center gap-1 rounded-lg bg-[#eceef0] p-0.5">
+              <button
+                type="button"
+                class={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode() === "markdown"
+                    ? "bg-white text-[#191c1e] shadow-sm"
+                    : "text-[#464555] hover:text-[#191c1e]"
+                }`}
+                onClick={() => setViewMode("markdown")}
+              >
+                Markdown 视图
+              </button>
+              <button
+                type="button"
+                class={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode() === "source"
+                    ? "bg-white text-[#191c1e] shadow-sm"
+                    : "text-[#464555] hover:text-[#191c1e]"
+                }`}
+                onClick={() => setViewMode("source")}
+              >
+                源码视图
+              </button>
+            </div>
+          </Show>
+        </div>
       </div>
 
       <div class="px-6 py-5 space-y-4">
@@ -1506,7 +1708,7 @@ export default function ModelCallExecutor(props: Props) {
         </Show>
 
         {/* Streaming / Polling / Done — model content */}
-        <Show when={phase() !== "idle" && modelList().length > 0}>
+        <Show when={phase() !== "idle" && modelList().length > 0 && !showArtifactBrowser()}>
           <Switch>
             {/* Compare view */}
             <Match when={showCompare() && isMultiModel()}>
@@ -1525,11 +1727,33 @@ export default function ModelCallExecutor(props: Props) {
                   const model = () => modelList()[0];
                   return (
                     <div class="space-y-3">
-                      <div class="flex items-center gap-2">
-                        <h4 class="text-sm font-medium text-[#191c1e]">
-                          {model()?.modelDisplayName}
-                        </h4>
-                        {statusBadge(model()?.status ?? "pending")}
+                      <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                          <h4 class="text-sm font-medium text-[#191c1e]">
+                            {model()?.modelDisplayName}
+                          </h4>
+                          {statusBadge(model()?.status ?? "pending")}
+                        </div>
+                        <Show
+                          when={
+                            model()?.status === "completed" ||
+                            model()?.status === "failed" ||
+                            model()?.status === "format_error"
+                          }
+                        >
+                          <button
+                            type="button"
+                            class="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+                            onClick={() =>
+                              openRetryDialog(
+                                model()?.modelId ?? "",
+                                model()?.modelDisplayName ?? "当前模型",
+                              )
+                            }
+                          >
+                            重新生成
+                          </button>
+                        </Show>
                       </div>
 
                       <Show when={model()?.status === "failed"}>
@@ -1544,10 +1768,10 @@ export default function ModelCallExecutor(props: Props) {
                             class="px-3 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
                             onClick={() => {
                               const m = model();
-                              if (m) handleRetry(m.modelId);
+                              if (m) openRetryDialog(m.modelId, m.modelDisplayName);
                             }}
                           >
-                            重试
+                            重新生成
                           </button>
                         </div>
                       </Show>
@@ -1602,34 +1826,18 @@ export default function ModelCallExecutor(props: Props) {
 
             {/* Multi-model tab mode */}
             <Match when={isMultiModel() && !showCompare()}>
-              <div class="space-y-3">
-                {/* Tab bar — use <Index> so button DOM stays stable across
-                    polling/streaming re-renders. <For> would rebuild every
-                    button on each content delta (because model refs change),
-                    which swallows user clicks mid-render. */}
-                <div class="flex items-center gap-1 border-b border-[rgba(199,196,216,0.2)]">
-                  <Index each={modelList()}>
-                    {(model) => (
-                      <button
-                        type="button"
-                        class={`flex items-center gap-2 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-                          activeTab() === model().modelId
-                            ? "border-indigo-600 text-indigo-600"
-                            : "border-transparent text-[#464555] hover:text-[#191c1e]"
-                        }`}
-                        onClick={() => setActiveTab(model().modelId)}
-                      >
-                        <span class="mr-1.5">{model().modelDisplayName}</span>
-                        {statusBadge(model().status)}
-                      </button>
-                    )}
-                  </Index>
-
-                  {/* Compare button */}
+              <div class="space-y-4">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h4 class="text-sm font-semibold text-[#191c1e]">模型响应</h4>
+                    <p class="mt-1 text-xs text-[#6b6a78]">
+                      生成进行中时先查看各模型实时响应，完成后可切到输出物浏览。
+                    </p>
+                  </div>
                   <Show when={modelList().length >= 2}>
                     <button
                       type="button"
-                      class="ml-auto px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+                      class="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
                       onClick={() => setShowCompare(true)}
                     >
                       多模型对比
@@ -1637,12 +1845,73 @@ export default function ModelCallExecutor(props: Props) {
                   </Show>
                 </div>
 
-                {/* Active tab content */}
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <Index each={modelList()}>
+                    {(model) => (
+                      <button
+                        type="button"
+                        class="rounded-2xl border p-4 text-left transition-colors"
+                        classList={{
+                          "border-[rgba(79,70,229,0.32)] bg-[rgba(79,70,229,0.08)] shadow-[0_8px_24px_rgba(79,70,229,0.08)]":
+                            activeTab() === model().modelId,
+                          "border-[rgba(199,196,216,0.2)] bg-white hover:bg-[#f7f9fb]":
+                            activeTab() !== model().modelId,
+                        }}
+                        onClick={() => setActiveTab(model().modelId)}
+                      >
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="min-w-0">
+                            <div
+                              class="truncate text-sm font-semibold"
+                              classList={{
+                                "text-[#3525cd]": activeTab() === model().modelId,
+                                "text-[#191c1e]": activeTab() !== model().modelId,
+                              }}
+                            >
+                              {model().modelDisplayName}
+                            </div>
+                            <div class="mt-1 text-[11px] text-[#8b8a99]">
+                              {model().content.length.toLocaleString()} 字符
+                            </div>
+                          </div>
+                          {statusBadge(model().status)}
+                        </div>
+                      </button>
+                    )}
+                  </Index>
+                </div>
+
                 <Show when={modelOutputs()[activeTab()]}>
                   {(model) => (
-                    <div class="space-y-3">
+                    <div class="overflow-hidden rounded-2xl border border-[rgba(199,196,216,0.3)] bg-[#fcfcfe] shadow-[0_8px_30px_rgba(25,28,30,0.04)]">
+                      <div class="flex items-center justify-between gap-3 border-b border-[rgba(199,196,216,0.2)] bg-white px-4 py-3">
+                        <div class="flex items-center gap-2">
+                          <h4 class="text-sm font-medium text-[#191c1e]">
+                            {model().modelDisplayName}
+                          </h4>
+                          {statusBadge(model().status)}
+                        </div>
+                        <Show
+                          when={
+                            model().status === "completed" ||
+                            model().status === "failed" ||
+                            model().status === "format_error"
+                          }
+                        >
+                          <button
+                            type="button"
+                            class="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+                            onClick={() =>
+                              openRetryDialog(model().modelId, model().modelDisplayName)
+                            }
+                          >
+                            重新生成
+                          </button>
+                        </Show>
+                      </div>
+
                       <Show when={model().status === "failed"}>
-                        <div class="bg-[#fef2f2] rounded-xl p-3 flex items-center justify-between">
+                        <div class="m-4 flex items-center justify-between rounded-xl bg-[#fef2f2] p-3">
                           <span class="text-sm text-red-600">
                             {model().errorMessage
                               ? localizeError(model().errorMessage ?? "")
@@ -1651,23 +1920,25 @@ export default function ModelCallExecutor(props: Props) {
                           <button
                             type="button"
                             class="px-3 py-1.5 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors"
-                            onClick={() => handleRetry(model().modelId)}
+                            onClick={() =>
+                              openRetryDialog(model().modelId, model().modelDisplayName)
+                            }
                           >
-                            重试
+                            重新生成
                           </button>
                         </div>
                       </Show>
 
                       {/* format_error display */}
                       <Show when={model().status === "format_error"}>
-                        {renderFormatError(model())}
+                        <div class="p-4">{renderFormatError(model())}</div>
                       </Show>
 
                       {/* Normal content (not format_error) */}
                       <Show when={model().status !== "format_error"}>
                         <div
                           ref={activeTabScroller}
-                          class="bg-[#f7f9fb] rounded-xl p-4 min-h-[200px] max-h-[500px] overflow-y-auto"
+                          class="min-h-[260px] max-h-[560px] overflow-y-auto bg-[#f7f9fb] p-4"
                         >
                           <Show
                             when={model().content}
@@ -1706,252 +1977,179 @@ export default function ModelCallExecutor(props: Props) {
               </div>
             </Match>
           </Switch>
+        </Show>
 
-          {/* Fallback warning */}
-          <Show when={fallbackWarning() && phase() === "done"}>
-            <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
-              <svg
-                class="w-4 h-4 text-amber-500 flex-shrink-0"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
-                />
-              </svg>
-              <span class="text-sm text-amber-700">模型未按预期格式输出，已合并为单个产物</span>
-            </div>
-          </Show>
-
-          <Show when={phase() === "done" && modelList().length > 0}>
-            <div class="border border-[rgba(199,196,216,0.35)] rounded-2xl p-4 space-y-3 bg-[#fcfcfe]">
-              <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div class="space-y-1">
-                  <div class="flex items-center gap-2">
-                    <h4 class="text-sm font-semibold text-[#191c1e]">人工意见</h4>
-                    <Show when={manualFeedbackPending()}>
-                      <span class="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">
-                        待重生成
-                      </span>
-                    </Show>
-                    <Show when={!manualFeedbackPending() && manualFeedbackContent().trim()}>
-                      <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">
-                        已应用
-                      </span>
-                    </Show>
-                  </div>
-                  <p class="text-xs text-[#6b6a78]">
-                    在这里描述你希望模型如何修改当前节点输出。保存后，点击“按意见重生成”让当前
-                    节点按最新意见重新生成；未应用的意见不能直接继续。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  class="px-4 py-2 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={manualFeedbackRegenerating() || !manualFeedbackContent().trim()}
-                  onClick={() => void handleRegenerateWithFeedback()}
-                >
-                  {manualFeedbackRegenerating() ? "重生成中..." : "按意见重生成"}
-                </button>
-              </div>
-
-              <textarea
-                value={manualFeedbackContent()}
-                onInput={(e) => handleManualFeedbackChange(e.currentTarget.value)}
-                placeholder="例如：保留整体结构，但把结论写得更保守；补充风险假设；统一术语；重新生成所有命名产物。"
-                class="w-full min-h-[120px] rounded-xl border border-[rgba(199,196,216,0.35)] bg-white px-4 py-3 text-sm text-[#191c1e] focus:outline-none focus:ring-2 focus:ring-indigo-200 resize-y"
+        {/* Fallback warning */}
+        <Show when={fallbackWarning() && phase() === "done"}>
+          <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-2">
+            <svg
+              class="w-4 h-4 text-amber-500 flex-shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
               />
-            </div>
-          </Show>
+            </svg>
+            <span class="text-sm text-amber-700">模型未按预期格式输出，已合并为单个产物</span>
+          </div>
+        </Show>
 
-          {/* Named output cards */}
-          <Show when={hasNamedOutputs() && phase() === "done"}>
-            <div class="space-y-3">
-              <Show when={selectionEnabled() && Object.keys(namedOutputs() ?? {}).length > 0}>
-                <div class="space-y-2">
-                  <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-[#191c1e]">用户选择输出</h4>
-                    <span class="text-xs text-[#464555]">
-                      已选 {selectedModelIds().length} 个模型
-                    </span>
-                  </div>
-                  <div class="space-y-2">
-                    <For each={Object.entries(namedOutputs() ?? {})}>
-                      {([artifactId, artifact]) => {
-                        const def = namedOutputDefs().find((d) => d.id === artifactId);
-                        return (
-                          <NamedOutputCard
-                            artifactId={artifactId}
-                            artifactName={def?.name ?? artifactId}
-                            content={artifact.content}
-                            format={artifact.format}
-                            modelId="selected"
-                            onContentChange={handleNamedOutputChange}
-                            readonly={props.readOnly}
-                          />
-                        );
-                      }}
-                    </For>
-                  </div>
-                </div>
-              </Show>
-
-              <Show when={Object.keys(namedOutputsByModel()).length > 0}>
-                <For
-                  each={modelList().filter(
-                    (m) => m.status === "completed" || m.status === "format_error",
+        <Show when={showArtifactBrowser()}>
+          <div class="space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h4 class="text-sm font-semibold text-[#191c1e]">输出物浏览</h4>
+                <p class="mt-1 text-xs text-[#6b6a78]">切换来源和输出物，只保留一个主预览窗口。</p>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <Show when={artifactSources().length > 0}>
+                  <span class="rounded-full bg-[rgba(79,70,229,0.08)] px-3 py-1 text-xs font-medium text-[#4f46e5]">
+                    {artifactSources().length} 个来源
+                  </span>
+                </Show>
+                <Show when={artifactRetryTarget()}>
+                  {(target) => (
+                    <button
+                      type="button"
+                      class="rounded-lg border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+                      onClick={() => openRetryDialog(target().modelId, target().modelDisplayName)}
+                    >
+                      重新生成当前模型
+                    </button>
                   )}
-                >
-                  {(model) => {
-                    const modelArtifacts = () => {
-                      const artifacts = namedOutputsByModel()[model.modelId];
-                      if (!artifacts) return [];
-                      return Object.entries(artifacts).filter(
-                        ([artifactId]) => artifactId !== "_default",
-                      );
-                    };
-
-                    return (
-                      <Show when={modelArtifacts().length > 0}>
-                        <div class="space-y-2">
-                          <div class="flex items-center gap-2">
-                            <h4 class="text-sm font-semibold text-[#191c1e]">
-                              {model.modelDisplayName}
-                            </h4>
-                            <Show when={selectionEnabled() && isModelSelected(model.modelId)}>
-                              <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-600 font-medium">
-                                已加入用户选择
-                              </span>
-                            </Show>
-                          </div>
-                          <div class="space-y-2">
-                            <For each={modelArtifacts()}>
-                              {([artifactId, artifact]) => {
-                                const def = namedOutputDefs().find((d) => d.id === artifactId);
-                                return (
-                                  <NamedOutputCard
-                                    artifactId={artifactId}
-                                    artifactName={def?.name ?? artifactId}
-                                    content={artifact.content}
-                                    format={artifact.format}
-                                    modelId={artifact.modelId ?? model.modelId}
-                                    onContentChange={handleNamedOutputChange}
-                                    readonly={props.readOnly || isMultiModel()}
-                                  />
-                                );
-                              }}
-                            </For>
-                          </div>
-                        </div>
-                      </Show>
-                    );
-                  }}
-                </For>
-              </Show>
-
-              <Show
-                when={
-                  Object.keys(namedOutputsByModel()).length === 0 &&
-                  Object.keys(namedOutputs() ?? {}).length > 0
-                }
-              >
-                <For each={Object.entries(namedOutputs() ?? {})}>
-                  {([artifactId, artifact]) => {
-                    const def = namedOutputDefs().find((d) => d.id === artifactId);
-                    return (
-                      <NamedOutputCard
-                        artifactId={artifactId}
-                        artifactName={def?.name ?? artifactId}
-                        content={artifact.content}
-                        format={artifact.format}
-                        modelId={artifact.modelId ?? "selected"}
-                        onContentChange={handleNamedOutputChange}
-                        readonly={props.readOnly}
-                      />
-                    );
-                  }}
-                </For>
-              </Show>
+                </Show>
+              </div>
             </div>
-          </Show>
 
-          {/* Output selection — only when user-selection output is enabled */}
-          <Show when={selectionEnabled() && hasAnyCompleted() && !showCompare()}>
-            <div class="bg-[#f7f9fb] rounded-xl px-5 py-4 space-y-3">
-              <p class="text-xs font-semibold text-[#464555] uppercase tracking-wide">选择输出</p>
-              <p class="text-xs text-[#6b6a78]">
-                选择一个或多个模型结果，系统会生成对应的“用户选择输出”供下游节点引用。
-              </p>
-              <div class="space-y-2">
-                <For each={modelList().filter((m) => m.status === "completed")}>
-                  {(model) => (
+            <NamedOutputsBrowser
+              sources={artifactSources()}
+              initialSourceId={initialArtifactSourceId()}
+              emptyMessage="暂无可展示的输出物"
+              onContentChange={handleNamedOutputChange}
+              onSelectionChange={setActiveArtifactSelection}
+            />
+          </div>
+        </Show>
+
+        {/* Output selection — only when user-selection output is enabled */}
+        <Show when={selectionEnabled() && hasAnyCompleted() && !showCompare()}>
+          <div class="bg-[#f7f9fb] rounded-xl px-5 py-4 space-y-3">
+            <p class="text-xs font-semibold text-[#464555] uppercase tracking-wide">选择输出</p>
+            <p class="text-xs text-[#6b6a78]">
+              选择一个或多个模型结果，系统会生成对应的“用户选择输出”供下游节点引用。
+            </p>
+            <div class="space-y-2">
+              <For each={modelList().filter((m) => m.status === "completed")}>
+                {(model) => (
+                  <div
+                    class={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                      isModelSelected(model.modelId)
+                        ? "bg-[#e2dfff] border border-[rgba(79,70,229,0.3)]"
+                        : "bg-white border border-[rgba(199,196,216,0.15)] hover:bg-[#f7f9fb]"
+                    }`}
+                  >
                     <div
-                      class={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                      class={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
                         isModelSelected(model.modelId)
-                          ? "bg-[#e2dfff] border border-[rgba(79,70,229,0.3)]"
-                          : "bg-white border border-[rgba(199,196,216,0.15)] hover:bg-[#f7f9fb]"
+                          ? "border-indigo-500 bg-indigo-500"
+                          : "border-[rgba(199,196,216,0.6)]"
                       }`}
                     >
-                      <div
-                        class={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          isModelSelected(model.modelId)
-                            ? "border-indigo-500 bg-indigo-500"
-                            : "border-[rgba(199,196,216,0.6)]"
-                        }`}
-                      >
-                        <Show when={isModelSelected(model.modelId)}>
-                          <div class="w-1.5 h-1.5 rounded-full bg-white" />
-                        </Show>
-                      </div>
-                      <div class="flex-1">
-                        <span class="text-sm font-medium text-[#191c1e]">
-                          {model.modelDisplayName}
-                        </span>
-                        <span class="ml-2 text-xs text-[#464555]">{model.content.length} 字符</span>
-                      </div>
                       <Show when={isModelSelected(model.modelId)}>
-                        <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-600 font-medium">
-                          已选择
-                        </span>
-                      </Show>
-                      <Show when={!isModelSelected(model.modelId)}>
-                        <button
-                          type="button"
-                          class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
-                          onClick={() => handleSelect(model.modelId)}
-                          disabled={selectLoading()}
-                        >
-                          加入选择
-                        </button>
-                      </Show>
-                      <Show when={isModelSelected(model.modelId)}>
-                        <button
-                          type="button"
-                          class="px-3 py-1.5 text-xs font-medium text-[#464555] border border-[rgba(199,196,216,0.4)] rounded-lg hover:bg-white transition-colors"
-                          onClick={() => handleSelect(model.modelId)}
-                          disabled={selectLoading()}
-                        >
-                          取消
-                        </button>
+                        <div class="w-1.5 h-1.5 rounded-full bg-white" />
                       </Show>
                     </div>
-                  )}
-                </For>
-              </div>
-              <Show when={selectedModelIds().length === 0}>
-                <div class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  继续前至少选择 1 个模型输出。
-                </div>
-              </Show>
+                    <div class="flex-1">
+                      <span class="text-sm font-medium text-[#191c1e]">
+                        {model.modelDisplayName}
+                      </span>
+                      <span class="ml-2 text-xs text-[#464555]">{model.content.length} 字符</span>
+                    </div>
+                    <Show when={isModelSelected(model.modelId)}>
+                      <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-600 font-medium">
+                        已选择
+                      </span>
+                    </Show>
+                    <Show when={!isModelSelected(model.modelId)}>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+                        onClick={() => handleSelect(model.modelId)}
+                        disabled={selectLoading()}
+                      >
+                        加入选择
+                      </button>
+                    </Show>
+                    <Show when={isModelSelected(model.modelId)}>
+                      <button
+                        type="button"
+                        class="px-3 py-1.5 text-xs font-medium text-[#464555] border border-[rgba(199,196,216,0.4)] rounded-lg hover:bg-white transition-colors"
+                        onClick={() => handleSelect(model.modelId)}
+                        disabled={selectLoading()}
+                      >
+                        取消
+                      </button>
+                    </Show>
+                  </div>
+                )}
+              </For>
             </div>
-          </Show>
+            <Show when={selectedModelIds().length === 0}>
+              <div class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                继续前至少选择 1 个模型输出。
+              </div>
+            </Show>
+          </div>
         </Show>
       </div>
+
+      <Modal
+        isOpen={retryDialog() !== null}
+        onClose={closeRetryDialog}
+        title="重新生成当前模型"
+        dialogClass="max-w-lg"
+      >
+        <div class="space-y-4">
+          <div class="space-y-1">
+            <p class="text-sm font-medium text-[#191c1e]">{retryDialog()?.modelDisplayName}</p>
+            <p class="text-xs text-[#6b6a78]">
+              可选填写本次重跑的额外要求。留空则按原始节点配置直接重新生成，仅影响当前模型这一次输出。
+            </p>
+          </div>
+
+          <textarea
+            value={retryPrompt()}
+            onInput={(e) => setRetryPrompt(e.currentTarget.value)}
+            placeholder="例如：保持整体结构，但补充风险说明；语气更克制；只收紧结论表达。"
+            class="min-h-[140px] w-full rounded-xl border border-[rgba(199,196,216,0.35)] bg-white px-4 py-3 text-sm text-[#191c1e] resize-y focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          />
+
+          <div class="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              class="rounded-lg border border-[rgba(199,196,216,0.35)] px-4 py-2 text-sm font-medium text-[#464555] transition-colors hover:bg-[#f7f9fb]"
+              onClick={closeRetryDialog}
+              disabled={retrySubmitting()}
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => void handleRetryDialogSubmit()}
+              disabled={retrySubmitting()}
+            >
+              {retrySubmitting() ? "重新生成中..." : "确定重生成"}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

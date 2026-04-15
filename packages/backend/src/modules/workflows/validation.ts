@@ -1,4 +1,10 @@
-import type { NodeExecutionRule, WorkflowEdgeDef, WorkflowNodeDef, WorkflowValidationError } from "@intelliflow/shared";
+import type {
+  NodeExecutionRule,
+  WorkflowEdgeDef,
+  WorkflowNodeDef,
+  WorkflowValidationError,
+} from "@intelliflow/shared";
+import { getConfigurableSkipOutputs, getSkipBinding } from "./skip-strategy";
 
 /**
  * Validate a workflow graph.
@@ -160,6 +166,60 @@ export function validateWorkflow(
 
   // ── Rule 6: Required fields per node type ─────────────────────────────────
   for (const node of nodes) {
+    if (node.type !== "export" && node.config.skippable) {
+      const skipTargets = getConfigurableSkipOutputs(node.id, node.config);
+      for (const output of skipTargets) {
+        const outputId = output.segmentKey ?? output.id;
+        const binding = getSkipBinding(node.config, outputId);
+        if (!binding) {
+          errors.push({
+            nodeId: node.id,
+            field: "skipStrategy",
+            message: `【${node.label}】可跳过，但输出 "${output.name}" 未配置跳过映射`,
+            severity: "error",
+          });
+          continue;
+        }
+        if (binding.mode === "inherit" && !binding.sourceRef?.nodeId) {
+          errors.push({
+            nodeId: node.id,
+            field: "skipStrategy",
+            message: `【${node.label}】输出 "${output.name}" 选择了继承上游，但未指定来源`,
+            severity: "error",
+          });
+        } else if (binding.mode === "inherit" && binding.sourceRef) {
+          const sourceNode = nodeMap.get(binding.sourceRef.nodeId);
+          if (!sourceNode) {
+            errors.push({
+              nodeId: node.id,
+              field: "skipStrategy",
+              message: `【${node.label}】输出 "${output.name}" 的跳过来源节点不存在`,
+              severity: "error",
+            });
+          } else if (
+            binding.sourceRef.nodeId === node.id ||
+            !getDownstreamIds(binding.sourceRef.nodeId).has(node.id)
+          ) {
+            errors.push({
+              nodeId: node.id,
+              field: "skipStrategy",
+              message: `【${node.label}】输出 "${output.name}" 的跳过来源必须来自上游节点`,
+              severity: "error",
+            });
+          }
+        }
+      }
+
+      if (!node.config.stepDescription || node.config.stepDescription.trim() === "") {
+        errors.push({
+          nodeId: node.id,
+          field: "stepDescription",
+          message: `【${node.label}】可跳过，建议补充步骤说明，帮助运行时用户理解该节点用途`,
+          severity: "warning",
+        });
+      }
+    }
+
     if (node.config.type === "input_transform") {
       const fields = node.config.formFields;
       if (!fields || fields.length === 0) {
@@ -415,7 +475,10 @@ export function validateWorkflow(
       while (m !== null) {
         const varKey = m[1].trim();
         // Skip system variables
-        if (!varKey.includes(".")) { m = regex.exec(template); continue; }
+        if (!varKey.includes(".")) {
+          m = regex.exec(template);
+          continue;
+        }
         const dotIdx = varKey.indexOf(".");
         const refNodeId = varKey.slice(0, dotIdx);
         const refNode = nodeMap.get(refNodeId);
@@ -626,7 +689,9 @@ export function validateWorkflow(
 
         // When operator is equals/not_equals/contains, value must be non-empty
         if (
-          (cond.operator === "equals" || cond.operator === "not_equals" || cond.operator === "contains") &&
+          (cond.operator === "equals" ||
+            cond.operator === "not_equals" ||
+            cond.operator === "contains") &&
           !cond.value
         ) {
           errors.push({

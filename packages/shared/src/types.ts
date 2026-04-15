@@ -148,6 +148,17 @@ export interface NodeExecutionRule {
   logic: "and" | "or";
 }
 
+/** Output-level behavior when a node is skipped */
+export interface SkipBinding {
+  mode: "inherit" | "empty";
+  sourceRef?: VariableRef;
+}
+
+/** Preconfigured skip behavior for a node */
+export interface SkipStrategy {
+  bindings: Record<string, SkipBinding>;
+}
+
 /** Form field type union */
 export type FormFieldType =
   | "text"
@@ -187,6 +198,10 @@ export interface FormFieldDef {
 export interface InputTransformConfig {
   type: "input_transform";
   formFields: FormFieldDef[];
+  /** Optional short hint displayed to users while executing this node */
+  stepDescription?: string;
+  /** Preconfigured output materialization when this node is skipped */
+  skipStrategy?: SkipStrategy;
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
@@ -198,6 +213,10 @@ export interface DesensitizeConfig {
   categories: Array<{ name: string; description: string }>;
   localModelId: string | null;
   inputSources?: InputSource[];
+  /** Optional short hint displayed to users while executing this node */
+  stepDescription?: string;
+  /** Preconfigured output materialization when this node is skipped */
+  skipStrategy?: SkipStrategy;
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
@@ -222,6 +241,8 @@ export interface ModelCallConfig {
   jsonSchema?: object;
   /** Description displayed to user during execution */
   stepDescription?: string;
+  /** Preconfigured output materialization when this node is skipped */
+  skipStrategy?: SkipStrategy;
   /** Named artifact definitions for multi-segment output */
   namedOutputs?: NamedOutputDef[];
   /** Whether this node exposes an extra "user selected output" group downstream */
@@ -236,6 +257,10 @@ export interface RestoreConfig {
   type: "restore";
   pairedDesensitizeNodeId: string | null;
   inputSources?: InputSource[];
+  /** Optional short hint displayed to users while executing this node */
+  stepDescription?: string;
+  /** Preconfigured output materialization when this node is skipped */
+  skipStrategy?: SkipStrategy;
   autoAdvance?: boolean;
   allowEdit?: boolean;
   skippable?: boolean;
@@ -246,6 +271,10 @@ export interface ExportConfig {
   type: "export";
   /** Allowed export formats (multi-select in config, user picks one at runtime) */
   formats: Array<"word" | "pdf" | "markdown" | "pptx">;
+  /** Optional short hint displayed to users while executing this node */
+  stepDescription?: string;
+  /** Preconfigured output materialization when this node is skipped */
+  skipStrategy?: SkipStrategy;
   /** @deprecated Use formats instead */
   format?: "word" | "pdf" | "markdown" | "pptx";
   /** @deprecated Use templateBindings instead */
@@ -265,6 +294,127 @@ export type NodeConfig =
   | ModelCallConfig
   | RestoreConfig
   | ExportConfig;
+
+/**
+ * Skip strategy is configured against the node's primary outputs.
+ * For model_call nodes, manual feedback is excluded and selected artifact outputs
+ * mirror named output bindings automatically at runtime.
+ */
+export function getSkipStrategyTargets(nodeId: string, config: NodeConfig): OutputDef[] {
+  switch (config.type) {
+    case "input_transform": {
+      const outputs: OutputDef[] = [];
+      for (const field of config.formFields) {
+        if (field.type === "file") {
+          if (field.fileSlotId) {
+            outputs.push({
+              id: `${nodeId}-fileslot-${field.fileSlotId}`,
+              name: field.fileSlotLabel || field.label || "文件槽位",
+              description: `文件槽位: ${field.fileSlotLabel || field.label}`,
+              segmentKey: field.fileSlotId,
+              category: "file_slot",
+            });
+          }
+        } else {
+          const key = field.machineKey || field.id;
+          outputs.push({
+            id: `${nodeId}-field-${key}`,
+            name: field.label || "未命名",
+            description: `用户输入项: ${field.label}`,
+            segmentKey: key,
+            category: "field",
+          });
+        }
+      }
+      if (config.formFields.some((field) => field.type === "file")) {
+        outputs.push({
+          id: `${nodeId}-file-upload`,
+          name: "文件输出 (合并)",
+          description: "所有文件合并文本",
+          segmentKey: "text",
+          category: "file_slot",
+        });
+      }
+      return outputs;
+    }
+
+    case "model_call":
+      if (config.namedOutputs && config.namedOutputs.length > 0) {
+        return config.namedOutputs.map((output) => ({
+          id: `${nodeId}-namedoutput-${output.id}`,
+          name: output.name,
+          description: `输出项: ${output.name}`,
+          segmentKey: output.id,
+        }));
+      }
+
+      return [
+        ...config.modelIds.map((modelId) => ({
+          id: `${nodeId}-model-${modelId}`,
+          name: config.modelNames?.[modelId] ?? modelId,
+          description: "模型生成输出",
+          segmentKey: modelId,
+          category: "model" as const,
+          modelId,
+        })),
+        ...(config.enableUserSelectionOutput
+          ? [
+              {
+                id: `${nodeId}-selected-output`,
+                name: "用户选择输出",
+                description: "模型生成输出",
+                segmentKey: "selected",
+                category: "selected" as const,
+                groupLabel: "用户选择输出",
+              },
+            ]
+          : []),
+      ];
+
+    case "desensitize":
+      if (config.inputSources && config.inputSources.length > 0) {
+        return config.inputSources.map((source) => ({
+          id: `${nodeId}-desensitized-${source.outputId}`,
+          name: `${source.displayName}.脱敏`,
+          description: `脱敏后文本: ${source.displayName}`,
+          segmentKey: source.outputId,
+          category: "desensitized",
+        }));
+      }
+      return [
+        {
+          id: `${nodeId}-desensitized`,
+          name: "脱敏后文本",
+          description: "脱敏后文本",
+          segmentKey: "desensitized",
+          category: "desensitized",
+        },
+      ];
+
+    case "restore":
+      if (config.inputSources && config.inputSources.length > 0) {
+        return config.inputSources.map((source) => ({
+          id: `${nodeId}-restored-${source.sourceNodeId}-${source.outputId}`,
+          name: `${source.displayName}.恢复`,
+          description: `恢复后文本: ${source.displayName}`,
+          segmentKey: `${source.sourceNodeId}.${source.outputId}`,
+          category: "restored",
+        }));
+      }
+      return [
+        {
+          id: `${nodeId}-restored`,
+          name: "恢复后文本",
+          description: "恢复后文本",
+          segmentKey: "restored",
+          category: "restored",
+        },
+      ];
+
+    case "export":
+      return [];
+  }
+}
 
 /** A node instance in a workflow */
 export interface WorkflowNodeDef {

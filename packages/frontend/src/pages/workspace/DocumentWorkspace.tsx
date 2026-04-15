@@ -15,6 +15,7 @@ import {
   Match,
   Show,
   Switch,
+  type JSX,
   createEffect,
   createMemo,
   createSignal,
@@ -56,6 +57,13 @@ type ViewMode = "current" | "history";
 
 /** Polling interval for workspace during active generation (seconds) */
 const WORKSPACE_POLL_INTERVAL = 3;
+
+const DEFAULT_NODE_STEP_DESCRIPTIONS: Partial<Record<NodeConfig["type"], string>> = {
+  input_transform: "补充当前步骤需要的输入内容；如果节点允许跳过且暂无意见，可以直接跳过。",
+  desensitize: "确认或调整脱敏结果，确保后续模型仅基于安全内容继续执行。",
+  restore: "确认恢复结果是否可用，再继续进入后续步骤。",
+  export: "确认导出条件已满足后，选择格式生成最终文件。",
+};
 
 export default function DocumentWorkspace() {
   const params = useParams<{ documentId: string }>();
@@ -353,6 +361,17 @@ export default function DocumentWorkspace() {
     return s.nodes[viewIndex()];
   };
 
+  const historyReexecuteIndex = createMemo(() => {
+    if (viewMode() !== "history") return null;
+
+    const node = viewedNode();
+    const s = state();
+    if (!node || !s || node.nodeType === "export") return null;
+
+    const index = s.nodes.findIndex((item) => item.id === node.id);
+    return index >= 0 ? index : null;
+  });
+
   /** Read-only mode: all nodes completed (no currentNode) */
   const readOnly = createMemo(() => {
     const s = state();
@@ -474,6 +493,10 @@ export default function DocumentWorkspace() {
       setViewMode("history");
       setViewIndex(index);
       setShowInlineEditor(false);
+    } else if (node.status === "failed") {
+      setViewMode("history");
+      setViewIndex(index);
+      setShowInlineEditor(false);
     } else if (node.status === "in_progress") {
       // Clicking the in-progress node returns to current view
       setViewMode("current");
@@ -592,6 +615,96 @@ export default function DocumentWorkspace() {
   }
 
   /** Render executor with real config from workflowNodes */
+  function getNodeStepDescription(nodeExecution: NodeExecution): string | undefined {
+    const config = getNodeConfig(nodeExecution) as
+      | (NodeConfig & { stepDescription?: string })
+      | undefined;
+    let baseDescription =
+      config?.stepDescription ?? DEFAULT_NODE_STEP_DESCRIPTIONS[nodeExecution.nodeType];
+
+    if (config?.type === "model_call" && config.enableUserSelectionOutput === true) {
+      const selectionHint = "本步骤完成后需要先选择一个合适的模型结果，再继续后续流程。";
+      if (!baseDescription) {
+        baseDescription = selectionHint;
+      } else if (!baseDescription.includes(selectionHint)) {
+        baseDescription = `${baseDescription} ${selectionHint}`;
+      }
+    }
+
+    if (config?.skippable) {
+      const skipHint =
+        "如果选择跳过，系统会按流程预设自动继承上游输出或置空，不需要你手动处理映射。";
+      if (!baseDescription) return skipHint;
+      if (!baseDescription.includes(skipHint)) {
+        return `${baseDescription} ${skipHint}`;
+      }
+    }
+
+    return baseDescription;
+  }
+
+  function renderSkippedHistoryBanner(node: NodeExecution) {
+    if (node.status !== "skipped") return null;
+    const outputData = (node.outputData as Record<string, unknown> | null) ?? null;
+    const skipType = outputData?.skipType;
+    const skipReason =
+      typeof outputData?.skipReason === "string" && outputData.skipReason.trim()
+        ? outputData.skipReason
+        : "该节点已按流程预设跳过。";
+    const skipBindings =
+      (outputData?.skipBindings as Record<string, { mode?: string }> | undefined) ?? {};
+    const bindings = Object.values(skipBindings);
+    const inheritCount = bindings.filter((binding) => binding?.mode === "inherit").length;
+    const emptyCount = bindings.filter((binding) => binding?.mode === "empty").length;
+    const bindingSummary = [
+      inheritCount > 0 ? `继承 ${inheritCount} 项` : null,
+      emptyCount > 0 ? `置空 ${emptyCount} 项` : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    const title =
+      skipType === "conditional" ? "条件跳过" : skipType === "automatic" ? "自动跳过" : "用户跳过";
+
+    return (
+      <section
+        class="rounded-xl px-5 py-4"
+        style={{
+          background: "#fffbeb",
+          border: "1px solid rgba(245,158,11,0.22)",
+        }}
+      >
+        <div class="flex items-start gap-3">
+          <div class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+            <svg
+              class="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              stroke-width="2"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                d="M9 12h6m-6 0l2.5-2.5M9 12l2.5 2.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <p class="text-sm font-semibold text-amber-800">{title}</p>
+              <Show when={bindingSummary}>
+                <span class="text-xs text-amber-700">{bindingSummary}</span>
+              </Show>
+            </div>
+            <p class="mt-1 text-sm leading-6 text-amber-700">{skipReason}</p>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   /**
    * Build the executor for the given node.
    *
@@ -610,6 +723,7 @@ export default function DocumentWorkspace() {
     return untrack(() => {
       const initialNode = nodeAccessor();
       const initialConfig = getNodeConfig(initialNode);
+      const stepDescription = getNodeStepDescription(initialNode);
       if (!initialConfig) {
         return (
           <div
@@ -631,9 +745,11 @@ export default function DocumentWorkspace() {
         debouncedDraftSave(data as Record<string, unknown>);
       };
 
+      let executor: JSX.Element;
+
       switch (initialNode.nodeType) {
         case "input_transform":
-          return (
+          executor = (
             <InputTransformExecutor
               nodeExecution={nodeAccessor()}
               config={getNodeConfig(nodeAccessor()) as InputTransformConfig}
@@ -643,8 +759,9 @@ export default function DocumentWorkspace() {
               registerConfirmAction={handleManualConfirmRegistration}
             />
           );
+          break;
         case "desensitize":
-          return (
+          executor = (
             <DesensitizeExecutor
               nodeExecution={nodeAccessor()}
               config={getNodeConfig(nodeAccessor()) as DesensitizeConfig}
@@ -654,8 +771,9 @@ export default function DocumentWorkspace() {
               registerConfirmAction={handleManualConfirmRegistration}
             />
           );
+          break;
         case "model_call":
-          return (
+          executor = (
             <ModelCallExecutor
               nodeExecution={nodeAccessor()}
               config={getNodeConfig(nodeAccessor()) as ModelCallConfig}
@@ -666,8 +784,9 @@ export default function DocumentWorkspace() {
               registerConfirmAction={handleManualConfirmRegistration}
             />
           );
+          break;
         case "restore":
-          return (
+          executor = (
             <RestoreExecutor
               nodeExecution={nodeAccessor()}
               config={getNodeConfig(nodeAccessor()) as RestoreConfig}
@@ -678,8 +797,9 @@ export default function DocumentWorkspace() {
               onAdvanceAfterConfirm={handleAdvance}
             />
           );
+          break;
         case "export":
-          return (
+          executor = (
             <ExportExecutor
               nodeExecution={nodeAccessor()}
               config={getNodeConfig(nodeAccessor()) as ExportConfig}
@@ -689,8 +809,9 @@ export default function DocumentWorkspace() {
               readOnly={readOnly()}
             />
           );
+          break;
         default:
-          return (
+          executor = (
             <div
               class="rounded-xl p-8 text-center"
               style={{
@@ -715,7 +836,56 @@ export default function DocumentWorkspace() {
               </div>
             </div>
           );
+          break;
       }
+
+      return (
+        <div class="space-y-4">
+          <Show when={stepDescription}>
+            <section
+              class="rounded-xl px-5 py-4"
+              style={{
+                background: "rgba(79,70,229,0.05)",
+                border: "1px solid rgba(79,70,229,0.12)",
+              }}
+            >
+              <div class="flex items-start gap-3">
+                <div
+                  class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full"
+                  style={{ background: "rgba(79,70,229,0.12)", color: "#4f46e5" }}
+                >
+                  <svg
+                    class="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <div class="min-w-0">
+                  <p
+                    class="text-xs font-semibold uppercase tracking-wide"
+                    style={{ color: "#4f46e5" }}
+                  >
+                    当前步骤说明
+                  </p>
+                  <p class="mt-1 text-sm leading-6" style={{ color: "#3525cd" }}>
+                    {stepDescription}
+                  </p>
+                </div>
+              </div>
+            </section>
+          </Show>
+          {executor}
+        </div>
+      );
     });
   }
 
@@ -956,21 +1126,34 @@ export default function DocumentWorkspace() {
                         <div class="space-y-4">
                           <Show when={!readOnly()}>
                             <h2 class="text-sm font-medium" style={{ color: "#191c1e" }}>
-                              历史记录: {viewed().nodeLabel}
+                              {viewed().status === "failed" ? "失败节点" : "历史记录"}:{" "}
+                              {viewed().nodeLabel}
                             </h2>
                           </Show>
-                          <CompletedViewRouter
-                            node={viewed()}
-                            config={getNodeConfig(viewed())}
-                            documentId={params.documentId}
-                            onFullscreen={(content, title) =>
-                              setFullscreenContent({ content, title })
+                          <Show
+                            when={
+                              viewed().status === "failed" && viewed().nodeType === "model_call"
                             }
-                            onReexecute={() => {
-                              const idx = s().nodes.findIndex((n) => n.id === viewed().id);
-                              if (idx >= 0) setShowReexecDialog(idx);
-                            }}
-                          />
+                            fallback={
+                              <div class="space-y-4">
+                                {renderSkippedHistoryBanner(viewed())}
+                                <CompletedViewRouter
+                                  node={viewed()}
+                                  config={getNodeConfig(viewed())}
+                                  documentId={params.documentId}
+                                  onFullscreen={(content, title) =>
+                                    setFullscreenContent({ content, title })
+                                  }
+                                  onReexecute={() => {
+                                    const idx = s().nodes.findIndex((n) => n.id === viewed().id);
+                                    if (idx >= 0) setShowReexecDialog(idx);
+                                  }}
+                                />
+                              </div>
+                            }
+                          >
+                            {renderExecutor(viewed)}
+                          </Show>
                         </div>
                       )}
                     </Match>
@@ -1472,6 +1655,51 @@ export default function DocumentWorkspace() {
                     vertical
                   />
                 </div>
+
+                <Show when={historyReexecuteIndex() !== null}>
+                  <div
+                    class="flex-shrink-0 px-3 py-3"
+                    style={{
+                      background: "linear-gradient(180deg, rgba(247,249,251,0) 0%, #f7f9fb 24%)",
+                      "border-top": "1px solid rgba(199,196,216,0.2)",
+                    }}
+                  >
+                    <div
+                      class="mb-2 text-center text-[11px] font-medium"
+                      style={{ color: "#8b8a99" }}
+                    >
+                      当前查看步骤
+                    </div>
+                    <button
+                      type="button"
+                      class="flex w-full items-center justify-center gap-1.5 rounded-[0.875rem] border-0 px-3 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-50"
+                      style={{
+                        background: actionLoading()
+                          ? "#a5b4fc"
+                          : "linear-gradient(135deg, #3525cd 0%, #4f46e5 100%)",
+                        "box-shadow": actionLoading() ? "none" : "0 4px 12px rgba(53,37,205,0.18)",
+                      }}
+                      disabled={actionLoading()}
+                      onClick={() => setShowReexecDialog(historyReexecuteIndex())}
+                    >
+                      <svg
+                        class="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        aria-hidden="true"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                      重新执行当前步骤
+                    </button>
+                  </div>
+                </Show>
 
                 {/* Sidebar action area — replaces former bottom ActionBar */}
                 <Show

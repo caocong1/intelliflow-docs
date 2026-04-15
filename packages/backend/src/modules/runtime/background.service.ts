@@ -27,6 +27,7 @@ import { normalizeModelCallOutputDataForFailure } from "./model-call-state";
 import { executeModelCallBackground } from "./model-call.service";
 import { executeRestore } from "./restore.service";
 import { advanceNode, initDocumentExecution } from "./runtime.service";
+import { buildSkippedNodeOutputData } from "./skip-output.service";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -240,9 +241,24 @@ export async function executeDocumentPipeline(
       // Auto-skip nodes with skippable + autoAdvance config
       if (nodeDef.config.skippable === true && nodeDef.config.autoAdvance === true) {
         const skipNow = new Date();
+        const skippedOutput = buildSkippedNodeOutputData({
+          nodeId: exec.nodeId,
+          config: nodeDef.config as NodeConfig,
+          nodeExecs: executions.map((item) => ({
+            nodeId: item.nodeId,
+            outputData: item.outputData as Record<string, unknown> | null,
+          })),
+          skipContext: "automatic",
+        });
         await db
           .update(nodeExecutions)
-          .set({ status: "skipped", completedAt: skipNow, updatedAt: skipNow })
+          .set({
+            status: "skipped",
+            outputData: skippedOutput.outputData,
+            selectedOutputKey: skippedOutput.selectedOutputKey,
+            completedAt: skipNow,
+            updatedAt: skipNow,
+          })
           .where(eq(nodeExecutions.id, exec.id));
         // Update progress
         const progress = Math.round(((i + 1) / totalNodes) * 100);
@@ -274,12 +290,23 @@ export async function executeDocumentPipeline(
         if (triggered) {
           const condNow = new Date();
           if (executionRule.action === "skip") {
+            const skippedOutput = buildSkippedNodeOutputData({
+              nodeId: exec.nodeId,
+              config: nodeDef.config as NodeConfig,
+              nodeExecs: freshExecs.map((item) => ({
+                nodeId: item.nodeId,
+                outputData: item.outputData as Record<string, unknown> | null,
+              })),
+              skipReason: reason,
+              skipContext: "conditional",
+            });
             // Mark as skipped with conditional skip metadata
             await db
               .update(nodeExecutions)
               .set({
                 status: "skipped",
-                outputData: { skipReason: reason, skipType: "conditional" },
+                outputData: skippedOutput.outputData,
+                selectedOutputKey: skippedOutput.selectedOutputKey,
                 completedAt: condNow,
                 updatedAt: condNow,
               })

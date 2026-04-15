@@ -33,10 +33,10 @@ import {
   buildModelCallOutputData,
   buildSelectedModelOutputData,
   getModelCallManualFeedback,
-  getModelCallManualFeedbackValidationError,
 } from "./model-call-output";
 import { getStrategy } from "./strategies";
 import type { ModelCallInput } from "./strategies";
+import { resolveFieldPath, resolveRef } from "./variable-resolution";
 
 // ─── Prompt Resolution ──────────────────────────────────────────────────────
 
@@ -44,190 +44,6 @@ import type { ModelCallInput } from "./strategies";
 export interface ResolvedPromptResult {
   resolved: string;
   mapping: Record<string, string>;
-}
-
-/**
- * Resolve a deep field path on a parsed JSON value.
- * Supports dot-separated keys, bracket[N] numeric indices, and [*] array traversal.
- * Examples: "items[0].name", "clauses[*].title", "nested.deep.key"
- */
-export function resolveFieldPath(obj: unknown, fieldPath: string): string | undefined {
-  // Parse fieldPath into segments: "items[0].name" -> ["items", 0, "name"], "a[*].b" -> ["a", "*", "b"]
-  const segments: Array<string | number> = [];
-  const tokenRegex = /([^.\[\]]+)|\[(\d+)\]|\[\*\]/g;
-  let match: RegExpExecArray | null;
-  match = tokenRegex.exec(fieldPath);
-  while (match !== null) {
-    if (match[1] !== undefined) {
-      segments.push(match[1]);
-    } else if (match[2] !== undefined) {
-      segments.push(Number(match[2]));
-    } else {
-      segments.push("*");
-    }
-    match = tokenRegex.exec(fieldPath);
-  }
-
-  function resolve(current: unknown, segIdx: number): unknown {
-    if (current === undefined || current === null || segIdx >= segments.length) {
-      return current;
-    }
-
-    const seg = segments[segIdx];
-
-    if (seg === "*") {
-      if (!Array.isArray(current)) return undefined;
-      const results = current.map((item) => resolve(item, segIdx + 1));
-      return results;
-    }
-
-    if (typeof seg === "number") {
-      if (!Array.isArray(current)) return undefined;
-      return resolve(current[seg], segIdx + 1);
-    }
-
-    if (typeof current === "object" && current !== null) {
-      return resolve((current as Record<string, unknown>)[seg], segIdx + 1);
-    }
-
-    return undefined;
-  }
-
-  const result = resolve(obj, 0);
-  if (result === undefined || result === null) return undefined;
-  if (typeof result === "string") return result;
-  return JSON.stringify(result);
-}
-
-/**
- * Resolve a single variable reference against upstream node outputs.
- * Uses a 6-level priority chain for segmentKey-based lookup:
- * 1. fieldsByKey[segmentKey] — machineKey lookup
- * 2. fields[segmentKey] — UUID fallback
- * 3. fileSlots[segmentKey] — file slot (.text)
- * 4. namedOutputs[segmentKey] — selected named outputs (.content)
- * 5. outputItems[segmentKey] — flattened model/artifact outputs
- * 6. models[segmentKey] — model output (.content)
- * 7. od[segmentKey] — direct property (text, confirmedAt, etc.)
- */
-export function resolveRef(
-  ref: { nodeId: string; outputId: string; fieldPath?: string },
-  nodeExecs: Array<{ nodeId: string; outputData: Record<string, unknown> | null }>,
-): string | undefined {
-  const exec = nodeExecs.find((ne) => ne.nodeId === ref.nodeId);
-  if (!exec?.outputData) return undefined;
-
-  const od = exec.outputData as Record<string, unknown>;
-  const segmentKey = ref.outputId;
-
-  // 1. fieldsByKey (machineKey lookup)
-  const fieldsByKey = od.fieldsByKey as Record<string, unknown> | undefined;
-  if (fieldsByKey?.[segmentKey] !== undefined && fieldsByKey[segmentKey] !== null) {
-    const v = fieldsByKey[segmentKey];
-    return typeof v === "string" ? v : JSON.stringify(v);
-  }
-
-  // 2. fields (UUID fallback)
-  const fields = od.fields as Record<string, unknown> | undefined;
-  if (fields?.[segmentKey] !== undefined && fields[segmentKey] !== null) {
-    const v = fields[segmentKey];
-    return typeof v === "string" ? v : JSON.stringify(v);
-  }
-
-  // 3. fileSlots (file slot — returns .text)
-  const fileSlots = od.fileSlots as Record<string, { text?: string }> | undefined;
-  if (fileSlots?.[segmentKey]) {
-    return fileSlots[segmentKey].text;
-  }
-
-  // 4. namedOutputs (returns .content, supports fieldPath for JSON access)
-  const namedOutputs = od.namedOutputs as Record<string, { content?: string }> | undefined;
-  if (namedOutputs?.[segmentKey]) {
-    const baseContent = namedOutputs[segmentKey].content;
-    if (ref.fieldPath && baseContent) {
-      try {
-        const parsed = JSON.parse(baseContent);
-        return resolveFieldPath(parsed, ref.fieldPath);
-      } catch {
-        console.warn(
-          `resolveRef: failed to parse namedOutput "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`,
-        );
-        return undefined;
-      }
-    }
-    return baseContent;
-  }
-
-  // 5. outputItems (flattened model/artifact outputs, supports fieldPath for JSON access)
-  const outputItems = od.outputItems as Record<string, { content?: string }> | undefined;
-  if (outputItems?.[segmentKey]) {
-    const baseContent = outputItems[segmentKey].content;
-    if (ref.fieldPath && baseContent) {
-      try {
-        const parsed = JSON.parse(baseContent);
-        return resolveFieldPath(parsed, ref.fieldPath);
-      } catch {
-        console.warn(
-          `resolveRef: failed to parse outputItem "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`,
-        );
-        return undefined;
-      }
-    }
-    return baseContent;
-  }
-
-  // 6. sources (restore node output — returns .restoredText)
-  const sources = od.sources as
-    | Record<string, { restoredText?: string; content?: string }>
-    | undefined;
-  if (sources?.[segmentKey]) {
-    return sources[segmentKey].restoredText ?? sources[segmentKey].content;
-  }
-  // Try compound key: segmentKey.fieldPath (restore sources use dotted keys like "node_techresp.form_fills")
-  if (sources && ref.fieldPath) {
-    const compoundKey = `${segmentKey}.${ref.fieldPath}`;
-    if (sources[compoundKey]) {
-      return sources[compoundKey].restoredText ?? sources[compoundKey].content;
-    }
-  }
-
-  // 7. models (model output — returns .content, supports fieldPath for JSON access)
-  const modelsMap = od.models as Record<string, { content?: string }> | undefined;
-  if (modelsMap?.[segmentKey]) {
-    const baseContent = modelsMap[segmentKey].content;
-    if (ref.fieldPath && baseContent) {
-      try {
-        const parsed = JSON.parse(baseContent);
-        return resolveFieldPath(parsed, ref.fieldPath);
-      } catch {
-        console.warn(
-          `resolveRef: failed to parse model output "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`,
-        );
-        return undefined;
-      }
-    }
-    return baseContent;
-  }
-
-  // 8. Direct property (text, confirmedAt, selectedContent, etc.)
-  if (od[segmentKey] !== undefined && od[segmentKey] !== null) {
-    const v = od[segmentKey];
-    const baseValue = typeof v === "string" ? v : JSON.stringify(v);
-    if (ref.fieldPath) {
-      try {
-        const parsed = JSON.parse(baseValue);
-        return resolveFieldPath(parsed, ref.fieldPath);
-      } catch {
-        console.warn(
-          `resolveRef: failed to parse property "${segmentKey}" as JSON for fieldPath "${ref.fieldPath}"`,
-        );
-        return undefined;
-      }
-    }
-    return baseValue;
-  }
-
-  return undefined;
 }
 
 /**
@@ -344,6 +160,16 @@ function appendManualFeedbackToPrompt(
   if (!normalized) return resolvedPrompt;
 
   return `${resolvedPrompt}\n\n---\n请严格落实以下人工意见后重新生成当前节点输出。只返回更新后的最终结果，不要解释修改过程。\n人工意见：\n${normalized}`;
+}
+
+export function appendTransientPromptToResolvedPrompt(
+  resolvedPrompt: string,
+  transientPrompt: string | null | undefined,
+): string {
+  const normalized = transientPrompt?.trim();
+  if (!normalized) return resolvedPrompt;
+
+  return `${resolvedPrompt}\n\n---\n以下是本次单模型重新生成的额外要求，仅对当前这一次重跑生效。请在满足既有格式约束的前提下优先落实。\n额外要求：\n${normalized}`;
 }
 
 export async function resolveModelCallExecutionPrompts(params: {
@@ -502,11 +328,6 @@ export function validateSelectedModelCallOutputData(
 
   if (!outputData) {
     return { status: "format_error", errors: ["当前节点没有可校验的输出数据"] };
-  }
-
-  const manualFeedbackError = getModelCallManualFeedbackValidationError(outputData);
-  if (manualFeedbackError) {
-    errors.push(manualFeedbackError);
   }
 
   const selectedModelIds = Array.isArray(outputData.selectedModelIds)

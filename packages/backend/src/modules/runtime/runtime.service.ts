@@ -15,6 +15,7 @@ import { backgroundTasks, documents, nodeExecutions, workflows } from "../../db/
 import { createVersionSnapshot } from "../versions/versions.service";
 import { evaluateExecutionRule } from "./conditions.service";
 import { getModelCallConfig, validateSelectedModelCallOutputData } from "./model-call.service";
+import { buildSkippedNodeOutputData } from "./skip-output.service";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -594,12 +595,23 @@ export async function advanceNode(
 
       if (triggered) {
         if (executionRule.action === "skip") {
+          const skippedOutput = buildSkippedNodeOutputData({
+            nodeId: nextNode.nodeId,
+            config: nextNodeDef!.config as NodeConfig,
+            nodeExecs: freshExecs.map((e) => ({
+              nodeId: e.nodeId,
+              outputData: e.outputData as Record<string, unknown> | null,
+            })),
+            skipReason: reason,
+            skipContext: "conditional",
+          });
           // Mark as skipped with conditional skip metadata
           await db
             .update(nodeExecutions)
             .set({
               status: "skipped",
-              outputData: { skipReason: reason, skipType: "conditional" },
+              outputData: skippedOutput.outputData,
+              selectedOutputKey: skippedOutput.selectedOutputKey,
               completedAt: now,
               updatedAt: now,
             })
@@ -768,11 +780,36 @@ export async function skipNode(
   }
 
   const now = new Date();
+  const executionsBeforeSkip = await db
+    .select()
+    .from(nodeExecutions)
+    .where(and(eq(nodeExecutions.documentId, documentId), eq(nodeExecutions.isCurrent, true)))
+    .orderBy(asc(nodeExecutions.stepOrder));
+
+  const nodeDef = wfData?.nodes.find((n: WorkflowNodeDef) => n.id === node.nodeId);
+  if (!nodeDef) {
+    throw new Error("Workflow node definition not found");
+  }
+  const skippedOutput = buildSkippedNodeOutputData({
+    nodeId: node.nodeId,
+    config: nodeDef.config as NodeConfig,
+    nodeExecs: executionsBeforeSkip.map((exec) => ({
+      nodeId: exec.nodeId,
+      outputData: exec.outputData as Record<string, unknown> | null,
+    })),
+    skipContext: "manual",
+  });
 
   // Mark as skipped
   await db
     .update(nodeExecutions)
-    .set({ status: "skipped", completedAt: now, updatedAt: now })
+    .set({
+      status: "skipped",
+      outputData: skippedOutput.outputData,
+      selectedOutputKey: skippedOutput.selectedOutputKey,
+      completedAt: now,
+      updatedAt: now,
+    })
     .where(eq(nodeExecutions.id, nodeExecutionId));
 
   // Advance to next node (only current)

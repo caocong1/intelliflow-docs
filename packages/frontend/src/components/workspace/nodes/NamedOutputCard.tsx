@@ -34,6 +34,17 @@ export default function NamedOutputCard(props: NamedOutputCardProps) {
     }
   });
 
+  createEffect((previousTarget?: string) => {
+    const target = `${props.modelId}:${props.artifactId}:${props.readonly ? "readonly" : "editable"}`;
+
+    if (previousTarget !== undefined && previousTarget !== target) {
+      setEditing(false);
+      setLocalContent(props.content);
+    }
+
+    return target;
+  });
+
   function handleSave() {
     props.onContentChange?.({
       artifactId: props.artifactId,
@@ -98,7 +109,7 @@ export default function NamedOutputCard(props: NamedOutputCardProps) {
           <textarea
             value={localContent()}
             onInput={(e) => setLocalContent(e.currentTarget.value)}
-            class={`w-full min-h-[120px] max-h-[400px] p-3 text-sm border border-[rgba(199,196,216,0.3)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y ${
+            class={`w-full min-h-[280px] max-h-[560px] p-3 text-sm border border-[rgba(199,196,216,0.3)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y ${
               isJson() ? "font-mono bg-[#fafaf9]" : "bg-white"
             }`}
           />

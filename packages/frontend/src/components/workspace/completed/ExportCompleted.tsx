@@ -1,5 +1,6 @@
 import type { ExportConfig, NodeConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal } from "solid-js";
+import { downloadBlobResponse } from "../../../lib/download";
 import { formatDuration, formatFileSize, formatTime } from "../../../lib/format-utils";
 
 interface Props {
@@ -61,15 +62,7 @@ export default function ExportCompleted(props: Props) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       if (!res.ok) return;
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = blobUrl;
-      link.download = r.filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(blobUrl);
+      await downloadBlobResponse(res, r.filename);
     } catch {
       // silently fail
     }

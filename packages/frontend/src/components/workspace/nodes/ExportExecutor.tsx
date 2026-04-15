@@ -1,6 +1,7 @@
 import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createSignal, onMount } from "solid-js";
 import { api, generateExport, getExportPreview } from "../../../api/client";
+import { downloadBlobResponse } from "../../../lib/download";
 import { sanitizeHtml } from "../../../lib/sanitize";
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
@@ -154,15 +155,7 @@ export default function ExportExecutor(props: Props) {
       setError("下载失败，请重试");
       return;
     }
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = filename() || exportResult()?.filename || "export";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(blobUrl);
+    await downloadBlobResponse(res, filename() || exportResult()?.filename || "export");
   }
 
   function formatFileSize(bytes: number): string {

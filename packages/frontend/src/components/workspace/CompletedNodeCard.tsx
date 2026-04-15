@@ -7,6 +7,7 @@ import {
   getFileExtColor,
 } from "../../lib/format-utils";
 import { renderMarkdown } from "../../lib/render-markdown";
+import { downloadBlobResponse } from "../../lib/download";
 
 interface Props {
   node: NodeExecution;
@@ -744,15 +745,7 @@ function renderExport(data: Record<string, unknown>, documentId: string, nodeId:
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) return;
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = filename || "export";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(blobUrl);
+    await downloadBlobResponse(res, filename || "export");
   }
 
   return (

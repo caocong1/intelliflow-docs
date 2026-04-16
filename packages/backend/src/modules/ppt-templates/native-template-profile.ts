@@ -42,6 +42,10 @@ const IMAGE_VISUAL_TYPES = new Set([
 
 const SAMPLE_TITLE_PATTERNS = [
   /输入标题文字/i,
+  /添加标题/i,
+  /pleaseclickhere.*title/i,
+  /pleaseaddyourtitlehere/i,
+  /clickhere.*title/i,
   /过渡页标题/i,
   /thankyou/i,
   /谢谢观看/i,
@@ -50,6 +54,14 @@ const SAMPLE_TITLE_PATTERNS = [
 
 const SAMPLE_BODY_PATTERNS = [
   /您的内容打在这里/i,
+  /请您单击此处添加合适文字/i,
+  /请单击此处输入文本内容/i,
+  /适当地调整文字的大小或者颜色等属性/i,
+  /适当地调整文字大小或者颜色等属性/i,
+  /pleaseclickhere.*addappropriate/i,
+  /pleaseclickhere.*addappropriatetext/i,
+  /pleaseclickhere.*textcontent/i,
+  /directlycopyandpastethetextcontent/i,
   /只保留文字/i,
   /复制您的文本/i,
   /输入正文/i,

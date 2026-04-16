@@ -231,17 +231,9 @@ export const pptTemplateRoutes = new Elysia({ prefix: "/ppt-templates" })
         const errorMap: Record<string, { status: number; error: string }> = {
           INVALID_FILE_TYPE: { status: 400, error: "仅支持 .pptx 文件" },
           FILE_TOO_LARGE: { status: 400, error: "文件大小不能超过 50MB" },
-          NO_PLACEHOLDERS: {
+          NO_USABLE_LAYOUTS: {
             status: 400,
-            error: "模板中未检测到 {{XXX}} 占位符，无法动态填充内容",
-          },
-          MISSING_TITLE_PLACEHOLDER: {
-            status: 400,
-            error: "模板中缺少含 {{TITLE}} 的 layout",
-          },
-          MISSING_BODY_PLACEHOLDER: {
-            status: 400,
-            error: "模板中缺少含 {{BODY}} 的 layout",
+            error: "模板中未识别出可用的标题/正文布局，请更换模板或选择结构更清晰的版式文件",
           },
         };
         const mapped = errorMap[message];

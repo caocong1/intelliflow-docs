@@ -13,6 +13,9 @@ import {
   mergeNativeTemplateProfiles,
   normalizeProfileAfterManualEdit,
 } from "./native-template-profile";
+import {
+  validateParsedNativeTemplate,
+} from "./ppt-template-validation";
 
 const WORKSPACE_ROOT = process.env.WORKSPACE_ROOT || "./data/workspaces";
 const TEMPLATE_DIR = join(WORKSPACE_ROOT, "uploads", "ppt-templates");
@@ -140,26 +143,9 @@ export async function uploadTemplate(input: {
 
   // Parse template with pptx-automizer
   const parsed = await parsePptxTemplate(buffer);
-
-  // Reject if no placeholders found at all
-  if (parsed.allPlaceholders.size === 0 && parsed.warnings.length === 0) {
-    throw new Error("NO_PLACEHOLDERS");
-  }
-
-  // Validate: need at least one layout with {{TITLE}} and one with {{BODY}}
-  let hasTitleLayout = false;
-  let hasBodyLayout = false;
-
-  for (const [, placeholders] of parsed.layouts) {
-    if (placeholders.has("TITLE")) hasTitleLayout = true;
-    if (placeholders.has("BODY")) hasBodyLayout = true;
-  }
-
-  if (parsed.allPlaceholders.size > 0 && !hasTitleLayout) {
-    throw new Error("MISSING_TITLE_PLACEHOLDER");
-  }
-  if (parsed.allPlaceholders.size > 0 && !hasBodyLayout) {
-    throw new Error("MISSING_BODY_PLACEHOLDER");
+  const validation = validateParsedNativeTemplate(parsed);
+  if (!validation.usable) {
+    throw new Error("NO_USABLE_LAYOUTS");
   }
 
   // Save file to disk
@@ -196,7 +182,7 @@ export async function uploadTemplate(input: {
         [...parsed.layouts].map(([k, v]) => [k, [...v]]),
       ),
       allPlaceholders: [...parsed.allPlaceholders],
-      warnings: parsed.warnings,
+      warnings: validation.warnings,
       profileSummary: parsed.profile?.summary ?? null,
     },
   };

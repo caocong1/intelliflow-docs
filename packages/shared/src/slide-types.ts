@@ -37,10 +37,17 @@ export const SLIDE_ARCHETYPES = [
 export type SlideArchetype = (typeof SLIDE_ARCHETYPES)[number];
 export type SlideDensity = "sparse" | "medium" | "dense";
 
+export interface SlideStyleOverride {
+  coverTone?: "formal" | "creative" | "energetic";
+  emphasisLevel?: "low" | "normal" | "high";
+  decorationDensity?: "minimal" | "moderate" | "rich";
+}
+
 export interface SlideCommonFields {
   semanticRole?: SlideSemanticRole;
   archetype?: SlideArchetype;
   density?: SlideDensity;
+  styleOverride?: SlideStyleOverride;
   sectionKey?: string;
   visualIntent?: string;
   notes?: string;
@@ -105,6 +112,15 @@ const sharedSlideProperties = {
   semanticRole: { type: "string", enum: [...SLIDE_SEMANTIC_ROLES] },
   archetype: { type: "string", enum: [...SLIDE_ARCHETYPES] },
   density: { type: "string", enum: ["sparse", "medium", "dense"] },
+  styleOverride: {
+    type: "object",
+    properties: {
+      coverTone: { type: "string", enum: ["formal", "creative", "energetic"] },
+      emphasisLevel: { type: "string", enum: ["low", "normal", "high"] },
+      decorationDensity: { type: "string", enum: ["minimal", "moderate", "rich"] },
+    },
+    additionalProperties: false,
+  },
   sectionKey: { type: "string", maxLength: 120 },
   visualIntent: { type: "string", maxLength: 120 },
   notes: { type: "string", maxLength: 500 },

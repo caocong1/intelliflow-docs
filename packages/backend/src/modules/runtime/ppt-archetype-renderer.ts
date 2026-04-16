@@ -8,6 +8,7 @@ import type {
   ImageSlide,
   Slide,
   SlideArchetype,
+  SlideStyleOverride,
   TableSlide,
   TitleSlide,
   TwoColumnSlide,
@@ -52,6 +53,18 @@ function contrastOn(bgHex: string, sp: StylePack): string {
   return lum < 140 ? "FFFFFF" : sp.palette.text;
 }
 
+/** Resolve effective accent color based on emphasisLevel override */
+function effectiveAccent(sp: StylePack, override?: SlideStyleOverride): string {
+  if (!override?.emphasisLevel || override.emphasisLevel === "normal") return sp.palette.accent;
+  if (override.emphasisLevel === "high") return sp.palette.primary;
+  return sp.palette.divider; // low emphasis — muted
+}
+
+/** Whether to render decorative shapes (cards, shadows, icons) */
+function showDecoration(override?: SlideStyleOverride): boolean {
+  return override?.decorationDensity !== "minimal";
+}
+
 function addNotes(pptSlide: PptSlide, slide: Slide) {
   if ("notes" in slide && slide.notes && typeof pptSlide.addNotes === "function") {
     pptSlide.addNotes(slide.notes.slice(0, 500));
@@ -75,7 +88,13 @@ function addPageTitle(pptSlide: PptSlide, title: string, sp: StylePack) {
 // ─── Archetype Renderers ─────────────────────────────────────────────────────
 
 function renderCoverHero(pptSlide: PptSlide, slide: TitleSlide, sp: StylePack) {
-  if (sp.cover.backgroundFill === "gradient" && sp.cover.gradientStops) {
+  const ovr = slide.styleOverride;
+  const tone = ovr?.coverTone ?? "formal";
+
+  if (tone === "energetic") {
+    // Energetic: use accent as background
+    pptSlide.background = { color: effectiveAccent(sp, ovr) };
+  } else if (sp.cover.backgroundFill === "gradient" && sp.cover.gradientStops) {
     pptSlide.background = {
       fill: {
         type: "linear",
@@ -83,7 +102,7 @@ function renderCoverHero(pptSlide: PptSlide, slide: TitleSlide, sp: StylePack) {
           position: s.position,
           color: s.color,
         })),
-        rotate: 135,
+        rotate: tone === "creative" ? 45 : 135,
       },
     };
   } else {
@@ -346,6 +365,7 @@ function renderBulletStory(pptSlide: PptSlide, slide: ContentSlide, sp: StylePac
 function renderFeatureGrid(pptSlide: PptSlide, slide: ContentSlide, sp: StylePack) {
   pptSlide.background = { color: sp.palette.background };
   addPageTitle(pptSlide, slide.title, sp);
+  const decorate = showDecoration(slide.styleOverride);
 
   const items = slide.bullets.slice(0, 4);
   const cols = items.length <= 2 ? 2 : 2;
@@ -369,37 +389,39 @@ function renderFeatureGrid(pptSlide: PptSlide, slide: ContentSlide, sp: StylePac
       h: cardH,
       fill: { color: sp.palette.surface },
       rectRadius: sp.shapes.cornerRadius,
-      shadow: sp.shapes.cardShadow
+      shadow: decorate && sp.shapes.cardShadow
         ? { type: "outer", blur: 4, offset: 2, color: "000000", opacity: 0.08 }
         : undefined,
     });
 
-    // Icon placeholder circle
-    pptSlide.addShape("ellipse", {
-      x: x + 0.35,
-      y: y + 0.3,
-      w: 0.5,
-      h: 0.5,
-      fill: { color: sp.palette.primary },
-    });
-    pptSlide.addText(String(i + 1), {
-      x: x + 0.35,
-      y: y + 0.3,
-      w: 0.5,
-      h: 0.5,
-      fontSize: 14,
-      fontFace: sp.fonts.body.face,
-      bold: true,
-      color: contrastOn(sp.palette.primary, sp),
-      align: "center",
-      valign: "middle",
-    });
+    if (decorate) {
+      // Icon placeholder circle
+      pptSlide.addShape("ellipse", {
+        x: x + 0.35,
+        y: y + 0.3,
+        w: 0.5,
+        h: 0.5,
+        fill: { color: sp.palette.primary },
+      });
+      pptSlide.addText(String(i + 1), {
+        x: x + 0.35,
+        y: y + 0.3,
+        w: 0.5,
+        h: 0.5,
+        fontSize: 14,
+        fontFace: sp.fonts.body.face,
+        bold: true,
+        color: contrastOn(sp.palette.primary, sp),
+        align: "center",
+        valign: "middle",
+      });
+    }
 
     // Feature text
     pptSlide.addText(truncate(strip(item), 100), {
-      x: x + 1.1,
+      x: decorate ? x + 1.1 : x + 0.3,
       y: y + 0.3,
-      w: cardW - 1.5,
+      w: decorate ? cardW - 1.5 : cardW - 0.6,
       h: cardH - 0.6,
       fontSize: sp.fonts.body.size,
       fontFace: sp.fonts.body.face,

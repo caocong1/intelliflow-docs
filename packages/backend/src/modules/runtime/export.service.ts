@@ -2507,18 +2507,30 @@ async function renderSlidesWithNativeTemplate(
 }
 
 async function resolvePptTemplate(templateId?: string | null) {
-  const defaultTemplate = await getDefaultTemplate();
-  const candidateIds = [...new Set([templateId, defaultTemplate?.id ?? null].filter(Boolean))] as string[];
-
-  for (const candidateId of candidateIds) {
+  if (templateId) {
     try {
-      return await getPptTemplate(candidateId);
+      return await getPptTemplate(templateId);
     } catch (err) {
-      console.warn(
-        `[export] Failed to resolve PPT template ${candidateId}, trying next fallback:`,
-        err instanceof Error ? err.message : err,
-      );
+      const message = err instanceof Error ? err.message : String(err);
+      if (message === "TEMPLATE_NOT_FOUND") {
+        throw new Error("所选 PPT 模板不存在，请刷新模板列表后重新选择");
+      }
+      throw err;
     }
+  }
+
+  const defaultTemplate = await getDefaultTemplate();
+  if (!defaultTemplate?.id) {
+    return null;
+  }
+
+  try {
+    return await getPptTemplate(defaultTemplate.id);
+  } catch (err) {
+    console.warn(
+      `[export] Failed to resolve default PPT template ${defaultTemplate.id}:`,
+      err instanceof Error ? err.message : err,
+    );
   }
 
   return null;

@@ -842,6 +842,11 @@ export default function ModelCallExecutor(props: Props) {
 
   createEffect(() => {
     props.registerConfirmAction?.(async () => {
+      if (phase() !== "done") {
+        setError("模型调用尚未完成，请等待执行结束后再确认。");
+        return false;
+      }
+
       if (selectionEnabled() && selectedModelIds().length === 0) {
         setError("请至少选择一个模型输出后再继续。");
         return false;

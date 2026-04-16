@@ -842,46 +842,26 @@ export default function DocumentWorkspace() {
       return (
         <div class="space-y-4">
           <Show when={stepDescription}>
-            <section
-              class="rounded-xl px-5 py-4"
-              style={{
-                background: "rgba(79,70,229,0.05)",
-                border: "1px solid rgba(79,70,229,0.12)",
-              }}
-            >
-              <div class="flex items-start gap-3">
-                <div
-                  class="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full"
-                  style={{ background: "rgba(79,70,229,0.12)", color: "#4f46e5" }}
-                >
-                  <svg
-                    class="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    aria-hidden="true"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <div class="min-w-0">
-                  <p
-                    class="text-xs font-semibold uppercase tracking-wide"
-                    style={{ color: "#4f46e5" }}
-                  >
-                    当前步骤说明
-                  </p>
-                  <p class="mt-1 text-sm leading-6" style={{ color: "#3525cd" }}>
-                    {stepDescription}
-                  </p>
-                </div>
-              </div>
-            </section>
+            <div class="flex items-center gap-2 px-1">
+              <svg
+                class="h-3.5 w-3.5 flex-shrink-0"
+                style={{ color: "#4f46e5" }}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+              <span class="text-xs leading-5" style={{ color: "#4f46e5" }}>
+                {stepDescription}
+              </span>
+            </div>
           </Show>
           {executor}
         </div>

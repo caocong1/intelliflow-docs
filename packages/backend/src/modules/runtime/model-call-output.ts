@@ -240,9 +240,15 @@ export function parseNamedOutputs(
     match = regex.exec(rawContent);
   }
 
-  const allFound = expectedIds.every((id) => id in result);
-  if (allFound) {
+  const foundCount = expectedIds.filter((id) => id in result).length;
+
+  if (foundCount === expectedIds.length) {
     return { namedOutputs: result, fallback: false };
+  }
+
+  // Partial match: keep successfully parsed outputs, fallback only for the rest
+  if (foundCount > 0) {
+    return { namedOutputs: result, fallback: true };
   }
 
   return {

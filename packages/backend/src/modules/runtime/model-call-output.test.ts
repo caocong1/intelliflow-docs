@@ -39,6 +39,26 @@ describe("model-call output helpers", () => {
     expect(parsed.namedOutputs.decision_log_v1?.content).toContain("Alpha Decision Log");
   });
 
+  it("keeps successfully parsed named outputs when only part of the delimiters are present", () => {
+    const partialContent = [
+      "===OUTPUT:prd_v1===",
+      "# Alpha PRD",
+      "===END:prd_v1===",
+      "",
+      "普通补充说明，没有形成完整的命名输出块。",
+    ].join("\n");
+
+    const parsed = parseNamedOutputs(partialContent, namedOutputDefs);
+
+    expect(parsed.fallback).toBe(true);
+    expect(parsed.namedOutputs).toEqual({
+      prd_v1: {
+        content: "# Alpha PRD",
+        format: "markdown",
+      },
+    });
+  });
+
   it("rebuilds named outputs from the newly selected compare result", () => {
     const models: Record<string, ModelOutput> = {
       alpha: {

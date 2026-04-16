@@ -22,6 +22,7 @@ interface Props {
   onDraftSave: (data: Record<string, unknown>) => void;
   readOnly: boolean;
   registerConfirmAction?: (action: (() => Promise<boolean>) | null) => void;
+  stepDescription?: string;
 }
 
 function formatFileSize(bytes: number): string {
@@ -653,7 +654,7 @@ export default function InputTransformExecutor(props: Props) {
               {props.nodeExecution.nodeLabel || "输入转换"}
             </h2>
             <p class="text-xs text-[#464555] mt-0.5">
-              填写表单信息并上传所需文件，AI 将自动分析文档结构并准备后续处理
+              {props.stepDescription ?? "填写表单信息并上传所需文件，AI 将自动分析文档结构并准备后续处理"}
             </p>
           </div>
         </div>

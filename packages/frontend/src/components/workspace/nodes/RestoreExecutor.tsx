@@ -35,6 +35,7 @@ interface Props {
   readOnly: boolean;
   registerConfirmAction?: (action: (() => Promise<boolean>) | null) => void;
   onAdvanceAfterConfirm?: () => Promise<void>;
+  stepDescription?: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -383,7 +384,7 @@ export default function RestoreExecutor(props: Props) {
               <div class="w-1 h-4 bg-emerald-500 rounded-full" />
               <h2 class="text-sm font-semibold text-[#191c1e]">信息恢复</h2>
             </div>
-            <p class="text-xs text-[#464555] mt-0.5">将脱敏占位符替换为真实敏感信息</p>
+            <p class="text-xs text-[#464555] mt-0.5">{props.stepDescription ?? "将脱敏占位符替换为真实敏感信息"}</p>
           </div>
         </div>
         <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50">

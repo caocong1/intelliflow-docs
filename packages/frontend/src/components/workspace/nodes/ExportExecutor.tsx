@@ -42,6 +42,7 @@ interface Props {
   onDraftSave: (data: Record<string, unknown>) => void;
   onCompleted?: () => Promise<void> | void;
   readOnly: boolean;
+  stepDescription?: string;
 }
 
 async function fetchStylePacks(): Promise<StylePackItem[]> {
@@ -519,7 +520,7 @@ export default function ExportExecutor(props: Props) {
               <div class="w-1 h-4 bg-[#4f46e5] rounded-full" />
               <h2 class="text-sm font-semibold text-[#191c1e]">文件导出</h2>
             </div>
-            <p class="text-xs text-[#464555] mt-0.5">选择导出格式并下载文档</p>
+            <p class="text-xs text-[#464555] mt-0.5">{props.stepDescription ?? "选择导出格式并下载文档"}</p>
           </div>
         </div>
         <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50">

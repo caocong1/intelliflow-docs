@@ -16,6 +16,7 @@ interface Props {
   onDraftSave: (data: Record<string, unknown>) => void;
   readOnly: boolean;
   registerConfirmAction?: (action: (() => Promise<boolean>) | null) => void;
+  stepDescription?: string;
 }
 
 type Phase = "detect" | "review" | "confirmed";

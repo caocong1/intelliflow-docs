@@ -757,6 +757,7 @@ export default function DocumentWorkspace() {
               onDraftSave={draftSave}
               readOnly={readOnly()}
               registerConfirmAction={handleManualConfirmRegistration}
+              stepDescription={stepDescription}
             />
           );
           break;
@@ -769,6 +770,7 @@ export default function DocumentWorkspace() {
               onDraftSave={draftSave}
               readOnly={readOnly()}
               registerConfirmAction={handleManualConfirmRegistration}
+              stepDescription={stepDescription}
             />
           );
           break;
@@ -782,6 +784,7 @@ export default function DocumentWorkspace() {
               readOnly={readOnly()}
               backgroundMode={isGenerating()}
               registerConfirmAction={handleManualConfirmRegistration}
+              stepDescription={stepDescription}
             />
           );
           break;
@@ -795,6 +798,7 @@ export default function DocumentWorkspace() {
               readOnly={readOnly()}
               registerConfirmAction={handleManualConfirmRegistration}
               onAdvanceAfterConfirm={handleAdvance}
+              stepDescription={stepDescription}
             />
           );
           break;
@@ -807,6 +811,7 @@ export default function DocumentWorkspace() {
               onDraftSave={draftSave}
               onCompleted={fetchRuntimeState}
               readOnly={readOnly()}
+              stepDescription={stepDescription}
             />
           );
           break;
@@ -839,33 +844,7 @@ export default function DocumentWorkspace() {
           break;
       }
 
-      return (
-        <div class="space-y-4">
-          <Show when={stepDescription}>
-            <div class="flex items-center gap-2 px-1">
-              <svg
-                class="h-3.5 w-3.5 flex-shrink-0"
-                style={{ color: "#4f46e5" }}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span class="text-xs leading-5" style={{ color: "#4f46e5" }}>
-                {stepDescription}
-              </span>
-            </div>
-          </Show>
-          {executor}
-        </div>
-      );
+      return executor;
     });
   }
 

@@ -37,6 +37,7 @@ interface Props {
   readOnly: boolean;
   backgroundMode?: boolean;
   registerConfirmAction?: (action: (() => Promise<boolean>) | null) => void;
+  stepDescription?: string;
 }
 
 type ExecutionPhase = "idle" | "streaming" | "polling" | "done";
@@ -1572,6 +1573,9 @@ export default function ModelCallExecutor(props: Props) {
                 : isMultiModel()
                   ? "多模型对比模式"
                   : "单模型模式"}
+              <Show when={props.stepDescription}>
+                <span class="text-[#4f46e5]">{" · "}{props.stepDescription}</span>
+              </Show>
             </p>
           </div>
         </div>

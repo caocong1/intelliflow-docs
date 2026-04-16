@@ -100,12 +100,13 @@ describe("validateModelOutput", () => {
     expect(validateModelOutput(content, config)).toEqual({ status: "completed" });
   });
 
-  it("rejects missing JSON named output artifacts", () => {
+  it("rejects missing named output artifacts with delimiter hint", () => {
     const content = ["===OUTPUT:qa_report===", "# PASS", "===END:qa_report==="].join("\n");
 
     const result = validateModelOutput(content, config);
     expect(result.status).toBe("format_error");
-    expect(result.errors).toContain("命名产物 slides_final 缺失或为空");
+    expect(result.errors?.[0]).toContain("===OUTPUT:slides_final===");
+    expect(result.errors?.[0]).toContain("===END:slides_final===");
   });
 
   it("rejects invalid JSON named output content", () => {
@@ -113,6 +114,74 @@ describe("validateModelOutput", () => {
 
     expect(result.status).toBe("format_error");
     expect(result.errors?.join("\n")).toContain("命名产物 slides_final JSON 语法错误");
+  });
+
+  it("rejects raw JSON without delimiters even for a single named output", () => {
+    const singleJsonConfig: ModelCallConfig = {
+      type: "model_call",
+      displayName: "结构整合会",
+      modelIds: ["model-a"],
+      promptTemplate: "prompt",
+      inputRefs: [],
+      outputFormat: "json",
+      namedOutputs: [{ id: "slide_outline", name: "逐页大纲", format: "json" }],
+    };
+
+    // Model outputs raw JSON without ===OUTPUT:slide_outline=== delimiters
+    const rawJson = JSON.stringify({ slides: [{ page_no: 1 }] });
+    const result = validateModelOutput(rawJson, singleJsonConfig);
+
+    expect(result.status).toBe("format_error");
+    expect(result.errors?.[0]).toContain("===OUTPUT:slide_outline===");
+  });
+
+  it("rejects raw text without delimiters for markdown named outputs", () => {
+    const markdownOnlyConfig: ModelCallConfig = {
+      type: "model_call",
+      displayName: "文稿生成",
+      modelIds: ["model-a"],
+      promptTemplate: "prompt",
+      inputRefs: [],
+      outputFormat: "markdown",
+      namedOutputs: [
+        { id: "summary", name: "摘要", format: "markdown" },
+        { id: "body", name: "正文", format: "markdown" },
+      ],
+    };
+
+    // Model outputs plain markdown without any delimiters
+    const result = validateModelOutput("# 这是一段没有分隔符的输出", markdownOnlyConfig);
+
+    expect(result.status).toBe("format_error");
+    expect(result.errors).toHaveLength(2);
+    expect(result.errors?.[0]).toContain("===OUTPUT:summary===");
+    expect(result.errors?.[1]).toContain("===OUTPUT:body===");
+  });
+
+  it("accepts properly delimited markdown named outputs", () => {
+    const markdownOnlyConfig: ModelCallConfig = {
+      type: "model_call",
+      displayName: "文稿生成",
+      modelIds: ["model-a"],
+      promptTemplate: "prompt",
+      inputRefs: [],
+      outputFormat: "markdown",
+      namedOutputs: [
+        { id: "summary", name: "摘要", format: "markdown" },
+        { id: "body", name: "正文", format: "markdown" },
+      ],
+    };
+
+    const content = [
+      "===OUTPUT:summary===",
+      "# 摘要内容",
+      "===END:summary===",
+      "===OUTPUT:body===",
+      "# 正文内容",
+      "===END:body===",
+    ].join("\n");
+
+    expect(validateModelOutput(content, markdownOnlyConfig)).toEqual({ status: "completed" });
   });
 });
 
@@ -160,6 +229,9 @@ describe("validateSelectedModelCallOutputData", () => {
         namedOutputs: {
           slides_final: {
             content: JSON.stringify({ slides: [{ layout: "title", title: "封面" }] }),
+          },
+          qa_report: {
+            content: "# PASS",
           },
         },
         manualFeedback: {

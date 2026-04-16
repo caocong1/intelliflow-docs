@@ -146,7 +146,7 @@ export async function resolvePromptTemplate(
         return `===OUTPUT:${o.id}===\n${parts.join("\n\n")}\n===END:${o.id}===`;
       })
       .join("\n\n");
-    resolved += `\n\n---\n以下是各产物的具体要求和输出格式，请按指定分隔符包裹每个产物的输出：\n\n${format}`;
+    resolved += `\n\n---\n以下是各产物的具体要求和输出格式。严格要求：每个产物必须用 ===OUTPUT:id=== 开头、===END:id=== 结尾，先写完一个产物并关闭后再开始下一个，禁止把所有 ===END=== 堆在末尾。所有 ${config.namedOutputs.length} 个产物都必须输出，不可省略。\n\n${format}`;
   }
 
   return { resolved, mapping };
@@ -245,25 +245,28 @@ export function validateModelOutput(
 ): { status: "completed" | "format_error"; errors?: string[] } {
   const errors: string[] = [];
   const namedOutputs = config.namedOutputs ?? [];
-  const jsonNamedOutputs = namedOutputs.filter((output) => output.format === "json");
 
-  if (jsonNamedOutputs.length > 0) {
+  if (namedOutputs.length > 0) {
     const extracted = extractNamedOutputContents(content);
 
-    for (const output of jsonNamedOutputs) {
+    for (const output of namedOutputs) {
       const artifactContent = extracted[output.id]?.trim() ?? "";
       if (!artifactContent) {
-        errors.push(`命名产物 ${output.id} 缺失或为空`);
+        errors.push(
+          `命名产物 ${output.id} 未按 ===OUTPUT:${output.id}===...===END:${output.id}=== 格式输出`,
+        );
         continue;
       }
 
-      errors.push(
-        ...validateJsonStringAgainstSchema(
-          artifactContent,
-          output.jsonSchema,
-          `命名产物 ${output.id}`,
-        ),
-      );
+      if (output.format === "json") {
+        errors.push(
+          ...validateJsonStringAgainstSchema(
+            artifactContent,
+            output.jsonSchema,
+            `命名产物 ${output.id}`,
+          ),
+        );
+      }
     }
   } else if (config.outputFormat === "json") {
     errors.push(...validateJsonStringAgainstSchema(content, config.jsonSchema, "节点输出"));
@@ -277,13 +280,32 @@ export function validateModelOutput(
 }
 
 function extractNamedOutputContents(rawContent: string): Record<string, string> {
+  // Strategy 1: strict paired delimiters
   const outputs: Record<string, string> = {};
   const regex = /===OUTPUT:(\w+)===\n?([\s\S]*?)===END:\1===/g;
   let match = regex.exec(rawContent);
-
   while (match !== null) {
     outputs[match[1]] = match[2]?.trim() ?? "";
     match = regex.exec(rawContent);
+  }
+
+  // Strategy 2: split by OUTPUT markers (handles grouped/missing END tags)
+  const markerRegex = /===OUTPUT:(\w+)===/g;
+  const markers: Array<{ id: string; start: number; contentStart: number }> = [];
+  let m = markerRegex.exec(rawContent);
+  while (m !== null) {
+    markers.push({ id: m[1], start: m.index, contentStart: m.index + m[0].length });
+    m = markerRegex.exec(rawContent);
+  }
+
+  if (markers.length > Object.keys(outputs).length) {
+    const markerOutputs: Record<string, string> = {};
+    for (let i = 0; i < markers.length; i++) {
+      const { id, contentStart } = markers[i];
+      const sectionEnd = i + 1 < markers.length ? markers[i + 1].start : rawContent.length;
+      markerOutputs[id] = rawContent.slice(contentStart, sectionEnd).replace(/===END:\w+===/g, "").trim();
+    }
+    return markerOutputs;
   }
 
   return outputs;
@@ -344,46 +366,44 @@ export function validateSelectedModelCallOutputData(
     errors.push("当前没有可推进的模型输出。");
   }
 
-  const jsonNamedOutputs = (config.namedOutputs ?? []).filter((output) => output.format === "json");
-  if (jsonNamedOutputs.length === 0) {
-    if (config.outputFormat === "json") {
-      const content =
-        typeof outputData.selectedContent === "string"
-          ? outputData.selectedContent
-          : typeof outputData.text === "string"
-            ? outputData.text
-            : "";
+  const allNamedOutputs = config.namedOutputs ?? [];
+  if (allNamedOutputs.length > 0) {
+    const namedOutputs =
+      (outputData.namedOutputs as Record<string, { content?: string }> | undefined) ?? {};
 
-      if (!content.trim()) {
-        errors.push("当前节点没有可校验的 JSON 输出。");
-      } else {
-        errors.push(...validateJsonStringAgainstSchema(content, config.jsonSchema, "节点输出"));
+    for (const output of allNamedOutputs) {
+      const namedOutput = namedOutputs[output.id];
+      const artifactContent =
+        typeof namedOutput?.content === "string" ? namedOutput.content.trim() : "";
+
+      if (!artifactContent) {
+        errors.push(`命名产物 ${output.id} 缺失或为空`);
+        continue;
+      }
+
+      if (output.format === "json") {
+        errors.push(
+          ...validateJsonStringAgainstSchema(
+            artifactContent,
+            output.jsonSchema,
+            `命名产物 ${output.id}`,
+          ),
+        );
       }
     }
+  } else if (config.outputFormat === "json") {
+    const content =
+      typeof outputData.selectedContent === "string"
+        ? outputData.selectedContent
+        : typeof outputData.text === "string"
+          ? outputData.text
+          : "";
 
-    return errors.length > 0 ? { status: "format_error", errors } : { status: "completed" };
-  }
-
-  const namedOutputs =
-    (outputData.namedOutputs as Record<string, { content?: string }> | undefined) ?? {};
-
-  for (const output of jsonNamedOutputs) {
-    const namedOutput = namedOutputs[output.id];
-    const artifactContent =
-      typeof namedOutput?.content === "string" ? namedOutput.content.trim() : "";
-
-    if (!artifactContent) {
-      errors.push(`命名产物 ${output.id} 缺失或为空`);
-      continue;
+    if (!content.trim()) {
+      errors.push("当前节点没有可校验的 JSON 输出。");
+    } else {
+      errors.push(...validateJsonStringAgainstSchema(content, config.jsonSchema, "节点输出"));
     }
-
-    errors.push(
-      ...validateJsonStringAgainstSchema(
-        artifactContent,
-        output.jsonSchema,
-        `命名产物 ${output.id}`,
-      ),
-    );
   }
 
   return errors.length > 0 ? { status: "format_error", errors } : { status: "completed" };
@@ -607,8 +627,12 @@ export async function executeModelCall(
           let modelStatus: ModelOutput["status"] = r.status;
           let formatErrors: string[] | undefined;
 
-          // Validate JSON output if configured
-          if (r.status === "completed" && config?.outputFormat === "json") {
+          // Validate output format (JSON syntax/schema + named output delimiters)
+          if (
+            r.status === "completed" &&
+            config &&
+            (config.outputFormat === "json" || (config.namedOutputs?.length ?? 0) > 0)
+          ) {
             const validation = validateModelOutput(r.content, config);
             if (validation.status === "format_error") {
               modelStatus = "format_error";
@@ -627,10 +651,11 @@ export async function executeModelCall(
         }
       }
 
+      // Prefer completed (valid format) over format_error for auto-selection
       const firstCompletedModelId =
-        Object.values(finalModels).find(
-          (m) => m.status === "completed" || m.status === "format_error",
-        )?.modelId ?? null;
+        Object.values(finalModels).find((m) => m.status === "completed")?.modelId ??
+        Object.values(finalModels).find((m) => m.status === "format_error")?.modelId ??
+        null;
       const { outputData: outputDataPayload, selectedOutputKey } = buildModelCallOutputData({
         models: finalModels,
         config,
@@ -929,6 +954,7 @@ export async function executeModelCallBackground(
     // Build final output data
     const finalModels: Record<string, ModelOutput> = {};
     let firstCompletedModelId: string | null = null;
+    let firstFormatErrorModelId: string | null = null;
 
     for (const result of results) {
       if (result.status === "fulfilled") {
@@ -936,8 +962,11 @@ export async function executeModelCallBackground(
         let modelStatus: ModelOutput["status"] = r.status;
         let formatErrors: string[] | undefined;
 
-        // Validate JSON output if configured
-        if (r.status === "completed" && mcConfig.outputFormat === "json") {
+        // Validate output format (JSON syntax/schema + named output delimiters)
+        if (
+          r.status === "completed" &&
+          (mcConfig.outputFormat === "json" || (mcConfig.namedOutputs?.length ?? 0) > 0)
+        ) {
           const validation = validateModelOutput(r.content, mcConfig);
           if (validation.status === "format_error") {
             modelStatus = "format_error";
@@ -954,17 +983,17 @@ export async function executeModelCallBackground(
           formatErrors,
         };
 
-        if (
-          (modelStatus === "completed" || modelStatus === "format_error") &&
-          !firstCompletedModelId
-        ) {
+        // Prefer completed (valid format) over format_error for auto-selection
+        if (modelStatus === "completed" && !firstCompletedModelId) {
           firstCompletedModelId = r.modelId;
+        } else if (modelStatus === "format_error" && !firstFormatErrorModelId) {
+          firstFormatErrorModelId = r.modelId;
         }
       }
     }
 
     // Check if at least one model succeeded
-    if (!firstCompletedModelId) {
+    if (!firstCompletedModelId && !firstFormatErrorModelId) {
       // All models failed — collect error messages
       const errors = results
         .map((r) =>
@@ -991,7 +1020,7 @@ export async function executeModelCallBackground(
       defaultSelectedModelId:
         mcConfig.enableUserSelectionOutput === true
           ? (currentExecution?.selectedOutputKey ?? null)
-          : (currentExecution?.selectedOutputKey ?? firstCompletedModelId),
+          : (currentExecution?.selectedOutputKey ?? firstCompletedModelId ?? firstFormatErrorModelId),
       previousOutputData: currentOutputData,
       markManualFeedbackApplied: true,
     });

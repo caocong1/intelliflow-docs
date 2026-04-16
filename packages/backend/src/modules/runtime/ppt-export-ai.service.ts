@@ -3,7 +3,7 @@ import type { SlidePresentation } from "../../../../shared/src/slide-types";
 import { db } from "../../db";
 import { modelCallLogs, models, providers } from "../../db/schema";
 import type { NativeTemplateProfile } from "../ppt-templates/native-template-profile";
-import { buildTemplatePromptSummary } from "./ppt-deck-composition";
+import { buildTemplatePromptSummary, inferArchetype } from "./ppt-deck-composition";
 import { validateSlidePresentation } from "./slide-schema";
 import { getStrategy } from "./strategies";
 import type { ModelCallInput } from "./strategies";
@@ -85,6 +85,9 @@ function buildPlanningPrompt(content: string, templateProfile?: NativeTemplatePr
       "必须严格输出 SlidePresentation JSON。",
       "每页都尽量补全 semanticRole、sectionKey、visualIntent。",
       "semanticRole 只能使用以下枚举：cover、toc、section_break、bullet_list、comparison、timeline、table、image_focus、summary、qna、closing。",
+      "每页还需填写 archetype 字段，从以下固定列表选择：cover_hero、cover_split、toc_vertical、toc_grid、section_divider、bullet_story、feature_grid、comparison_split、timeline_horizontal、kpi_row、table_clean、summary_cards、qna_centered、closing_minimal。",
+      "archetype 决定页面的视觉排版方式，例如：feature_grid 适合 3-4 个特性的 2×2 网格；kpi_row 适合大数字+标签的数据亮点页；timeline_horizontal 适合流程/历程的水平时间轴。",
+      "每页还需填写 density 字段：sparse（内容少，留白多）、medium（适中）、dense（内容密集）。",
       "优先保证封面、目录、过渡页、总结页、结尾页的叙事完整。",
       "bullets 需要控制在适合 PPT 阅读的密度，不要长段落。",
       templateSummary,
@@ -138,6 +141,11 @@ export async function composeDeckWithAi(params: {
       const validation = validateSlidePresentation(parsed);
       if (validation.valid) {
         presentation = parsed as SlidePresentation;
+        // Back-fill archetype/density when AI omits them
+        for (const slide of presentation.slides) {
+          if (!slide.archetype) slide.archetype = inferArchetype(slide);
+          if (!slide.density) slide.density = "medium";
+        }
       } else {
         warning = `AI 编排输出未通过幻灯片 Schema 校验：${validation.errors?.join("；") ?? "未知错误"}`;
       }

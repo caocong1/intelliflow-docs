@@ -283,6 +283,45 @@ describe("PPT buffer generation", () => {
       .split("\n")
       .filter((line) => /ppt\/slides\/slide\d+\.xml/.test(line));
 
-    expect(slideFiles).toHaveLength(2);
+    const inspectResult = Bun.spawnSync(
+      [
+        "python3",
+        "-c",
+        `
+from zipfile import ZipFile
+import xml.etree.ElementTree as ET
+import re, sys
+ns = {'p':'http://schemas.openxmlformats.org/presentationml/2006/main'}
+path = sys.argv[1]
+with ZipFile(path) as z:
+    root = ET.fromstring(z.read('ppt/presentation.xml'))
+    slide_refs = root.find('p:sldIdLst', ns)
+    print('refs=' + str(len(slide_refs.findall('p:sldId', ns)) if slide_refs is not None else 0))
+    rel_names = [n for n in z.namelist() if re.match(r'ppt/slides/_rels/slide\\d+\\.xml\\.rels$', n)]
+    missing = []
+    for rel in rel_names:
+        root = ET.fromstring(z.read(rel))
+        for child in root:
+            target = child.attrib.get('Target')
+            if not target or target.startswith('http'):
+                continue
+            if target.startswith('../'):
+                normalized = 'ppt/' + target[3:]
+            else:
+                normalized = 'ppt/slides/' + target
+            if normalized not in z.namelist():
+                missing.append((rel, target, normalized))
+    print('missing=' + str(len(missing)))
+`,
+        filePath,
+      ],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const inspectText = Buffer.from(inspectResult.stdout).toString("utf8");
+    const refCount = Number(inspectText.match(/refs=(\d+)/)?.[1] ?? "0");
+    const missingCount = Number(inspectText.match(/missing=(\d+)/)?.[1] ?? "0");
+    expect(slideFiles.length).toBeGreaterThanOrEqual(2);
+    expect(refCount).toBe(2);
+    expect(missingCount).toBe(0);
   });
 });

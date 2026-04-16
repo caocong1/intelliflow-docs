@@ -2381,49 +2381,6 @@ async function renderSlidesToPptx(slides: Slide[], theme: PptTheme = PPT_THEME):
   return Buffer.from(output as ArrayBuffer);
 }
 
-async function createEmptyRootBuffer(): Promise<Buffer> {
-  const emptyRoot = new PptxGenJS();
-  emptyRoot.layout = "LAYOUT_WIDE";
-  const emptyRootOutput = await emptyRoot.write({ outputType: "nodebuffer" });
-  return Buffer.from(emptyRootOutput as ArrayBuffer);
-}
-
-async function trimLeadingRenderedSlides(
-  buffer: Buffer,
-  expectedSlideCount: number,
-): Promise<Buffer> {
-  const { default: AutomizerCls } = await import("pptx-automizer");
-  const rootBuffer = await createEmptyRootBuffer();
-  const inspector = new AutomizerCls({
-    templateDir: "",
-    outputDir: "",
-    removeExistingSlides: true,
-    useCreationIds: false,
-  });
-
-  inspector.loadRoot(rootBuffer).load(buffer, "__rendered__");
-  const infos = await inspector.setCreationIds();
-  const renderedInfo = infos.find((info) => info.name === "__rendered__") ?? infos[0];
-  const renderedSlides = renderedInfo?.slides ?? [];
-  const extraLeadingSlides = renderedSlides.length - expectedSlideCount;
-  if (extraLeadingSlides <= 0) return buffer;
-
-  const trimmer = new AutomizerCls({
-    templateDir: "",
-    outputDir: "",
-    removeExistingSlides: true,
-    useCreationIds: false,
-  });
-  trimmer.loadRoot(rootBuffer).load(buffer, "__rendered__");
-  renderedSlides.slice(extraLeadingSlides).forEach((slide) => {
-    trimmer.addSlide("__rendered__", slide.number);
-  });
-
-  const zip = await trimmer.getJSZip();
-  const output = await zip.generateAsync({ type: "nodebuffer" });
-  return Buffer.from(output);
-}
-
 async function renderSlidesWithNativeTemplate(
   assignments: DeckAssignment[],
   templateBuffer: Buffer,
@@ -2431,7 +2388,6 @@ async function renderSlidesWithNativeTemplate(
   storedProfile?: NativeTemplateProfile | null,
 ): Promise<Buffer> {
   const { default: AutomizerCls, modify } = await import("pptx-automizer");
-  const rootBuffer = await createEmptyRootBuffer();
   const useCreationIds = Boolean(
     storedProfile?.slides.some((slide) => slide.slideId !== slide.slideNumber),
   );
@@ -2442,7 +2398,7 @@ async function renderSlidesWithNativeTemplate(
     useCreationIds,
   });
 
-  automizer.loadRoot(rootBuffer).load(templateBuffer, "__native_template__");
+  automizer.loadRoot(templateBuffer).load(templateBuffer, "__native_template__");
   const templateInfos = await automizer.setCreationIds();
   const liveProfile = buildNativeTemplateProfile(templateInfos as never);
   const templateProfile = mergeNativeTemplateProfiles(
@@ -2460,7 +2416,10 @@ async function renderSlidesWithNativeTemplate(
     const matchedTemplateSlide = assignment.templateSlide as unknown as NativeTemplateSlide | null;
     const sourceSlide = matchedTemplateSlide ?? fallbackCanvas;
 
-    automizer.addSlide("__native_template__", sourceSlide.slideId, (targetSlide) => {
+    automizer.addSlide(
+      "__native_template__",
+      useCreationIds ? sourceSlide.slideId : sourceSlide.slideNumber,
+      (targetSlide) => {
       const templateTargetSlide = targetSlide as unknown as TemplateSlideController;
       if (!matchedTemplateSlide) {
         console.warn(
@@ -2498,12 +2457,13 @@ async function renderSlidesWithNativeTemplate(
           assignment.pageNumber,
         );
       }
-    });
+      },
+    );
   });
 
   const zip = await automizer.getJSZip();
   const output = await zip.generateAsync({ type: "nodebuffer" });
-  return trimLeadingRenderedSlides(Buffer.from(output), assignments.length);
+  return Buffer.from(output);
 }
 
 async function resolvePptTemplate(templateId?: string | null) {

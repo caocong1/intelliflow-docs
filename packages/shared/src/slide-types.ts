@@ -17,8 +17,30 @@ export const SLIDE_SEMANTIC_ROLES = [
 
 export type SlideSemanticRole = (typeof SLIDE_SEMANTIC_ROLES)[number];
 
+export const SLIDE_ARCHETYPES = [
+  "cover_hero",
+  "cover_split",
+  "toc_vertical",
+  "toc_grid",
+  "section_divider",
+  "bullet_story",
+  "feature_grid",
+  "comparison_split",
+  "timeline_horizontal",
+  "kpi_row",
+  "table_clean",
+  "summary_cards",
+  "qna_centered",
+  "closing_minimal",
+] as const;
+
+export type SlideArchetype = (typeof SLIDE_ARCHETYPES)[number];
+export type SlideDensity = "sparse" | "medium" | "dense";
+
 export interface SlideCommonFields {
   semanticRole?: SlideSemanticRole;
+  archetype?: SlideArchetype;
+  density?: SlideDensity;
   sectionKey?: string;
   visualIntent?: string;
   notes?: string;
@@ -81,6 +103,8 @@ export interface BlankSlide extends SlideCommonFields {
 /** JSON Schema for SlidePresentation — usable as a model call JSON Schema preset */
 const sharedSlideProperties = {
   semanticRole: { type: "string", enum: [...SLIDE_SEMANTIC_ROLES] },
+  archetype: { type: "string", enum: [...SLIDE_ARCHETYPES] },
+  density: { type: "string", enum: ["sparse", "medium", "dense"] },
   sectionKey: { type: "string", maxLength: 120 },
   visualIntent: { type: "string", maxLength: 120 },
   notes: { type: "string", maxLength: 500 },

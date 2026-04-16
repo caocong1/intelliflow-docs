@@ -42,6 +42,7 @@ export default function ExportCompleted(props: Props) {
       fileSize: number;
       filePath?: string;
       templateId?: string | null;
+      stylePackId?: string;
       renderMode?: string;
       warnings?: string[];
       compositionSummary?: Record<string, unknown> | null;
@@ -108,6 +109,10 @@ export default function ExportCompleted(props: Props) {
     }
     if (c.templateId) {
       entries.push({ label: "模板 ID", value: c.templateId });
+    }
+    const rStylePackId = result()?.stylePackId;
+    if (rStylePackId) {
+      entries.push({ label: "演示风格", value: rStylePackId });
     }
     return entries;
   };

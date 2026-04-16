@@ -2,6 +2,7 @@ import Elysia, { t } from "elysia";
 import { requireAuth } from "../auth/auth.guard";
 import { canEditDocument, isDocumentProjectMember } from "../versions/versions.service";
 import { downloadExport, generateExport, getExportPreview } from "./export.service";
+import { listStylePacks } from "./ppt-style-packs";
 
 export const exportRoutes = new Elysia({ prefix: "/runtime" })
   .use(requireAuth)
@@ -62,6 +63,7 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
           body.filename,
           userId,
           body.templateId,
+          body.stylePackId,
         );
         return result;
       } catch (err: unknown) {
@@ -81,6 +83,7 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
         ]),
         filename: t.String(),
         templateId: t.Optional(t.Nullable(t.String())),
+        stylePackId: t.Optional(t.Nullable(t.String())),
       }),
     },
   )
@@ -128,4 +131,8 @@ export const exportRoutes = new Elysia({ prefix: "/runtime" })
     {
       params: t.Object({ documentId: t.String(), nodeExecutionId: t.String() }),
     },
-  );
+  )
+
+  // ─── List available style packs ───────────────────────────────────────────
+
+  .get("/style-packs", () => listStylePacks());

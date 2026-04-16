@@ -46,6 +46,8 @@ import {
   type DeckSource,
 } from "./ppt-deck-composition";
 import type { SlideSemanticRole } from "../../../../shared/src/slide-types";
+import { getStylePack, DEFAULT_STYLE_PACK_ID } from "./ppt-style-packs";
+import { renderArchetypeSlide, type PptSlide } from "./ppt-archetype-renderer";
 
 // ─── Node config loader ─────────────────────────────────────────────────────
 
@@ -2510,6 +2512,7 @@ type PptBufferResult = {
   warnings: string[];
   compositionSummary: DeckCompositionSummary;
   templateId: string | null;
+  stylePackId?: string;
 };
 
 type PptCompositionResult = {
@@ -2558,13 +2561,57 @@ async function buildDeckComposition(
 }
 
 /** Generate PPT buffer from content, optionally applying a PPT template */
+async function renderSlidesToPptxWithStylePack(
+  slides: Slide[],
+  stylePackId: string,
+): Promise<Buffer> {
+  const stylePack = getStylePack(stylePackId) ?? getStylePack(DEFAULT_STYLE_PACK_ID);
+  if (!stylePack) throw new Error(`Style pack "${stylePackId}" not found`);
+
+  const pptx = new PptxGenJS();
+  pptx.layout = "LAYOUT_WIDE";
+
+  for (const slide of slides) {
+    const pptSlide = pptx.addSlide() as unknown as PptSlide;
+    renderArchetypeSlide(pptSlide, slide, stylePack);
+  }
+
+  return (await pptx.write({ outputType: "nodebuffer" })) as unknown as Buffer;
+}
+
 async function generatePptBuffer(params: {
   content: string;
   templateId?: string | null;
+  stylePackId?: string | null;
   documentId: string;
   nodeExecutionId: string;
   userId: string;
 }): Promise<PptBufferResult> {
+  // Style pack path: when stylePackId is provided (or no templateId), use style packs
+  if (params.stylePackId || !params.templateId) {
+    const effectiveStylePackId = params.stylePackId || DEFAULT_STYLE_PACK_ID;
+    const composition = await buildDeckComposition(
+      params.content,
+      null,
+      params.documentId,
+      params.nodeExecutionId,
+      params.userId,
+    );
+    const buffer = await renderSlidesToPptxWithStylePack(composition.slides, effectiveStylePackId);
+    return {
+      buffer,
+      renderMode: `style_pack_v1_${composition.source}`,
+      warnings: [...new Set(composition.warnings)],
+      compositionSummary: buildDeckCompositionSummary({
+        source: composition.source,
+        slides: composition.slides,
+      }),
+      templateId: null,
+      stylePackId: effectiveStylePackId,
+    };
+  }
+
+  // Legacy template path: only when explicit templateId is provided
   const template = await resolvePptTemplate(params.templateId);
   const templateProfile = extractNativeTemplateProfile(template?.themeConfig);
   const composition = await buildDeckComposition(
@@ -2659,12 +2706,14 @@ export async function generateExport(
   filename: string,
   userId: string,
   templateIdOverride?: string | null,
+  stylePackId?: string | null,
 ): Promise<{
   filename: string;
   storagePath: string;
   fileSize: number;
   format: string;
   templateId?: string | null;
+  stylePackId?: string;
   renderMode?: string;
   warnings?: string[];
   compositionSummary?: DeckCompositionSummary;
@@ -2677,6 +2726,7 @@ export async function generateExport(
   let buffer: Buffer;
   let mimeType: string;
   let appliedTemplateId: string | null = null;
+  let appliedStylePackId: string | undefined;
   let renderMode: string | undefined;
   let warnings: string[] | undefined;
   let compositionSummary: DeckCompositionSummary | undefined;
@@ -2705,11 +2755,13 @@ export async function generateExport(
       const pptResult = await generatePptBuffer({
         content,
         templateId: pptxTemplateId,
+        stylePackId,
         documentId,
         nodeExecutionId,
         userId,
       });
       appliedTemplateId = pptResult.templateId ?? pptxTemplateId ?? null;
+      appliedStylePackId = pptResult.stylePackId;
       buffer = pptResult.buffer;
       renderMode = pptResult.renderMode;
       warnings = pptResult.warnings;
@@ -2754,6 +2806,7 @@ export async function generateExport(
         ...(format === "pptx"
           ? {
               templateId: appliedTemplateId,
+              stylePackId: appliedStylePackId,
               renderMode,
               warnings,
               compositionSummary,
@@ -2772,6 +2825,7 @@ export async function generateExport(
     ...(format === "pptx"
       ? {
           templateId: appliedTemplateId,
+          stylePackId: appliedStylePackId,
           renderMode,
           warnings,
           compositionSummary,

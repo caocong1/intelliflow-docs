@@ -163,12 +163,14 @@ export async function generateExport(
   format: string,
   filename: string,
   templateId?: string | null,
+  stylePackId?: string | null,
 ): Promise<{
   filename: string;
   format: string;
   fileSize: number;
   storagePath: string;
   templateId?: string | null;
+  stylePackId?: string;
   renderMode?: string;
   warnings?: string[];
   compositionSummary?: Record<string, unknown>;
@@ -177,6 +179,7 @@ export async function generateExport(
     format,
     filename,
     templateId,
+    stylePackId,
   });
   if ("data" in res) return res.data;
   return null;

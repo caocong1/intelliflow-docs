@@ -2,7 +2,7 @@ import type { ExportConfig, NodeExecution } from "@intelliflow/shared";
 import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup, onMount } from "solid-js";
 import { advanceNode, generateExport, getExportPreview } from "../../../api/client";
 import { downloadBlobResponse, type DownloadProgress } from "../../../lib/download";
-import { listTemplates, type PptTemplate } from "../../../lib/api/ppt-templates";
+import { listStylePacks, type StylePackItem } from "../../../lib/api/style-packs";
 import { sanitizeHtml } from "../../../lib/sanitize";
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
@@ -28,7 +28,7 @@ const FORMAT_ICONS: Record<ExportFormat, string> = {
   pptx: "S",
 };
 
-const PPT_EXPORT_STAGES = ["内容编排中", "模板匹配中", "导出生成中"] as const;
+const PPT_EXPORT_STAGES = ["内容编排中", "风格渲染中", "导出生成中"] as const;
 
 interface Props {
   nodeExecution: NodeExecution;
@@ -39,9 +39,8 @@ interface Props {
   readOnly: boolean;
 }
 
-async function fetchPptTemplates(): Promise<PptTemplate[]> {
-  const res = await listTemplates(1, 100, undefined, { includeInactive: false });
-  return res.data;
+async function fetchStylePacks(): Promise<StylePackItem[]> {
+  return listStylePacks();
 }
 
 export default function ExportExecutor(props: Props) {
@@ -87,20 +86,21 @@ export default function ExportExecutor(props: Props) {
   const [completing, setCompleting] = createSignal(false);
   const [downloading, setDownloading] = createSignal(false);
   const [downloadProgress, setDownloadProgress] = createSignal<DownloadProgress | null>(null);
-  const [selectedPptTemplateId, setSelectedPptTemplateId] = createSignal<string | null>(null);
+  const [selectedStylePackId, setSelectedStylePackId] = createSignal<string | null>(null);
   const [pptExportStageIndex, setPptExportStageIndex] = createSignal(0);
   const [exportResult, setExportResult] = createSignal<{
     filename: string;
     format: string;
     fileSize: number;
     templateId?: string | null;
+    stylePackId?: string;
     renderMode?: string;
     warnings?: string[];
     compositionSummary?: Record<string, unknown> | null;
   } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
-  const [pptTemplates] = createResource(fetchPptTemplates);
-  let pptTemplateSelectRef: HTMLSelectElement | undefined;
+  const [stylePacks] = createResource(fetchStylePacks);
+  let stylePackSelectRef: HTMLSelectElement | undefined;
   let pptStageTimer: ReturnType<typeof setInterval> | undefined;
   const latestExportResult = createMemo(() => {
     const local = exportResult();
@@ -133,12 +133,12 @@ export default function ExportExecutor(props: Props) {
     if (format() !== "pptx") return false;
     const result = latestExportResult();
     if (!result || result.format !== "pptx") return false;
-    return (selectedPptTemplateId() ?? null) !== (result.templateId ?? null);
+    return (selectedStylePackId() ?? null) !== (result.stylePackId ?? null);
   });
 
   createEffect(() => {
     if (format() === "pptx") {
-      selectedPptTemplateId();
+      selectedStylePackId();
       setExportResult(null);
     }
   });
@@ -199,16 +199,17 @@ export default function ExportExecutor(props: Props) {
     }
 
     try {
-      const runtimeTemplateId =
+      const runtimeStylePackId =
         format() === "pptx"
-          ? pptTemplateSelectRef?.value || selectedPptTemplateId() || null
+          ? stylePackSelectRef?.value || selectedStylePackId() || null
           : undefined;
       const result = await generateExport(
         props.documentId,
         props.nodeExecution.id,
         format(),
         filename(),
-        runtimeTemplateId,
+        undefined,
+        runtimeStylePackId,
       );
 
       if (result && !("error" in result)) {
@@ -216,7 +217,8 @@ export default function ExportExecutor(props: Props) {
           filename: result.filename,
           format: result.format,
           fileSize: result.fileSize,
-          templateId: result.templateId ?? runtimeTemplateId ?? null,
+          templateId: result.templateId ?? null,
+          stylePackId: result.stylePackId ?? runtimeStylePackId ?? undefined,
           renderMode: result.renderMode,
           warnings: result.warnings,
           compositionSummary:
@@ -508,25 +510,22 @@ export default function ExportExecutor(props: Props) {
 
         <Show when={format() === "pptx"}>
           <div>
-            <span class="block text-xs font-medium text-[#464555] mb-1">PPT 模板</span>
+            <span class="block text-xs font-medium text-[#464555] mb-1">演示风格</span>
             <select
-              ref={pptTemplateSelectRef}
-              value={selectedPptTemplateId() ?? ""}
-              onChange={(e) => setSelectedPptTemplateId(e.currentTarget.value || null)}
+              ref={stylePackSelectRef}
+              value={selectedStylePackId() ?? ""}
+              onChange={(e) => setSelectedStylePackId(e.currentTarget.value || null)}
               class="w-full px-3 py-2 text-sm border border-[rgba(199,196,216,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] bg-[#f7f9fb] text-[#191c1e]"
             >
-              <option value="">不套用模板</option>
-              <For each={pptTemplates() ?? []}>
-                {(template) => (
-                  <option value={template.id}>
-                    {template.name}
-                    {template.type === "native_pptx" ? "（原生模板）" : "（主题）"}
-                  </option>
+              <option value="">默认风格（商务深蓝）</option>
+              <For each={stylePacks() ?? []}>
+                {(pack) => (
+                  <option value={pack.id}>{pack.label}</option>
                 )}
               </For>
             </select>
             <p class="mt-1 text-xs text-[#6b7280]">
-              运行时可反复切换模板导出；确认满意后再点击“完成导出”结束本步骤。
+              选择演示风格后导出；可反复切换风格重新导出，确认满意后点击「完成导出」。
             </p>
           </div>
         </Show>
@@ -695,7 +694,7 @@ export default function ExportExecutor(props: Props) {
       <Show when={isPptExportResultStale()}>
         <div class="px-6 py-4 border-b border-[rgba(199,196,216,0.15)]">
           <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            当前已切换 PPT 模板，请重新点击“导出并下载”生成新文件。下面不会再显示旧模板导出的结果。
+            当前已切换演示风格，请重新点击「导出并下载」生成新文件。下面不会再显示旧风格导出的结果。
           </div>
         </div>
       </Show>

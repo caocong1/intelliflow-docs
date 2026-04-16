@@ -1,5 +1,7 @@
 import type {
+  ContentSlide,
   Slide,
+  SlideArchetype,
   SlideSemanticRole,
 } from "../../../../shared/src/slide-types";
 import type { NativeTemplateProfileSlide } from "../ppt-templates/native-template-profile";
@@ -105,12 +107,53 @@ function inferVisualIntent(role: SlideSemanticRole, slide: Slide): string {
   }
 }
 
+export function inferArchetype(slide: Slide): SlideArchetype {
+  const role = slide.semanticRole ?? "bullet_list";
+  switch (role) {
+    case "cover":
+      return slide.layout === "two_column" ? "cover_split" : "cover_hero";
+    case "toc": {
+      if (slide.layout === "content") {
+        const bullets = (slide as ContentSlide).bullets;
+        return bullets.length > 4 ? "toc_grid" : "toc_vertical";
+      }
+      return "toc_vertical";
+    }
+    case "section_break":
+      return "section_divider";
+    case "comparison":
+      return "comparison_split";
+    case "timeline":
+      return "timeline_horizontal";
+    case "table":
+      return "table_clean";
+    case "summary":
+      return "summary_cards";
+    case "qna":
+      return "qna_centered";
+    case "closing":
+      return "closing_minimal";
+    case "bullet_list":
+    default: {
+      if (slide.layout === "content") {
+        const bullets = (slide as ContentSlide).bullets;
+        if (bullets.length >= 3 && bullets.length <= 4 && bullets.every((b) => b.length < 60)) {
+          return "feature_grid";
+        }
+      }
+      return "bullet_story";
+    }
+  }
+}
+
 export function normalizeSlidesForDeck(slides: Slide[]): Slide[] {
   return slides.map((slide, index) => {
     const semanticRole = inferSemanticRole(slide, index, slides.length);
+    const withRole = { ...slide, semanticRole };
     return {
-      ...slide,
-      semanticRole,
+      ...withRole,
+      archetype: slide.archetype ?? inferArchetype(withRole),
+      density: slide.density ?? measureSlideDensity(slide),
       sectionKey: slide.sectionKey ?? `${semanticRole}-${index + 1}`,
       visualIntent: slide.visualIntent ?? inferVisualIntent(semanticRole, slide),
     };

@@ -319,24 +319,7 @@ const Sidebar: Component = () => {
             </svg>
             <Show when={!collapsed()}>模型调用日志</Show>
           </A>
-          <A href="/admin/ppt-templates" class={linkClass("/admin/ppt-templates")} title="PPT 模板">
-            <svg
-              class="w-4 h-4 flex-shrink-0"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <title>PPT 模板</title>
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-              />
-            </svg>
-            <Show when={!collapsed()}>PPT 模板</Show>
-          </A>
+          {/* PPT 模板管理已迁移到内置风格包，导航入口隐藏；路由保留供内部访问 */}
           <A href="/admin/workflows" class={linkClass("/admin/workflows")} title="流程管理">
             <svg
               class="w-4 h-4 flex-shrink-0"

@@ -45,7 +45,13 @@ import {
   type DeckCompositionSummary,
   type DeckSource,
 } from "./ppt-deck-composition";
-import type { SlideSemanticRole } from "../../../../shared/src/slide-types";
+import type {
+  ImageSlide,
+  Slide,
+  SlidePresentation,
+  SlideSemanticRole,
+  TableSlide,
+} from "../../../../shared/src/slide-types";
 import { getStylePack, DEFAULT_STYLE_PACK_ID } from "./ppt-style-packs";
 import { renderArchetypeSlide, type PptSlide } from "./ppt-archetype-renderer";
 
@@ -787,52 +793,7 @@ async function generatePdfBuffer(content: string): Promise<Buffer> {
 import PptxGenJS from "pptxgenjs";
 import { validateSlidePresentation } from "./slide-schema";
 
-// Slide schema types
-interface SlideCommonFields {
-  semanticRole?: SlideSemanticRole;
-  sectionKey?: string;
-  visualIntent?: string;
-  notes?: string;
-}
-
-interface TitleSlide extends SlideCommonFields {
-  layout: "title";
-  title: string;
-  subtitle?: string;
-}
-interface ContentSlide extends SlideCommonFields {
-  layout: "content";
-  title: string;
-  bullets: string[];
-}
-interface TwoColumnSlide extends SlideCommonFields {
-  layout: "two_column";
-  title: string;
-  left: { title?: string; bullets: string[] };
-  right: { title?: string; bullets: string[] };
-}
-interface TableSlide extends SlideCommonFields {
-  layout: "table";
-  title: string;
-  headers: string[];
-  rows: string[][];
-}
-interface ImageSlide extends SlideCommonFields {
-  layout: "image";
-  title: string;
-  imageRef?: string;
-  caption?: string;
-}
-interface BlankSlide extends SlideCommonFields {
-  layout: "blank";
-}
-
-type Slide = TitleSlide | ContentSlide | TwoColumnSlide | TableSlide | ImageSlide | BlankSlide;
-
-interface SlidePresentation {
-  metadata?: { aspectRatio?: "16:9" | "4:3"; language?: string };
-  slides: Slide[];
-}
+// Slide types imported from shared/src/slide-types.ts
 
 // Theme defaults
 const PPT_THEME = {

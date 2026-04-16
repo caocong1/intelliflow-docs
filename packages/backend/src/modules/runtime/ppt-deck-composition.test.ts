@@ -88,6 +88,33 @@ describe("ppt deck composition", () => {
     expect(assignments[1].templateSlide?.slideNumber).not.toBe(assignments[2].templateSlide?.slideNumber);
   });
 
+  test("cover prefers first-page template cover over generic content pages", () => {
+    const slides = normalizeSlidesForDeck([
+      { layout: "title", title: "项目方案", subtitle: "副标题" },
+    ] as Slide[]);
+    const templateSlides = [
+      createTemplateSlide(1, "cover", ["title"]),
+      createTemplateSlide(4, "comparison", ["content", "two_column"]),
+    ];
+
+    const assignments = assignTemplateSequence(slides, templateSlides);
+    expect(assignments[0].templateSlide?.slideNumber).toBe(1);
+  });
+
+  test("toc avoids template pages without content-bearing slots", () => {
+    const slides = normalizeSlidesForDeck([
+      { layout: "content", title: "目录", bullets: ["A", "B", "C", "D"] },
+    ] as Slide[]);
+    const tocTitleOnly = createTemplateSlide(2, "toc", ["title"]);
+    delete (tocTitleOnly as any).bodySlot;
+    delete (tocTitleOnly as any).leftSlot;
+    delete (tocTitleOnly as any).rightSlot;
+    const tocContent = createTemplateSlide(4, "toc", ["content"]);
+
+    const assignments = assignTemplateSequence(slides, [tocTitleOnly, tocContent]);
+    expect(assignments[0].templateSlide?.slideNumber).toBe(4);
+  });
+
   test("scoreTemplateCandidate strongly prefers exact semantic role matches", () => {
     const slide = normalizeSlidesForDeck([
       {

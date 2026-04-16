@@ -2235,15 +2235,23 @@ function renderSlideWithNativeTemplate(
   const notesSlot = resolveTemplateSlot(templateSlide, "notesSlot");
   const footerSlot = resolveTemplateSlot(templateSlide, "footerSlot");
   const pageNumSlot = resolveTemplateSlot(templateSlide, "pageNumSlot");
+  const effectiveTitleSlot = titleSlot ?? bodySlot ?? subtitleSlot;
+  const effectiveSubtitleSlot =
+    subtitleSlot ?? (effectiveTitleSlot && effectiveTitleSlot === bodySlot ? undefined : bodySlot);
 
-  setTemplateText(targetSlide, modify, titleSlot, "title" in slide ? truncate(slide.title, MAX_TITLE_CHARS) : "");
+  setTemplateText(targetSlide, modify, effectiveTitleSlot, "title" in slide ? truncate(slide.title, MAX_TITLE_CHARS) : "");
   setTemplateText(targetSlide, modify, notesSlot, slide.notes?.slice(0, 500) ?? "");
   setTemplateText(targetSlide, modify, footerSlot, "");
   setTemplateText(targetSlide, modify, pageNumSlot, String(pageNumber));
 
   switch (slide.layout) {
     case "title":
-      setTemplateText(targetSlide, modify, subtitleSlot, slide.subtitle ? truncate(slide.subtitle, 120) : "");
+      setTemplateText(
+        targetSlide,
+        modify,
+        effectiveSubtitleSlot,
+        slide.subtitle ? truncate(slide.subtitle, 120) : "",
+      );
       break;
     case "content":
       setTemplateParagraphs(targetSlide, modify, bodySlot, buildBulletParagraphs(slide.bullets));

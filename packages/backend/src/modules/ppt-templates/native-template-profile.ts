@@ -631,7 +631,7 @@ function inferSemanticRole(
     scores.set(role, (scores.get(role) ?? 0) + score);
   };
 
-  if (slide.slideNumber === 1) addScore("cover", 70);
+  if (slide.slideNumber === 1) addScore("cover", 180);
   if (slide.slideNumber === totalSlides) addScore("closing", 45);
   if (slide.hasFullBleedImage) addScore("image_focus", 20);
   if (slide.roleHints.includes("title")) addScore("section_break", 24);
@@ -649,6 +649,12 @@ function inferSemanticRole(
   if (/对比|vs|compare|comparison|优势/.test(text)) addScore("comparison", 100);
   if (/过渡页|chapter|part|section|篇章/.test(text)) addScore("section_break", 100);
   if (/封面|businesspowerpoint|standardtemplate|商业计划书/.test(text)) addScore("cover", 110);
+  if (slide.slideNumber === 1 && /business|汇报人|日期|部门复盘总结|商业计划书/.test(text)) {
+    addScore("cover", 120);
+  }
+  if (/^part\/?\d*/.test(text) || /part\/|章节|工作概述|工作成果展示/.test(text)) {
+    addScore("section_break", 70);
+  }
 
   if (scores.size === 0) {
     addScore("bullet_list", 20);

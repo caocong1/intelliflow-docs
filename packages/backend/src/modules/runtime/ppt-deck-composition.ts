@@ -179,11 +179,49 @@ function scoreRoleMatch(
   return candidate ? Math.max(20, Math.round(candidate.score * 0.55)) : 0;
 }
 
+function scoreSemanticSlotFit(
+  templateSlide: NativeTemplateProfileSlide,
+  slide: Slide,
+  semanticRole: SlideSemanticRole | null,
+): number {
+  const titleLike =
+    Boolean(getEffectiveSlot(templateSlide, "titleSlot")) ||
+    Boolean(getEffectiveSlot(templateSlide, "subtitleSlot")) ||
+    Boolean(getEffectiveSlot(templateSlide, "bodySlot"));
+  const contentLike =
+    Boolean(getEffectiveSlot(templateSlide, "bodySlot")) ||
+    (Boolean(getEffectiveSlot(templateSlide, "leftSlot")) &&
+      Boolean(getEffectiveSlot(templateSlide, "rightSlot")));
+  const imageLike = Boolean(getEffectiveSlot(templateSlide, "imageSlot"));
+
+  switch (semanticRole) {
+    case "cover":
+      return titleLike ? 45 : Number.NEGATIVE_INFINITY;
+    case "toc":
+      return contentLike ? 36 : Number.NEGATIVE_INFINITY;
+    case "section_break":
+      return titleLike ? 38 : Number.NEGATIVE_INFINITY;
+    case "summary":
+    case "qna":
+      return contentLike ? 26 : Number.NEGATIVE_INFINITY;
+    case "image_focus":
+      return imageLike ? 24 : -10;
+    case "closing":
+      return titleLike ? 34 : Number.NEGATIVE_INFINITY;
+    default:
+      return 0;
+  }
+}
+
 function scoreLayoutFit(templateSlide: NativeTemplateProfileSlide, slide: Slide): number {
   switch (slide.layout) {
     case "title":
-      return getEffectiveSlot(templateSlide, "titleSlot")
-        ? 40 + (getEffectiveSlot(templateSlide, "subtitleSlot") ? 8 : 0)
+      return getEffectiveSlot(templateSlide, "titleSlot") ||
+        getEffectiveSlot(templateSlide, "bodySlot") ||
+        getEffectiveSlot(templateSlide, "subtitleSlot")
+        ? 40 +
+            (getEffectiveSlot(templateSlide, "titleSlot") ? 10 : 0) +
+            (getEffectiveSlot(templateSlide, "subtitleSlot") ? 8 : 0)
         : 0;
     case "content":
       return getEffectiveSlot(templateSlide, "titleSlot") &&
@@ -232,9 +270,11 @@ export function scoreTemplateCandidate(params: {
   const semanticRole = slide.semanticRole ?? null;
   const roleScore = scoreRoleMatch(templateSlide, semanticRole);
   const layoutScore = scoreLayoutFit(templateSlide, slide);
+  const semanticSlotFit = scoreSemanticSlotFit(templateSlide, slide, semanticRole);
+  if (!Number.isFinite(semanticSlotFit)) return Number.NEGATIVE_INFINITY;
   if (roleScore === 0 && layoutScore === 0) return Number.NEGATIVE_INFINITY;
 
-  let score = roleScore + layoutScore;
+  let score = roleScore + layoutScore + semanticSlotFit;
 
   if (templateSlide.contentDensity === measureSlideDensity(slide)) {
     score += 18;
@@ -245,10 +285,17 @@ export function scoreTemplateCandidate(params: {
     score += 8;
   }
 
-  if (pageIndex === 0 && templateSlide.semanticRole === "cover") score += 24;
-  if (pageIndex === totalSlides - 1 && templateSlide.semanticRole === "closing") score += 24;
+  if (pageIndex === 0 && templateSlide.semanticRole === "cover") score += 120;
+  if (pageIndex === 0 && templateSlide.slideNumber === 1) score += 90;
+  if (pageIndex === totalSlides - 1 && templateSlide.semanticRole === "closing") score += 40;
   if (pageIndex > 0 && pageIndex < Math.max(2, totalSlides - 1) && templateSlide.semanticRole === "toc") {
-    score += 10;
+    score += 20;
+  }
+  if (semanticRole === "toc" && !getEffectiveSlot(templateSlide, "bodySlot")) {
+    score -= 50;
+  }
+  if (semanticRole === "cover" && templateSlide.slideNumber !== 1) {
+    score -= 25;
   }
 
   score -= usageCount * 38;

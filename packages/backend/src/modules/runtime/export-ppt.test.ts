@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import Automizer from "pptx-automizer";
 import PptxGenJS from "pptxgenjs";
+import { DEFAULT_PPT_STYLE_PACK_ID } from "@intelliflow/shared";
 import { buildNativeTemplateProfile } from "../ppt-templates/native-template-profile";
 import { normalizeSlidesForDeck, assignTemplateSequence } from "./ppt-deck-composition";
 import { __pptExportTestUtils, markdownToSlides, tryParseSlideJson } from "./export.service";
@@ -184,6 +185,40 @@ describe("tryParseSlideJson", () => {
 // For the full buffer generation, we test via a lightweight approach.
 
 describe("PPT buffer generation", () => {
+  test("legacy workflow template bindings are ignored unless internal fallback is enabled", () => {
+    const config = {
+      type: "export" as const,
+      formats: ["pptx"] as const,
+      contentMapping: [],
+      templateId: "legacy-template-root",
+      templateBindings: {
+        pptx: "legacy-template-binding",
+      },
+    };
+
+    expect(
+      __pptExportTestUtils.resolveLegacyPptTemplateId({
+        config,
+        legacyEnabled: false,
+      }),
+    ).toBeNull();
+
+    expect(
+      __pptExportTestUtils.resolveLegacyPptTemplateId({
+        config,
+        legacyEnabled: true,
+      }),
+    ).toBe("legacy-template-binding");
+
+    expect(
+      __pptExportTestUtils.resolveLegacyPptTemplateId({
+        config,
+        templateIdOverride: "manual-template",
+        legacyEnabled: true,
+      }),
+    ).toBe("manual-template");
+  });
+
   test("markdownToSlides + renderSlidesToPptx produces valid PPTX", async () => {
     // Dynamically import to get renderSlidesToPptx via the module
     // Since renderSlidesToPptx is not exported, we test through the slide pipeline
@@ -226,6 +261,43 @@ describe("PPT buffer generation", () => {
     const result = tryParseSlideJson(json);
     expect(result).not.toBeNull();
     expect(result!.slides.length).toBe(3);
+  });
+
+  test("style-pack export ignores legacy template ids by default and returns render metadata", async () => {
+    const result = await __pptExportTestUtils.generatePptBuffer({
+      content: JSON.stringify({
+        slides: [
+          { layout: "title", title: "运营复盘", subtitle: "Q2" },
+          { layout: "content", title: "关键结论", bullets: ["增长提速", "成本回落"] },
+        ],
+      }),
+      templateId: "legacy-template-id",
+      stylePackId: null,
+      documentId: "doc-style-pack",
+      nodeExecutionId: "node-style-pack",
+      userId: "user-style-pack",
+    });
+
+    expect(result.templateId).toBeNull();
+    expect(result.stylePackId).toBe(DEFAULT_PPT_STYLE_PACK_ID);
+    expect(result.renderMode).toBe("style_pack_v1_structured");
+    expect(result.compositionSummary).toMatchObject({
+      source: "structured",
+      totalSlides: 2,
+    });
+    expect(result.buffer[0]).toBe(0x50);
+    expect(result.buffer[1]).toBe(0x4b);
+
+    const tempDir = await mkdtemp(join(tmpdir(), "style-pack-export-"));
+    const filePath = join(tempDir, "style-pack-export.pptx");
+    await writeFile(filePath, result.buffer);
+
+    const verifyResult = Bun.spawnSync(["unzip", "-t", filePath], {
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    expect(verifyResult.exitCode).toBe(0);
   });
 
   test("native template rendering does not keep original sample slides", async () => {

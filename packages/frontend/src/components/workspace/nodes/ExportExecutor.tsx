@@ -3,6 +3,11 @@ import { For, Show, createEffect, createMemo, createResource, createSignal, onCl
 import { advanceNode, generateExport, getExportPreview } from "../../../api/client";
 import { downloadBlobResponse, type DownloadProgress } from "../../../lib/download";
 import { listStylePacks, type StylePackItem } from "../../../lib/api/style-packs";
+import {
+  DEFAULT_PPT_STYLE_PACK_ID,
+  isPptExportResultStale as getIsPptExportResultStale,
+  normalizePptStylePackId,
+} from "../../../lib/ppt-export";
 import { sanitizeHtml } from "../../../lib/sanitize";
 
 type ExportFormat = "word" | "pdf" | "markdown" | "pptx";
@@ -41,6 +46,39 @@ interface Props {
 
 async function fetchStylePacks(): Promise<StylePackItem[]> {
   return listStylePacks();
+}
+
+function withHash(color: string): string {
+  return color.startsWith("#") ? color : `#${color}`;
+}
+
+function buildStylePackCardBackground(pack: StylePackItem): string {
+  const { coverFill, primary, secondary, background } = pack.preview;
+  if (coverFill === "gradient") {
+    return `linear-gradient(135deg, ${withHash(primary)} 0%, ${withHash(secondary)} 100%)`;
+  }
+  if (coverFill === "accent_bar") {
+    return `linear-gradient(180deg, ${withHash(background)} 0%, ${withHash(background)} 76%, ${withHash(pack.preview.accent)} 76%, ${withHash(pack.preview.accent)} 100%)`;
+  }
+  return withHash(primary);
+}
+
+function getStylePackPreviewTags(pack: StylePackItem): string[] {
+  const tags: string[] = [];
+  tags.push(
+    pack.preview.coverFill === "gradient"
+      ? "渐变封面"
+      : pack.preview.coverFill === "accent_bar"
+        ? "强调条封面"
+        : "纯色封面",
+  );
+  tags.push(pack.preview.titleAlign === "center" ? "标题居中" : "标题左对齐");
+  if (pack.preview.cardShadow) tags.push("卡片投影");
+  if (pack.preview.cornerRadius > 0.09) tags.push("圆角更强");
+  else if (pack.preview.cornerRadius === 0) tags.push("锐角理性");
+  if (pack.preview.dividerStyle === "dot") tags.push("点状分隔");
+  if (pack.preview.dividerStyle === "none") tags.push("弱化分隔");
+  return tags.slice(0, 3);
 }
 
 export default function ExportExecutor(props: Props) {
@@ -86,7 +124,7 @@ export default function ExportExecutor(props: Props) {
   const [completing, setCompleting] = createSignal(false);
   const [downloading, setDownloading] = createSignal(false);
   const [downloadProgress, setDownloadProgress] = createSignal<DownloadProgress | null>(null);
-  const [selectedStylePackId, setSelectedStylePackId] = createSignal<string | null>(null);
+  const [selectedStylePackId, setSelectedStylePackId] = createSignal<string>(DEFAULT_PPT_STYLE_PACK_ID);
   const [pptExportStageIndex, setPptExportStageIndex] = createSignal(0);
   const [exportResult, setExportResult] = createSignal<{
     filename: string;
@@ -100,8 +138,33 @@ export default function ExportExecutor(props: Props) {
   } | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   const [stylePacks] = createResource(fetchStylePacks);
-  let stylePackSelectRef: HTMLSelectElement | undefined;
   let pptStageTimer: ReturnType<typeof setInterval> | undefined;
+  const stylePackOptions = createMemo<StylePackItem[]>(() => {
+    const packs = stylePacks() ?? [];
+    if (packs.some((pack) => pack.id === DEFAULT_PPT_STYLE_PACK_ID)) {
+      return packs;
+    }
+    return [
+      {
+        id: DEFAULT_PPT_STYLE_PACK_ID,
+        label: "商务深蓝",
+        preview: {
+          primary: "1E3A5F",
+          secondary: "3B82F6",
+          accent: "F59E0B",
+          background: "FFFFFF",
+          surface: "F8FAFC",
+          text: "1F2937",
+          coverFill: "gradient",
+          titleAlign: "center",
+          cornerRadius: 0.08,
+          cardShadow: true,
+          dividerStyle: "line",
+        },
+      },
+      ...packs,
+    ];
+  });
   const latestExportResult = createMemo(() => {
     const local = exportResult();
     if (local) return local;
@@ -117,6 +180,7 @@ export default function ExportExecutor(props: Props) {
         format: output.format,
         fileSize: output.fileSize,
         templateId: typeof output.templateId === "string" ? output.templateId : null,
+        stylePackId: typeof output.stylePackId === "string" ? output.stylePackId : undefined,
         renderMode: typeof output.renderMode === "string" ? output.renderMode : undefined,
         warnings: Array.isArray(output.warnings)
           ? output.warnings.filter((item): item is string => typeof item === "string")
@@ -133,7 +197,7 @@ export default function ExportExecutor(props: Props) {
     if (format() !== "pptx") return false;
     const result = latestExportResult();
     if (!result || result.format !== "pptx") return false;
-    return (selectedStylePackId() ?? null) !== (result.stylePackId ?? null);
+    return getIsPptExportResultStale(selectedStylePackId(), result.stylePackId ?? null);
   });
 
   createEffect(() => {
@@ -201,7 +265,7 @@ export default function ExportExecutor(props: Props) {
     try {
       const runtimeStylePackId =
         format() === "pptx"
-          ? stylePackSelectRef?.value || selectedStylePackId() || null
+          ? normalizePptStylePackId(selectedStylePackId())
           : undefined;
       const result = await generateExport(
         props.documentId,
@@ -510,22 +574,100 @@ export default function ExportExecutor(props: Props) {
 
         <Show when={format() === "pptx"}>
           <div>
-            <span class="block text-xs font-medium text-[#464555] mb-1">演示风格</span>
-            <select
-              ref={stylePackSelectRef}
-              value={selectedStylePackId() ?? ""}
-              onChange={(e) => setSelectedStylePackId(e.currentTarget.value || null)}
-              class="w-full px-3 py-2 text-sm border border-[rgba(199,196,216,0.3)] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#c3c0ff] focus:border-[#4f46e5] bg-[#f7f9fb] text-[#191c1e]"
-            >
-              <option value="">默认风格（商务深蓝）</option>
-              <For each={stylePacks() ?? []}>
-                {(pack) => (
-                  <option value={pack.id}>{pack.label}</option>
-                )}
+            <div class="flex items-center justify-between gap-3 mb-2">
+              <span class="block text-xs font-medium text-[#464555]">演示风格</span>
+              <span class="text-[11px] text-[#6b7280]">
+                选择一种风格后直接导出；无需再编辑模板。
+              </span>
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <For each={stylePackOptions()}>
+                {(pack) => {
+                  const selected = () => selectedStylePackId() === pack.id;
+                  const tags = () => getStylePackPreviewTags(pack);
+                  const background = () => buildStylePackCardBackground(pack);
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStylePackId(normalizePptStylePackId(pack.id))}
+                      class="group overflow-hidden rounded-2xl border text-left transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#4f46e5] focus:ring-offset-2"
+                      classList={{
+                        "border-[#4f46e5] bg-white shadow-[0_16px_36px_rgba(79,70,229,0.16)] -translate-y-0.5": selected(),
+                        "border-[rgba(199,196,216,0.35)] bg-white hover:border-[#c3c0ff] hover:shadow-[0_14px_30px_rgba(25,28,30,0.08)]": !selected(),
+                      }}
+                    >
+                      <div class="relative h-28 border-b border-white/10 px-4 py-3" style={{ background: background() }}>
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="max-w-[75%]">
+                            <div class="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/70">
+                              {pack.id === DEFAULT_PPT_STYLE_PACK_ID ? "Default" : "Style Pack"}
+                            </div>
+                            <div class="mt-2 text-base font-semibold text-white">{pack.label}</div>
+                          </div>
+                          <div class="flex items-center gap-1 rounded-full bg-white/16 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+                            <Show when={pack.id === DEFAULT_PPT_STYLE_PACK_ID}>
+                              <span>默认</span>
+                            </Show>
+                            <Show when={selected()}>
+                              <span>{pack.id === DEFAULT_PPT_STYLE_PACK_ID ? "已选" : "选中"}</span>
+                            </Show>
+                          </div>
+                        </div>
+                        <div class="absolute inset-x-4 bottom-3 flex items-center gap-2">
+                          <span class="h-3 w-3 rounded-full border border-white/40" style={{ background: withHash(pack.preview.primary) }} />
+                          <span class="h-3 w-3 rounded-full border border-white/40" style={{ background: withHash(pack.preview.secondary) }} />
+                          <span class="h-3 w-3 rounded-full border border-white/40" style={{ background: withHash(pack.preview.accent) }} />
+                        </div>
+                      </div>
+
+                      <div class="space-y-3 px-4 py-3">
+                        <div
+                          class="rounded-xl border p-3"
+                          style={{
+                            background: withHash(pack.preview.background),
+                            borderColor: `${withHash(pack.preview.surface)}80`,
+                          }}
+                        >
+                          <div class="flex items-center justify-between gap-3">
+                            <div
+                              class="text-xs font-semibold"
+                              style={{ color: withHash(pack.preview.text), "text-align": pack.preview.titleAlign }}
+                            >
+                              季度业务回顾
+                            </div>
+                            <div
+                              class="h-2.5 w-2.5 rounded-full"
+                              style={{ background: withHash(pack.preview.accent) }}
+                            />
+                          </div>
+                          <div class="mt-2 flex items-center gap-2">
+                            <div class="h-2 flex-1 rounded-full" style={{ background: withHash(pack.preview.surface) }} />
+                            <div class="h-2 w-14 rounded-full" style={{ background: withHash(pack.preview.secondary) }} />
+                          </div>
+                          <div class="mt-2 grid grid-cols-3 gap-2">
+                            <div class="h-9 rounded-lg" style={{ background: withHash(pack.preview.surface) }} />
+                            <div class="h-9 rounded-lg" style={{ background: `${withHash(pack.preview.secondary)}1A` }} />
+                            <div class="h-9 rounded-lg" style={{ background: `${withHash(pack.preview.accent)}1A` }} />
+                          </div>
+                        </div>
+
+                        <div class="flex flex-wrap gap-2">
+                          <For each={tags()}>
+                            {(tag) => (
+                              <span class="rounded-full bg-[#f7f9fb] px-2.5 py-1 text-[11px] font-medium text-[#5b5a6b]">
+                                {tag}
+                              </span>
+                            )}
+                          </For>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                }}
               </For>
-            </select>
-            <p class="mt-1 text-xs text-[#6b7280]">
-              选择演示风格后导出；可反复切换风格重新导出，确认满意后点击「完成导出」。
+            </div>
+            <p class="mt-2 text-xs text-[#6b7280]">
+              导出会把所选 style-pack 写入结果 metadata；切换风格后重新导出即可比较效果。
             </p>
           </div>
         </Show>

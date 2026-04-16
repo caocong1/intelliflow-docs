@@ -15,6 +15,7 @@ import WorkflowManagement from "./pages/admin/WorkflowManagement";
 import WorkflowEditor from "./pages/admin/WorkflowEditor";
 import ModelCallLogs from "./pages/admin/ModelCallLogs";
 import PptTemplateManagement from "./pages/admin/PptTemplateManagement";
+import PptTemplateProfileEditor from "./pages/admin/PptTemplateProfileEditor";
 import StatsDashboard from "./pages/admin/StatsDashboard";
 import ProjectList from "./pages/projects/ProjectList";
 import ProjectHome from "./pages/projects/ProjectHome";
@@ -120,9 +121,28 @@ const App: Component = () => {
         />
         <Route
           path="/admin/ppt-templates"
+          component={() => <Navigate href="/admin/internal/ppt-templates" />}
+        />
+        <Route
+          path="/admin/ppt-templates/:id/profile"
+          component={() => {
+            const p = useParams<{ id: string }>();
+            return <Navigate href={`/admin/internal/ppt-templates/${p.id}/profile`} />;
+          }}
+        />
+        <Route
+          path="/admin/internal/ppt-templates"
           component={() => (
             <AdminRoute>
               <PptTemplateManagement />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/internal/ppt-templates/:id/profile"
+          component={() => (
+            <AdminRoute>
+              <PptTemplateProfileEditor />
             </AdminRoute>
           )}
         />

@@ -81,6 +81,9 @@ export interface ConnectivityTestResult {
   latencyMs: number;
 }
 
+/** Explicit default PPT style pack used by both frontend and backend */
+export const DEFAULT_PPT_STYLE_PACK_ID = "corporate_blue";
+
 // ─── Workflow types ───────────────────────────────────────────────────────────
 
 /** The 5 workflow node types */

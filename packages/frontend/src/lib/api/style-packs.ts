@@ -1,6 +1,19 @@
 export interface StylePackItem {
   id: string;
   label: string;
+  preview: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    surface: string;
+    text: string;
+    coverFill: "solid" | "gradient" | "accent_bar";
+    titleAlign: "center" | "left";
+    cornerRadius: number;
+    cardShadow: boolean;
+    dividerStyle: "line" | "dot" | "none";
+  };
 }
 
 function authHeaders(): Record<string, string> {

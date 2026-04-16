@@ -1,3 +1,4 @@
+import { useNavigate } from "@solidjs/router";
 import { For, Show, createSignal, onMount } from "solid-js";
 import Badge from "../../components/ui/Badge";
 import Modal from "../../components/ui/Modal";
@@ -6,18 +7,14 @@ import Table, { type Column } from "../../components/ui/Table";
 import { showToast } from "../../components/ui/Toast";
 import {
   type PptTemplate,
-  type PptTemplateProfile,
   type PptTemplateSemanticRole,
-  type PptTemplateSlotBindingKey,
   type PptTemplateType,
   createTheme,
   deleteTemplate,
-  getTemplateProfile,
   listTemplates,
   reRecognizeTemplate,
   setDefaultTemplate,
   updateTemplate,
-  updateTemplateProfile,
   uploadTemplate,
 } from "../../lib/api/ppt-templates";
 
@@ -44,31 +41,6 @@ const SEMANTIC_ROLE_LABELS: Record<PptTemplateSemanticRole, string> = {
   qna: "答疑页",
   closing: "结尾页",
 };
-
-const SLOT_BINDING_LABELS: Record<PptTemplateSlotBindingKey, string> = {
-  titleSlot: "标题槽位",
-  subtitleSlot: "副标题槽位",
-  bodySlot: "正文槽位",
-  leftSlot: "左栏槽位",
-  rightSlot: "右栏槽位",
-  tableSlot: "表格槽位",
-  imageSlot: "图片槽位",
-  captionSlot: "图注槽位",
-  notesSlot: "备注槽位",
-  footerSlot: "页脚槽位",
-  pageNumSlot: "页码槽位",
-};
-
-const PROFILE_SLOT_FIELDS: PptTemplateSlotBindingKey[] = [
-  "titleSlot",
-  "subtitleSlot",
-  "bodySlot",
-  "leftSlot",
-  "rightSlot",
-  "tableSlot",
-  "imageSlot",
-  "captionSlot",
-];
 
 function getNativeTemplateRecognitionSummary(template: PptTemplate): string | null {
   if (template.type !== "native_pptx" || !template.themeConfig || typeof template.themeConfig !== "object") {
@@ -99,6 +71,7 @@ function getNativeTemplateRecognitionSummary(template: PptTemplate): string | nu
 }
 
 export default function PptTemplateManagement() {
+  const navigate = useNavigate();
   const [templates, setTemplates] = createSignal<PptTemplate[]>([]);
   const [total, setTotal] = createSignal(0);
   const [page, setPage] = createSignal(1);
@@ -124,9 +97,6 @@ export default function PptTemplateManagement() {
   const [editDesc, setEditDesc] = createSignal("");
   const [editRatio, setEditRatio] = createSignal("16:9");
   const [editThemeJson, setEditThemeJson] = createSignal("{}");
-  const [profileTemplate, setProfileTemplate] = createSignal<PptTemplate | null>(null);
-  const [profileDraft, setProfileDraft] = createSignal<PptTemplateProfile | null>(null);
-  const [profileLoading, setProfileLoading] = createSignal(false);
 
   // Confirm
   const [confirmAction, setConfirmAction] = createSignal<ConfirmAction | null>(null);
@@ -317,98 +287,6 @@ export default function PptTemplateManagement() {
     }
   }
 
-  async function openProfileEditor(template: PptTemplate) {
-    setProfileTemplate(template);
-    setProfileDraft(null);
-    setProfileLoading(true);
-    try {
-      const profile = await getTemplateProfile(template.id);
-      setProfileDraft(profile);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "加载模板画像失败";
-      showToast(msg, "error");
-      setProfileTemplate(null);
-    } finally {
-      setProfileLoading(false);
-    }
-  }
-
-  function closeProfileEditor() {
-    setProfileTemplate(null);
-    setProfileDraft(null);
-    setProfileLoading(false);
-  }
-
-  function updateProfileSlide(
-    slideNumber: number,
-    updater: (slide: PptTemplateProfile["slides"][number]) => PptTemplateProfile["slides"][number],
-  ) {
-    const profile = profileDraft();
-    if (!profile) return;
-    setProfileDraft({
-      ...profile,
-      slides: profile.slides.map((slide) =>
-        slide.slideNumber === slideNumber ? updater(slide) : slide,
-      ),
-    });
-  }
-
-  function setProfileSemanticRole(
-    slideNumber: number,
-    roleValue: string,
-  ) {
-    updateProfileSlide(slideNumber, (slide) => ({
-      ...slide,
-      semanticRole: (roleValue || null) as PptTemplateSemanticRole | null,
-      semanticRoleSource: roleValue ? "manual" : "auto",
-      semanticRoleConfidence: roleValue ? 0.99 : slide.semanticRoleConfidence,
-    }));
-  }
-
-  function setProfileAutoUse(slideNumber: number, checked: boolean) {
-    updateProfileSlide(slideNumber, (slide) => ({
-      ...slide,
-      autoUse: checked,
-    }));
-  }
-
-  function setSlotOverride(
-    slideNumber: number,
-    slotKey: PptTemplateSlotBindingKey,
-    value: string,
-  ) {
-    updateProfileSlide(slideNumber, (slide) => {
-      const nextOverrides = { ...(slide.slotOverrides ?? {}) };
-      if (!value || value === slotKey) {
-        delete nextOverrides[slotKey];
-      } else {
-        nextOverrides[slotKey] = value as PptTemplateSlotBindingKey | "__NONE__";
-      }
-      return {
-        ...slide,
-        slotOverrides: Object.keys(nextOverrides).length > 0 ? nextOverrides : undefined,
-      };
-    });
-  }
-
-  async function handleSaveProfile() {
-    const template = profileTemplate();
-    const profile = profileDraft();
-    if (!template || !profile) return;
-    setSubmitting(true);
-    try {
-      const saved = await updateTemplateProfile(template.id, profile);
-      setProfileDraft(saved);
-      showToast("模板画像已保存", "success");
-      await fetchTemplates();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "保存模板画像失败";
-      showToast(msg, "error");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   function formatDate(dateStr: string) {
     return new Date(dateStr).toLocaleDateString("zh-CN", {
       year: "numeric",
@@ -426,10 +304,6 @@ export default function PptTemplateManagement() {
     "px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2";
   const actionBtnClass =
     "text-sm cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded px-1";
-
-  const semanticRoleOptions = Object.entries(SEMANTIC_ROLE_LABELS) as Array<
-    [PptTemplateSemanticRole, string]
-  >;
 
   const columns: Column<PptTemplate>[] = [
     {
@@ -499,7 +373,7 @@ export default function PptTemplateManagement() {
           <Show when={t.type === "native_pptx"}>
             <button
               type="button"
-              onClick={() => void openProfileEditor(t)}
+              onClick={() => navigate(`/admin/internal/ppt-templates/${t.id}/profile`)}
               class={`${actionBtnClass} text-violet-600 hover:text-violet-800`}
             >
               画像编辑
@@ -558,8 +432,8 @@ export default function PptTemplateManagement() {
     <div class="p-6">
       <div class="flex items-center justify-between mb-6">
         <div>
-          <h1 class="text-xl font-bold text-indigo-950">PPT 模板管理</h1>
-          <p class="text-sm text-slate-400 mt-0.5">管理演示文稿导出模板</p>
+          <h1 class="text-xl font-bold text-indigo-950">PPT 模板管理（Legacy / Internal）</h1>
+          <p class="text-sm text-slate-400 mt-0.5">仅用于维护历史模板数据，不属于普通用户 PPT 导出主流程</p>
         </div>
         <div class="flex items-center gap-3">
           <button
@@ -585,6 +459,10 @@ export default function PptTemplateManagement() {
             新建代码主题
           </button>
         </div>
+      </div>
+
+      <div class="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        普通用户的 PPT 导出已切换到内置 style-pack 风格系统。此页保留给管理员处理历史模板资产与画像数据。
       </div>
 
       <Table columns={columns} data={templates()} loading={loading()} emptyMessage="暂无 PPT 模板" />
@@ -717,138 +595,6 @@ export default function PptTemplateManagement() {
               {submitting() ? "处理中..." : "确定"}
             </button>
           </div>
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={!!profileTemplate()}
-        onClose={closeProfileEditor}
-        title={profileTemplate() ? `模板画像编辑 · ${profileTemplate()!.name}` : "模板画像编辑"}
-      >
-        <div class="space-y-4">
-          <Show when={profileLoading()}>
-            <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500">
-              正在加载模板画像...
-            </div>
-          </Show>
-
-          <Show when={!profileLoading() && profileDraft()}>
-            {(profile) => (
-              <>
-                <div class="rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-                  共识别 {profile().summary.slideCount} 页，可自动参与匹配 {profile().summary.editableSlideCount} 页。
-                  可在这里修正页语义、关闭不适合自动匹配的样张页，并调整关键槽位映射。
-                </div>
-                <div class="max-h-[65vh] space-y-3 overflow-y-auto pr-1">
-                  <For each={profile().slides}>
-                    {(slide) => (
-                      <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                          <div>
-                            <div class="flex items-center gap-2">
-                              <span class="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                                第 {slide.slideNumber} 页
-                              </span>
-                              <span class="text-sm font-semibold text-slate-900">{slide.layoutName}</span>
-                            </div>
-                            <p class="mt-1 text-xs text-slate-500">
-                              自动识别：{slide.semanticRole ? SEMANTIC_ROLE_LABELS[slide.semanticRole] : "未识别"}
-                              {" · "}
-                              置信度 {(slide.semanticRoleConfidence * 100).toFixed(0)}%
-                              {" · "}
-                              密度 {slide.contentDensity}
-                            </p>
-                          </div>
-                          <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-                            <input
-                              type="checkbox"
-                              checked={slide.autoUse}
-                              onChange={(e) => setProfileAutoUse(slide.slideNumber, e.currentTarget.checked)}
-                            />
-                            参与自动匹配
-                          </label>
-                        </div>
-
-                        <div class="mt-3 grid gap-4 md:grid-cols-2">
-                          <div>
-                            <label class={labelClass}>页语义</label>
-                            <select
-                              class={inputClass}
-                              value={slide.semanticRole ?? ""}
-                              onChange={(e) => setProfileSemanticRole(slide.slideNumber, e.currentTarget.value)}
-                            >
-                              <option value="">跟随自动识别</option>
-                              <For each={semanticRoleOptions}>
-                                {([value, label]) => <option value={value}>{label}</option>}
-                              </For>
-                            </select>
-                          </div>
-                          <div>
-                            <label class={labelClass}>检测到的槽位</label>
-                            <div class="flex flex-wrap gap-1.5">
-                              <For each={PROFILE_SLOT_FIELDS.filter((key) => Boolean(slide[key]))}>
-                                {(key) => (
-                                  <span class="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                                    {SLOT_BINDING_LABELS[key]}
-                                  </span>
-                                )}
-                              </For>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div class="mt-3">
-                          <label class={labelClass}>样本文字摘要</label>
-                          <div class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-                            <Show when={slide.sampleTextSummary.length > 0} fallback={<span>暂无样本文字</span>}>
-                              {slide.sampleTextSummary.join(" / ")}
-                            </Show>
-                          </div>
-                        </div>
-
-                        <div class="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                          <For each={PROFILE_SLOT_FIELDS}>
-                            {(slotKey) => (
-                              <div>
-                                <label class="mb-1 block text-xs font-medium text-slate-600">
-                                  {SLOT_BINDING_LABELS[slotKey]}
-                                </label>
-                                <select
-                                  class="w-full rounded-lg border border-slate-200 px-2.5 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                  value={slide.slotOverrides?.[slotKey] ?? slotKey}
-                                  onChange={(e) =>
-                                    setSlotOverride(slide.slideNumber, slotKey, e.currentTarget.value)
-                                  }
-                                >
-                                  <option value={slotKey}>保持默认</option>
-                                  <option value="__NONE__">禁用此槽位</option>
-                                  <For each={PROFILE_SLOT_FIELDS.filter((candidate) => Boolean(slide[candidate]))}>
-                                    {(candidate) => (
-                                      <Show when={candidate !== slotKey}>
-                                        <option value={candidate}>{SLOT_BINDING_LABELS[candidate]}</option>
-                                      </Show>
-                                    )}
-                                  </For>
-                                </select>
-                              </div>
-                            )}
-                          </For>
-                        </div>
-                      </div>
-                    )}
-                  </For>
-                </div>
-                <div class="flex justify-end gap-3 pt-2">
-                  <button type="button" class={cancelBtnClass} onClick={closeProfileEditor}>
-                    关闭
-                  </button>
-                  <button type="button" class={primaryBtnClass} disabled={submitting()} onClick={() => void handleSaveProfile()}>
-                    {submitting() ? "保存中..." : "保存画像"}
-                  </button>
-                </div>
-              </>
-            )}
-          </Show>
         </div>
       </Modal>
     </div>

@@ -95,16 +95,27 @@ function renderCoverHero(pptSlide: PptSlide, slide: TitleSlide, sp: StylePack) {
     // Energetic: use accent as background
     pptSlide.background = { color: effectiveAccent(sp, ovr) };
   } else if (sp.cover.backgroundFill === "gradient" && sp.cover.gradientStops) {
-    pptSlide.background = {
-      fill: {
-        type: "linear",
-        stops: sp.cover.gradientStops.map((s) => ({
-          position: s.position,
-          color: s.color,
-        })),
-        rotate: tone === "creative" ? 45 : 135,
-      },
-    };
+    // PptxGenJS only supports solid fills in this code path. Use a layered
+    // solid treatment that keeps the intended two-tone cover without relying
+    // on unsupported gradient background XML.
+    const accentColor = sp.cover.gradientStops[sp.cover.gradientStops.length - 1]?.color ?? sp.palette.secondary;
+    pptSlide.background = { color: sp.palette.primary };
+    pptSlide.addShape("rect", {
+      x: tone === "creative" ? 0 : 9.2,
+      y: 0,
+      w: tone === "creative" ? 13.33 : 4.13,
+      h: 7.5,
+      fill: { color: accentColor, transparency: tone === "creative" ? 55 : 15 },
+      line: { color: accentColor, transparency: 100 },
+    });
+    pptSlide.addShape("rect", {
+      x: 0,
+      y: tone === "creative" ? 6.82 : 0,
+      w: 13.33,
+      h: tone === "creative" ? 0.68 : 0.22,
+      fill: { color: accentColor },
+      line: { color: accentColor, transparency: 100 },
+    });
   } else {
     pptSlide.background = { color: sp.palette.primary };
   }

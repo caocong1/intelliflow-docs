@@ -160,7 +160,9 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
           <Show when={hasPptx()}>
             <div>
               <p class="text-xs text-slate-500 leading-5">
-                PPT 模板不再在流程里预绑定。用户执行到导出节点时，可按本次需要手动选择模板并多次导出下载。
+                PPT 导出主流程已切换为内置 style-pack 风格系统。流程里不再预绑定 PPT 模板，
+                运行时用户只需选择一种演示风格并导出下载；历史 `templateBindings.pptx` /
+                `templateId` 仅作兼容保留，不再影响主导出路径。
               </p>
             </div>
           </Show>

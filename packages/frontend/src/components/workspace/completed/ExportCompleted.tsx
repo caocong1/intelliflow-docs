@@ -107,7 +107,7 @@ export default function ExportCompleted(props: Props) {
         value: c.formats.map((f) => FORMAT_LABELS[f] ?? f).join("、"),
       });
     }
-    if (c.templateId) {
+    if (c.templateId && result()?.format !== "pptx") {
       entries.push({ label: "模板 ID", value: c.templateId });
     }
     const rStylePackId = result()?.stylePackId;

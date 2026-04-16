@@ -1,3 +1,5 @@
+import { DEFAULT_PPT_STYLE_PACK_ID } from "@intelliflow/shared";
+
 // ─── Built-in PPT Style Packs ────────────────────────────────────────────────
 // Code-only definitions — no DB, no user upload.
 // Each pack fully specifies palette, fonts, cover treatment, shape language,
@@ -46,6 +48,24 @@ export interface StylePack {
     stripeFill: string;
     borderColor: string;
     borderWidth: number; // pt
+  };
+}
+
+export interface StylePackListItem {
+  id: string;
+  label: string;
+  preview: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    surface: string;
+    text: string;
+    coverFill: StylePack["cover"]["backgroundFill"];
+    titleAlign: StylePack["cover"]["titleAlign"];
+    cornerRadius: number;
+    cardShadow: boolean;
+    dividerStyle: StylePack["shapes"]["dividerStyle"];
   };
 }
 
@@ -256,12 +276,28 @@ export const STYLE_PACKS: readonly StylePack[] = [
 
 const packMap = new Map(STYLE_PACKS.map((p) => [p.id, p]));
 
-export const DEFAULT_STYLE_PACK_ID = "corporate_blue";
+export const DEFAULT_STYLE_PACK_ID = DEFAULT_PPT_STYLE_PACK_ID;
 
 export function getStylePack(id: string): StylePack | undefined {
   return packMap.get(id);
 }
 
-export function listStylePacks(): Array<{ id: string; label: string }> {
-  return STYLE_PACKS.map((p) => ({ id: p.id, label: p.label }));
+export function listStylePacks(): StylePackListItem[] {
+  return STYLE_PACKS.map((p) => ({
+    id: p.id,
+    label: p.label,
+    preview: {
+      primary: p.palette.primary,
+      secondary: p.palette.secondary,
+      accent: p.palette.accent,
+      background: p.palette.background,
+      surface: p.palette.surface,
+      text: p.palette.text,
+      coverFill: p.cover.backgroundFill,
+      titleAlign: p.cover.titleAlign,
+      cornerRadius: p.shapes.cornerRadius,
+      cardShadow: p.shapes.cardShadow,
+      dividerStyle: p.shapes.dividerStyle,
+    },
+  }));
 }

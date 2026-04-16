@@ -34,7 +34,12 @@ import {
   mergeNativeTemplateProfiles,
   type NativeTemplateProfile,
 } from "../ppt-templates/native-template-profile";
-import type { ExportConfig, VariableRef, WorkflowNodeDef } from "@intelliflow/shared";
+import {
+  DEFAULT_PPT_STYLE_PACK_ID,
+  type ExportConfig,
+  type VariableRef,
+  type WorkflowNodeDef,
+} from "@intelliflow/shared";
 import { composeDeckWithAi } from "./ppt-export-ai.service";
 import {
   assignTemplateSequence,
@@ -54,6 +59,8 @@ import type {
 } from "../../../../shared/src/slide-types";
 import { getStylePack, DEFAULT_STYLE_PACK_ID } from "./ppt-style-packs";
 import { renderArchetypeSlide, type PptSlide } from "./ppt-archetype-renderer";
+
+const LEGACY_PPT_TEMPLATE_EXPORT_ENV = "INTELLIFLOW_INTERNAL_ENABLE_LEGACY_PPT_TEMPLATE_EXPORT";
 
 // ─── Node config loader ─────────────────────────────────────────────────────
 
@@ -2467,6 +2474,32 @@ async function resolvePptTemplate(templateId?: string | null) {
   return null;
 }
 
+function isLegacyPptTemplateExportEnabled(
+  envValue = process.env[LEGACY_PPT_TEMPLATE_EXPORT_ENV],
+): boolean {
+  return envValue === "true";
+}
+
+function resolvePptStylePackId(stylePackId?: string | null): string {
+  return getStylePack(stylePackId ?? DEFAULT_STYLE_PACK_ID)?.id ?? DEFAULT_PPT_STYLE_PACK_ID;
+}
+
+function resolveLegacyPptTemplateId(params: {
+  config?: ExportConfig | null;
+  templateIdOverride?: string | null;
+  legacyEnabled?: boolean;
+}): string | null {
+  const legacyEnabled =
+    params.legacyEnabled ?? isLegacyPptTemplateExportEnabled();
+  if (!legacyEnabled) {
+    return null;
+  }
+  if (params.templateIdOverride !== undefined) {
+    return params.templateIdOverride ?? null;
+  }
+  return params.config?.templateBindings?.pptx ?? params.config?.templateId ?? null;
+}
+
 type PptBufferResult = {
   buffer: Buffer;
   renderMode: string;
@@ -2548,9 +2581,14 @@ async function generatePptBuffer(params: {
   nodeExecutionId: string;
   userId: string;
 }): Promise<PptBufferResult> {
-  // Style pack path: when stylePackId is provided (or no templateId), use style packs
-  if (params.stylePackId || !params.templateId) {
-    const effectiveStylePackId = params.stylePackId || DEFAULT_STYLE_PACK_ID;
+  const effectiveStylePackId = resolvePptStylePackId(params.stylePackId);
+  const legacyTemplateId = resolveLegacyPptTemplateId({
+    templateIdOverride: params.templateId,
+  });
+
+  // Style-pack export is the default user path. Legacy template export is
+  // only reachable when an internal compatibility flag is explicitly enabled.
+  if (!legacyTemplateId) {
     const composition = await buildDeckComposition(
       params.content,
       null,
@@ -2572,8 +2610,7 @@ async function generatePptBuffer(params: {
     };
   }
 
-  // Legacy template path: only when explicit templateId is provided
-  const template = await resolvePptTemplate(params.templateId);
+  const template = await resolvePptTemplate(legacyTemplateId);
   const templateProfile = extractNativeTemplateProfile(template?.themeConfig);
   const composition = await buildDeckComposition(
     params.content,
@@ -2655,7 +2692,11 @@ async function generatePptBuffer(params: {
 }
 
 export const __pptExportTestUtils = {
+  generatePptBuffer,
+  isLegacyPptTemplateExportEnabled,
   renderSlidesWithNativeTemplate,
+  resolveLegacyPptTemplateId,
+  resolvePptStylePackId,
 };
 
 // ─── Public API ──────────────────────────────────────────────────────────────
@@ -2709,19 +2750,20 @@ export async function generateExport(
       break;
     }
     case "pptx": {
-      const pptxTemplateId =
-        templateIdOverride !== undefined
-          ? templateIdOverride
-          : config?.templateBindings?.pptx ?? config?.templateId ?? null;
+      const effectiveStylePackId = resolvePptStylePackId(stylePackId);
+      const legacyPptTemplateId = resolveLegacyPptTemplateId({
+        config,
+        templateIdOverride,
+      });
       const pptResult = await generatePptBuffer({
         content,
-        templateId: pptxTemplateId,
-        stylePackId,
+        templateId: legacyPptTemplateId,
+        stylePackId: effectiveStylePackId,
         documentId,
         nodeExecutionId,
         userId,
       });
-      appliedTemplateId = pptResult.templateId ?? pptxTemplateId ?? null;
+      appliedTemplateId = pptResult.templateId ?? null;
       appliedStylePackId = pptResult.stylePackId;
       buffer = pptResult.buffer;
       renderMode = pptResult.renderMode;

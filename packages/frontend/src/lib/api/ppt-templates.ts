@@ -25,6 +25,21 @@ export type PptTemplateSlotBindingKey =
   | "footerSlot"
   | "pageNumSlot";
 
+export type PptTemplateSlotPosition = {
+  x: number;
+  y: number;
+  cx: number;
+  cy: number;
+};
+
+export type PptTemplateSlot = {
+  selector: string | { creationId?: string; name: string; nameIdx?: number };
+  position: PptTemplateSlotPosition;
+  explicitTag?: string;
+  visualType?: string;
+  source?: "explicit" | "slide" | "layout" | "sample";
+};
+
 export type PptTemplateProfileSlide = {
   slideId: number;
   slideNumber: number;
@@ -37,17 +52,17 @@ export type PptTemplateProfileSlide = {
   autoUse: boolean;
   sampleTextSummary: string[];
   slotOverrides?: Partial<Record<PptTemplateSlotBindingKey, PptTemplateSlotBindingKey | "__NONE__">>;
-  titleSlot?: unknown;
-  subtitleSlot?: unknown;
-  bodySlot?: unknown;
-  leftSlot?: unknown;
-  rightSlot?: unknown;
-  tableSlot?: unknown;
-  imageSlot?: unknown;
-  captionSlot?: unknown;
-  notesSlot?: unknown;
-  footerSlot?: unknown;
-  pageNumSlot?: unknown;
+  titleSlot?: PptTemplateSlot;
+  subtitleSlot?: PptTemplateSlot;
+  bodySlot?: PptTemplateSlot;
+  leftSlot?: PptTemplateSlot;
+  rightSlot?: PptTemplateSlot;
+  tableSlot?: PptTemplateSlot;
+  imageSlot?: PptTemplateSlot;
+  captionSlot?: PptTemplateSlot;
+  notesSlot?: PptTemplateSlot;
+  footerSlot?: PptTemplateSlot;
+  pageNumSlot?: PptTemplateSlot;
 };
 
 export type PptTemplateProfile = {

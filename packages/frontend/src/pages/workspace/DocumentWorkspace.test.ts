@@ -30,7 +30,7 @@ vi.mock("../../components/ui/Toast", () => ({
   showToast: vi.fn(),
 }));
 
-import { getRuntimeState, initRuntime } from "../../api/client";
+import { getRuntimeState, initRuntime, rollbackNode } from "../../api/client";
 import { checkFavorites, recordAccess, toggleFavorite } from "../../lib/api/user-activity";
 import DocumentWorkspace from "./DocumentWorkspace";
 
@@ -164,6 +164,93 @@ const failedRuntimeState = {
   ],
 } as const;
 
+const rollbackSourceRuntimeState = {
+  backgroundTaskActive: false,
+  currentNodeIndex: 1,
+  documentTitle: "无线网络建设全解析",
+  projectId: "project-1",
+  workflowName: "通用 PPT 生成与质检 Agent 流程",
+  nodes: [
+    {
+      id: "node-exec-a",
+      nodeId: "workflow-node-a",
+      nodeLabel: "输入准备",
+      nodeType: "input_transform",
+      status: "completed",
+      stepOrder: 0,
+      startedAt: "2026-04-15T10:00:00.000Z",
+      completedAt: "2026-04-15T10:02:00.000Z",
+      outputData: {
+        fields: {
+          topic: "原始输入",
+        },
+      },
+    },
+    {
+      id: "node-exec-b",
+      nodeId: "workflow-node-b",
+      nodeLabel: "当前模型步骤",
+      nodeType: "model_call",
+      status: "in_progress",
+      stepOrder: 1,
+      startedAt: "2026-04-15T10:02:00.000Z",
+      completedAt: null,
+      outputData: null,
+    },
+  ],
+  workflowNodes: [
+    {
+      id: "workflow-node-a",
+      config: {
+        type: "input_transform",
+        stepDescription: "回退后的输入步骤",
+        formFields: [],
+      },
+    },
+    {
+      id: "workflow-node-b",
+      config: {
+        type: "model_call",
+        modelIds: ["kimi"],
+        stepDescription: "当前模型步骤说明",
+      },
+    },
+  ],
+} as const;
+
+const rollbackTargetRuntimeState = {
+  ...rollbackSourceRuntimeState,
+  currentNodeIndex: 0,
+  nodes: [
+    {
+      id: "node-exec-a",
+      nodeId: "workflow-node-a",
+      nodeLabel: "输入准备",
+      nodeType: "input_transform",
+      status: "in_progress",
+      stepOrder: 0,
+      startedAt: "2026-04-15T10:05:00.000Z",
+      completedAt: null,
+      outputData: {
+        fields: {
+          topic: "回退后输入",
+        },
+      },
+    },
+    {
+      id: "node-exec-b",
+      nodeId: "workflow-node-b",
+      nodeLabel: "当前模型步骤",
+      nodeType: "model_call",
+      status: "pending",
+      stepOrder: 1,
+      startedAt: null,
+      completedAt: null,
+      outputData: null,
+    },
+  ],
+} as const;
+
 async function flush() {
   await Promise.resolve();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -253,6 +340,45 @@ describe("DocumentWorkspace history actions", () => {
     expect(container.textContent).toContain("DeepSeek V3.2");
     expect(container.textContent).toContain("网络超时，请重试");
     expect(container.textContent).toContain("重新生成");
+
+    dispose();
+  });
+
+  it("remounts the left executor when rollback switches the current node", async () => {
+    vi.mocked(initRuntime).mockResolvedValue(rollbackSourceRuntimeState as never);
+    vi.mocked(getRuntimeState).mockResolvedValue(rollbackSourceRuntimeState as never);
+    vi.mocked(rollbackNode).mockResolvedValue(rollbackTargetRuntimeState as never);
+
+    const dispose = render(() => createComponent(DocumentWorkspace, {}), container);
+
+    await flush();
+
+    expect(container.textContent).toContain("当前模型步骤说明");
+    expect(container.textContent).not.toContain("回退后的输入步骤");
+
+    const rollbackButton = Array.from(container.querySelectorAll("button")).find((button) =>
+      button.textContent?.includes("回退到之前节点"),
+    );
+
+    expect(rollbackButton).toBeDefined();
+    rollbackButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    await flush();
+
+    const targetButton = Array.from(container.querySelectorAll("button")).find(
+      (button) =>
+        button.textContent?.includes("输入准备") &&
+        !button.getAttribute("title") &&
+        !button.textContent?.includes("回退到之前节点"),
+    );
+
+    expect(targetButton).toBeDefined();
+    targetButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    await flush();
+
+    expect(container.textContent).toContain("回退后的输入步骤");
+    expect(container.textContent).not.toContain("当前模型步骤说明");
 
     dispose();
   });

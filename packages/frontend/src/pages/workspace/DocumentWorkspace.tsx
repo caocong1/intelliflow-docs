@@ -12,10 +12,10 @@ import type {
 import { A, useParams } from "@solidjs/router";
 import {
   For,
+  type JSX,
   Match,
   Show,
   Switch,
-  type JSX,
   createEffect,
   createMemo,
   createSignal,
@@ -720,132 +720,138 @@ export default function DocumentWorkspace() {
    * `props.nodeExecution` inside it always return the latest value.
    */
   function renderExecutor(nodeAccessor: () => NodeExecution) {
-    return untrack(() => {
-      const initialNode = nodeAccessor();
-      const initialConfig = getNodeConfig(initialNode);
-      const stepDescription = getNodeStepDescription(initialNode);
-      if (!initialConfig) {
-        return (
-          <div
-            class="rounded-xl p-8 text-center"
-            style={{
-              background: "#ffffff",
-              "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
-            }}
-          >
-            <div class="text-sm" style={{ color: "#464555" }}>
-              加载节点配置中...
-            </div>
-          </div>
-        );
-      }
+    return (
+      <Show when={nodeAccessor().id} keyed>
+        {() =>
+          untrack(() => {
+            const initialNode = nodeAccessor();
+            const initialConfig = getNodeConfig(initialNode);
+            const stepDescription = getNodeStepDescription(initialNode);
+            if (!initialConfig) {
+              return (
+                <div
+                  class="rounded-xl p-8 text-center"
+                  style={{
+                    background: "#ffffff",
+                    "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
+                  }}
+                >
+                  <div class="text-sm" style={{ color: "#464555" }}>
+                    加载节点配置中...
+                  </div>
+                </div>
+              );
+            }
 
-      const docId = params.documentId;
-      const draftSave = (data: unknown) => {
-        debouncedDraftSave(data as Record<string, unknown>);
-      };
+            const docId = params.documentId;
+            const draftSave = (data: unknown) => {
+              debouncedDraftSave(data as Record<string, unknown>);
+            };
 
-      let executor: JSX.Element;
+            let executor: JSX.Element;
 
-      switch (initialNode.nodeType) {
-        case "input_transform":
-          executor = (
-            <InputTransformExecutor
-              nodeExecution={nodeAccessor()}
-              config={getNodeConfig(nodeAccessor()) as InputTransformConfig}
-              documentId={docId}
-              onDraftSave={draftSave}
-              readOnly={readOnly()}
-              registerConfirmAction={handleManualConfirmRegistration}
-              stepDescription={stepDescription}
-            />
-          );
-          break;
-        case "desensitize":
-          executor = (
-            <DesensitizeExecutor
-              nodeExecution={nodeAccessor()}
-              config={getNodeConfig(nodeAccessor()) as DesensitizeConfig}
-              documentId={docId}
-              onDraftSave={draftSave}
-              readOnly={readOnly()}
-              registerConfirmAction={handleManualConfirmRegistration}
-              stepDescription={stepDescription}
-            />
-          );
-          break;
-        case "model_call":
-          executor = (
-            <ModelCallExecutor
-              nodeExecution={nodeAccessor()}
-              config={getNodeConfig(nodeAccessor()) as ModelCallConfig}
-              documentId={docId}
-              onDraftSave={draftSave}
-              readOnly={readOnly()}
-              backgroundMode={isGenerating()}
-              registerConfirmAction={handleManualConfirmRegistration}
-              stepDescription={stepDescription}
-            />
-          );
-          break;
-        case "restore":
-          executor = (
-            <RestoreExecutor
-              nodeExecution={nodeAccessor()}
-              config={getNodeConfig(nodeAccessor()) as RestoreConfig}
-              documentId={docId}
-              onDraftSave={draftSave}
-              readOnly={readOnly()}
-              registerConfirmAction={handleManualConfirmRegistration}
-              onAdvanceAfterConfirm={handleAdvance}
-              stepDescription={stepDescription}
-            />
-          );
-          break;
-        case "export":
-          executor = (
-            <ExportExecutor
-              nodeExecution={nodeAccessor()}
-              config={getNodeConfig(nodeAccessor()) as ExportConfig}
-              documentId={docId}
-              onDraftSave={draftSave}
-              onCompleted={fetchRuntimeState}
-              readOnly={readOnly()}
-              stepDescription={stepDescription}
-            />
-          );
-          break;
-        default:
-          executor = (
-            <div
-              class="rounded-xl p-8 text-center"
-              style={{
-                background: "#ffffff",
-                "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
-              }}
-            >
-              <div class="text-sm mb-2" style={{ color: "#464555" }}>
-                节点执行器
-              </div>
-              <div class="text-lg font-semibold" style={{ color: "#191c1e" }}>
-                {nodeAccessor().nodeLabel}
-              </div>
-              <div
-                class="mt-2 inline-flex px-3 py-1 rounded-full text-xs font-medium"
-                style={{
-                  background: "rgba(79,70,229,0.08)",
-                  color: "#4f46e5",
-                }}
-              >
-                {nodeAccessor().nodeType}
-              </div>
-            </div>
-          );
-          break;
-      }
+            switch (initialNode.nodeType) {
+              case "input_transform":
+                executor = (
+                  <InputTransformExecutor
+                    nodeExecution={nodeAccessor()}
+                    config={getNodeConfig(nodeAccessor()) as InputTransformConfig}
+                    documentId={docId}
+                    onDraftSave={draftSave}
+                    readOnly={readOnly()}
+                    registerConfirmAction={handleManualConfirmRegistration}
+                    stepDescription={stepDescription}
+                  />
+                );
+                break;
+              case "desensitize":
+                executor = (
+                  <DesensitizeExecutor
+                    nodeExecution={nodeAccessor()}
+                    config={getNodeConfig(nodeAccessor()) as DesensitizeConfig}
+                    documentId={docId}
+                    onDraftSave={draftSave}
+                    readOnly={readOnly()}
+                    registerConfirmAction={handleManualConfirmRegistration}
+                    stepDescription={stepDescription}
+                  />
+                );
+                break;
+              case "model_call":
+                executor = (
+                  <ModelCallExecutor
+                    nodeExecution={nodeAccessor()}
+                    config={getNodeConfig(nodeAccessor()) as ModelCallConfig}
+                    documentId={docId}
+                    onDraftSave={draftSave}
+                    readOnly={readOnly()}
+                    backgroundMode={isGenerating()}
+                    registerConfirmAction={handleManualConfirmRegistration}
+                    stepDescription={stepDescription}
+                  />
+                );
+                break;
+              case "restore":
+                executor = (
+                  <RestoreExecutor
+                    nodeExecution={nodeAccessor()}
+                    config={getNodeConfig(nodeAccessor()) as RestoreConfig}
+                    documentId={docId}
+                    onDraftSave={draftSave}
+                    readOnly={readOnly()}
+                    registerConfirmAction={handleManualConfirmRegistration}
+                    onAdvanceAfterConfirm={handleAdvance}
+                    stepDescription={stepDescription}
+                  />
+                );
+                break;
+              case "export":
+                executor = (
+                  <ExportExecutor
+                    nodeExecution={nodeAccessor()}
+                    config={getNodeConfig(nodeAccessor()) as ExportConfig}
+                    documentId={docId}
+                    onDraftSave={draftSave}
+                    onCompleted={fetchRuntimeState}
+                    readOnly={readOnly()}
+                    stepDescription={stepDescription}
+                  />
+                );
+                break;
+              default:
+                executor = (
+                  <div
+                    class="rounded-xl p-8 text-center"
+                    style={{
+                      background: "#ffffff",
+                      "box-shadow": "0 12px 40px rgba(25,28,30,0.06)",
+                    }}
+                  >
+                    <div class="text-sm mb-2" style={{ color: "#464555" }}>
+                      节点执行器
+                    </div>
+                    <div class="text-lg font-semibold" style={{ color: "#191c1e" }}>
+                      {nodeAccessor().nodeLabel}
+                    </div>
+                    <div
+                      class="mt-2 inline-flex px-3 py-1 rounded-full text-xs font-medium"
+                      style={{
+                        background: "rgba(79,70,229,0.08)",
+                        color: "#4f46e5",
+                      }}
+                    >
+                      {nodeAccessor().nodeType}
+                    </div>
+                  </div>
+                );
+                break;
+            }
 
-      return executor;
-    });
+            return executor;
+          })
+        }
+      </Show>
+    );
   }
 
   const backHref = () => {
@@ -1081,40 +1087,55 @@ export default function DocumentWorkspace() {
                   <Switch>
                     {/* Viewing completed node history */}
                     <Match when={viewMode() === "history" ? viewedNode() : undefined}>
-                      {(viewed) => (
-                        <div class="space-y-4">
-                          <Show when={!readOnly()}>
-                            <h2 class="text-sm font-medium" style={{ color: "#191c1e" }}>
-                              {viewed().status === "failed" ? "失败节点" : "历史记录"}:{" "}
-                              {viewed().nodeLabel}
-                            </h2>
+                      {(() => {
+                        const historyNode = () => viewedNode();
+
+                        return (
+                          <Show when={historyNode()?.id} keyed>
+                            <div class="space-y-4">
+                              <Show when={!readOnly()}>
+                                <h2 class="text-sm font-medium" style={{ color: "#191c1e" }}>
+                                  {historyNode()?.status === "failed" ? "失败节点" : "历史记录"}:{" "}
+                                  {historyNode()?.nodeLabel}
+                                </h2>
+                              </Show>
+                              <Show
+                                when={
+                                  historyNode()?.status === "failed" &&
+                                  historyNode()?.nodeType === "model_call"
+                                }
+                                fallback={
+                                  <Show when={historyNode()}>
+                                    {(node) => (
+                                      <div class="space-y-4">
+                                        {renderSkippedHistoryBanner(node())}
+                                        <CompletedViewRouter
+                                          node={node()}
+                                          config={getNodeConfig(node())}
+                                          documentId={params.documentId}
+                                          onFullscreen={(content, title) =>
+                                            setFullscreenContent({ content, title })
+                                          }
+                                          onReexecute={() => {
+                                            const idx = s().nodes.findIndex(
+                                              (n) => n.id === node().id,
+                                            );
+                                            if (idx >= 0) setShowReexecDialog(idx);
+                                          }}
+                                        />
+                                      </div>
+                                    )}
+                                  </Show>
+                                }
+                              >
+                                <Show when={historyNode()}>
+                                  {() => renderExecutor(() => historyNode() as NodeExecution)}
+                                </Show>
+                              </Show>
+                            </div>
                           </Show>
-                          <Show
-                            when={
-                              viewed().status === "failed" && viewed().nodeType === "model_call"
-                            }
-                            fallback={
-                              <div class="space-y-4">
-                                {renderSkippedHistoryBanner(viewed())}
-                                <CompletedViewRouter
-                                  node={viewed()}
-                                  config={getNodeConfig(viewed())}
-                                  documentId={params.documentId}
-                                  onFullscreen={(content, title) =>
-                                    setFullscreenContent({ content, title })
-                                  }
-                                  onReexecute={() => {
-                                    const idx = s().nodes.findIndex((n) => n.id === viewed().id);
-                                    if (idx >= 0) setShowReexecDialog(idx);
-                                  }}
-                                />
-                              </div>
-                            }
-                          >
-                            {renderExecutor(viewed)}
-                          </Show>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </Match>
 
                     {/* Failed node summary with retry — shown when generation failed */}
@@ -1269,7 +1290,13 @@ export default function DocumentWorkspace() {
                               </div>
                             }
                           >
-                            {(node) => <div class="space-y-6">{renderExecutor(node)}</div>}
+                            {() => (
+                              <Show when={inProgressNode()?.id} keyed>
+                                <div class="space-y-6">
+                                  {renderExecutor(() => inProgressNode() as NodeExecution)}
+                                </div>
+                              </Show>
+                            )}
                           </Show>
                         );
                       })()}
@@ -1301,15 +1328,17 @@ export default function DocumentWorkspace() {
                           : undefined
                       }
                     >
-                      {(curNode) => (
-                        <div class="space-y-6">
-                          {/* Node executor -- route by nodeType with real config */}
-                          {renderExecutor(curNode)}
+                      {() => (
+                        <Show when={currentNode()?.id} keyed>
+                          <div class="space-y-6">
+                            {/* Node executor -- route by nodeType with real config */}
+                            {renderExecutor(() => currentNode() as NodeExecution)}
 
-                          {/* (Inline editor removed) */}
+                            {/* (Inline editor removed) */}
 
-                          {/* Completed node history removed — stepper bar already shows progress */}
-                        </div>
+                            {/* Completed node history removed — stepper bar already shows progress */}
+                          </div>
+                        </Show>
                       )}
                     </Match>
 

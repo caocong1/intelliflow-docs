@@ -14,7 +14,7 @@ export interface NamedOutputBrowserSource {
   id: string;
   label: string;
   meta?: string;
-  tone?: "default" | "selected";
+  tone?: "default" | "selected" | "warning";
   artifacts: NamedOutputBrowserArtifact[];
 }
 
@@ -129,6 +129,8 @@ export default function NamedOutputsBrowser(props: NamedOutputsBrowserProps) {
                     class="min-w-0 rounded-xl border px-3 py-2 text-left transition-colors"
                     classList={{
                       "border-[rgba(79,70,229,0.35)] bg-[rgba(79,70,229,0.08)]": active(),
+                      "border-amber-200 bg-amber-50 hover:bg-amber-100":
+                        !active() && source.tone === "warning",
                       "border-[rgba(199,196,216,0.24)] bg-white hover:bg-[#f7f9fb]": !active(),
                     }}
                     onClick={() => setActiveSourceId(source.id)}
@@ -148,10 +150,20 @@ export default function NamedOutputsBrowser(props: NamedOutputsBrowserProps) {
                           汇总
                         </span>
                       </Show>
+                      <Show when={source.tone === "warning"}>
+                        <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          异常
+                        </span>
+                      </Show>
                     </div>
                     <div class="mt-1 flex items-center gap-2 text-[11px] text-[#8b8a99]">
                       <Show when={source.meta}>
-                        <span class="truncate">{source.meta}</span>
+                        <span
+                          class="truncate"
+                          classList={{ "text-amber-700": source.tone === "warning" }}
+                        >
+                          {source.meta}
+                        </span>
                       </Show>
                       <span>{source.artifacts.length} 个输出</span>
                     </div>

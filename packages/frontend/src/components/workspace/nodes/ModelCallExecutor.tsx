@@ -27,6 +27,10 @@ import NamedOutputsBrowser, {
   type NamedOutputBrowserSelection,
   type NamedOutputBrowserSource,
 } from "../shared/NamedOutputsBrowser";
+import {
+  type ModelArtifactDiagnostic,
+  diagnoseModelArtifacts,
+} from "../shared/model-call-artifact-diagnostics";
 import ModelCompareView from "./ModelCompareView";
 
 interface Props {
@@ -533,6 +537,23 @@ export default function ModelCallExecutor(props: Props) {
     };
   });
 
+  const modelArtifactDiagnostics = createMemo<Record<string, ModelArtifactDiagnostic>>(() => {
+    const diagnostics: Record<string, ModelArtifactDiagnostic> = {};
+    const outputsByModel = namedOutputsByModel();
+
+    for (const model of modelList().filter(
+      (entry) => entry.status === "completed" || entry.status === "format_error",
+    )) {
+      diagnostics[model.modelId] = diagnoseModelArtifacts({
+        namedOutputDefs: namedOutputDefs(),
+        outputs: outputsByModel[model.modelId],
+        rawContent: model.content,
+      });
+    }
+
+    return diagnostics;
+  });
+
   const artifactSources = createMemo<NamedOutputBrowserSource[]>(() => {
     const defs = new Map(namedOutputDefs().map((def) => [def.id, def]));
     const selectedArtifacts = Object.entries(namedOutputs() ?? {}).filter(
@@ -577,25 +598,38 @@ export default function ModelCallExecutor(props: Props) {
       });
     }
 
-    const outputsByModel = namedOutputsByModel();
     for (const model of modelList().filter(
       (entry) => entry.status === "completed" || entry.status === "format_error",
     )) {
-      const modelArtifacts = Object.entries(outputsByModel[model.modelId] ?? {}).filter(
-        ([artifactId]) => artifactId !== "_default",
-      );
+      const diagnostic = modelArtifactDiagnostics()[model.modelId];
+      const modelArtifacts = diagnostic?.parsedArtifacts ?? [];
+      const browserArtifacts = diagnostic?.rawArtifact
+        ? [
+            ...modelArtifacts,
+            [
+              diagnostic.rawArtifact.artifactId,
+              {
+                content: diagnostic.rawArtifact.content,
+                format: diagnostic.rawArtifact.format,
+                modelId: model.modelId,
+                modelDisplayName: model.modelDisplayName,
+              },
+            ] as [string, ModelCallNamedOutput],
+          ]
+        : modelArtifacts;
       const mergedSelectedModel =
         mergeSelectedSourceIntoModel() && model.modelId === singleSelectedModelId();
-      appendSource(`model:${model.modelId}`, model.modelDisplayName, modelArtifacts, {
+      appendSource(`model:${model.modelId}`, model.modelDisplayName, browserArtifacts, {
         meta: selectionEnabled()
           ? mergedSelectedModel
             ? "当前采用输出"
             : isModelSelected(model.modelId)
               ? "已加入用户选择"
-              : undefined
+              : (diagnostic?.issue?.sourceMeta ?? undefined)
           : model.modelId === selectedModelId()
             ? "当前选中模型"
-            : undefined,
+            : (diagnostic?.issue?.sourceMeta ?? undefined),
+        tone: diagnostic?.issue ? "warning" : undefined,
         fallbackModelId: model.modelId,
         readonly: props.readOnly,
       });
@@ -1574,7 +1608,10 @@ export default function ModelCallExecutor(props: Props) {
                   ? "多模型对比模式"
                   : "单模型模式"}
               <Show when={props.stepDescription}>
-                <span class="text-[#4f46e5]">{" · "}{props.stepDescription}</span>
+                <span class="text-[#4f46e5]">
+                  {" · "}
+                  {props.stepDescription}
+                </span>
               </Show>
             </p>
           </div>
@@ -2005,7 +2042,9 @@ export default function ModelCallExecutor(props: Props) {
                 d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
               />
             </svg>
-            <span class="text-sm text-amber-700">模型未按预期格式输出，已合并为单个产物</span>
+            <span class="text-sm text-amber-700">
+              部分模型的命名产物解析异常，已保留原始响应供排查。
+            </span>
           </div>
         </Show>
 
@@ -2053,60 +2092,89 @@ export default function ModelCallExecutor(props: Props) {
             <p class="text-xs text-[#6b6a78]">
               选择一个或多个模型结果，系统会生成对应的“用户选择输出”供下游节点引用。
             </p>
+            <Show when={fallbackWarning()}>
+              <div class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                部分模型的命名产物解析异常，已在上方“输出物浏览”中显示原始响应。这些异常模型暂不可加入选择。
+              </div>
+            </Show>
             <div class="space-y-2">
               <For each={modelList().filter((m) => m.status === "completed")}>
-                {(model) => (
-                  <div
-                    class={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                      isModelSelected(model.modelId)
-                        ? "bg-[#e2dfff] border border-[rgba(79,70,229,0.3)]"
-                        : "bg-white border border-[rgba(199,196,216,0.15)] hover:bg-[#f7f9fb]"
-                    }`}
-                  >
+                {(model) => {
+                  const diagnostic = () => modelArtifactDiagnostics()[model.modelId];
+                  const selectable = () =>
+                    !hasNamedOutputs() || (diagnostic()?.isSelectable ?? true);
+
+                  return (
                     <div
-                      class={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                      class={`rounded-xl border p-3 transition-colors ${
                         isModelSelected(model.modelId)
-                          ? "border-indigo-500 bg-indigo-500"
-                          : "border-[rgba(199,196,216,0.6)]"
+                          ? "bg-[#e2dfff] border-[rgba(79,70,229,0.3)]"
+                          : selectable()
+                            ? "bg-white border-[rgba(199,196,216,0.15)] hover:bg-[#f7f9fb]"
+                            : "bg-amber-50 border-amber-200"
                       }`}
                     >
-                      <Show when={isModelSelected(model.modelId)}>
-                        <div class="w-1.5 h-1.5 rounded-full bg-white" />
+                      <div class="flex items-center gap-3">
+                        <div
+                          class={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
+                            isModelSelected(model.modelId)
+                              ? "border-indigo-500 bg-indigo-500"
+                              : selectable()
+                                ? "border-[rgba(199,196,216,0.6)]"
+                                : "border-amber-400 bg-white"
+                          }`}
+                        >
+                          <Show when={isModelSelected(model.modelId)}>
+                            <div class="w-1.5 h-1.5 rounded-full bg-white" />
+                          </Show>
+                        </div>
+                        <div class="flex-1">
+                          <span class="text-sm font-medium text-[#191c1e]">
+                            {model.modelDisplayName}
+                          </span>
+                          <span class="ml-2 text-xs text-[#464555]">
+                            {model.content.length} 字符
+                          </span>
+                        </div>
+                        <Show when={diagnostic()?.issue}>
+                          <span class="text-xs px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 font-medium">
+                            解析异常
+                          </span>
+                        </Show>
+                        <Show when={isModelSelected(model.modelId)}>
+                          <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-600 font-medium">
+                            已选择
+                          </span>
+                        </Show>
+                        <Show when={!isModelSelected(model.modelId) && selectable()}>
+                          <button
+                            type="button"
+                            class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
+                            onClick={() => handleSelect(model.modelId)}
+                            disabled={selectLoading()}
+                          >
+                            加入选择
+                          </button>
+                        </Show>
+                        <Show when={isModelSelected(model.modelId)}>
+                          <button
+                            type="button"
+                            class="px-3 py-1.5 text-xs font-medium text-[#464555] border border-[rgba(199,196,216,0.4)] rounded-lg hover:bg-white transition-colors"
+                            onClick={() => handleSelect(model.modelId)}
+                            disabled={selectLoading()}
+                          >
+                            取消
+                          </button>
+                        </Show>
+                      </div>
+                      <Show when={diagnostic()?.issue}>
+                        <div class="mt-2 text-xs text-amber-700">
+                          {diagnostic()?.issue?.selectionMessage}
+                        </div>
                       </Show>
                     </div>
-                    <div class="flex-1">
-                      <span class="text-sm font-medium text-[#191c1e]">
-                        {model.modelDisplayName}
-                      </span>
-                      <span class="ml-2 text-xs text-[#464555]">{model.content.length} 字符</span>
-                    </div>
-                    <Show when={isModelSelected(model.modelId)}>
-                      <span class="text-xs px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-600 font-medium">
-                        已选择
-                      </span>
-                    </Show>
-                    <Show when={!isModelSelected(model.modelId)}>
-                      <button
-                        type="button"
-                        class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors"
-                        onClick={() => handleSelect(model.modelId)}
-                        disabled={selectLoading()}
-                      >
-                        加入选择
-                      </button>
-                    </Show>
-                    <Show when={isModelSelected(model.modelId)}>
-                      <button
-                        type="button"
-                        class="px-3 py-1.5 text-xs font-medium text-[#464555] border border-[rgba(199,196,216,0.4)] rounded-lg hover:bg-white transition-colors"
-                        onClick={() => handleSelect(model.modelId)}
-                        disabled={selectLoading()}
-                      >
-                        取消
-                      </button>
-                    </Show>
-                  </div>
-                )}
+                  );
+                }}
               </For>
             </div>
             <Show when={selectedModelIds().length === 0}>

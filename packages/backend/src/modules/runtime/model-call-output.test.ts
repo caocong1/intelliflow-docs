@@ -204,4 +204,70 @@ describe("model-call output helpers", () => {
       },
     });
   });
+
+  it("recovers all outputs when END tags are grouped at the bottom", () => {
+    const content = [
+      "===OUTPUT:prd_v1===",
+      "# PRD content",
+      "",
+      "===OUTPUT:open_items_v1===",
+      "## Open items content",
+      "",
+      "===OUTPUT:decision_log_v1===",
+      "## Decision log content",
+      "",
+      "===END:prd_v1===",
+      "===END:open_items_v1===",
+      "===END:decision_log_v1===",
+    ].join("\n");
+
+    const parsed = parseNamedOutputs(content, namedOutputDefs);
+
+    expect(parsed.fallback).toBe(false);
+    expect(parsed.namedOutputs.prd_v1.content).toBe("# PRD content");
+    expect(parsed.namedOutputs.open_items_v1.content).toBe("## Open items content");
+    expect(parsed.namedOutputs.decision_log_v1.content).toBe("## Decision log content");
+  });
+
+  it("recovers outputs when some END tags are missing", () => {
+    const content = [
+      "===OUTPUT:prd_v1===",
+      "# PRD content",
+      "===END:prd_v1===",
+      "",
+      "===OUTPUT:open_items_v1===",
+      "## Open items content",
+      "",
+      "===OUTPUT:decision_log_v1===",
+      "## Decision log content",
+      // no END tags for open_items_v1 and decision_log_v1
+    ].join("\n");
+
+    const parsed = parseNamedOutputs(content, namedOutputDefs);
+
+    expect(parsed.fallback).toBe(false);
+    expect(parsed.namedOutputs.prd_v1.content).toBe("# PRD content");
+    expect(parsed.namedOutputs.open_items_v1.content).toBe("## Open items content");
+    expect(parsed.namedOutputs.decision_log_v1.content).toBe("## Decision log content");
+  });
+
+  it("marks fallback when some expected outputs are entirely absent", () => {
+    const content = [
+      "===OUTPUT:prd_v1===",
+      "# PRD content",
+      "===END:prd_v1===",
+      "",
+      "===OUTPUT:open_items_v1===",
+      "## Open items content",
+      "===END:open_items_v1===",
+      // decision_log_v1 is entirely absent
+    ].join("\n");
+
+    const parsed = parseNamedOutputs(content, namedOutputDefs);
+
+    expect(parsed.fallback).toBe(true);
+    expect(parsed.namedOutputs.prd_v1.content).toBe("# PRD content");
+    expect(parsed.namedOutputs.open_items_v1.content).toBe("## Open items content");
+    expect(parsed.namedOutputs.decision_log_v1).toBeUndefined();
+  });
 });

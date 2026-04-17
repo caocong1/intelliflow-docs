@@ -11,6 +11,10 @@ import NamedOutputsBrowser, {
   type NamedOutputBrowserSelection,
   type NamedOutputBrowserSource,
 } from "../shared/NamedOutputsBrowser";
+import {
+  type ModelArtifactDiagnostic,
+  diagnoseModelArtifacts,
+} from "../shared/model-call-artifact-diagnostics";
 
 interface ModelOutput {
   content: string;
@@ -188,19 +192,43 @@ export default function ModelCallCompleted(props: Props) {
       });
     }
 
-    const outputsByModel = od()?.namedOutputsByModel ?? {};
+    const diagnostics: Record<string, ModelArtifactDiagnostic> = Object.fromEntries(
+      modelEntries().map((model) => [
+        model.key,
+        diagnoseModelArtifacts({
+          namedOutputDefs: namedOutputDefs(),
+          outputs: od()?.namedOutputsByModel?.[model.key],
+          rawContent: model.content,
+        }),
+      ]),
+    );
+
     for (const model of modelEntries()) {
-      const modelArtifacts = Object.entries(outputsByModel[model.key] ?? {}).filter(
-        ([artifactId]) => artifactId !== "_default",
-      );
+      const diagnostic = diagnostics[model.key];
+      const modelArtifacts = diagnostic?.parsedArtifacts ?? [];
+      const browserArtifacts = diagnostic?.rawArtifact
+        ? [
+            ...modelArtifacts,
+            [
+              diagnostic.rawArtifact.artifactId,
+              {
+                content: diagnostic.rawArtifact.content,
+                format: diagnostic.rawArtifact.format,
+                modelId: model.key,
+                modelDisplayName: model.modelDisplayName,
+              },
+            ] as [string, { content: string; format: string; modelId?: string }],
+          ]
+        : modelArtifacts;
       const mergedSelectedModel =
         mergeSelectedSourceIntoModel() && model.key === singleSelectedModelId();
-      appendSource(`model:${model.key}`, model.modelDisplayName, modelArtifacts, {
+      appendSource(`model:${model.key}`, model.modelDisplayName, browserArtifacts, {
         meta: mergedSelectedModel
           ? "当前采用输出"
           : model.key === props.node.selectedOutputKey
             ? "当前选中模型"
-            : undefined,
+            : (diagnostic?.issue?.sourceMeta ?? undefined),
+        tone: diagnostic?.issue ? "warning" : undefined,
         fallbackModelId: model.key,
       });
     }
@@ -484,7 +512,9 @@ export default function ModelCallCompleted(props: Props) {
                   d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
                 />
               </svg>
-              <span class="text-sm text-amber-700">模型未按预期格式输出，已合并为单个产物</span>
+              <span class="text-sm text-amber-700">
+                部分模型的命名产物解析异常，已保留原始响应供排查。
+              </span>
             </div>
           </Show>
 

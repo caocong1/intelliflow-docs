@@ -211,10 +211,60 @@ export function buildSelectedArtifactSegmentKey(artifactId: string): string {
   return `selected__artifact__${artifactId}`;
 }
 
+/** Strategy 1: standard paired ===OUTPUT:id===…===END:id=== extraction. */
+function parsePairedDelimiters(
+  rawContent: string,
+  formatMap: Map<string, NamedOutputDef["format"]>,
+): Record<string, { content: string; format: NamedOutputDef["format"] }> {
+  const result: Record<string, { content: string; format: NamedOutputDef["format"] }> = {};
+  const regex = /===OUTPUT:(\w+)===\n?([\s\S]*?)===END:\1===/g;
+  let match = regex.exec(rawContent);
+  while (match !== null) {
+    result[match[1]] = { content: match[2].trim(), format: formatMap.get(match[1]) ?? "text" };
+    match = regex.exec(rawContent);
+  }
+  return result;
+}
+
+/**
+ * Strategy 2: split by ===OUTPUT:id=== markers, strip any ===END:xxx=== tags.
+ * Handles models that group all END tags at the bottom or omit some of them.
+ */
+function parseByOutputMarkers(
+  rawContent: string,
+  formatMap: Map<string, NamedOutputDef["format"]>,
+): Record<string, { content: string; format: NamedOutputDef["format"] }> {
+  const markerRegex = /===OUTPUT:(\w+)===/g;
+  const markers: Array<{ id: string; start: number; contentStart: number }> = [];
+  let m = markerRegex.exec(rawContent);
+  while (m !== null) {
+    markers.push({ id: m[1], start: m.index, contentStart: m.index + m[0].length });
+    m = markerRegex.exec(rawContent);
+  }
+  if (markers.length === 0) return {};
+
+  const result: Record<string, { content: string; format: NamedOutputDef["format"] }> = {};
+  for (let i = 0; i < markers.length; i++) {
+    const { id, contentStart } = markers[i];
+    const sectionEnd = i + 1 < markers.length ? markers[i + 1].start : rawContent.length;
+    const content = rawContent
+      .slice(contentStart, sectionEnd)
+      .replace(/===END:\w+===/g, "")
+      .trim();
+    result[id] = { content, format: formatMap.get(id) ?? "text" };
+  }
+  return result;
+}
+
 /**
  * Parse named output delimiters from raw model content.
  * Expected format: ===OUTPUT:id===\n...content...\n===END:id===
- * Falls back to storing entire content as _default when delimiters not found.
+ *
+ * Two strategies are tried in order:
+ * 1. Paired delimiters (strict OUTPUT+END regex)
+ * 2. OUTPUT-marker splitting (tolerates grouped/missing END tags)
+ *
+ * Falls back to storing entire content as _default when no delimiters found.
  */
 export function parseNamedOutputs(
   rawContent: string,
@@ -225,30 +275,24 @@ export function parseNamedOutputs(
 } {
   const expectedIds = expectedDefs.map((d) => d.id);
   const formatMap = new Map(expectedDefs.map((d) => [d.id, d.format]));
-  const result: Record<string, { content: string; format: NamedOutputDef["format"] }> = {};
 
-  const regex = /===OUTPUT:(\w+)===\n?([\s\S]*?)===END:\1===/g;
-  let match: RegExpExecArray | null;
-  match = regex.exec(rawContent);
-  while (match !== null) {
-    const id = match[1];
-    const content = match[2].trim();
-    result[id] = {
-      content,
-      format: formatMap.get(id) ?? "text",
-    };
-    match = regex.exec(rawContent);
+  // Strategy 1: strict paired delimiters
+  const paired = parsePairedDelimiters(rawContent, formatMap);
+  const pairedCount = expectedIds.filter((id) => id in paired).length;
+  if (pairedCount === expectedIds.length) {
+    return { namedOutputs: paired, fallback: false };
   }
 
-  const foundCount = expectedIds.filter((id) => id in result).length;
+  // Strategy 2: split by OUTPUT markers (tolerates grouped/missing END tags)
+  const marker = parseByOutputMarkers(rawContent, formatMap);
+  const markerCount = expectedIds.filter((id) => id in marker).length;
 
-  if (foundCount === expectedIds.length) {
-    return { namedOutputs: result, fallback: false };
-  }
+  // Pick whichever strategy recovered more expected outputs
+  const best = markerCount > pairedCount ? marker : paired;
+  const bestCount = Math.max(markerCount, pairedCount);
 
-  // Partial match: keep successfully parsed outputs, fallback only for the rest
-  if (foundCount > 0) {
-    return { namedOutputs: result, fallback: true };
+  if (bestCount > 0) {
+    return { namedOutputs: best, fallback: bestCount < expectedIds.length };
   }
 
   return {

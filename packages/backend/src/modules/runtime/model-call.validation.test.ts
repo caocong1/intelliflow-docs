@@ -222,6 +222,29 @@ describe("validateSelectedModelCallOutputData", () => {
     expect(result.errors).toContain("请至少选择一个模型输出后再继续。");
   });
 
+  it("can skip selection enforcement when only validating draft artifact JSON", () => {
+    const result = validateSelectedModelCallOutputData(
+      {
+        namedOutputs: {
+          slides_final: {
+            content: JSON.stringify({ slides: [{ layout: "title", title: "封面" }] }),
+          },
+          qa_report: {
+            content: "# PASS",
+          },
+        },
+      },
+      {
+        ...config,
+        enableUserSelectionOutput: true,
+      },
+      null,
+      { requireSelection: false },
+    );
+
+    expect(result.status).toBe("completed");
+  });
+
   it("does not block advance when legacy manual feedback exists", () => {
     const result = validateSelectedModelCallOutputData(
       {

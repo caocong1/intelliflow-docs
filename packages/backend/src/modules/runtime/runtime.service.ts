@@ -595,9 +595,14 @@ export async function advanceNode(
 
       if (triggered) {
         if (executionRule.action === "skip") {
+          const nextNodeConfig = nextNodeDef?.config;
+          if (!nextNodeConfig) {
+            throw new Error(`Workflow node definition not found for ${nextNode.nodeId}`);
+          }
+
           const skippedOutput = buildSkippedNodeOutputData({
             nodeId: nextNode.nodeId,
-            config: nextNodeDef!.config as NodeConfig,
+            config: nextNodeConfig as NodeConfig,
             nodeExecs: freshExecs.map((e) => ({
               nodeId: e.nodeId,
               outputData: e.outputData as Record<string, unknown> | null,
@@ -749,6 +754,35 @@ export async function saveNodeDraft(
   nodeExecutionId: string,
   data: Record<string, unknown>,
 ): Promise<void> {
+  const [currentNode] = await db
+    .select({
+      nodeType: nodeExecutions.nodeType,
+      selectedOutputKey: nodeExecutions.selectedOutputKey,
+    })
+    .from(nodeExecutions)
+    .where(eq(nodeExecutions.id, nodeExecutionId))
+    .limit(1);
+
+  if (!currentNode) {
+    throw new Error("Node execution not found");
+  }
+
+  if (currentNode.nodeType === "model_call") {
+    const config = await getModelCallConfig(nodeExecutionId);
+    if (config?.type === "model_call") {
+      const validation = validateSelectedModelCallOutputData(
+        data,
+        config,
+        currentNode.selectedOutputKey,
+        { requireSelection: false },
+      );
+
+      if (validation.status === "format_error") {
+        throw new Error(validation.errors?.join("\n") ?? "当前模型输出校验失败");
+      }
+    }
+  }
+
   const now = new Date();
   await db
     .update(nodeExecutions)

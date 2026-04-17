@@ -24,6 +24,7 @@ const FORMAT_BADGES: Record<string, { label: string; class: string }> = {
 export default function NamedOutputCard(props: NamedOutputCardProps) {
   const [editing, setEditing] = createSignal(false);
   const [localContent, setLocalContent] = createSignal(props.content);
+  const [saveError, setSaveError] = createSignal<string | null>(null);
 
   const badge = () => FORMAT_BADGES[props.format] ?? FORMAT_BADGES.text;
   const isJson = () => props.format === "json";
@@ -40,12 +41,24 @@ export default function NamedOutputCard(props: NamedOutputCardProps) {
     if (previousTarget !== undefined && previousTarget !== target) {
       setEditing(false);
       setLocalContent(props.content);
+      setSaveError(null);
     }
 
     return target;
   });
 
   function handleSave() {
+    if (isJson()) {
+      try {
+        JSON.parse(localContent());
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        setSaveError(`JSON 语法错误: ${message}`);
+        return;
+      }
+    }
+
+    setSaveError(null);
     props.onContentChange?.({
       artifactId: props.artifactId,
       modelId: props.modelId,
@@ -56,6 +69,7 @@ export default function NamedOutputCard(props: NamedOutputCardProps) {
 
   function handleCancel() {
     setLocalContent(props.content);
+    setSaveError(null);
     setEditing(false);
   }
 
@@ -108,7 +122,10 @@ export default function NamedOutputCard(props: NamedOutputCardProps) {
         >
           <textarea
             value={localContent()}
-            onInput={(e) => setLocalContent(e.currentTarget.value)}
+            onInput={(e) => {
+              setLocalContent(e.currentTarget.value);
+              if (saveError()) setSaveError(null);
+            }}
             class={`w-full min-h-[280px] max-h-[560px] p-3 text-sm border border-[rgba(199,196,216,0.3)] rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y ${
               isJson() ? "font-mono bg-[#fafaf9]" : "bg-white"
             }`}
@@ -129,6 +146,9 @@ export default function NamedOutputCard(props: NamedOutputCardProps) {
               取消
             </button>
           </div>
+          <Show when={saveError()}>
+            {(message) => <p class="mt-2 text-xs text-rose-600">{message()}</p>}
+          </Show>
         </Show>
       </div>
     </div>

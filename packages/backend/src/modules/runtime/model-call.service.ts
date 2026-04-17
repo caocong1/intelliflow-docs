@@ -303,7 +303,10 @@ function extractNamedOutputContents(rawContent: string): Record<string, string> 
     for (let i = 0; i < markers.length; i++) {
       const { id, contentStart } = markers[i];
       const sectionEnd = i + 1 < markers.length ? markers[i + 1].start : rawContent.length;
-      markerOutputs[id] = rawContent.slice(contentStart, sectionEnd).replace(/===END:\w+===/g, "").trim();
+      markerOutputs[id] = rawContent
+        .slice(contentStart, sectionEnd)
+        .replace(/===END:\w+===/g, "")
+        .trim();
     }
     return markerOutputs;
   }
@@ -345,8 +348,10 @@ export function validateSelectedModelCallOutputData(
   outputData: Record<string, unknown> | null,
   config: ModelCallConfig,
   selectedOutputKey?: string | null,
+  options?: { requireSelection?: boolean },
 ): { status: "completed" | "format_error"; errors?: string[] } {
   const errors: string[] = [];
+  const requireSelection = options?.requireSelection ?? true;
 
   if (!outputData) {
     return { status: "format_error", errors: ["当前节点没有可校验的输出数据"] };
@@ -359,7 +364,7 @@ export function validateSelectedModelCallOutputData(
     : [];
 
   if (config.enableUserSelectionOutput === true) {
-    if (selectedModelIds.length === 0) {
+    if (requireSelection && selectedModelIds.length === 0) {
       errors.push("请至少选择一个模型输出后再继续。");
     }
   } else if (!selectedOutputKey && typeof outputData.selectedContent !== "string") {
@@ -1020,7 +1025,9 @@ export async function executeModelCallBackground(
       defaultSelectedModelId:
         mcConfig.enableUserSelectionOutput === true
           ? (currentExecution?.selectedOutputKey ?? null)
-          : (currentExecution?.selectedOutputKey ?? firstCompletedModelId ?? firstFormatErrorModelId),
+          : (currentExecution?.selectedOutputKey ??
+            firstCompletedModelId ??
+            firstFormatErrorModelId),
       previousOutputData: currentOutputData,
       markManualFeedbackApplied: true,
     });

@@ -245,6 +245,68 @@ describe("validateSelectedModelCallOutputData", () => {
     expect(result.status).toBe("completed");
   });
 
+  it("validates each model's individual JSON artifact when multiple models are selected", () => {
+    const validDraft = JSON.stringify({ slides: [{ layout: "title", title: "封面" }] });
+    const validDraftB = JSON.stringify({ slides: [{ layout: "title", title: "Cover" }] });
+
+    // Combined `namedOutputs.slides_final.content` is an array wrapper (UX format)
+    // that would fail the single-object schema — the fix must validate each
+    // model's individual artifact via `namedOutputsByModel` instead.
+    const result = validateSelectedModelCallOutputData(
+      {
+        selectedModelIds: ["model-a", "model-b"],
+        namedOutputs: {
+          slides_final: {
+            content: JSON.stringify([
+              { modelId: "model-a", value: JSON.parse(validDraft) },
+              { modelId: "model-b", value: JSON.parse(validDraftB) },
+            ]),
+          },
+          qa_report: { content: "【model-a】\n\n# PASS\n\n====================\n\n【model-b】\n\n# PASS" },
+        },
+        namedOutputsByModel: {
+          "model-a": {
+            slides_final: { content: validDraft, format: "json", modelId: "model-a" },
+          },
+          "model-b": {
+            slides_final: { content: validDraftB, format: "json", modelId: "model-b" },
+          },
+        },
+      },
+      { ...config, enableUserSelectionOutput: true },
+      "model-a",
+    );
+
+    expect(result.status).toBe("completed");
+  });
+
+  it("reports the offending model when one of multiple selected JSON artifacts is invalid", () => {
+    const validDraft = JSON.stringify({ slides: [{ layout: "title", title: "封面" }] });
+    const invalidDraft = JSON.stringify({ slides: [{ layout: "content" }] });
+
+    const result = validateSelectedModelCallOutputData(
+      {
+        selectedModelIds: ["model-a", "model-b"],
+        namedOutputs: {
+          slides_final: { content: "[array-wrapped content]" },
+        },
+        namedOutputsByModel: {
+          "model-a": {
+            slides_final: { content: validDraft, format: "json", modelId: "model-a" },
+          },
+          "model-b": {
+            slides_final: { content: invalidDraft, format: "json", modelId: "model-b" },
+          },
+        },
+      },
+      { ...config, enableUserSelectionOutput: true },
+      "model-a",
+    );
+
+    expect(result.status).toBe("format_error");
+    expect(result.errors?.join("\n")).toContain("命名产物 slides_final（model-b）");
+  });
+
   it("does not block advance when legacy manual feedback exists", () => {
     const result = validateSelectedModelCallOutputData(
       {

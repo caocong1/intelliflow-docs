@@ -375,8 +375,41 @@ export function validateSelectedModelCallOutputData(
   if (allNamedOutputs.length > 0) {
     const namedOutputs =
       (outputData.namedOutputs as Record<string, { content?: string }> | undefined) ?? {};
+    const namedOutputsByModel = outputData.namedOutputsByModel as
+      | Record<string, Record<string, { content?: string }>>
+      | undefined;
+    // When user selects 2+ models with JSON named outputs, the combined
+    // `namedOutputs[id].content` is an array wrapper (for display), which
+    // cannot match a single-object schema. Validate each model's individual
+    // artifact against the schema instead.
+    const validatePerModelJson =
+      config.enableUserSelectionOutput === true &&
+      selectedModelIds.length > 1 &&
+      !!namedOutputsByModel;
 
     for (const output of allNamedOutputs) {
+      if (validatePerModelJson && output.format === "json") {
+        for (const modelId of selectedModelIds) {
+          const modelArtifact = namedOutputsByModel?.[modelId]?.[output.id];
+          const artifactContent =
+            typeof modelArtifact?.content === "string" ? modelArtifact.content.trim() : "";
+
+          if (!artifactContent) {
+            errors.push(`命名产物 ${output.id}（${modelId}）缺失或为空`);
+            continue;
+          }
+
+          errors.push(
+            ...validateJsonStringAgainstSchema(
+              artifactContent,
+              output.jsonSchema,
+              `命名产物 ${output.id}（${modelId}）`,
+            ),
+          );
+        }
+        continue;
+      }
+
       const namedOutput = namedOutputs[output.id];
       const artifactContent =
         typeof namedOutput?.content === "string" ? namedOutput.content.trim() : "";

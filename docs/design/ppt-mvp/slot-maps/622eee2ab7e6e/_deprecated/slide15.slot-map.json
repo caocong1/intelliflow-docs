@@ -1,0 +1,256 @@
+{
+  "version": "template_slot_map/v1",
+  "templateId": "622eee2ab7e6e",
+  "templatePath": "../../../../packages/backend/test-fixtures/ppt-mvp/622eee2ab7e6e.pptx",
+  "slideIndex": 15,
+  "slideId": 2225026078,
+  "slots": [
+    {
+      "slotId": "section_title",
+      "slotType": "title",
+      "kind": "text",
+      "selector": {
+        "creationId": "6537A731-E12B-428B-A722-F2E01836965D",
+        "name": "文本框 8"
+      },
+      "bbox": { "x": 913716, "y": 244859, "w": 2467659, "h": 523220 },
+      "textSample": "存在不足之处",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 26,
+      "maxLines": 1,
+      "minFontPt": 22,
+      "notes": "Template's default font is ~32pt. Wireless title is 2.2× longer — shrink to 22pt to fit."
+    },
+    {
+      "slotId": "section_header_decoration_1",
+      "slotType": "decoration",
+      "kind": "group",
+      "selector": {
+        "creationId": "A35AEE44-51BF-4AAE-903E-DB91462EC1CE",
+        "name": "组合 9"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "section_header_decoration_2",
+      "slotType": "decoration",
+      "kind": "group",
+      "selector": {
+        "creationId": "34B3F16C-5B61-4F13-AA19-108AF14BE173",
+        "name": "组合 6"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "section_header_decoration_3",
+      "slotType": "decoration",
+      "kind": "group",
+      "selector": {
+        "creationId": "2574297B-EE0B-4530-9EBD-F5D835357B46",
+        "name": "组合 5"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "section_header_pill_1",
+      "slotType": "decoration",
+      "kind": "text",
+      "selector": {
+        "creationId": "043F6C6B-23C8-4C86-9A1E-295066281B90",
+        "name": "矩形: 圆角 1"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "section_header_pill_2",
+      "slotType": "decoration",
+      "kind": "text",
+      "selector": {
+        "creationId": "E55048C9-6607-43F5-96CE-F6F69D50BEC8",
+        "name": "矩形: 圆角 2"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "section_header_pill_3",
+      "slotType": "decoration",
+      "kind": "text",
+      "selector": {
+        "creationId": "14491875-3293-4B90-8D71-7E0990B0A759",
+        "name": "矩形: 圆角 4"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "eyebrow_pill",
+      "slotType": "eyebrow",
+      "kind": "text",
+      "selector": {
+        "creationId": "D0031025-F3AA-4C1E-91BA-CD71F483EFD1",
+        "name": "对角圆角矩形 29"
+      },
+      "bbox": { "x": 548925, "y": 868575, "w": 1332482, "h": 407922 },
+      "textSample": "添加标题",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 23,
+      "maxLines": 1,
+      "minFontPt": 12,
+      "widthStretchEmu": 1200000,
+      "notes": "Oblique rounded pill. Widen + shrink to fit 'ARCHITECTURE COMPARISON' (23 ASCII units)."
+    },
+    {
+      "slotId": "top_description",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "0609829A-8461-41F7-A6F5-67215D559872",
+        "name": "文本框 19"
+      },
+      "bbox": { "x": 548925, "y": 1327752, "w": 6874042, "h": 738625 },
+      "textSample": "请您单击此处添加合适文字加以说明",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 75,
+      "maxLines": 1,
+      "notes": "Wide horizontal description bar. Used for right-side comparison summary (merged rightTitle + rightBullets)."
+    },
+    {
+      "slotId": "left_group",
+      "slotType": "decoration",
+      "kind": "group",
+      "selector": {
+        "creationId": "88D0951C-EC18-4374-AAD3-57933D0A03B7",
+        "name": "组合 7"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true,
+      "notes": "Left column container — contains bg, icon, sub-title, description."
+    },
+    {
+      "slotId": "left_bg",
+      "slotType": "decoration",
+      "kind": "text",
+      "selector": {
+        "creationId": "D964F690-DE54-476D-859C-D0E51A502F97",
+        "name": "矩形 10"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "left_icon",
+      "slotType": "decoration",
+      "kind": "text",
+      "selector": {
+        "creationId": "DFEE7F70-D497-4E94-BD53-007EA9EFCB62",
+        "name": "iconfont-1187-868319"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "left_sub_title",
+      "slotType": "subtitle",
+      "kind": "text",
+      "selector": {
+        "creationId": "3D09ECFB-620C-454A-894A-8178C3725829",
+        "name": "1"
+      },
+      "bbox": { "x": 1355515, "y": 3196587, "w": 1127594, "h": 307777 },
+      "textSample": "添加标题",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 20,
+      "maxLines": 1,
+      "minFontPt": 14,
+      "widthStretchEmu": 600000,
+      "notes": "Left column sub-title (first '1' shape in doc order). Widen + shrink for '无线网络 · 核心优势'."
+    },
+    {
+      "slotId": "left_description",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "2FE8F772-2335-4155-9472-43BBEF42CCD8",
+        "name": "1"
+      },
+      "bbox": { "x": 546637, "y": 3629649, "w": 2745350, "h": 1433982 },
+      "textSample": "请您单击此处添加合适文字加以说明",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 28,
+      "maxLines": 4,
+      "minFontPt": 14,
+      "widthStretchEmu": 500000,
+      "notes": "Left column body text (second '1' shape in doc order). Holds 3 wireless leftBullets. A+B+C combo: physical bbox +500000 EMU cx stretch, font shrink to 14pt, LLM compresses to 28 units if needed."
+    },
+    {
+      "slotId": "right_group",
+      "slotType": "decoration",
+      "kind": "group",
+      "selector": {
+        "creationId": "4CB181B5-71CF-4579-992B-7750115B9E81",
+        "name": "组合 22"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true,
+      "notes": "Right-side image+rect group."
+    },
+    {
+      "slotId": "right_inner_group",
+      "slotType": "decoration",
+      "kind": "group",
+      "selector": {
+        "creationId": "FEACF733-3FF9-4514-A3FA-EF414A8A2CFA",
+        "name": "组合 17"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "right_bg",
+      "slotType": "decoration",
+      "kind": "text",
+      "selector": {
+        "creationId": "37F42A06-7698-4899-9707-D5CBD7B65E3E",
+        "name": "矩形 21"
+      },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true
+    },
+    {
+      "slotId": "image_middle",
+      "slotType": "image",
+      "kind": "image",
+      "selector": {
+        "creationId": "9CAB5ABE-262B-4AB0-8138-DED9DBF279A4",
+        "name": "图片 15"
+      },
+      "bbox": { "x": 3842523, "y": 1362342, "w": 3935983, "h": 2459989 },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true,
+      "notes": "Middle-column illustration. Image replacement deferred to a follow-up session."
+    },
+    {
+      "slotId": "image_right",
+      "slotType": "image",
+      "kind": "image",
+      "selector": {
+        "creationId": "AFB4750D-F16E-42EE-9B7F-FE3DD9528A70",
+        "name": "图片 16"
+      },
+      "bbox": { "x": 7848600, "y": 1362342, "w": 3943299, "h": 2464562 },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true,
+      "notes": "Right-column illustration. Image replacement deferred to a follow-up session."
+    }
+  ]
+}

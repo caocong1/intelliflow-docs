@@ -1,0 +1,69 @@
+{
+  "version": "page_plan/v1",
+  "pages": [
+    {
+      "pageId": "p1",
+      "pageType": "cover",
+      "variantHint": "cover_hero_image",
+      "title": "无线网络建设科普方案",
+      "subtitle": "场景选型 · 品牌选择 · 建设运维全指南",
+      "eyebrow": "WIRELESS NETWORK CONSTRUCTION GUIDE",
+      "audienceLine": "面向企业与公共机构的采购与 IT 负责人",
+      "speakerNote": "这一页用于快速建立主题和受众预期。本次内容聚焦无线网络建设中的场景选型、品牌判断和后续建设运维方法。"
+    },
+    {
+      "pageId": "p2",
+      "pageType": "toc",
+      "variantHint": "toc_card_grid_8",
+      "title": "目录",
+      "eyebrow": "CONTENTS",
+      "speakerNote": "本次分享将围绕这八个核心模块展开，全面覆盖无线建设的全链路知识。我们将从基础的对比开始，逐步深入到技术细节、设备选型和实际应用，最后还会解答一些常见问题。",
+      "items": [
+        { "index": "01", "title": "核心优势对比", "subtitle": "无线 vs 有线架构对比" },
+        { "index": "02", "title": "技术发展历程", "subtitle": "Wi-Fi 4~7 演进" },
+        { "index": "03", "title": "标准建设流程", "subtitle": "6 个关键步骤" },
+        { "index": "04", "title": "主流设备解析", "subtitle": "无线 AP 类型总览" },
+        { "index": "05", "title": "品牌选型对比", "subtitle": "主流品牌能力对照" },
+        { "index": "06", "title": "全场景选型指南", "subtitle": "办公/商场/工厂方案" },
+        { "index": "07", "title": "优化与运维要点", "subtitle": "信道/调优/排障" },
+        { "index": "08", "title": "常见问题答疑", "subtitle": "盲区与并发问题" }
+      ]
+    },
+    {
+      "pageId": "p3",
+      "pageType": "comparison",
+      "variantHint": "comparison_dual_image",
+      "title": "无线与有线网络核心优势对比",
+      "eyebrow": "ARCHITECTURE COMPARISON",
+      "leftTitle": "无线网络 · 核心优势",
+      "rightTitle": "有线网络 · 主要局限",
+      "speakerNote": "首先，我们来看无线和有线网络的核心区别。无线网络最大的优势在于其移动性和灵活性，它让我们摆脱了线缆的束缚，可以随时随地接入网络。而有线网络虽然稳定，但在部署和扩容方面存在明显局限性。需要强调的是，无线并非要完全取代有线，而是作为有线网络的有力补充，共同构建一个完整的网络体系。",
+      "leftBullets": [
+        "终端接入不受物理位置限制",
+        "无需大规模布线，部署更灵活",
+        "扩容仅需新增 AP"
+      ],
+      "rightBullets": [
+        "终端依赖网口接入，移动性弱",
+        "布线改造成本高、周期长",
+        "IoT 和高并发场景扩容更困难"
+      ]
+    },
+    {
+      "pageId": "p4",
+      "pageType": "timeline",
+      "variantHint": "timeline_horizontal_5",
+      "title": "无线网络技术发展历程",
+      "eyebrow": "TECHNOLOGY EVOLUTION",
+      "summary": "速率提升、并发增强、功耗下降，场景持续拓展。",
+      "speakerNote": "无线网络技术经历了快速的发展。从最初的 Wi-Fi 4，到现在主流的 Wi-Fi 6，再到最新的 Wi-Fi 7，每一代标准都在速率、并发能力和应用场景上有巨大的飞跃。目前，Wi-Fi 6 已经是市场的主流选择，它能很好地满足当前大部分场景的需求。而对于有更高要求的场景，Wi-Fi 7 则提供了更强的性能。",
+      "nodes": [
+        { "year": "1997", "title": "802.11 初代标准", "detail": "开启无线时代" },
+        { "year": "2009", "title": "Wi-Fi 4", "detail": "双频并发，600Mbps" },
+        { "year": "2014", "title": "Wi-Fi 5", "detail": "5G 高速，3.5Gbps" },
+        { "year": "2019", "title": "Wi-Fi 6", "detail": "高密并发适配" },
+        { "year": "2024", "title": "Wi-Fi 7", "detail": "46Gbps 级体验" }
+      ]
+    }
+  ]
+}

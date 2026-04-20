@@ -1,0 +1,193 @@
+{
+  "version": "template_fill_plan/v1",
+  "templateId": "622eee2ab7e6e",
+  "templatePath": "../../../packages/backend/test-fixtures/ppt-mvp/622eee2ab7e6e.pptx",
+  "slotMapDir": "../slot-maps/622eee2ab7e6e",
+  "pages": [
+    {
+      "pageId": "p1",
+      "sourceSlideIndex": 1,
+      "mode": "preserve",
+      "expectedTopology": "cover_hero",
+      "slotAssignments": [
+        { "slotId": "eyebrow", "value": "WIRELESS NETWORK CONSTRUCTION GUIDE" },
+        { "slotId": "title", "value": "无线网络科普" },
+        {
+          "slotId": "body",
+          "paragraphs": [
+            { "text": "场景选型 · 品牌选择 · 建设运维全指南" },
+            { "text": "面向企业与公共机构的采购与 IT 负责人" }
+          ]
+        },
+        { "slotId": "pill_1", "value": "汇报：IT基建" },
+        { "slotId": "pill_2", "value": "2026.04" }
+      ]
+    },
+    {
+      "pageId": "p2",
+      "sourceSlideIndex": 2,
+      "mode": "preserve",
+      "expectedTopology": "toc_list_4",
+      "slotAssignments": [
+        {
+          "slotId": "row_1_title",
+          "paragraphs": [
+            { "text": "核心优势对比" },
+            { "text": "技术发展历程" }
+          ]
+        },
+        {
+          "slotId": "row_2_title",
+          "paragraphs": [
+            { "text": "标准建设流程" },
+            { "text": "主流设备解析" }
+          ]
+        },
+        {
+          "slotId": "row_3_title",
+          "paragraphs": [
+            { "text": "品牌选型对比" },
+            { "text": "全场景选型指南" }
+          ]
+        },
+        {
+          "slotId": "row_4_title",
+          "paragraphs": [
+            { "text": "优化与运维要点" },
+            { "text": "常见问题答疑" }
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "p3",
+      "sourceSlideIndex": 17,
+      "mode": "preserve",
+      "expectedTopology": "grid_2x2_symmetric",
+      "slotAssignments": [
+        { "slotId": "section_title", "value": "无线与有线网络核心对比" },
+        { "slotId": "quad_tl_title", "paragraphs": [{ "text": "无线网络 · 核心优势" }] },
+        { "slotId": "quad_tr_title", "paragraphs": [{ "text": "有线网络 · 主要局限" }] },
+        {
+          "slotId": "quad_bl_bullets",
+          "paragraphs": [
+            { "text": "终端接入不受物理位置限制" },
+            { "text": "无需大规模布线,部署更灵活" },
+            { "text": "扩容仅需新增 AP" }
+          ]
+        },
+        {
+          "slotId": "quad_br_bullets",
+          "paragraphs": [
+            { "text": "终端依赖网口接入,移动性弱" },
+            { "text": "布线改造成本高,周期长" },
+            { "text": "IoT 与高并发扩容困难" }
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "p4",
+      "sourceSlideIndex": 21,
+      "mode": "preserve",
+      "expectedTopology": "row_4_cells",
+      "slotAssignments": [
+        { "slotId": "section_title", "value": "无线网络技术发展历程" },
+        {
+          "slotId": "cell_1",
+          "paragraphs": [
+            { "text": "1997" },
+            { "text": "802.11 初代" },
+            { "text": "开启无线时代" }
+          ]
+        },
+        {
+          "slotId": "cell_2",
+          "paragraphs": [
+            { "text": "2009·2014" },
+            { "text": "Wi-Fi 4/5" },
+            { "text": "双频高速演进" }
+          ]
+        },
+        {
+          "slotId": "cell_3",
+          "paragraphs": [
+            { "text": "2019" },
+            { "text": "Wi-Fi 6" },
+            { "text": "高密并发主流" }
+          ]
+        },
+        {
+          "slotId": "cell_4",
+          "paragraphs": [
+            { "text": "2024" },
+            { "text": "Wi-Fi 7" },
+            { "text": "46Gbps 级体验" }
+          ]
+        }
+      ]
+    },
+    {
+      "pageId": "p5",
+      "sourceSlideIndex": 22,
+      "mode": "preserve",
+      "expectedTopology": "grid_2x2_symmetric",
+      "slotAssignments": [
+        { "slotId": "section_title", "value": "无线网络建设实施流程" },
+        { "slotId": "step_1_title", "value": "01 · 现场勘测" },
+        {
+          "slotId": "step_1_desc",
+          "paragraphs": [{ "text": "核对面积、障碍物与干扰源分布" }]
+        },
+        { "slotId": "step_2_title", "value": "02 · 方案设计" },
+        {
+          "slotId": "step_2_desc",
+          "paragraphs": [{ "text": "确定 AP 点位、回传与容量冗余" }]
+        },
+        { "slotId": "step_3_title", "value": "03 · 设备部署" },
+        {
+          "slotId": "step_3_desc",
+          "paragraphs": [{ "text": "安装 AP、交换与供电链路" }]
+        },
+        { "slotId": "step_4_title", "value": "04 · 调优验收" },
+        {
+          "slotId": "step_4_desc",
+          "paragraphs": [{ "text": "调优信道与功率,验收覆盖与带宽基线" }]
+        }
+      ]
+    },
+    {
+      "pageId": "p6",
+      "sourceSlideIndex": 13,
+      "mode": "preserve",
+      "expectedTopology": "row_3_cells",
+      "slotAssignments": [
+        { "slotId": "section_title", "value": "主流 AP 形态与部署场景" },
+        {
+          "slotId": "cell_a",
+          "paragraphs": [
+            { "text": "面板 AP" },
+            { "text": "客房 / 小会议室" },
+            { "text": "隐蔽安装,兼顾接入与回传" }
+          ]
+        },
+        {
+          "slotId": "cell_b",
+          "paragraphs": [
+            { "text": "吸顶 AP" },
+            { "text": "办公区 / 教室" },
+            { "text": "覆盖均匀,适合室内高并发" }
+          ]
+        },
+        {
+          "slotId": "cell_c",
+          "paragraphs": [
+            { "text": "室外 AP" },
+            { "text": "园区 / 通道" },
+            { "text": "防护要求高,远距离覆盖" }
+          ]
+        }
+      ]
+    }
+  ]
+}

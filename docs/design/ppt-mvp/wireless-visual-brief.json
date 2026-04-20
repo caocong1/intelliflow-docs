@@ -1,0 +1,14 @@
+{
+  "version": "visual_brief/v1",
+  "deckTone": "clean_green_editorial",
+  "colorMode": "light_with_green_accent",
+  "imageLanguage": "technical_illustration_plus_real_photo",
+  "iconLanguage": "simple_numeric_badge",
+  "shapeLanguage": "soft_card_with_light_frame",
+  "density": "medium",
+  "avoid": [
+    "dashboard",
+    "consulting_template",
+    "template_market_generic"
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "version": "template_slot_map/v1",
+  "templateId": "622eee2ab7e6e",
+  "templatePath": "../../../../packages/backend/test-fixtures/ppt-mvp/622eee2ab7e6e.pptx",
+  "slideIndex": 17,
+  "topology": "grid_2x2_symmetric",
+  "slots": [
+    {
+      "slotId": "section_title",
+      "slotType": "title",
+      "kind": "text",
+      "selector": {
+        "creationId": "6537A731-E12B-428B-A722-F2E01836965D",
+        "name": "文本框 8"
+      },
+      "bbox": { "x": 913716, "y": 244859, "w": 2467659, "h": 523220 },
+      "textSample": "存在不足之处",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 24,
+      "maxLines": 1,
+      "minFontPt": 20,
+      "notes": "Section title. Shrink to 22pt so 'wireless vs wired' style titles fit."
+    },
+    {
+      "slotId": "quad_tl_title",
+      "slotType": "subtitle",
+      "kind": "text",
+      "selector": {
+        "creationId": "A7BA13D5-7789-43CD-BF6D-D7BAA6C6F038",
+        "name": "矩形 72"
+      },
+      "bbox": { "x": 820574, "y": 1774349, "w": 3382459, "h": 1526315 },
+      "textSample": "添加标题 请您单击此处添加合适文字加以说明...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 20,
+      "maxLines": 1,
+      "notes": "Top-left quadrant = LEFT side header (wireless)."
+    },
+    {
+      "slotId": "quad_tr_title",
+      "slotType": "subtitle",
+      "kind": "text",
+      "selector": {
+        "creationId": "E7B958AB-A3EE-4469-8F72-CFC4D3D6B039",
+        "name": "矩形 70"
+      },
+      "bbox": { "x": 7943267, "y": 1774349, "w": 3382459, "h": 1526315 },
+      "textSample": "添加标题 请您单击此处添加合适文字加以说明...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 20,
+      "maxLines": 1,
+      "notes": "Top-right quadrant = RIGHT side header (wired)."
+    },
+    {
+      "slotId": "quad_bl_bullets",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "F6202D53-668A-425A-A010-682199202B54",
+        "name": "矩形 73"
+      },
+      "bbox": { "x": 820574, "y": 3667317, "w": 3382459, "h": 1526315 },
+      "textSample": "添加标题 请您单击此处添加合适文字加以说明...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 28,
+      "maxLines": 3,
+      "notes": "Bottom-left quadrant = LEFT side bullets (wireless leftBullets as 3 paragraphs)."
+    },
+    {
+      "slotId": "quad_br_bullets",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "7A6E93EE-B423-4474-B0BD-2377276476CE",
+        "name": "矩形 71"
+      },
+      "bbox": { "x": 7943267, "y": 3667317, "w": 3382459, "h": 1526315 },
+      "textSample": "添加标题 请您单击此处添加合适文字加以说明...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 28,
+      "maxLines": 3,
+      "notes": "Bottom-right quadrant = RIGHT side bullets (wireless rightBullets as 3 paragraphs)."
+    }
+  ]
+}

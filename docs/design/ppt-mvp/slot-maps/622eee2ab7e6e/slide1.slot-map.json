@@ -1,0 +1,124 @@
+{
+  "version": "template_slot_map/v1",
+  "templateId": "622eee2ab7e6e",
+  "templatePath": "../../../../packages/backend/test-fixtures/ppt-mvp/622eee2ab7e6e.pptx",
+  "slideIndex": 1,
+  "slideId": 2664420792,
+  "topology": "cover_hero",
+  "slots": [
+    {
+      "slotId": "hero_bg",
+      "slotType": "hero_bg",
+      "kind": "image",
+      "selector": {
+        "creationId": "44B68600-34CF-45B1-A9D4-BB66C7C3BE72",
+        "name": "图片 2"
+      },
+      "bbox": { "x": 0, "y": 0, "w": 12192000, "h": 6858000 },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true,
+      "notes": "Full-slide hero background. Replacement deferred to Session 2 via replace_image + loadMedia."
+    },
+    {
+      "slotId": "eyebrow",
+      "slotType": "eyebrow",
+      "kind": "text",
+      "selector": {
+        "creationId": "17F9BD92-68D3-4E2F-A5DF-0C38752F3606",
+        "name": "文本框 18"
+      },
+      "bbox": { "x": 5295900, "y": 2113721, "w": 6225845, "h": 400110 },
+      "textSample": "BUSINESS",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 40,
+      "maxLines": 1
+    },
+    {
+      "slotId": "title",
+      "slotType": "title",
+      "kind": "text",
+      "selector": {
+        "creationId": "3F8248F5-110C-447D-8FCC-7A4DA782AC9E",
+        "name": "文本框 19"
+      },
+      "bbox": { "x": 5118685, "y": 2390500, "w": 6580274, "h": 1323439 },
+      "textSample": "部门复盘总结",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 12,
+      "maxLines": 1
+    },
+    {
+      "slotId": "body",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "7732A3C0-8A8F-42E9-AF9B-2E30A2B667A4",
+        "name": "TextBox 36"
+      },
+      "bbox": { "x": 5295900, "y": 3554734, "w": 6225845, "h": 679930 },
+      "textSample": "Please click here to add appropriate text to expla",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 40,
+      "maxLines": 2
+    },
+    {
+      "slotId": "pill_1",
+      "slotType": "pill_label",
+      "kind": "text",
+      "selector": {
+        "creationId": "6C25FD4B-17AA-4DE4-A136-283049DA85CC",
+        "name": "矩形: 圆角 33"
+      },
+      "bbox": { "x": 1818026, "y": 4462628, "w": 1702905, "h": 468000 },
+      "textSample": "汇报人： 小包",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 12,
+      "maxLines": 1
+    },
+    {
+      "slotId": "pill_2",
+      "slotType": "pill_label",
+      "kind": "text",
+      "selector": {
+        "creationId": "1AE3E85C-D24C-4FE5-87BB-D6971EA27B16",
+        "name": "矩形: 圆角 34"
+      },
+      "bbox": { "x": 3979695, "y": 4462628, "w": 1702905, "h": 468000 },
+      "textSample": "日期： 20XX",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 12,
+      "maxLines": 1
+    },
+    {
+      "slotId": "decoration_pill_group",
+      "slotType": "decoration",
+      "kind": "group",
+      "selector": {
+        "creationId": "EE3C0D73-A1B7-4D0D-8D0D-59B0CEDB7947",
+        "name": "组合 24"
+      },
+      "bbox": { "x": 6476535, "y": 4644173, "w": 3864574, "h": 468000 },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true,
+      "notes": "Decorative grouped element in bottom-right of cover. Never modified."
+    },
+    {
+      "slotId": "brand_icon",
+      "slotType": "brand_icon",
+      "kind": "image",
+      "selector": {
+        "creationId": "597166A1-6CC7-4290-ACE7-AD7957FEA535",
+        "name": "5d18099cb3d9e"
+      },
+      "bbox": { "x": 0, "y": 0, "w": 609600, "h": 609600 },
+      "replaceStrategy": "preserve",
+      "preserveGeometry": true,
+      "notes": "Top-left small brand/logo. Reported as Hyperlink type by automizer; preserved as-is."
+    }
+  ]
+}

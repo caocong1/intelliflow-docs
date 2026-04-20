@@ -1,0 +1,295 @@
+{
+  "version": "native_template/v1",
+  "templateId": "doubao-light-tech-v1-native",
+  "familyId": "doubao_light_tech_v1",
+  "familyName": "Doubao Light Tech v1",
+  "source": {
+    "kind": "hand_authored",
+    "label": "Codified from the current native renderer baseline"
+  },
+  "tokens": {
+    "colors": {
+      "bg": "F5F7F8",
+      "surface": "FFFFFF",
+      "text": "1F2937",
+      "textMuted": "667085",
+      "primary": "2FCF7A",
+      "accent": "1F3147",
+      "outline": "D9E2EC",
+      "success": "2FCF7A"
+    },
+    "typography": {
+      "title": "Microsoft YaHei",
+      "body": "Microsoft YaHei",
+      "mono": "Arial",
+      "eyebrow": "Microsoft YaHei"
+    },
+    "spacing": {
+      "pagePadding": 56,
+      "sectionGap": 24,
+      "cardGap": 14,
+      "titleGap": 10
+    },
+    "radius": {
+      "card": 8,
+      "pill": 16,
+      "image": 8
+    },
+    "stroke": {
+      "thin": 1,
+      "strong": 1.4
+    },
+    "shadow": {
+      "cardOpacity": 0.06,
+      "cardBlur": 3,
+      "cardOffset": 1
+    }
+  },
+  "primitives": [
+    {
+      "id": "title_block_top_left",
+      "kind": "title_block",
+      "description": "Large Chinese title at the top-left with muted English eyebrow.",
+      "defaults": {
+        "titleWidth": 6
+      }
+    },
+    {
+      "id": "hero_panel_image",
+      "kind": "hero_panel",
+      "description": "Large image-led opening panel with dark overlay for cover slides.",
+      "requiredSlots": ["hero_bg"],
+      "defaults": {
+        "overlayOpacity": 48
+      }
+    },
+    {
+      "id": "info_rail_right",
+      "kind": "info_rail",
+      "description": "Narrow right-side rail for guide track, audience and compact metadata.",
+      "defaults": {
+        "enabled": true,
+        "width": 2.14
+      }
+    },
+    {
+      "id": "soft_white_card",
+      "kind": "card",
+      "description": "Rounded white card with light outline and soft outer shadow.",
+      "defaults": {
+        "tocLayout": "featured_grid",
+        "comparisonMode": "versus"
+      }
+    },
+    {
+      "id": "white_panel_image_frame",
+      "kind": "image_frame",
+      "description": "White framed image container for illustration and product photography."
+    },
+    {
+      "id": "index_pill_badge",
+      "kind": "badge",
+      "description": "Compact rounded numeric badge used for TOC items, guide track and device tags."
+    },
+    {
+      "id": "timeline_node_milestone",
+      "kind": "timeline_node",
+      "description": "Circular icon anchor with alternating milestone cards above and below the track.",
+      "defaults": {
+        "layoutMode": "alternating"
+      }
+    },
+    {
+      "id": "process_step_column",
+      "kind": "process_step",
+      "description": "Vertical numbered process nodes connected by a thin guide line.",
+      "defaults": {
+        "showIllustration": true
+      }
+    },
+    {
+      "id": "footer_summary_bar",
+      "kind": "footer_summary",
+      "description": "Light green summary bar used for bottom takeaway strips."
+    }
+  ],
+  "variantBindings": [
+    {
+      "variantId": "cover_hero_image",
+      "pageType": "cover",
+      "requiredPrimitives": ["title_block_top_left", "hero_panel_image", "info_rail_right"],
+      "optionalPrimitives": ["index_pill_badge"],
+      "requiredAssetSlots": ["hero_bg"],
+      "contentRules": [
+        "Cover must dedicate the largest visual area to the hero image panel.",
+        "Right-side rail is compact and supports guide track plus audience summary.",
+        "Subtitle stays short and the audience explanation belongs in speaker notes first."
+      ],
+      "notesPolicy": "speaker_notes_first"
+    },
+    {
+      "variantId": "toc_card_grid_8",
+      "pageType": "toc",
+      "requiredPrimitives": ["title_block_top_left", "soft_white_card", "index_pill_badge"],
+      "optionalPrimitives": ["footer_summary_bar"],
+      "requiredAssetSlots": ["bg_texture"],
+      "contentRules": [
+        "TOC uses one featured card and compact secondary cards, not a uniform card wall.",
+        "Each item keeps title plus a single supporting subtitle line.",
+        "Only one primary visual anchor should dominate the page."
+      ],
+      "notesPolicy": "speaker_notes_first"
+    },
+    {
+      "variantId": "comparison_dual_image",
+      "pageType": "comparison",
+      "requiredPrimitives": ["title_block_top_left", "soft_white_card", "white_panel_image_frame"],
+      "optionalPrimitives": ["index_pill_badge"],
+      "requiredAssetSlots": ["bg_texture", "left_illustration", "right_illustration"],
+      "contentRules": [
+        "Comparison must read as a left-vs-right opposition, not two neutral cards.",
+        "Primary bullets are highlighted and secondary bullets stay short.",
+        "Image zone sits above the argument zone in both columns."
+      ],
+      "notesPolicy": "speaker_notes_first"
+    },
+    {
+      "variantId": "timeline_horizontal_5",
+      "pageType": "timeline",
+      "requiredPrimitives": ["title_block_top_left", "timeline_node_milestone", "footer_summary_bar"],
+      "optionalPrimitives": ["soft_white_card"],
+      "requiredAssetSlots": [
+        "bg_texture",
+        "timeline_icon_1",
+        "timeline_icon_2",
+        "timeline_icon_3",
+        "timeline_icon_4",
+        "timeline_icon_5"
+      ],
+      "contentRules": [
+        "Timeline alternates milestone cards above and below the central track.",
+        "Each node only keeps year, short title and one-line detail.",
+        "A bottom summary strip carries the final trend statement."
+      ],
+      "notesPolicy": "speaker_notes_first"
+    },
+    {
+      "variantId": "process_flow_5",
+      "pageType": "process",
+      "requiredPrimitives": ["title_block_top_left", "white_panel_image_frame", "process_step_column", "footer_summary_bar"],
+      "optionalPrimitives": ["soft_white_card"],
+      "requiredAssetSlots": ["bg_texture", "process_illustration"],
+      "contentRules": [
+        "Process uses a left visual anchor and a right implementation sequence.",
+        "Each step keeps a number, title and short operational detail only.",
+        "Bottom-left summary bar reinforces the delivery loop."
+      ],
+      "notesPolicy": "speaker_notes_first"
+    },
+    {
+      "variantId": "device_triptych_3",
+      "pageType": "device_overview",
+      "requiredPrimitives": ["title_block_top_left", "soft_white_card", "white_panel_image_frame", "index_pill_badge", "footer_summary_bar"],
+      "optionalPrimitives": ["info_rail_right"],
+      "requiredAssetSlots": ["scenario_bg", "device_image_1", "device_image_2", "device_image_3"],
+      "contentRules": [
+        "Device page uses three equal product cards under a soft scenario backdrop.",
+        "Scenario tags must be explicit so product photos are not isolated objects.",
+        "Deployment summary is collected into a bottom strip."
+      ],
+      "notesPolicy": "speaker_notes_first"
+    }
+  ],
+  "assetRules": [
+    {
+      "slot": "hero_bg",
+      "usage": "required",
+      "treatment": "background_cover",
+      "variantIds": ["cover_hero_image"]
+    },
+    {
+      "slot": "bg_texture",
+      "usage": "required",
+      "treatment": "texture_overlay",
+      "variantIds": ["toc_card_grid_8", "comparison_dual_image", "timeline_horizontal_5", "process_flow_5"]
+    },
+    {
+      "slot": "left_illustration",
+      "usage": "required",
+      "treatment": "image_panel",
+      "variantIds": ["comparison_dual_image"]
+    },
+    {
+      "slot": "right_illustration",
+      "usage": "required",
+      "treatment": "image_panel",
+      "variantIds": ["comparison_dual_image"]
+    },
+    {
+      "slot": "timeline_icon_1",
+      "usage": "required",
+      "treatment": "icon_badge",
+      "variantIds": ["timeline_horizontal_5"]
+    },
+    {
+      "slot": "timeline_icon_2",
+      "usage": "required",
+      "treatment": "icon_badge",
+      "variantIds": ["timeline_horizontal_5"]
+    },
+    {
+      "slot": "timeline_icon_3",
+      "usage": "required",
+      "treatment": "icon_badge",
+      "variantIds": ["timeline_horizontal_5"]
+    },
+    {
+      "slot": "timeline_icon_4",
+      "usage": "required",
+      "treatment": "icon_badge",
+      "variantIds": ["timeline_horizontal_5"]
+    },
+    {
+      "slot": "timeline_icon_5",
+      "usage": "required",
+      "treatment": "icon_badge",
+      "variantIds": ["timeline_horizontal_5"]
+    },
+    {
+      "slot": "process_illustration",
+      "usage": "required",
+      "treatment": "image_panel",
+      "variantIds": ["process_flow_5"]
+    },
+    {
+      "slot": "scenario_bg",
+      "usage": "required",
+      "treatment": "background_cover",
+      "variantIds": ["device_triptych_3"]
+    },
+    {
+      "slot": "device_image_1",
+      "usage": "required",
+      "treatment": "image_contain",
+      "variantIds": ["device_triptych_3"]
+    },
+    {
+      "slot": "device_image_2",
+      "usage": "required",
+      "treatment": "image_contain",
+      "variantIds": ["device_triptych_3"]
+    },
+    {
+      "slot": "device_image_3",
+      "usage": "required",
+      "treatment": "image_contain",
+      "variantIds": ["device_triptych_3"]
+    }
+  ],
+  "layoutBindings": [],
+  "notes": [
+    "This template codifies the current hand-authored native baseline rather than an imported PPT marketplace template.",
+    "It is intended to be the bridge layer between raw ingest descriptors and future template-driven native rendering.",
+    "The next phase should add a converter from ingest-template output into this normalized structure."
+  ]
+}

@@ -1,0 +1,146 @@
+{
+  "version": "asset_plan/v1",
+  "pageAssets": [
+    {
+      "pageId": "p1",
+      "assets": [
+        {
+          "slot": "hero_bg",
+          "kind": "background_photo",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image1.jpeg"
+          }
+        }
+      ]
+    },
+    {
+      "pageId": "p2",
+      "assets": [
+        {
+          "slot": "bg_texture",
+          "kind": "background_photo",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image2.jpeg"
+          }
+        }
+      ]
+    },
+    {
+      "pageId": "p3",
+      "assets": [
+        {
+          "slot": "bg_texture",
+          "kind": "background_photo",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image2.jpeg"
+          }
+        },
+        {
+          "slot": "left_illustration",
+          "kind": "illustration",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image3.jpeg"
+          }
+        },
+        {
+          "slot": "right_illustration",
+          "kind": "illustration",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image6.jpeg"
+          }
+        },
+        {
+          "slot": "left_icon",
+          "kind": "icon",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image5.svg"
+          }
+        },
+        {
+          "slot": "right_icon",
+          "kind": "icon",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image8.svg"
+          }
+        }
+      ]
+    },
+    {
+      "pageId": "p4",
+      "assets": [
+        {
+          "slot": "bg_texture",
+          "kind": "background_photo",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image2.jpeg"
+          }
+        },
+        {
+          "slot": "timeline_icon_1",
+          "kind": "icon",
+          "source": {
+            "type": "file",
+            "path": "/Users/dongli/Workspace/intelliflow-docs/docs/design/ppt-mvp/assets/timeline-wifi-1.svg"
+          }
+        },
+        {
+          "slot": "timeline_icon_2",
+          "kind": "icon",
+          "source": {
+            "type": "file",
+            "path": "/Users/dongli/Workspace/intelliflow-docs/docs/design/ppt-mvp/assets/timeline-wifi-2.svg"
+          }
+        },
+        {
+          "slot": "timeline_icon_3",
+          "kind": "icon",
+          "source": {
+            "type": "file",
+            "path": "/Users/dongli/Workspace/intelliflow-docs/docs/design/ppt-mvp/assets/timeline-wifi-3.svg"
+          }
+        },
+        {
+          "slot": "timeline_icon_4",
+          "kind": "icon",
+          "source": {
+            "type": "file",
+            "path": "/Users/dongli/Workspace/intelliflow-docs/docs/design/ppt-mvp/assets/timeline-wifi-4.svg"
+          }
+        },
+        {
+          "slot": "timeline_icon_5",
+          "kind": "icon",
+          "source": {
+            "type": "file",
+            "path": "/Users/dongli/Workspace/intelliflow-docs/docs/design/ppt-mvp/assets/timeline-wifi-5.svg"
+          }
+        },
+        {
+          "slot": "summary_icon",
+          "kind": "icon",
+          "source": {
+            "type": "pptx_media",
+            "pptxPath": "/Users/dongli/Downloads/无线网络建设科普方案.pptx",
+            "mediaPath": "ppt/media/image11.svg"
+          }
+        }
+      ]
+    }
+  ]
+}

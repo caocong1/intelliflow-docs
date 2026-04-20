@@ -1,0 +1,20 @@
+{
+  "version": "presentation_outline/v1",
+  "title": "无线网络建设全流程指南",
+  "audience": "企业与公共机构采购负责人、IT负责人",
+  "language": "zh-CN",
+  "sections": [
+    {
+      "id": "s1",
+      "title": "无线与有线的核心差异",
+      "intent": "comparison",
+      "priority": "high"
+    },
+    {
+      "id": "s2",
+      "title": "技术演进与建设流程",
+      "intent": "timeline_process",
+      "priority": "high"
+    }
+  ]
+}

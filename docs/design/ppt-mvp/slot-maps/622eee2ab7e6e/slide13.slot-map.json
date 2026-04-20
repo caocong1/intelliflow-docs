@@ -1,0 +1,73 @@
+{
+  "version": "template_slot_map/v1",
+  "templateId": "622eee2ab7e6e",
+  "templatePath": "../../../../packages/backend/test-fixtures/ppt-mvp/622eee2ab7e6e.pptx",
+  "slideIndex": 13,
+  "topology": "row_3_cells",
+  "slots": [
+    {
+      "slotId": "section_title",
+      "slotType": "title",
+      "kind": "text",
+      "selector": {
+        "creationId": "6537A731-E12B-428B-A722-F2E01836965D",
+        "name": "文本框 8"
+      },
+      "bbox": { "x": 913716, "y": 244859, "w": 2467659, "h": 523220 },
+      "textSample": "工作成果展示",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 22,
+      "maxLines": 1,
+      "minFontPt": 22
+    },
+    {
+      "slotId": "cell_a",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "0D095620-768E-422F-AC24-844F958F9AE9",
+        "name": "文本框 68"
+      },
+      "bbox": { "x": 1208751, "y": 3834140, "w": 2331650, "h": 1987980 },
+      "textSample": "添加标题 请您单击此处输入文本内容...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 24,
+      "maxLines": 4,
+      "notes": "Cell A (left). Device 1 (name / scenario / note)."
+    },
+    {
+      "slotId": "cell_b",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "66079627-8008-4238-A12B-60154164895E",
+        "name": "文本框 75"
+      },
+      "bbox": { "x": 4575840, "y": 3834140, "w": 2331650, "h": 1987980 },
+      "textSample": "添加标题 请您单击此处输入文本内容...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 24,
+      "maxLines": 4,
+      "notes": "Cell B (center). Device 2."
+    },
+    {
+      "slotId": "cell_c",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "D2A0B6D0-D9B2-433D-9B9B-B17F12B45A49",
+        "name": "文本框 87"
+      },
+      "bbox": { "x": 7942929, "y": 3834140, "w": 2331650, "h": 1987980 },
+      "textSample": "添加标题 请您单击此处输入文本内容...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 24,
+      "maxLines": 4,
+      "notes": "Cell C (right). Device 3."
+    }
+  ]
+}

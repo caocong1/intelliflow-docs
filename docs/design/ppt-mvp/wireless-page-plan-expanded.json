@@ -1,0 +1,99 @@
+{
+  "version": "page_plan/v1",
+  "pages": [
+    {
+      "pageId": "p1",
+      "pageType": "cover",
+      "variantHint": "cover_hero_image",
+      "title": "无线网络建设科普方案",
+      "subtitle": "场景选型 · 品牌选择 · 建设运维全指南",
+      "eyebrow": "WIRELESS NETWORK CONSTRUCTION GUIDE",
+      "audienceLine": "面向企业与公共机构的采购与 IT 负责人",
+      "speakerNote": "这一页用于快速建立主题和受众预期。本次内容聚焦无线网络建设中的场景选型、品牌判断和后续建设运维方法。"
+    },
+    {
+      "pageId": "p2",
+      "pageType": "toc",
+      "variantHint": "toc_card_grid_8",
+      "title": "目录",
+      "eyebrow": "CONTENTS",
+      "speakerNote": "本次分享将围绕这八个核心模块展开，全面覆盖无线建设的全链路知识。我们将从基础对比开始，逐步进入技术演进、实施流程、设备形态、品牌选型与运维答疑。",
+      "items": [
+        { "index": "01", "title": "核心优势对比", "subtitle": "无线 vs 有线架构对比" },
+        { "index": "02", "title": "技术发展历程", "subtitle": "Wi-Fi 4~7 演进" },
+        { "index": "03", "title": "建设实施流程", "subtitle": "勘测到验收的五步闭环" },
+        { "index": "04", "title": "主流 AP 形态", "subtitle": "面板 / 吸顶 / 室外设备" },
+        { "index": "05", "title": "品牌选型对比", "subtitle": "主流品牌能力对照" },
+        { "index": "06", "title": "全场景选型指南", "subtitle": "办公 / 商场 / 工厂方案" },
+        { "index": "07", "title": "优化与运维要点", "subtitle": "信道 / 调优 / 排障" },
+        { "index": "08", "title": "常见问题答疑", "subtitle": "盲区与并发问题" }
+      ]
+    },
+    {
+      "pageId": "p3",
+      "pageType": "comparison",
+      "variantHint": "comparison_dual_image",
+      "title": "无线与有线网络核心优势对比",
+      "eyebrow": "ARCHITECTURE COMPARISON",
+      "leftTitle": "无线网络 · 核心优势",
+      "rightTitle": "有线网络 · 主要局限",
+      "speakerNote": "这一页建立无线和有线网络的核心对比框架。无线强调灵活部署与扩容效率，有线则更依赖固定布线和物理接入口，二者差异会直接影响建设成本与场景适配。",
+      "leftBullets": [
+        "终端接入不受物理位置限制",
+        "无需大规模布线，部署更灵活",
+        "扩容仅需新增 AP"
+      ],
+      "rightBullets": [
+        "终端依赖网口接入，移动性弱",
+        "布线改造成本高、周期长",
+        "IoT 和高并发场景扩容更困难"
+      ]
+    },
+    {
+      "pageId": "p4",
+      "pageType": "timeline",
+      "variantHint": "timeline_horizontal_5",
+      "title": "无线网络技术发展历程",
+      "eyebrow": "TECHNOLOGY EVOLUTION",
+      "summary": "速率提升、并发增强、功耗下降，场景持续拓展。",
+      "speakerNote": "这一页从标准代际切入，说明无线网络为什么在近十年快速进入主流建设视野。不同代 Wi-Fi 的速率、频段与并发能力提升，是企业升级网络的技术依据。",
+      "nodes": [
+        { "year": "1997", "title": "802.11 初代标准", "detail": "开启无线时代" },
+        { "year": "2009", "title": "Wi-Fi 4", "detail": "双频并发，600Mbps" },
+        { "year": "2014", "title": "Wi-Fi 5", "detail": "5G 高速，3.5Gbps" },
+        { "year": "2019", "title": "Wi-Fi 6", "detail": "高密并发适配" },
+        { "year": "2024", "title": "Wi-Fi 7", "detail": "46Gbps 级体验" }
+      ]
+    },
+    {
+      "pageId": "p5",
+      "pageType": "process",
+      "variantHint": "process_flow_5",
+      "title": "无线网络建设实施流程",
+      "eyebrow": "DELIVERY WORKFLOW",
+      "summary": "从现场勘测到最终验收，五步闭环共同决定网络稳定性与可维护性。",
+      "speakerNote": "无线网络建设不是买设备后直接上线，而是一个从勘测、设计、部署、调优到验收的标准闭环。前面少做一步，后面就会在稳定性、漫游和覆盖盲区上持续付出代价。",
+      "steps": [
+        { "index": "01", "title": "现场勘测", "detail": "核对面积、障碍物与干扰源分布" },
+        { "index": "02", "title": "方案设计", "detail": "确定 AP 点位、回传与容量冗余" },
+        { "index": "03", "title": "设备部署", "detail": "安装 AP、交换与供电链路" },
+        { "index": "04", "title": "参数调优", "detail": "优化信道、功率与漫游策略" },
+        { "index": "05", "title": "测试验收", "detail": "压测覆盖、带宽与终端体验基线" }
+      ]
+    },
+    {
+      "pageId": "p6",
+      "pageType": "device_overview",
+      "variantHint": "device_triptych_3",
+      "title": "主流 AP 形态与部署场景",
+      "eyebrow": "DEVICE OVERVIEW",
+      "summary": "面板、吸顶、室外三种主流形态分别适配客房、办公与园区等不同覆盖环境。",
+      "speakerNote": "这一页的目标不是讲参数，而是让采购和 IT 负责人先建立设备形态与部署场景的一一对应关系。先明白设备长什么样、该装在哪，再谈品牌和规格更有效。",
+      "devices": [
+        { "name": "面板 AP", "scenario": "客房 / 小会议室", "note": "隐蔽安装，兼顾无线接入与有线回传" },
+        { "name": "吸顶 AP", "scenario": "办公区 / 教室", "note": "覆盖均匀，适合室内高并发环境" },
+        { "name": "室外 AP", "scenario": "园区 / 通道", "note": "防护要求更高，适合远距离覆盖" }
+      ]
+    }
+  ]
+}

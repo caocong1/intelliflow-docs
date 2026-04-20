@@ -1,0 +1,146 @@
+{
+  "version": "template_slot_map/v1",
+  "templateId": "622eee2ab7e6e",
+  "templatePath": "../../../../packages/backend/test-fixtures/ppt-mvp/622eee2ab7e6e.pptx",
+  "slideIndex": 22,
+  "topology": "grid_2x2_symmetric",
+  "slots": [
+    {
+      "slotId": "section_title",
+      "slotType": "title",
+      "kind": "text",
+      "selector": {
+        "creationId": "6537A731-E12B-428B-A722-F2E01836965D",
+        "name": "文本框 8"
+      },
+      "bbox": { "x": 913716, "y": 244859, "w": 2467659, "h": 523220 },
+      "textSample": "未来工作规划",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 22,
+      "maxLines": 1,
+      "minFontPt": 22
+    },
+    {
+      "slotId": "step_1_title",
+      "slotType": "subtitle",
+      "kind": "text",
+      "selector": {
+        "creationId": "D06378E1-9EBA-4A2B-933E-CEFD147223F0",
+        "name": "TextBox 16"
+      },
+      "bbox": { "x": 1639001, "y": 1950802, "w": 1723549, "h": 400110 },
+      "textSample": "单击添加标题",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 16,
+      "maxLines": 1,
+      "notes": "Step 1 title (top-left). 5-step process compressed to 4 cells — step 1 + step 2 = steps 1+2 merged."
+    },
+    {
+      "slotId": "step_1_desc",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "0979377A-224F-4F1F-972E-BA7F1358B0C3",
+        "name": "Rectangle 24"
+      },
+      "bbox": { "x": 759303, "y": 2566287, "w": 4671962, "h": 787652 },
+      "textSample": "请您单击此处添加合适文字...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 36,
+      "maxLines": 2
+    },
+    {
+      "slotId": "step_2_title",
+      "slotType": "subtitle",
+      "kind": "text",
+      "selector": {
+        "creationId": "A5EE517B-7E0F-42D6-A693-94EC62A41017",
+        "name": "TextBox 17"
+      },
+      "bbox": { "x": 8125836, "y": 1950802, "w": 1723549, "h": 400110 },
+      "textSample": "单击添加标题",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 16,
+      "maxLines": 1
+    },
+    {
+      "slotId": "step_2_desc",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "2FD04354-F906-4B48-A592-2E3913970FE7",
+        "name": "Rectangle 25"
+      },
+      "bbox": { "x": 7186421, "y": 2562127, "w": 4671962, "h": 787652 },
+      "textSample": "请您单击此处添加合适文字...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 36,
+      "maxLines": 2
+    },
+    {
+      "slotId": "step_3_title",
+      "slotType": "subtitle",
+      "kind": "text",
+      "selector": {
+        "creationId": "153B0C52-22FD-47F9-A6C3-88595774A7B7",
+        "name": "TextBox 19"
+      },
+      "bbox": { "x": 1639001, "y": 4018385, "w": 1723549, "h": 400110 },
+      "textSample": "单击添加标题",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 16,
+      "maxLines": 1
+    },
+    {
+      "slotId": "step_3_desc",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "6E428B5A-28EC-42F7-AB70-9383907D52A9",
+        "name": "Rectangle 27"
+      },
+      "bbox": { "x": 759303, "y": 4648512, "w": 4671962, "h": 787652 },
+      "textSample": "请您单击此处添加合适文字...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 36,
+      "maxLines": 2
+    },
+    {
+      "slotId": "step_4_title",
+      "slotType": "subtitle",
+      "kind": "text",
+      "selector": {
+        "creationId": "D3373FEB-1E2D-436F-A858-6380D389CA2E",
+        "name": "TextBox 20"
+      },
+      "bbox": { "x": 8125836, "y": 4018385, "w": 1723549, "h": 400110 },
+      "textSample": "单击添加标题",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 16,
+      "maxLines": 1
+    },
+    {
+      "slotId": "step_4_desc",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "C347A6CB-96DE-4CE3-8665-B3918DBBEBF8",
+        "name": "Rectangle 28"
+      },
+      "bbox": { "x": 7186421, "y": 4644352, "w": 4671962, "h": 787652 },
+      "textSample": "请您单击此处添加合适文字...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 36,
+      "maxLines": 2
+    }
+  ]
+}

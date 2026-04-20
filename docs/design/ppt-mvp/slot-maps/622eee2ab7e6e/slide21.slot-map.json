@@ -1,0 +1,90 @@
+{
+  "version": "template_slot_map/v1",
+  "templateId": "622eee2ab7e6e",
+  "templatePath": "../../../../packages/backend/test-fixtures/ppt-mvp/622eee2ab7e6e.pptx",
+  "slideIndex": 21,
+  "topology": "row_4_cells",
+  "slots": [
+    {
+      "slotId": "section_title",
+      "slotType": "title",
+      "kind": "text",
+      "selector": {
+        "creationId": "6537A731-E12B-428B-A722-F2E01836965D",
+        "name": "文本框 8"
+      },
+      "bbox": { "x": 913716, "y": 244859, "w": 2467659, "h": 523220 },
+      "textSample": "未来工作规划",
+      "replaceStrategy": "replace_text",
+      "preserveGeometry": true,
+      "maxWidthUnits": 22,
+      "maxLines": 1,
+      "minFontPt": 22,
+      "notes": "Section title. Shrink to 22pt for wireless-length titles."
+    },
+    {
+      "slotId": "cell_1",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "11E06629-03CC-423D-A62F-EE11FEA3F091",
+        "name": "Rectangle 11"
+      },
+      "bbox": { "x": 1160658, "y": 3298633, "w": 1996342, "h": 2052804 },
+      "textSample": "添加标题 请您单击此处添加合适文字加以说明...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 16,
+      "maxLines": 4,
+      "notes": "Cell 1 (leftmost). Timeline era 1."
+    },
+    {
+      "slotId": "cell_2",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "A82E4D46-116C-4732-A8CC-BA4870ED53BF",
+        "name": "Rectangle 11"
+      },
+      "bbox": { "x": 3788413, "y": 3298633, "w": 1996342, "h": 2052804 },
+      "textSample": "添加标题 请您单击此处添加合适文字加以说明...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 16,
+      "maxLines": 4,
+      "notes": "Cell 2. Timeline era 2."
+    },
+    {
+      "slotId": "cell_3",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "46167A78-5DA7-4630-9E3B-72F1411504E2",
+        "name": "Rectangle 11"
+      },
+      "bbox": { "x": 6416168, "y": 3298633, "w": 1996342, "h": 2052804 },
+      "textSample": "添加标题 请您单击此处添加合适文字加以说明...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 16,
+      "maxLines": 4,
+      "notes": "Cell 3. Timeline era 3."
+    },
+    {
+      "slotId": "cell_4",
+      "slotType": "body",
+      "kind": "text",
+      "selector": {
+        "creationId": "1BCB45E9-A2D6-4992-9294-1BA079D56A32",
+        "name": "Rectangle 11"
+      },
+      "bbox": { "x": 9043923, "y": 3298633, "w": 1996342, "h": 2052804 },
+      "textSample": "添加标题 请您单击此处添加合适文字加以说明...",
+      "replaceStrategy": "replace_runs",
+      "preserveGeometry": true,
+      "maxWidthUnits": 16,
+      "maxLines": 4,
+      "notes": "Cell 4 (rightmost). Timeline era 4."
+    }
+  ]
+}

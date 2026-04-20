@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style cover — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #2F2F2F;
+    --color-primary: #1E40AF;
+    --color-accent: #22C55E;
+    --color-surface: #FFFFFF;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+  }
+
+  .hero-bg {
+    position: absolute; inset: 0;
+    background-image: var(--hero-url, url("./cover-hero.jpg"));
+    background-size: cover;
+    background-position: center left;
+    /* Only the left 42% of the slide shows the hero image; right side is
+       white canvas for text + geometric overlays. */
+    clip-path: polygon(0 0, 42% 0, 42% 100%, 0 100%);
+  }
+
+  /* Top-right blue angled block */
+  .geo-blue {
+    position: absolute;
+    top: 0; right: 0;
+    width: 440px; height: 340px;
+    background: var(--color-primary);
+    clip-path: polygon(40% 0, 100% 0, 100% 70%, 0 0);
+  }
+
+  /* Mid/bottom green accent triangle */
+  .geo-green {
+    position: absolute;
+    top: 250px; right: 320px;
+    width: 380px; height: 320px;
+    background: var(--color-accent);
+    clip-path: polygon(0 0, 100% 0, 0 100%);
+    opacity: 0.92;
+  }
+
+  /* Lower-right green curl */
+  .geo-green-curl {
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 420px; height: 220px;
+    background: var(--color-accent);
+    clip-path: polygon(20% 100%, 100% 40%, 100% 100%);
+  }
+
+  /* Curved divider line running through slide */
+  .curve-divider {
+    position: absolute;
+    top: 0;
+    left: 40%;
+    width: 420px;
+    height: 100%;
+    pointer-events: none;
+  }
+  .curve-divider svg { width: 100%; height: 100%; }
+
+  /* Content block: eyebrow + title + body + pills */
+  .content {
+    position: absolute;
+    left: 540px;
+    top: 210px;
+    width: 700px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .eyebrow {
+    font-family: var(--font-body);
+    font-size: 20pt; letter-spacing: 4px;
+    color: var(--color-ink); font-weight: 500;
+  }
+  .title {
+    font-family: var(--font-title);
+    font-size: 72pt; font-weight: 700;
+    line-height: 1.05;
+    color: var(--color-ink);
+    letter-spacing: 2px;
+  }
+  .body {
+    font-family: var(--font-body);
+    font-size: 14pt; line-height: 1.6;
+    color: #555;
+    margin-top: 10px;
+  }
+  .body p { margin: 4px 0; }
+
+  .pill-row {
+    display: flex; gap: 24px; margin-top: 36px;
+  }
+  .pill {
+    padding: 10px 22px;
+    border-radius: 999px;
+    color: #FFF;
+    font-family: var(--font-body);
+    font-size: 14pt;
+    min-width: 140px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .pill--primary { background: var(--color-primary); }
+  .pill--accent { background: var(--color-accent); }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <div class="hero-bg" data-region="hero_bg"></div>
+  <div class="geo-blue" aria-hidden="true"></div>
+  <div class="geo-green" aria-hidden="true"></div>
+  <div class="geo-green-curl" aria-hidden="true"></div>
+
+  <svg class="curve-divider" viewBox="0 0 420 720" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M 100 0 Q 250 200 180 360 Q 110 520 260 720" stroke="#FFF" stroke-width="3" fill="none" opacity="0.7"/>
+  </svg>
+
+  <div class="content">
+    <div class="eyebrow" data-region="eyebrow" data-max-width-units="40">WIRELESS NETWORK CONSTRUCTION GUIDE</div>
+    <div class="title" data-region="title" data-max-width-units="12" data-max-lines="1">无线网络科普</div>
+    <div class="body" data-region="body" data-max-lines="2">
+      <p>场景选型 · 品牌选择 · 建设运维全指南</p>
+      <p>面向企业与公共机构的采购与 IT 负责人</p>
+    </div>
+    <div class="pill-row">
+      <div class="pill pill--primary" data-region="pill_1" data-max-width-units="14">汇报：IT 基建</div>
+      <div class="pill pill--accent" data-region="pill_2" data-max-width-units="14">2026.04</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

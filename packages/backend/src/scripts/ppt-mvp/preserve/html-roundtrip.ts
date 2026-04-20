@@ -23,6 +23,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { callClaude, extractJson } from "../ai-pipeline/claude-client";
 import { ensureLiveClaudeEnvFromDb } from "../ai-pipeline/live-config";
+import { callOpenAICompat } from "../ai-pipeline/openai-compat-client";
+import { callQwenCli } from "../ai-pipeline/qwen-cli-client";
 import {
   extractRegionsFromHtml,
   validateHtmlFillPlan,
@@ -52,13 +54,12 @@ function buildPrompt(args: {
     `页面 ID: ${args.pageId}`,
     "",
     "HTML 提供了若干 data-region 区域，每个区域有可选的宽度/行数预算：",
-    ...args.regions.map(
-      (r) =>
-        `  - regionId="${r.regionId}"` +
-        (r.maxWidthUnits !== undefined ? ` maxWidthUnits=${r.maxWidthUnits}` : "") +
-        (r.maxLines !== undefined ? ` maxLines=${r.maxLines}` : "") +
-        (r.originalText ? ` 原文示例: "${r.originalText.slice(0, 60)}"` : ""),
-    ),
+    ...args.regions.map((r) => {
+      const width = r.maxWidthUnits !== undefined ? ` maxWidthUnits=${r.maxWidthUnits}` : "";
+      const lines = r.maxLines !== undefined ? ` maxLines=${r.maxLines}` : "";
+      const sample = r.originalText ? ` 原文示例: "${r.originalText.slice(0, 60)}"` : "";
+      return `  - regionId="${r.regionId}"${width}${lines}${sample}`;
+    }),
     "",
     "宽度单位规则: CJK 字符算 2 单位, ASCII 字符算 1 单位。",
     "",
@@ -112,13 +113,37 @@ export async function generateHtmlFillPlan(args: {
     regions,
     pageContent: args.pageContent,
   });
-  const { content } = await callClaude({
-    prompt,
-    maxTokens: 1500,
-    temperature: 0.2,
-    mockResponse: args.mockResponse,
-    mock: args.mockResponse !== undefined,
-  });
+  // Provider dispatch (live mode):
+  //   1. USE_QWEN_CLI=1       → shell out to standalone `qwen` CLI (for
+  //                             Bailian Coding-Plan keys that can't be
+  //                             called directly via HTTPS)
+  //   2. OPENAI_COMPAT_*       → raw /v1/chat/completions fetch
+  //   3. default              → Anthropic /v1/messages (existing Claude path)
+  // Mock mode always uses the claude-client's canned-response path.
+  const isLive = args.mockResponse === undefined;
+  let content: string;
+  if (isLive && process.env.USE_QWEN_CLI === "1") {
+    ({ content } = await callQwenCli({ prompt }));
+  } else if (
+    isLive &&
+    process.env.OPENAI_COMPAT_API_KEY &&
+    process.env.OPENAI_COMPAT_BASE_URL &&
+    process.env.OPENAI_COMPAT_MODEL
+  ) {
+    ({ content } = await callOpenAICompat({
+      prompt,
+      maxTokens: 1500,
+      temperature: 0.2,
+    }));
+  } else {
+    ({ content } = await callClaude({
+      prompt,
+      maxTokens: 1500,
+      temperature: 0.2,
+      mockResponse: args.mockResponse,
+      mock: args.mockResponse !== undefined,
+    }));
+  }
   const parsed = extractJson<HtmlFillPlan>(content);
   const result = validateHtmlFillPlan(parsed);
   if (!result.valid || !result.data) {
@@ -251,14 +276,24 @@ if (import.meta.main) {
       `[html-roundtrip] template=${cli.templateId} page=${cli.pageId} html=${htmlPath} mode=${mockResponse ? "mock" : "live"}`,
     );
     if (!mockResponse && process.env.CLAUDE_MOCK !== "1") {
-      try {
-        const live = await ensureLiveClaudeEnvFromDb();
+      if (process.env.USE_QWEN_CLI === "1") {
         console.error(
-          `[html-roundtrip] LLM live — source=${live.source} model=${live.modelId ?? "?"}`,
+          `[html-roundtrip] LLM live (qwen cli) model=${process.env.QWEN_MODEL ?? "(default)"}`,
         );
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[html-roundtrip] could not auto-load LLM config (${msg}); LLM call will fail.`);
+      } else if (process.env.OPENAI_COMPAT_API_KEY && process.env.OPENAI_COMPAT_BASE_URL) {
+        console.error(
+          `[html-roundtrip] LLM live (openai-compat) model=${process.env.OPENAI_COMPAT_MODEL ?? "?"}`,
+        );
+      } else {
+        try {
+          const live = await ensureLiveClaudeEnvFromDb();
+          console.error(
+            `[html-roundtrip] LLM live (anthropic) source=${live.source} model=${live.modelId ?? "?"}`,
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[html-roundtrip] could not auto-load LLM config (${msg}); LLM call will fail.`);
+        }
       }
     }
     const plan = await generateHtmlFillPlan({

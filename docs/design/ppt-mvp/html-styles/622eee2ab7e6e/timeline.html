@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style timeline — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-primary-bg: #EFF6FF;
+    --color-accent: #16A34A;
+    --color-accent-soft: #22C55E;
+    --color-accent-bg: #F0FDF4;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    padding: 48px 52px 40px 52px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* diagonal backdrop accent */
+  .slide-root::before {
+    content: "";
+    position: absolute;
+    top: -40px; left: 60%;
+    width: 80%;
+    height: 480px;
+    background: linear-gradient(135deg, var(--color-primary-bg) 0%, transparent 65%);
+    pointer-events: none;
+    transform: rotate(-6deg);
+  }
+
+  /* Header */
+  .header {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 2;
+  }
+  .eyebrow-row { display: flex; align-items: center; gap: 14px; }
+  .eyebrow-bar { width: 32px; height: 3px; background: var(--color-primary); }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10pt; letter-spacing: 5px; text-transform: uppercase;
+    color: var(--color-primary); font-weight: 600;
+  }
+  .title {
+    font-family: var(--font-title);
+    font-size: 26pt; font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-ink);
+    letter-spacing: 1px;
+  }
+  .summary {
+    font-family: var(--font-body);
+    font-size: 11pt; line-height: 1.5;
+    color: var(--color-ink-soft);
+    max-width: 720px;
+    margin-top: 2px;
+  }
+
+  /* Timeline rail + nodes */
+  .timeline {
+    position: relative;
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    align-items: stretch;
+    padding: 12px 24px 0 24px;
+    height: 220px;
+    overflow: hidden;
+  }
+
+  .rail {
+    position: absolute;
+    left: 40px; right: 40px;
+    bottom: 34px;
+    height: 4px;
+    background: linear-gradient(90deg,
+      var(--color-primary-soft) 0%,
+      var(--color-primary) 25%,
+      var(--color-accent) 75%,
+      var(--color-accent-soft) 100%);
+    border-radius: 4px;
+  }
+
+  .node {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-start;
+  }
+  .node::before {
+    content: "";
+    position: absolute;
+    bottom: 34px; left: 50%;
+    width: 22px; height: 22px;
+    border-radius: 999px;
+    background: #FFF;
+    border: 3px solid var(--color-primary);
+    transform: translate(-50%, 50%);
+    box-shadow: 0 2px 8px rgba(30, 64, 175, 0.22);
+    z-index: 2;
+  }
+  .node--final::before { border-color: var(--color-accent); }
+
+  /* All nodes render card ABOVE the rail for layout stability; differentiation
+     from preserve-mode's horizontal row comes from gradient rail + large year
+     stamp + final-node accent. */
+  .node {
+    justify-content: flex-start;
+  }
+  .node .node-card {
+    padding-top: 8px;
+    padding-bottom: 28px; /* leave room for rail + dot below */
+  }
+  .node .connector {
+    position: absolute;
+    bottom: 56px;
+    left: 50%;
+    width: 1px;
+    height: 14px;
+    background: var(--color-border);
+    transform: translateX(-50%);
+  }
+
+  /* Footer narrative band — takes the remaining vertical space under the rail */
+  .footer {
+    position: relative;
+    flex: 1 1 auto;
+    margin-top: 18px;
+    padding: 22px 28px;
+    background: linear-gradient(135deg, #F8FAFC 0%, var(--color-primary-bg) 100%);
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    display: flex; align-items: center;
+    gap: 24px;
+    min-height: 0;
+  }
+  .footer-mark {
+    width: 48px; height: 48px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+    color: #FFF;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-title);
+    font-size: 14pt; font-weight: 800;
+    flex-shrink: 0;
+  }
+  .footer-content {
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .footer-label {
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--color-ink-dim); font-weight: 600;
+  }
+  .footer-quote {
+    font-family: var(--font-body);
+    font-size: 12pt; line-height: 1.55;
+    color: var(--color-ink);
+    font-weight: 500;
+    max-width: 880px;
+  }
+
+  .node-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    text-align: center;
+    padding: 0 4px;
+  }
+  .year-stamp {
+    font-family: var(--font-title);
+    font-size: 20pt; font-weight: 800;
+    color: var(--color-primary);
+    letter-spacing: 1px;
+    line-height: 1;
+  }
+  .node--final .year-stamp { color: var(--color-accent); }
+
+  .node-title {
+    font-family: var(--font-body);
+    font-size: 12pt; font-weight: 700;
+    color: var(--color-ink);
+    line-height: 1.2;
+    margin-top: 2px;
+  }
+  .node-detail {
+    font-family: var(--font-body);
+    font-size: 9pt; line-height: 1.35;
+    color: var(--color-ink-soft);
+    max-width: 180px;
+    margin-top: 0;
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- Header -->
+  <div class="header">
+    <div class="eyebrow-row">
+      <div class="eyebrow-bar"></div>
+      <div class="eyebrow" data-region="eyebrow" data-max-width-units="28">TECHNOLOGY EVOLUTION</div>
+    </div>
+    <div class="title" data-region="title" data-max-width-units="22" data-max-lines="1">无线网络技术发展历程</div>
+    <div class="summary" data-region="summary" data-max-width-units="50" data-max-lines="2">速率提升、并发增强、功耗下降，场景持续拓展。</div>
+  </div>
+
+  <!-- 5-node zigzag timeline -->
+  <div class="timeline">
+    <div class="rail"></div>
+
+    <div class="node node--above">
+      <div class="node-card">
+        <div class="year-stamp" data-region="node_1_year" data-max-width-units="6">1997</div>
+        <div class="node-title" data-region="node_1_title" data-max-width-units="18" data-max-lines="1">802.11 初代标准</div>
+        <div class="node-detail" data-region="node_1_detail" data-max-width-units="28" data-max-lines="2">开启无线时代</div>
+      </div>
+      <div class="connector"></div>
+    </div>
+
+    <div class="node node--below">
+      <div class="connector"></div>
+      <div class="node-card">
+        <div class="year-stamp" data-region="node_2_year" data-max-width-units="6">2009</div>
+        <div class="node-title" data-region="node_2_title" data-max-width-units="18" data-max-lines="1">Wi-Fi 4</div>
+        <div class="node-detail" data-region="node_2_detail" data-max-width-units="28" data-max-lines="2">双频并发，600Mbps</div>
+      </div>
+    </div>
+
+    <div class="node node--above">
+      <div class="node-card">
+        <div class="year-stamp" data-region="node_3_year" data-max-width-units="6">2014</div>
+        <div class="node-title" data-region="node_3_title" data-max-width-units="18" data-max-lines="1">Wi-Fi 5</div>
+        <div class="node-detail" data-region="node_3_detail" data-max-width-units="28" data-max-lines="2">5G 高速，3.5Gbps</div>
+      </div>
+      <div class="connector"></div>
+    </div>
+
+    <div class="node node--below">
+      <div class="connector"></div>
+      <div class="node-card">
+        <div class="year-stamp" data-region="node_4_year" data-max-width-units="6">2019</div>
+        <div class="node-title" data-region="node_4_title" data-max-width-units="18" data-max-lines="1">Wi-Fi 6</div>
+        <div class="node-detail" data-region="node_4_detail" data-max-width-units="28" data-max-lines="2">高密并发适配</div>
+      </div>
+    </div>
+
+    <div class="node node--above node--final">
+      <div class="node-card">
+        <div class="year-stamp" data-region="node_5_year" data-max-width-units="6">2024</div>
+        <div class="node-title" data-region="node_5_title" data-max-width-units="18" data-max-lines="1">Wi-Fi 7</div>
+        <div class="node-detail" data-region="node_5_detail" data-max-width-units="28" data-max-lines="2">46Gbps 级体验</div>
+      </div>
+      <div class="connector"></div>
+    </div>
+  </div>
+
+  <!-- Footer narrative -->
+  <div class="footer">
+    <div class="footer-mark" data-region="footer_mark" data-max-width-units="4">↑</div>
+    <div class="footer-content">
+      <div class="footer-label" data-region="footer_label" data-max-width-units="26">CURRENT POSITION</div>
+      <div class="footer-quote" data-region="footer_quote" data-max-width-units="80" data-max-lines="2">Wi-Fi 6 已是主流，Wi-Fi 7 为高密场景提供新上限。</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

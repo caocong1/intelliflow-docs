@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style closing — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-primary-bg: #EFF6FF;
+    --color-accent: #16A34A;
+    --color-accent-soft: #22C55E;
+    --color-accent-bg: #F0FDF4;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    display: grid;
+    grid-template-columns: 1fr 360px;
+  }
+
+  /* LEFT — thank you block */
+  .thanks-col {
+    position: relative;
+    padding: 100px 64px 60px 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 16px;
+    overflow: hidden;
+  }
+  .thanks-col::before {
+    content: "";
+    position: absolute;
+    bottom: -100px; left: -80px;
+    width: 460px; height: 360px;
+    background: radial-gradient(circle at center, var(--color-primary-bg) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .thanks-eyebrow {
+    position: relative;
+    font-family: var(--font-mono);
+    font-size: 11pt; letter-spacing: 8px; text-transform: uppercase;
+    color: var(--color-primary); font-weight: 700;
+    display: flex; align-items: center; gap: 14px;
+  }
+  .thanks-eyebrow::before {
+    content: "";
+    width: 44px; height: 3px; background: var(--color-primary);
+  }
+
+  .thanks-title {
+    position: relative;
+    font-family: var(--font-title);
+    font-size: 96pt; font-weight: 800;
+    line-height: 0.95;
+    color: var(--color-ink);
+    letter-spacing: 6px;
+  }
+  .thanks-en {
+    position: relative;
+    font-family: var(--font-mono);
+    font-size: 14pt; letter-spacing: 4px; text-transform: uppercase;
+    color: var(--color-ink-dim); font-weight: 600;
+    margin-top: 6px;
+  }
+
+  .thanks-tagline {
+    position: relative;
+    font-family: var(--font-body);
+    font-size: 14pt; line-height: 1.6;
+    color: var(--color-ink-soft);
+    max-width: 580px;
+    margin-top: 12px;
+  }
+
+  /* RIGHT — accent column with contact card */
+  .contact-col {
+    position: relative;
+    background: linear-gradient(165deg, var(--color-primary) 0%, #2563EB 50%, var(--color-accent) 100%);
+    color: #FFF;
+    padding: 100px 40px 40px 40px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  .contact-col::before {
+    content: "";
+    position: absolute;
+    top: 60%; right: -40px;
+    width: 220px; height: 220px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(255,255,255,0.14) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .contact-col::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .contact-label {
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 4px; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.65);
+    font-weight: 600;
+  }
+
+  .contact-author {
+    font-family: var(--font-title);
+    font-size: 22pt; font-weight: 700;
+    line-height: 1.3;
+    margin-top: 6px;
+  }
+
+  .contact-role {
+    font-family: var(--font-body);
+    font-size: 12pt; line-height: 1.5;
+    color: rgba(255, 255, 255, 0.82);
+    margin-top: 2px;
+  }
+
+  .contact-details {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-top: 36px;
+  }
+  .contact-row {
+    display: flex; align-items: center; gap: 10px;
+    font-family: var(--font-body);
+    font-size: 11pt;
+    color: rgba(255, 255, 255, 0.9);
+  }
+  .contact-row-label {
+    flex-shrink: 0;
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 2px;
+    color: rgba(255, 255, 255, 0.55);
+    text-transform: uppercase;
+    width: 42px;
+  }
+
+  .contact-footer {
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.25);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .contact-brand {
+    font-family: var(--font-title);
+    font-size: 15pt; font-weight: 700;
+    letter-spacing: 2px;
+  }
+  .contact-tagline {
+    font-family: var(--font-body);
+    font-size: 10pt; color: rgba(255, 255, 255, 0.7);
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- LEFT: thank-you block -->
+  <div class="thanks-col">
+    <div class="thanks-eyebrow" data-region="eyebrow" data-max-width-units="28">THE END</div>
+    <div class="thanks-title" data-region="title" data-max-width-units="8" data-max-lines="1">感谢聆听</div>
+    <div class="thanks-en" data-region="title_en" data-max-width-units="30">THANK YOU FOR YOUR ATTENTION</div>
+    <div class="thanks-tagline" data-region="tagline" data-max-width-units="60" data-max-lines="3">欢迎进入问答环节，或会后联系我们进一步探讨无线建设方案。</div>
+  </div>
+
+  <!-- RIGHT: speaker / contact -->
+  <div class="contact-col">
+    <div>
+      <div class="contact-label" data-region="contact_label" data-max-width-units="20">SPEAKER</div>
+      <div class="contact-author" data-region="contact_author" data-max-width-units="22" data-max-lines="2">IntelliFlow 产品团队</div>
+      <div class="contact-role" data-region="contact_role" data-max-width-units="26" data-max-lines="2">方案架构组 · 基础设施</div>
+
+      <div class="contact-details">
+        <div class="contact-row">
+          <div class="contact-row-label">EMAIL</div>
+          <div data-region="contact_email" data-max-width-units="28">team@intelliflow.ai</div>
+        </div>
+        <div class="contact-row">
+          <div class="contact-row-label">WEB</div>
+          <div data-region="contact_web" data-max-width-units="28">intelliflow.ai</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="contact-footer">
+      <div class="contact-brand" data-region="contact_brand" data-max-width-units="18">INTELLIFLOW</div>
+      <div class="contact-tagline" data-region="contact_brand_tag" data-max-width-units="30">DOCUMENT FLOW PLATFORM</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

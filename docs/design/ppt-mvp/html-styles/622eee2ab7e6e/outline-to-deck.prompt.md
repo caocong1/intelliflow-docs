@@ -38,6 +38,8 @@ editable PPT，并**严格**按下面定义的 JSON schema 输出。
 | `device` | 实体/形态三分对比场景 | `title`、`eyebrow`、`summary`、`devices: [{ name, scenario, note }]`（恰好 3 项） |
 | `feature_grid` | 功能/价值维度的并列展示，恰好 4 项，每项带数字指标 | `title`、`eyebrow`、`summary`、`features: [{ title, description, stat, unit }]`（恰好 4 项） |
 | `summary` | 收束/要点总结，3 条关键结论 + 一句话签名 | `title`、`eyebrow`、`lead`、`clusters: [{ title, body, eyebrow }]`（恰好 3 项）、`signature` |
+| `closing` | 结尾感谢页 / THE END / 联系方式 | `title`、`titleEn`、`eyebrow`、`tagline`、`speaker`、`role`、`email`、`web` |
+| `section_break` | 章节过渡页，放大章节编号 + 标题，多用于长 deck 中 | `chapterIndex`、`totalChapters`、`chapterTitle`、`chapterSubtitle`、`partLabel`、`brandName`、`brandContext` |
 
 ### 页数与选型原则
 
@@ -51,6 +53,8 @@ editable PPT，并**严格**按下面定义的 JSON schema 输出。
   - "形态 / 设备 / 场景三种 / 三分" → `device`
   - "核心价值 / 四大能力 / 特性 / pillars / 维度（恰好 4 项带数据指标）" → `feature_grid`
   - "总结 / 回顾 / 要点 / takeaways / 三条结论（恰好 3 项）" → `summary`
+  - "感谢 / 结束 / thank / 联系 / Q&A 引导 / 最后一页" → `closing`
+  - "章节过渡 / PART 02 / Chapter 03 / 长 deck 里显式的段落分隔页" → `section_break`（不替代 toc，**只在章节之间用一次**）
   - 兜不住的问答页等 → 目前不要硬套别的 template；把内容并入前一页的字段，或省略。
 
 ### 输出 schema

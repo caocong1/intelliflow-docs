@@ -231,4 +231,59 @@ describe("renderHtmlFidelityDeckToBuffer (with fill-plan overrides)", () => {
     },
     300_000,
   );
+
+  // 10-page Phase-2.2 deck — adds closing + section_break on top of Phase 2.1.
+  const closingPlan = join(FIXTURE_DIR, "closing-live.fillplan.json");
+  const sectionBreakPlan = join(FIXTURE_DIR, "section-break-live.fillplan.json");
+  const haveTen = haveEight && [closingPlan, sectionBreakPlan].every((p) => existsSync(p));
+
+  test.skipIf(!haveTen)(
+    "builds a 10-slide editable pptx buffer with phase-2.2 templates",
+    async () => {
+      const deck: Parameters<typeof renderHtmlFidelityDeckToBuffer>[0] = {
+        version: "html_fidelity_deck/v1",
+        templateId: "622eee2ab7e6e",
+        htmlStylesDir: join(REPO_ROOT, "docs/design/ppt-mvp/html-styles"),
+        pages: [
+          { pageId: "p1", template: "cover", content: {} },
+          { pageId: "p2", template: "toc", content: {} },
+          { pageId: "p3", template: "comparison", content: {} },
+          { pageId: "p4", template: "timeline", content: {} },
+          { pageId: "p5", template: "process", content: {} },
+          { pageId: "p6", template: "device", content: {} },
+          { pageId: "p7", template: "feature_grid", content: {} },
+          { pageId: "p8", template: "summary", content: {} },
+          { pageId: "p9", template: "section_break", content: {} },
+          { pageId: "p10", template: "closing", content: {} },
+        ],
+      };
+      const overrides: Record<string, HtmlFillPlan> = {
+        p1: JSON.parse(readFileSync(coverPlan, "utf8")) as HtmlFillPlan,
+        p2: JSON.parse(readFileSync(tocPlan, "utf8")) as HtmlFillPlan,
+        p3: JSON.parse(readFileSync(comparisonPlan, "utf8")) as HtmlFillPlan,
+        p4: JSON.parse(readFileSync(timelinePlan, "utf8")) as HtmlFillPlan,
+        p5: JSON.parse(readFileSync(processPlan, "utf8")) as HtmlFillPlan,
+        p6: JSON.parse(readFileSync(devicePlan, "utf8")) as HtmlFillPlan,
+        p7: JSON.parse(readFileSync(featureGridPlan, "utf8")) as HtmlFillPlan,
+        p8: JSON.parse(readFileSync(summaryPlan, "utf8")) as HtmlFillPlan,
+        p9: JSON.parse(readFileSync(sectionBreakPlan, "utf8")) as HtmlFillPlan,
+        p10: JSON.parse(readFileSync(closingPlan, "utf8")) as HtmlFillPlan,
+      };
+      const scratch = mkdtempSync(join(tmpdir(), "html-fidelity-10page-test-"));
+      const result = await renderHtmlFidelityDeckToBuffer(deck, {
+        scratchDir: scratch,
+        fillPlanOverrides: overrides,
+      });
+      expect(result.buffer.length).toBeGreaterThan(50_000);
+      expect(result.compositionSummary.totalSlides).toBe(10);
+      const roles = result.compositionSummary.semanticRoleCounts as Record<string, number>;
+      expect(roles.cover).toBe(1);
+      expect(roles.closing).toBe(1);
+      expect(roles.section_break).toBe(1);
+      expect(roles.feature_grid).toBe(1);
+      expect(roles.summary).toBe(1);
+      expect(roles.bullet_list ?? 0).toBe(0);
+    },
+    360_000,
+  );
 });

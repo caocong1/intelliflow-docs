@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style section_break — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-primary-bg: #EFF6FF;
+    --color-accent: #16A34A;
+    --color-accent-soft: #22C55E;
+    --color-accent-bg: #F0FDF4;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 72px 96px 64px 96px;
+    box-sizing: border-box;
+  }
+
+  /* Huge background numeral, anchored bottom-right */
+  .slide-root::before {
+    content: attr(data-section-numeral);
+    position: absolute;
+    bottom: -120px; right: -40px;
+    font-family: var(--font-title);
+    font-size: 520pt;
+    font-weight: 900;
+    color: var(--color-primary-bg);
+    line-height: 0.85;
+    letter-spacing: -40px;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+  /* Soft diagonal wash */
+  .slide-root::after {
+    content: "";
+    position: absolute;
+    top: 0; left: -140px;
+    width: 500px; height: 420px;
+    background: linear-gradient(135deg, var(--color-accent-bg) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Top band: part label + chapter number */
+  .part-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    z-index: 2;
+  }
+  .part-bar {
+    width: 64px; height: 3px;
+    background: var(--color-primary);
+  }
+  .part-label {
+    font-family: var(--font-mono);
+    font-size: 12pt; letter-spacing: 6px; text-transform: uppercase;
+    color: var(--color-primary); font-weight: 700;
+  }
+  .part-number {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 11pt; letter-spacing: 4px;
+    color: var(--color-ink-dim); font-weight: 600;
+  }
+
+  /* Center block: chapter title */
+  .center {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    z-index: 2;
+  }
+  .numeral {
+    display: flex; align-items: baseline; gap: 18px;
+  }
+  .numeral-index {
+    font-family: var(--font-title);
+    font-size: 128pt; font-weight: 900;
+    line-height: 0.9;
+    color: var(--color-primary);
+    letter-spacing: 0;
+  }
+  .numeral-of {
+    font-family: var(--font-mono);
+    font-size: 14pt; letter-spacing: 4px;
+    color: var(--color-ink-dim); font-weight: 600;
+  }
+  .chapter-title {
+    font-family: var(--font-title);
+    font-size: 44pt; font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-ink);
+    letter-spacing: 2px;
+  }
+  .chapter-subtitle {
+    font-family: var(--font-body);
+    font-size: 14pt; line-height: 1.6;
+    color: var(--color-ink-soft);
+    max-width: 720px;
+    margin-top: 6px;
+  }
+
+  /* Bottom band: progress + brand */
+  .footer {
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    z-index: 2;
+  }
+  .progress {
+    display: flex; flex-direction: column; gap: 8px;
+    width: 340px;
+  }
+  .progress-track {
+    width: 100%;
+    height: 4px;
+    background: var(--color-border);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .progress-fill {
+    position: absolute;
+    top: 0; left: 0; bottom: 0;
+    background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+    border-radius: 4px;
+    width: 50%;
+  }
+  .progress-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 2px;
+    color: var(--color-ink-dim); font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .brand {
+    display: flex; flex-direction: column; align-items: flex-end;
+    font-family: var(--font-mono);
+    font-size: 10pt; letter-spacing: 3px;
+    color: var(--color-ink-dim); font-weight: 600;
+    text-transform: uppercase;
+    gap: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- Top -->
+  <div class="part-row">
+    <div class="part-bar"></div>
+    <div class="part-label" data-region="part_label" data-max-width-units="26">SECTION</div>
+    <div class="part-number" data-region="part_progress_note" data-max-width-units="18">PART 02 OF 04</div>
+  </div>
+
+  <!-- Center -->
+  <div class="center">
+    <div class="numeral">
+      <div class="numeral-index" data-region="chapter_index" data-max-width-units="4">02</div>
+      <div class="numeral-of" data-region="chapter_of" data-max-width-units="14">/ 04</div>
+    </div>
+    <div class="chapter-title" data-region="chapter_title" data-max-width-units="24" data-max-lines="2">技术发展历程</div>
+    <div class="chapter-subtitle" data-region="chapter_subtitle" data-max-width-units="50" data-max-lines="2">Wi-Fi 代际演进与当前主流选择</div>
+  </div>
+
+  <!-- Bottom -->
+  <div class="footer">
+    <div class="progress">
+      <div class="progress-track">
+        <div class="progress-fill"></div>
+      </div>
+      <div class="progress-label">
+        <div data-region="progress_start" data-max-width-units="12">CHAPTER 02</div>
+        <div data-region="progress_end" data-max-width-units="12">50% 完成</div>
+      </div>
+    </div>
+    <div class="brand">
+      <div data-region="brand_name" data-max-width-units="18">INTELLIFLOW</div>
+      <div data-region="brand_context" data-max-width-units="22">WIRELESS GUIDE 2026</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style comparison — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-primary-bg: #EFF6FF;
+    --color-accent: #16A34A;
+    --color-accent-soft: #22C55E;
+    --color-accent-bg: #F0FDF4;
+    --color-warn: #D97706;
+    --color-warn-bg: #FFFBEB;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    padding: 52px 64px 48px 64px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  /* Subtle diagonal background accent */
+  .slide-root::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 360px; height: 280px;
+    background: linear-gradient(210deg, var(--color-primary-bg) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .slide-root::after {
+    content: "";
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 320px; height: 240px;
+    background: linear-gradient(30deg, var(--color-accent-bg) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Header */
+  .header {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .eyebrow-row {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .eyebrow-bar {
+    width: 32px; height: 3px; background: var(--color-primary);
+  }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10pt; letter-spacing: 5px; text-transform: uppercase;
+    color: var(--color-primary); font-weight: 600;
+  }
+  .title {
+    font-family: var(--font-title);
+    font-size: 28pt; font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-ink);
+    letter-spacing: 1px;
+    max-width: 900px;
+  }
+
+  /* Comparison row */
+  .comparison {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 120px 1fr;
+    gap: 0;
+    flex: 1;
+    align-items: stretch;
+  }
+
+  .card {
+    position: relative;
+    display: flex; flex-direction: column;
+    padding: 28px 30px 26px 30px;
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+  }
+  .card--pro {
+    background: var(--color-accent-bg);
+    border-color: rgba(22, 163, 74, 0.25);
+  }
+  .card--con {
+    background: var(--color-card);
+    border-color: var(--color-border);
+  }
+
+  /* Card decorative stamp */
+  .card::before {
+    content: "";
+    position: absolute;
+    top: -10px; right: -10px;
+    width: 120px; height: 120px;
+    border-radius: 999px;
+    opacity: 0.12;
+  }
+  .card--pro::before { background: var(--color-accent); }
+  .card--con::before { background: var(--color-primary); }
+
+  .card-head {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 6px;
+  }
+  .card-tag {
+    display: inline-flex; align-items: center;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 9pt; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+  }
+  .card-tag--pro {
+    background: var(--color-accent);
+    color: #FFF;
+  }
+  .card-tag--con {
+    background: #FFF;
+    color: var(--color-ink-soft);
+    border: 1px solid var(--color-border);
+  }
+
+  .card-title {
+    font-family: var(--font-title);
+    font-size: 20pt; font-weight: 700;
+    line-height: 1.3;
+    color: var(--color-ink);
+    margin: 0;
+  }
+  .card--pro .card-title { color: #065F46; }
+  .card--con .card-title { color: var(--color-ink); }
+
+  .card-subtitle {
+    font-family: var(--font-body);
+    font-size: 10pt; line-height: 1.5;
+    color: var(--color-ink-soft);
+    margin-top: -2px;
+  }
+
+  .bullet-list {
+    list-style: none;
+    padding: 0; margin: 18px 0 0 0;
+    display: flex; flex-direction: column;
+    gap: 12px;
+  }
+  .bullet {
+    display: grid;
+    grid-template-columns: 26px 1fr;
+    align-items: start;
+    gap: 12px;
+  }
+  .bullet-icon {
+    width: 22px; height: 22px;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    font-size: 12pt;
+    line-height: 1;
+  }
+  .card--pro .bullet-icon {
+    background: var(--color-accent);
+    color: #FFF;
+  }
+  .card--con .bullet-icon {
+    background: var(--color-warn-bg);
+    color: var(--color-warn);
+    border: 1px solid rgba(217, 119, 6, 0.3);
+  }
+  .bullet-text {
+    font-family: var(--font-body);
+    font-size: 13pt; line-height: 1.55;
+    color: var(--color-ink);
+  }
+  .card--con .bullet-text { color: var(--color-ink-soft); }
+
+  /* VS anchor band */
+  .vs-band {
+    position: relative;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px;
+  }
+  .vs-line-top, .vs-line-bottom {
+    width: 2px;
+    flex: 1;
+    background: linear-gradient(var(--color-border), transparent);
+  }
+  .vs-line-bottom { background: linear-gradient(transparent, var(--color-border)); }
+  .vs-badge {
+    width: 72px; height: 72px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-primary) 100%);
+    color: #FFF;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-title);
+    font-size: 20pt; font-weight: 800;
+    letter-spacing: 2px;
+    box-shadow: 0 10px 24px rgba(30, 64, 175, 0.22);
+  }
+  .vs-label {
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--color-ink-dim);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- Header: eyebrow + title -->
+  <div class="header">
+    <div class="eyebrow-row">
+      <div class="eyebrow-bar"></div>
+      <div class="eyebrow" data-region="eyebrow" data-max-width-units="30">ARCHITECTURE COMPARISON</div>
+    </div>
+    <div class="title" data-region="title" data-max-width-units="30" data-max-lines="1">无线与有线网络核心优势对比</div>
+  </div>
+
+  <!-- Comparison: pro / vs / con -->
+  <div class="comparison">
+    <!-- PRO (wireless) -->
+    <div class="card card--pro">
+      <div class="card-head">
+        <div class="card-tag card-tag--pro" data-region="left_tag" data-max-width-units="14">PROS · 优势</div>
+      </div>
+      <div class="card-title" data-region="left_title" data-max-width-units="22" data-max-lines="1">无线网络 · 核心优势</div>
+      <div class="card-subtitle" data-region="left_subtitle" data-max-width-units="32">移动性、灵活性、扩容敏捷</div>
+      <ul class="bullet-list">
+        <li class="bullet">
+          <span class="bullet-icon">✓</span>
+          <span class="bullet-text" data-region="left_bullet_1" data-max-width-units="28" data-max-lines="2">终端接入不受物理位置限制</span>
+        </li>
+        <li class="bullet">
+          <span class="bullet-icon">✓</span>
+          <span class="bullet-text" data-region="left_bullet_2" data-max-width-units="28" data-max-lines="2">无需大规模布线，部署更灵活</span>
+        </li>
+        <li class="bullet">
+          <span class="bullet-icon">✓</span>
+          <span class="bullet-text" data-region="left_bullet_3" data-max-width-units="28" data-max-lines="2">扩容仅需新增 AP</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- VS anchor -->
+    <div class="vs-band">
+      <div class="vs-line-top"></div>
+      <div class="vs-badge" data-region="vs_label" data-max-width-units="4">VS</div>
+      <div class="vs-label" data-region="vs_note" data-max-width-units="10">COMPARE</div>
+      <div class="vs-line-bottom"></div>
+    </div>
+
+    <!-- CON (wired) -->
+    <div class="card card--con">
+      <div class="card-head">
+        <div class="card-tag card-tag--con" data-region="right_tag" data-max-width-units="14">CONS · 局限</div>
+      </div>
+      <div class="card-title" data-region="right_title" data-max-width-units="22" data-max-lines="1">有线网络 · 主要局限</div>
+      <div class="card-subtitle" data-region="right_subtitle" data-max-width-units="32">部署重、移动弱、扩容慢</div>
+      <ul class="bullet-list">
+        <li class="bullet">
+          <span class="bullet-icon">!</span>
+          <span class="bullet-text" data-region="right_bullet_1" data-max-width-units="28" data-max-lines="2">终端依赖网口接入，移动性弱</span>
+        </li>
+        <li class="bullet">
+          <span class="bullet-icon">!</span>
+          <span class="bullet-text" data-region="right_bullet_2" data-max-width-units="28" data-max-lines="2">布线改造成本高、周期长</span>
+        </li>
+        <li class="bullet">
+          <span class="bullet-icon">!</span>
+          <span class="bullet-text" data-region="right_bullet_3" data-max-width-units="28" data-max-lines="2">IoT 高并发扩容更困难</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -36,6 +36,8 @@ editable PPT，并**严格**按下面定义的 JSON schema 输出。
 | `timeline` | 时间线/代际演进，3–6 个节点 | `title`、`eyebrow`、`summary`、`nodes: [{ year, title, detail }]` |
 | `process` | 流程/步骤，3–6 步 | `title`、`eyebrow`、`summary`、`steps: [{ index, title, detail }]` |
 | `device` | 实体/形态三分对比场景 | `title`、`eyebrow`、`summary`、`devices: [{ name, scenario, note }]`（恰好 3 项） |
+| `feature_grid` | 功能/价值维度的并列展示，恰好 4 项，每项带数字指标 | `title`、`eyebrow`、`summary`、`features: [{ title, description, stat, unit }]`（恰好 4 项） |
+| `summary` | 收束/要点总结，3 条关键结论 + 一句话签名 | `title`、`eyebrow`、`lead`、`clusters: [{ title, body, eyebrow }]`（恰好 3 项）、`signature` |
 
 ### 页数与选型原则
 
@@ -47,7 +49,9 @@ editable PPT，并**严格**按下面定义的 JSON schema 输出。
   - "发展 / 演进 / 历程 / 时间 / 年份" → `timeline`
   - "步骤 / 流程 / 阶段 / 实施 / 闭环" → `process`
   - "形态 / 设备 / 场景三种 / 三分" → `device`
-  - 兜不住的总结/问答页 → 目前不要硬套别的 template；把内容并入前一页的 `summary` 字段，或省略。
+  - "核心价值 / 四大能力 / 特性 / pillars / 维度（恰好 4 项带数据指标）" → `feature_grid`
+  - "总结 / 回顾 / 要点 / takeaways / 三条结论（恰好 3 项）" → `summary`
+  - 兜不住的问答页等 → 目前不要硬套别的 template；把内容并入前一页的字段，或省略。
 
 ### 输出 schema
 

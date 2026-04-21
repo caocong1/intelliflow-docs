@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style feature_grid — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-primary-bg: #EFF6FF;
+    --color-accent: #16A34A;
+    --color-accent-soft: #22C55E;
+    --color-accent-bg: #F0FDF4;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    padding: 40px 56px 32px 56px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .slide-root::before {
+    content: "";
+    position: absolute;
+    top: 0; right: -80px;
+    width: 400px; height: 260px;
+    background: linear-gradient(215deg, var(--color-primary-bg) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .slide-root::after {
+    content: "";
+    position: absolute;
+    bottom: -40px; left: -80px;
+    width: 360px; height: 220px;
+    background: linear-gradient(35deg, var(--color-accent-bg) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Header */
+  .header { position: relative; display: flex; flex-direction: column; gap: 8px; z-index: 2; }
+  .eyebrow-row { display: flex; align-items: center; gap: 14px; }
+  .eyebrow-bar { width: 32px; height: 3px; background: var(--color-primary); }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10pt; letter-spacing: 5px; text-transform: uppercase;
+    color: var(--color-primary); font-weight: 600;
+  }
+  .title {
+    font-family: var(--font-title);
+    font-size: 26pt; font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-ink);
+    letter-spacing: 1px;
+  }
+  .summary {
+    font-family: var(--font-body);
+    font-size: 11pt; line-height: 1.5;
+    color: var(--color-ink-soft);
+    max-width: 900px;
+  }
+
+  /* 2x2 feature grid — equal row heights via auto-rows */
+  .grid {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows: 220px;
+    gap: 16px;
+    flex: 0 0 auto;
+    z-index: 2;
+  }
+
+  .feature {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 22px 16px 22px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
+  }
+  /* Colored accent bar top */
+  .feature::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 64px; height: 4px;
+    border-radius: 0 4px 4px 0;
+  }
+  .feature-a::before { background: var(--color-primary); }
+  .feature-b::before { background: var(--color-accent); }
+  .feature-c::before { background: #6366F1; }
+  .feature-d::before { background: #F59E0B; }
+
+  .feature-head {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .feature-badge {
+    flex-shrink: 0;
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 14pt; font-weight: 700;
+    color: #FFF;
+  }
+  .feature-a .feature-badge { background: var(--color-primary); }
+  .feature-b .feature-badge { background: var(--color-accent); }
+  .feature-c .feature-badge { background: #6366F1; }
+  .feature-d .feature-badge { background: #F59E0B; }
+
+  .feature-title {
+    font-family: var(--font-title);
+    font-size: 18pt; font-weight: 700;
+    color: var(--color-ink);
+    line-height: 1.25;
+  }
+
+  .feature-description {
+    font-family: var(--font-body);
+    font-size: 11pt; line-height: 1.6;
+    color: var(--color-ink-soft);
+    margin: 0;
+  }
+
+  .feature-stat {
+    margin-top: auto;
+    display: flex; align-items: baseline; gap: 6px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--color-border);
+  }
+  .feature-stat-value {
+    font-family: var(--font-title);
+    font-size: 15pt; font-weight: 700;
+    color: var(--color-primary);
+  }
+  .feature-b .feature-stat-value { color: var(--color-accent); }
+  .feature-c .feature-stat-value { color: #6366F1; }
+  .feature-d .feature-stat-value { color: #F59E0B; }
+  .feature-stat-unit {
+    font-family: var(--font-body);
+    font-size: 10pt; color: var(--color-ink-soft);
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- Header -->
+  <div class="header">
+    <div class="eyebrow-row">
+      <div class="eyebrow-bar"></div>
+      <div class="eyebrow" data-region="eyebrow" data-max-width-units="26">VALUE PILLARS</div>
+    </div>
+    <div class="title" data-region="title" data-max-width-units="24" data-max-lines="1">无线网络建设四大核心价值</div>
+    <div class="summary" data-region="summary" data-max-width-units="60" data-max-lines="2">从效率到韧性，覆盖企业网络建设的关键维度。</div>
+  </div>
+
+  <!-- 2x2 grid -->
+  <div class="grid">
+    <div class="feature feature-a">
+      <div class="feature-head">
+        <div class="feature-badge" data-region="feature_1_badge" data-max-width-units="3">01</div>
+        <div class="feature-title" data-region="feature_1_title" data-max-width-units="16" data-max-lines="1">高敏捷性</div>
+      </div>
+      <p class="feature-description" data-region="feature_1_description" data-max-width-units="40" data-max-lines="3">部署周期从周缩短到天，适配业务节奏</p>
+      <div class="feature-stat">
+        <span class="feature-stat-value" data-region="feature_1_stat" data-max-width-units="10">5×</span>
+        <span class="feature-stat-unit" data-region="feature_1_unit" data-max-width-units="20">周期提速</span>
+      </div>
+    </div>
+
+    <div class="feature feature-b">
+      <div class="feature-head">
+        <div class="feature-badge" data-region="feature_2_badge" data-max-width-units="3">02</div>
+        <div class="feature-title" data-region="feature_2_title" data-max-width-units="16" data-max-lines="1">高并发力</div>
+      </div>
+      <p class="feature-description" data-region="feature_2_description" data-max-width-units="40" data-max-lines="3">同等面积可支撑 3× 终端密度</p>
+      <div class="feature-stat">
+        <span class="feature-stat-value" data-region="feature_2_stat" data-max-width-units="10">3×</span>
+        <span class="feature-stat-unit" data-region="feature_2_unit" data-max-width-units="20">并发能力</span>
+      </div>
+    </div>
+
+    <div class="feature feature-c">
+      <div class="feature-head">
+        <div class="feature-badge" data-region="feature_3_badge" data-max-width-units="3">03</div>
+        <div class="feature-title" data-region="feature_3_title" data-max-width-units="16" data-max-lines="1">低运维成本</div>
+      </div>
+      <p class="feature-description" data-region="feature_3_description" data-max-width-units="40" data-max-lines="3">中心化管理，远程调优无需现场</p>
+      <div class="feature-stat">
+        <span class="feature-stat-value" data-region="feature_3_stat" data-max-width-units="10">-40%</span>
+        <span class="feature-stat-unit" data-region="feature_3_unit" data-max-width-units="20">运维投入</span>
+      </div>
+    </div>
+
+    <div class="feature feature-d">
+      <div class="feature-head">
+        <div class="feature-badge" data-region="feature_4_badge" data-max-width-units="3">04</div>
+        <div class="feature-title" data-region="feature_4_title" data-max-width-units="16" data-max-lines="1">强扩展性</div>
+      </div>
+      <p class="feature-description" data-region="feature_4_description" data-max-width-units="40" data-max-lines="3">新增 AP 即扩容，无需重新布线</p>
+      <div class="feature-stat">
+        <span class="feature-stat-value" data-region="feature_4_stat" data-max-width-units="10">零</span>
+        <span class="feature-stat-unit" data-region="feature_4_unit" data-max-width-units="20">布线成本</span>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

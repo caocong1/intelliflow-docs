@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style summary — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-primary-bg: #EFF6FF;
+    --color-accent: #16A34A;
+    --color-accent-soft: #22C55E;
+    --color-accent-bg: #F0FDF4;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    padding: 40px 64px 36px 64px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* Diagonal accent strip behind content */
+  .slide-root::before {
+    content: "";
+    position: absolute;
+    top: 50%; left: -60px;
+    width: 140%; height: 280px;
+    background: linear-gradient(100deg, var(--color-primary-bg) 0%, transparent 30%, transparent 70%, var(--color-accent-bg) 100%);
+    transform: translateY(-50%) rotate(-4deg);
+    pointer-events: none;
+  }
+
+  /* Header */
+  .header { position: relative; display: flex; flex-direction: column; gap: 8px; z-index: 2; }
+  .eyebrow-row { display: flex; align-items: center; gap: 14px; }
+  .eyebrow-bar { width: 44px; height: 3px; background: var(--color-accent); }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11pt; letter-spacing: 6px; text-transform: uppercase;
+    color: var(--color-accent); font-weight: 700;
+  }
+  .title {
+    font-family: var(--font-title);
+    font-size: 30pt; font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-ink);
+    letter-spacing: 1px;
+  }
+  .lead {
+    font-family: var(--font-body);
+    font-size: 12pt; line-height: 1.55;
+    color: var(--color-ink-soft);
+    max-width: 960px;
+  }
+
+  /* 3-card takeaway row — fixed height so signature band always fits */
+  .clusters {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-auto-rows: 300px;
+    gap: 22px;
+    flex: 0 0 auto;
+    z-index: 2;
+  }
+
+  .cluster {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 22px 26px 22px 26px;
+    background: var(--color-surface);
+    border-radius: 14px;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+    overflow: hidden;
+  }
+
+  /* Cluster number anchor — big faded numeral */
+  .cluster-num {
+    position: absolute;
+    top: -12px; right: 8px;
+    font-family: var(--font-title);
+    font-size: 100pt; font-weight: 800;
+    color: var(--color-card);
+    letter-spacing: -4px;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+    z-index: 0;
+  }
+
+  .cluster-head {
+    position: relative;
+    display: flex; align-items: center; gap: 10px;
+    z-index: 1;
+  }
+  .cluster-badge {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 12pt; font-weight: 700;
+    color: #FFF;
+    background: var(--color-primary);
+  }
+  .cluster-b .cluster-badge { background: var(--color-accent); }
+  .cluster-c .cluster-badge { background: #6366F1; }
+
+  .cluster-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--color-ink-dim); font-weight: 600;
+  }
+
+  .cluster-title {
+    position: relative;
+    font-family: var(--font-title);
+    font-size: 19pt; font-weight: 700;
+    color: var(--color-ink);
+    line-height: 1.25;
+    z-index: 1;
+  }
+
+  .cluster-body {
+    position: relative;
+    font-family: var(--font-body);
+    font-size: 11pt; line-height: 1.65;
+    color: var(--color-ink-soft);
+    flex: 1;
+    z-index: 1;
+  }
+
+  /* Footer signature band */
+  .signature {
+    position: relative;
+    display: flex; align-items: center; gap: 16px;
+    padding: 14px 22px;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+    color: #FFF;
+    border-radius: 10px;
+    z-index: 2;
+  }
+  .signature-mark {
+    flex-shrink: 0;
+    font-family: var(--font-title);
+    font-size: 18pt; font-weight: 800;
+    letter-spacing: 2px;
+  }
+  .signature-sep {
+    width: 2px; height: 24px; background: rgba(255,255,255,0.4);
+  }
+  .signature-text {
+    font-family: var(--font-body);
+    font-size: 12pt; line-height: 1.45;
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- Header -->
+  <div class="header">
+    <div class="eyebrow-row">
+      <div class="eyebrow-bar"></div>
+      <div class="eyebrow" data-region="eyebrow" data-max-width-units="28">KEY TAKEAWAYS</div>
+    </div>
+    <div class="title" data-region="title" data-max-width-units="28" data-max-lines="1">建设要点回顾</div>
+    <div class="lead" data-region="lead" data-max-width-units="64" data-max-lines="2">三条主线决定无线网络建设的长期价值。</div>
+  </div>
+
+  <!-- 3 takeaway clusters -->
+  <div class="clusters">
+    <div class="cluster cluster-a">
+      <div class="cluster-num" data-region="cluster_1_num" data-max-width-units="2">1</div>
+      <div class="cluster-head">
+        <div class="cluster-badge" data-region="cluster_1_badge" data-max-width-units="3">01</div>
+        <div class="cluster-eyebrow" data-region="cluster_1_eyebrow" data-max-width-units="20">PILLAR</div>
+      </div>
+      <div class="cluster-title" data-region="cluster_1_title" data-max-width-units="18" data-max-lines="2">场景优先</div>
+      <div class="cluster-body" data-region="cluster_1_body" data-max-width-units="38" data-max-lines="4">先定场景再选设备形态，形态决定部署边界</div>
+    </div>
+
+    <div class="cluster cluster-b">
+      <div class="cluster-num" data-region="cluster_2_num" data-max-width-units="2">2</div>
+      <div class="cluster-head">
+        <div class="cluster-badge" data-region="cluster_2_badge" data-max-width-units="3">02</div>
+        <div class="cluster-eyebrow" data-region="cluster_2_eyebrow" data-max-width-units="20">PILLAR</div>
+      </div>
+      <div class="cluster-title" data-region="cluster_2_title" data-max-width-units="18" data-max-lines="2">设计先行</div>
+      <div class="cluster-body" data-region="cluster_2_body" data-max-width-units="38" data-max-lines="4">勘测与方案决定 80% 稳定性，不要跳过</div>
+    </div>
+
+    <div class="cluster cluster-c">
+      <div class="cluster-num" data-region="cluster_3_num" data-max-width-units="2">3</div>
+      <div class="cluster-head">
+        <div class="cluster-badge" data-region="cluster_3_badge" data-max-width-units="3">03</div>
+        <div class="cluster-eyebrow" data-region="cluster_3_eyebrow" data-max-width-units="20">PILLAR</div>
+      </div>
+      <div class="cluster-title" data-region="cluster_3_title" data-max-width-units="18" data-max-lines="2">持续迭代</div>
+      <div class="cluster-body" data-region="cluster_3_body" data-max-width-units="38" data-max-lines="4">运维与扩容是长期命题，不是一次性项目</div>
+    </div>
+  </div>
+
+  <!-- Closing signature -->
+  <div class="signature">
+    <div class="signature-mark" data-region="signature_mark" data-max-width-units="6">KEY</div>
+    <div class="signature-sep"></div>
+    <div class="signature-text" data-region="signature_text" data-max-width-units="64" data-max-lines="1">把每一步做对，比做多做快更重要。</div>
+  </div>
+</div>
+</body>
+</html>

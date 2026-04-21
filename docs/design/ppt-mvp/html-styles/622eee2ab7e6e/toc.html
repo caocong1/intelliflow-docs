@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style toc — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-accent: #22C55E;
+    --color-accent-soft: #86EFAC;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-card-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    display: grid;
+    grid-template-columns: 460px 1fr 64px;
+  }
+
+  /* LEFT — hero feature item */
+  .hero-col {
+    position: relative;
+    background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 45%, #2563EB 100%);
+    color: #FFF;
+    padding: 80px 48px 60px 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  /* hero geometry: angled light strip + tiny green pill */
+  .hero-col::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 55%, rgba(255,255,255,0.06) 55%, rgba(255,255,255,0.06) 62%, transparent 62%);
+    pointer-events: none;
+  }
+  .hero-col::after {
+    content: "";
+    position: absolute;
+    bottom: 48px; right: -30px;
+    width: 160px; height: 160px;
+    border-radius: 999px;
+    background: radial-gradient(circle, rgba(34,197,94,0.22) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-header { display: flex; flex-direction: column; gap: 8px; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11pt; letter-spacing: 6px; text-transform: uppercase;
+    color: var(--color-accent-soft);
+    font-weight: 600;
+  }
+  .page-title {
+    font-family: var(--font-title);
+    font-size: 44pt; font-weight: 700;
+    letter-spacing: 6px; line-height: 1.0;
+  }
+  .page-title-count {
+    font-family: var(--font-mono);
+    font-size: 11pt; letter-spacing: 2px;
+    color: rgba(255,255,255,0.6);
+    margin-top: 18px;
+  }
+
+  .hero-feature {
+    display: flex; flex-direction: column; gap: 14px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255,255,255,0.18);
+  }
+  .hero-feature-label {
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 4px; text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+    font-weight: 500;
+  }
+  .hero-index {
+    font-family: var(--font-title);
+    font-size: 108pt; font-weight: 800;
+    line-height: 0.85;
+    color: var(--color-accent);
+    letter-spacing: -4px;
+  }
+  .hero-title {
+    font-family: var(--font-title);
+    font-size: 28pt; font-weight: 700;
+    line-height: 1.25;
+  }
+  .hero-subtitle {
+    font-family: var(--font-body);
+    font-size: 13pt; line-height: 1.55;
+    color: rgba(255,255,255,0.78);
+    margin-top: -4px;
+  }
+
+  /* MIDDLE — dense index list */
+  .list-col {
+    padding: 44px 40px 36px 48px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .list-header {
+    display: flex; align-items: baseline; gap: 14px;
+    margin-bottom: 6px;
+  }
+  .list-header-accent {
+    width: 48px; height: 3px; background: var(--color-accent);
+    align-self: center;
+    margin-right: 6px;
+  }
+  .list-header-label {
+    font-family: var(--font-mono);
+    font-size: 10pt; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--color-ink-dim); font-weight: 600;
+  }
+  .list-header-count {
+    font-family: var(--font-mono);
+    font-size: 10pt; color: var(--color-primary);
+    font-weight: 600; letter-spacing: 2px;
+    margin-left: auto;
+  }
+
+  .index-item {
+    display: grid;
+    grid-template-columns: 52px 1fr auto;
+    align-items: center;
+    gap: 18px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    transition: all 0.12s ease;
+  }
+  .index-item:hover { background: var(--color-card); border-color: var(--color-card-border); }
+
+  .index-num {
+    font-family: var(--font-mono);
+    font-size: 18pt; font-weight: 700;
+    color: var(--color-primary);
+    letter-spacing: 1px;
+    line-height: 1.0;
+  }
+  .index-body {
+    display: flex; flex-direction: column; gap: 2px;
+    min-width: 0;
+  }
+  .index-title {
+    font-family: var(--font-body);
+    font-size: 14pt; font-weight: 600;
+    color: var(--color-ink);
+    line-height: 1.2;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .index-subtitle {
+    font-family: var(--font-body);
+    font-size: 10pt; line-height: 1.4;
+    color: var(--color-ink-soft);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .index-dot {
+    width: 8px; height: 8px; border-radius: 999px;
+    background: var(--color-card-border);
+  }
+  .index-item--alt .index-dot { background: var(--color-accent); }
+
+  /* RIGHT — vertical CONTENTS ribbon */
+  .ribbon {
+    position: relative;
+    background: #F1F5F9;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ribbon-text {
+    font-family: var(--font-mono);
+    font-size: 11pt;
+    letter-spacing: 12px; text-transform: uppercase;
+    color: var(--color-ink-dim);
+    writing-mode: vertical-rl;
+    font-weight: 600;
+  }
+  .ribbon::before {
+    content: "";
+    position: absolute;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px; height: 48px;
+    background: var(--color-accent);
+  }
+  .ribbon::after {
+    content: "";
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px; height: 48px;
+    background: var(--color-primary);
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- LEFT: hero feature -->
+  <div class="hero-col">
+    <div class="hero-header">
+      <div class="eyebrow" data-region="eyebrow" data-max-width-units="20">CONTENTS</div>
+      <div class="page-title" data-region="page_title" data-max-width-units="6" data-max-lines="1">目录</div>
+      <div class="page-title-count" data-region="page_count" data-max-width-units="18">08 CHAPTERS · 8 模块</div>
+    </div>
+    <div class="hero-feature">
+      <div class="hero-feature-label" data-region="hero_label" data-max-width-units="22">FEATURED CHAPTER</div>
+      <div class="hero-index" data-region="hero_index" data-max-width-units="4">01</div>
+      <div class="hero-title" data-region="hero_title" data-max-width-units="16" data-max-lines="2">核心优势对比</div>
+      <div class="hero-subtitle" data-region="hero_subtitle" data-max-width-units="28" data-max-lines="2">无线 vs 有线架构对比</div>
+    </div>
+  </div>
+
+  <!-- MIDDLE: dense list 02-08 -->
+  <div class="list-col">
+    <div class="list-header">
+      <div class="list-header-accent"></div>
+      <div class="list-header-label" data-region="list_label" data-max-width-units="26">MORE CHAPTERS</div>
+      <div class="list-header-count" data-region="list_count" data-max-width-units="12">02 → 08</div>
+    </div>
+
+    <div class="index-item">
+      <div class="index-num" data-region="item_02_index" data-max-width-units="4">02</div>
+      <div class="index-body">
+        <div class="index-title" data-region="item_02_title" data-max-width-units="18">技术发展历程</div>
+        <div class="index-subtitle" data-region="item_02_subtitle" data-max-width-units="32">Wi-Fi 4~7 演进</div>
+      </div>
+      <div class="index-dot"></div>
+    </div>
+
+    <div class="index-item">
+      <div class="index-num" data-region="item_03_index" data-max-width-units="4">03</div>
+      <div class="index-body">
+        <div class="index-title" data-region="item_03_title" data-max-width-units="18">标准建设流程</div>
+        <div class="index-subtitle" data-region="item_03_subtitle" data-max-width-units="32">6 个关键步骤</div>
+      </div>
+      <div class="index-dot"></div>
+    </div>
+
+    <div class="index-item index-item--alt">
+      <div class="index-num" data-region="item_04_index" data-max-width-units="4">04</div>
+      <div class="index-body">
+        <div class="index-title" data-region="item_04_title" data-max-width-units="18">主流设备解析</div>
+        <div class="index-subtitle" data-region="item_04_subtitle" data-max-width-units="32">无线 AP 类型总览</div>
+      </div>
+      <div class="index-dot"></div>
+    </div>
+
+    <div class="index-item">
+      <div class="index-num" data-region="item_05_index" data-max-width-units="4">05</div>
+      <div class="index-body">
+        <div class="index-title" data-region="item_05_title" data-max-width-units="18">品牌选型对比</div>
+        <div class="index-subtitle" data-region="item_05_subtitle" data-max-width-units="32">主流品牌能力对照</div>
+      </div>
+      <div class="index-dot"></div>
+    </div>
+
+    <div class="index-item index-item--alt">
+      <div class="index-num" data-region="item_06_index" data-max-width-units="4">06</div>
+      <div class="index-body">
+        <div class="index-title" data-region="item_06_title" data-max-width-units="18">全场景选型指南</div>
+        <div class="index-subtitle" data-region="item_06_subtitle" data-max-width-units="32">办公/商场/工厂方案</div>
+      </div>
+      <div class="index-dot"></div>
+    </div>
+
+    <div class="index-item">
+      <div class="index-num" data-region="item_07_index" data-max-width-units="4">07</div>
+      <div class="index-body">
+        <div class="index-title" data-region="item_07_title" data-max-width-units="18">优化与运维要点</div>
+        <div class="index-subtitle" data-region="item_07_subtitle" data-max-width-units="32">信道/调优/排障</div>
+      </div>
+      <div class="index-dot"></div>
+    </div>
+
+    <div class="index-item index-item--alt">
+      <div class="index-num" data-region="item_08_index" data-max-width-units="4">08</div>
+      <div class="index-body">
+        <div class="index-title" data-region="item_08_title" data-max-width-units="18">常见问题答疑</div>
+        <div class="index-subtitle" data-region="item_08_subtitle" data-max-width-units="32">盲区与并发问题</div>
+      </div>
+      <div class="index-dot"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: vertical ribbon -->
+  <div class="ribbon">
+    <div class="ribbon-text" data-region="ribbon_text" data-max-width-units="10">CONTENTS</div>
+  </div>
+</div>
+</body>
+</html>

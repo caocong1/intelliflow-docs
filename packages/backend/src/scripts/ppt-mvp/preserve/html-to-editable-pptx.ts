@@ -25,7 +25,8 @@
  *     --page <id> --out <pptx> [--template-id <id>] [--mock <json>]
  *     [--keep-intermediates]
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import PptxGenJS from "pptxgenjs";
@@ -308,6 +309,31 @@ async function compileEditablePptx(args: {
  * caller will use addHtmlSlideToPres to stage it into a shared multi-slide
  * pres. Useful for runtime/export.service paths that compose decks.
  */
+/**
+ * Content-addressable cache for expensive per-page assets.
+ *
+ * Cache key derivation:
+ *   - bg PNG:        sha256(filled-html + baseUrl + "bg/v1")
+ *   - geometry JSON: sha256(filled-html + baseUrl + "geom/v1")
+ *
+ * Location: `CACHE_DIR` (default `/tmp/intelliflow-html-cache`). Override
+ * via `HTML_EDITABLE_CACHE_DIR` env var. Disable with
+ * `HTML_EDITABLE_CACHE=0` (useful for A/B testing + tests that need
+ * deterministic uncached runs).
+ */
+const CACHE_DIR = process.env.HTML_EDITABLE_CACHE_DIR ?? "/tmp/intelliflow-html-cache";
+const CACHE_ENABLED = process.env.HTML_EDITABLE_CACHE !== "0";
+
+function cacheKey(parts: string[]): string {
+  return createHash("sha256").update(parts.join("::")).digest("hex");
+}
+
+function ensureCacheDir(): void {
+  if (!existsSync(CACHE_DIR)) {
+    mkdirSync(CACHE_DIR, { recursive: true });
+  }
+}
+
 export async function prepareHtmlSlideAssets(args: {
   templateId: string;
   htmlPath: string;
@@ -316,6 +342,8 @@ export async function prepareHtmlSlideAssets(args: {
   scratchDir: string;
   mockResponse?: string;
   fillPlanOverride?: import("./html-fill-plan-schema").HtmlFillPlan;
+  /** Force-bypass the content-addressable cache even when enabled globally. */
+  skipCache?: boolean;
 }): Promise<{ bgPng: string; regions: RegionGeometry[] }> {
   const htmlRaw = readFileSync(args.htmlPath, "utf8");
   const plan =
@@ -330,8 +358,40 @@ export async function prepareHtmlSlideAssets(args: {
   const filled = applyFillPlanToHtml(htmlRaw, plan, args.pageId);
   const baseUrl = `file://${dirname(resolve(args.htmlPath))}/`;
   const bgPng = resolve(args.scratchDir, `${args.pageId}.bg.png`);
-  await renderBackgroundPng(filled, baseUrl, bgPng, args.scratchDir);
-  const regions = await extractGeometry(filled, baseUrl, args.scratchDir);
+
+  const useCache = CACHE_ENABLED && !args.skipCache;
+  const bgCacheKey = useCache ? cacheKey([filled, baseUrl, "bg/v1"]) : "";
+  const geomCacheKey = useCache ? cacheKey([filled, baseUrl, "geom/v1"]) : "";
+  const bgCachePath = useCache ? resolve(CACHE_DIR, `${bgCacheKey}.png`) : "";
+  const geomCachePath = useCache ? resolve(CACHE_DIR, `${geomCacheKey}.geom.json`) : "";
+
+  if (useCache) ensureCacheDir();
+
+  // Background PNG: cache hit → copy; miss → render + populate.
+  if (useCache && existsSync(bgCachePath)) {
+    copyFileSync(bgCachePath, bgPng);
+  } else {
+    await renderBackgroundPng(filled, baseUrl, bgPng, args.scratchDir);
+    if (useCache) {
+      try {
+        copyFileSync(bgPng, bgCachePath);
+      } catch {}
+    }
+  }
+
+  // Geometry: cache hit → parse; miss → extract + populate.
+  let regions: RegionGeometry[];
+  if (useCache && existsSync(geomCachePath)) {
+    regions = JSON.parse(readFileSync(geomCachePath, "utf8")) as RegionGeometry[];
+  } else {
+    regions = await extractGeometry(filled, baseUrl, args.scratchDir);
+    if (useCache) {
+      try {
+        writeFileSync(geomCachePath, JSON.stringify(regions));
+      } catch {}
+    }
+  }
+
   return { bgPng, regions };
 }
 

@@ -118,20 +118,36 @@ export async function renderHtmlFidelityDeckToBuffer(
      * tests + deterministic replays — skips the LLM roundtrip.
      */
     fillPlanOverrides?: Record<string, import("../../scripts/ppt-mvp/preserve/html-fill-plan-schema").HtmlFillPlan>;
+    /**
+     * Max concurrent per-page asset preparations (LLM + chrome).
+     * Defaults to 4 — trades off rate-limit safety vs wall-clock.
+     */
+    concurrency?: number;
   } = {},
 ): Promise<HtmlFidelityRenderResult> {
   const scratchDir = opts.scratchDir ?? mkdtempSync(join(tmpdir(), "html-fidelity-"));
   const pres = new PptxGenJS();
   const warnings: string[] = [];
+  const concurrency = Math.max(1, opts.concurrency ?? 4);
 
-  for (const page of deck.pages) {
+  const { mkdirSync } = await import("node:fs");
+
+  // Phase 1 — parallelize per-page asset preparation (bg render + geometry
+  // + LLM fill-plan). Each page is independent up to this point; adding a
+  // shared pres slide must still happen in order, so we collect assets
+  // first, then stage them sequentially.
+  type PreparedAsset = {
+    page: HtmlFidelityPageRef;
+    bgPng: string;
+    regions: import("../../scripts/ppt-mvp/preserve/html-to-editable-pptx").RegionGeometry[];
+  };
+
+  async function prepareOnePage(page: HtmlFidelityPageRef): Promise<PreparedAsset> {
     const htmlPath = resolveTemplateHtmlPath(deck, page.template);
     const pageScratch = join(scratchDir, page.pageId);
     try {
-      const { mkdirSync } = await import("node:fs");
       mkdirSync(pageScratch, { recursive: true });
     } catch {}
-
     const { bgPng, regions } = await prepareHtmlSlideAssets({
       templateId: deck.templateId,
       htmlPath,
@@ -140,9 +156,31 @@ export async function renderHtmlFidelityDeckToBuffer(
       scratchDir: pageScratch,
       fillPlanOverride: opts.fillPlanOverrides?.[page.pageId],
     });
-    addHtmlSlideToPres(pres, { bgPng, regions });
-    if (regions.length === 0) {
-      warnings.push(`${page.pageId}: no data-region elements found in ${page.template}.html`);
+    return { page, bgPng, regions };
+  }
+
+  // Bounded-concurrency worker pool over deck.pages preserving order.
+  const prepared: PreparedAsset[] = new Array(deck.pages.length);
+  let cursor = 0;
+  const workers: Promise<void>[] = [];
+  for (let w = 0; w < Math.min(concurrency, deck.pages.length); w += 1) {
+    workers.push(
+      (async () => {
+        while (true) {
+          const idx = cursor++;
+          if (idx >= deck.pages.length) return;
+          prepared[idx] = await prepareOnePage(deck.pages[idx]);
+        }
+      })(),
+    );
+  }
+  await Promise.all(workers);
+
+  // Phase 2 — stage slides into the shared pres in deck order.
+  for (const asset of prepared) {
+    addHtmlSlideToPres(pres, { bgPng: asset.bgPng, regions: asset.regions });
+    if (asset.regions.length === 0) {
+      warnings.push(`${asset.page.pageId}: no data-region elements found in ${asset.page.template}.html`);
     }
   }
 

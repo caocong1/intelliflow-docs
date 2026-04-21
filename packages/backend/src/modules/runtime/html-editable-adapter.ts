@@ -177,6 +177,8 @@ function templateToRole(template: string): string {
   if (template === "toc") return "toc";
   if (template === "comparison") return "comparison";
   if (template === "timeline") return "timeline";
+  if (template === "process") return "process";
+  if (template === "device") return "device_overview";
   if (template === "closing") return "closing";
   if (template === "summary") return "summary";
   if (template === "qna") return "qna";

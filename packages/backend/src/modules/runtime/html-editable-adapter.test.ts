@@ -124,4 +124,56 @@ describe("renderHtmlFidelityDeckToBuffer (with fill-plan overrides)", () => {
     },
     120_000,
   );
+
+  // 6-page fully-covered deck — exercises every HTML template currently
+  // authored for the 622eee2ab7e6e family (cover/toc/comparison/timeline/
+  // process/device). Skipped when any fixture is missing.
+  const timelinePlan = join(FIXTURE_DIR, "timeline-live-v5.fillplan.json");
+  const processPlan = join(FIXTURE_DIR, "process-live.fillplan.json");
+  const devicePlan = join(FIXTURE_DIR, "device-live.fillplan.json");
+  const haveSix = havePlans && [timelinePlan, processPlan, devicePlan].every((p) => existsSync(p));
+
+  test.skipIf(!haveSix)(
+    "builds a 6-slide editable pptx buffer covering every authored template",
+    async () => {
+      const deck: Parameters<typeof renderHtmlFidelityDeckToBuffer>[0] = {
+        version: "html_fidelity_deck/v1",
+        templateId: "622eee2ab7e6e",
+        htmlStylesDir: join(REPO_ROOT, "docs/design/ppt-mvp/html-styles"),
+        pages: [
+          { pageId: "p1", template: "cover", content: {} },
+          { pageId: "p2", template: "toc", content: {} },
+          { pageId: "p3", template: "comparison", content: {} },
+          { pageId: "p4", template: "timeline", content: {} },
+          { pageId: "p5", template: "process", content: {} },
+          { pageId: "p6", template: "device", content: {} },
+        ],
+      };
+      const overrides: Record<string, HtmlFillPlan> = {
+        p1: JSON.parse(readFileSync(coverPlan, "utf8")) as HtmlFillPlan,
+        p2: JSON.parse(readFileSync(tocPlan, "utf8")) as HtmlFillPlan,
+        p3: JSON.parse(readFileSync(comparisonPlan, "utf8")) as HtmlFillPlan,
+        p4: JSON.parse(readFileSync(timelinePlan, "utf8")) as HtmlFillPlan,
+        p5: JSON.parse(readFileSync(processPlan, "utf8")) as HtmlFillPlan,
+        p6: JSON.parse(readFileSync(devicePlan, "utf8")) as HtmlFillPlan,
+      };
+      const scratch = mkdtempSync(join(tmpdir(), "html-fidelity-6page-test-"));
+      const result = await renderHtmlFidelityDeckToBuffer(deck, {
+        scratchDir: scratch,
+        fillPlanOverrides: overrides,
+      });
+      expect(result.buffer.length).toBeGreaterThan(50_000);
+      expect(result.compositionSummary.totalSlides).toBe(6);
+      const roles = result.compositionSummary.semanticRoleCounts;
+      expect(roles.cover).toBe(1);
+      expect(roles.toc).toBe(1);
+      expect(roles.comparison).toBe(1);
+      expect(roles.timeline).toBe(1);
+      // process + device should map to their specific roles now, not bullet_list.
+      expect((roles as Record<string, number>).process).toBe(1);
+      expect((roles as Record<string, number>).device_overview).toBe(1);
+      expect((roles as Record<string, number>).bullet_list ?? 0).toBe(0);
+    },
+    240_000,
+  );
 });

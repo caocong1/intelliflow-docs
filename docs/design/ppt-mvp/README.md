@@ -224,6 +224,11 @@ export node (format: pptx)
   → 返回可编辑 .pptx buffer
 ```
 
+**备选**：直接从 markdown 调用
+`modules/runtime/html-fidelity-markdown-adapter.markdownToHtmlFidelityDeck(markdown)`
+→ 返回 `HtmlFidelityDeck`，再喂给 `renderHtmlFidelityDeckToBuffer`。
+适合不想让用户先经过 model_call 节点的简化路径（Phase 4 已落地）。
+
 单页脚本线（开发/调试用）：
 
 ```bash

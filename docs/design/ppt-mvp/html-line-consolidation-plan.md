@@ -110,7 +110,7 @@ Tactics:
 - ≤3s from warm cache
 - No test regressions
 
-### Phase 4 — Markdown preprocessor (2–3 sessions)
+### Phase 4 — Markdown preprocessor (partial, LLM path shipped)
 
 **Goal**: let line 2 accept raw markdown, not just structured JSON.
 

@@ -34,11 +34,11 @@ import PptxGenJS from "pptxgenjs";
 import type {
   DeckCompositionSummary,
   DeckSource,
-} from "../../../modules/runtime/ppt-deck-composition";
+} from "./ppt-deck-composition";
 import {
   addHtmlSlideToPres,
   prepareHtmlSlideAssets,
-} from "./html-to-editable-pptx";
+} from "../../scripts/ppt-mvp/preserve/html-to-editable-pptx";
 
 export const HTML_FIDELITY_DECK_VERSION = "html_fidelity_deck/v1";
 
@@ -99,7 +99,7 @@ export function parseHtmlFidelityDeckContent(content: unknown): HtmlFidelityDeck
 export function resolveTemplateHtmlPath(deck: HtmlFidelityDeck, template: string): string {
   // Default styles dir is repo-relative. In production (backend installed on
   // a server), callers should pass an absolute path via htmlStylesDir.
-  const stylesDir = deck.htmlStylesDir ?? resolve(__dirname, "../../../../../../docs/design/ppt-mvp/html-styles");
+  const stylesDir = deck.htmlStylesDir ?? resolve(__dirname, "../../../../../docs/design/ppt-mvp/html-styles");
   const htmlPath = join(stylesDir, deck.templateId, `${template}.html`);
   if (!existsSync(htmlPath)) {
     throw new Error(
@@ -117,7 +117,7 @@ export async function renderHtmlFidelityDeckToBuffer(
      * Optional per-page fill-plan overrides keyed by pageId. Useful for
      * tests + deterministic replays — skips the LLM roundtrip.
      */
-    fillPlanOverrides?: Record<string, import("./html-fill-plan-schema").HtmlFillPlan>;
+    fillPlanOverrides?: Record<string, import("../../scripts/ppt-mvp/preserve/html-fill-plan-schema").HtmlFillPlan>;
   } = {},
 ): Promise<HtmlFidelityRenderResult> {
   const scratchDir = opts.scratchDir ?? mkdtempSync(join(tmpdir(), "html-fidelity-"));

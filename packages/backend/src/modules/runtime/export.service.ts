@@ -62,7 +62,7 @@ import { renderArchetypeSlide, type PptSlide } from "./ppt-archetype-renderer";
 import {
   parseHtmlFidelityDeckContent,
   renderHtmlFidelityDeckToBuffer,
-} from "../../scripts/ppt-mvp/preserve/html-editable-runtime-adapter";
+} from "./html-editable-adapter";
 
 const LEGACY_PPT_TEMPLATE_EXPORT_ENV = "INTELLIFLOW_INTERNAL_ENABLE_LEGACY_PPT_TEMPLATE_EXPORT";
 

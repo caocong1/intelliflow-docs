@@ -3,13 +3,13 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { describe, expect, test } from "vitest";
-import type { HtmlFillPlan } from "./html-fill-plan-schema";
+import type { HtmlFillPlan } from "../../scripts/ppt-mvp/preserve/html-fill-plan-schema";
 import {
   parseHtmlFidelityDeckContent,
   renderHtmlFidelityDeckToBuffer,
-} from "./html-editable-runtime-adapter";
+} from "./html-editable-adapter";
 
-const REPO_ROOT = resolve(__dirname, "../../../../../..");
+const REPO_ROOT = resolve(__dirname, "../../../../..");
 
 describe("parseHtmlFidelityDeckContent", () => {
   test("accepts a well-formed html_fidelity_deck/v1 object", () => {

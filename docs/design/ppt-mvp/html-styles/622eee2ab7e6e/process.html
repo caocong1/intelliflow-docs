@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style process — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-primary-bg: #EFF6FF;
+    --color-accent: #16A34A;
+    --color-accent-soft: #22C55E;
+    --color-accent-bg: #F0FDF4;
+    --color-warn: #D97706;
+    --color-warn-bg: #FFFBEB;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    padding: 44px 48px 36px 48px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  /* Corner accents — two small geometric marks for template continuity */
+  .slide-root::before {
+    content: "";
+    position: absolute;
+    top: 0; right: 0;
+    width: 320px; height: 180px;
+    background: linear-gradient(210deg, var(--color-primary-bg) 0%, transparent 65%);
+    pointer-events: none;
+  }
+  .slide-root::after {
+    content: "";
+    position: absolute;
+    bottom: 0; left: 0;
+    width: 280px; height: 140px;
+    background: linear-gradient(30deg, var(--color-accent-bg) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* Header */
+  .header { position: relative; display: flex; flex-direction: column; gap: 8px; z-index: 2; }
+  .eyebrow-row { display: flex; align-items: center; gap: 14px; }
+  .eyebrow-bar { width: 32px; height: 3px; background: var(--color-accent); }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10pt; letter-spacing: 5px; text-transform: uppercase;
+    color: var(--color-accent); font-weight: 600;
+  }
+  .title {
+    font-family: var(--font-title);
+    font-size: 26pt; font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-ink);
+    letter-spacing: 1px;
+  }
+  .summary {
+    font-family: var(--font-body);
+    font-size: 11pt; line-height: 1.5;
+    color: var(--color-ink-soft);
+    max-width: 900px;
+  }
+
+  /* Step flow — 5 cards in a row with arrow connectors.
+     Cards size to content so the closing loop-note band below always fits. */
+  .flow {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 20px 1fr 20px 1fr 20px 1fr 20px 1fr;
+    align-items: start;
+    gap: 0;
+    flex: 0 0 auto;
+  }
+
+  .step {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 18px 16px 16px 16px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  }
+  .step--final {
+    border-color: rgba(22, 163, 74, 0.35);
+    background: linear-gradient(180deg, #FFF 0%, var(--color-accent-bg) 100%);
+  }
+
+  .step-head {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .step-index {
+    flex-shrink: 0;
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    background: var(--color-primary);
+    color: #FFF;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 13pt; font-weight: 700;
+    letter-spacing: 0;
+  }
+  .step--final .step-index { background: var(--color-accent); }
+
+  .step-title {
+    font-family: var(--font-body);
+    font-size: 14pt; font-weight: 700;
+    color: var(--color-ink);
+    line-height: 1.2;
+  }
+
+  .step-detail {
+    font-family: var(--font-body);
+    font-size: 10pt; line-height: 1.5;
+    color: var(--color-ink-soft);
+    margin: 0;
+  }
+
+  .step-caution {
+    margin-top: 4px;
+    display: flex; align-items: flex-start; gap: 6px;
+    padding: 6px 8px;
+    background: var(--color-warn-bg);
+    border-radius: 5px;
+    border-left: 2px solid var(--color-warn);
+  }
+  .step-caution-icon {
+    flex-shrink: 0;
+    width: 14px; height: 14px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--color-warn);
+    font-weight: 700;
+    font-size: 10pt;
+    line-height: 1;
+    margin-top: 1px;
+  }
+  .step-caution-text {
+    font-family: var(--font-body);
+    font-size: 8.5pt; line-height: 1.35;
+    color: var(--color-warn);
+    font-weight: 500;
+  }
+
+  /* Arrow between steps */
+  .arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--color-ink-dim);
+    font-size: 14pt; font-weight: 700;
+  }
+
+  /* Footer rhythm band */
+  .loop-note {
+    position: relative;
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 20px;
+    background: linear-gradient(90deg, var(--color-primary-bg) 0%, var(--color-accent-bg) 100%);
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    z-index: 2;
+  }
+  .loop-note-badge {
+    flex-shrink: 0;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+    color: #FFF;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 11pt; font-weight: 700;
+  }
+  .loop-note-label {
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 3px; text-transform: uppercase;
+    color: var(--color-ink-dim); font-weight: 600;
+  }
+  .loop-note-quote {
+    font-family: var(--font-body);
+    font-size: 11pt;
+    color: var(--color-ink);
+    flex: 1;
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- Header -->
+  <div class="header">
+    <div class="eyebrow-row">
+      <div class="eyebrow-bar"></div>
+      <div class="eyebrow" data-region="eyebrow" data-max-width-units="24">DELIVERY WORKFLOW</div>
+    </div>
+    <div class="title" data-region="title" data-max-width-units="24" data-max-lines="1">无线网络建设实施流程</div>
+    <div class="summary" data-region="summary" data-max-width-units="60" data-max-lines="2">从现场勘测到最终验收，五步闭环共同决定网络稳定性与可维护性。</div>
+  </div>
+
+  <!-- 5-step flow with arrows -->
+  <div class="flow">
+    <div class="step">
+      <div class="step-head">
+        <div class="step-index" data-region="step_1_index" data-max-width-units="3">01</div>
+        <div class="step-title" data-region="step_1_title" data-max-width-units="12" data-max-lines="1">现场勘测</div>
+      </div>
+      <p class="step-detail" data-region="step_1_detail" data-max-width-units="26" data-max-lines="3">核对面积、障碍物与干扰源分布</p>
+      <div class="step-caution">
+        <div class="step-caution-icon">!</div>
+        <div class="step-caution-text" data-region="step_1_risk" data-max-width-units="28" data-max-lines="2">缺勘测 = 后期盲区返工</div>
+      </div>
+    </div>
+    <div class="arrow">›</div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-index" data-region="step_2_index" data-max-width-units="3">02</div>
+        <div class="step-title" data-region="step_2_title" data-max-width-units="12" data-max-lines="1">方案设计</div>
+      </div>
+      <p class="step-detail" data-region="step_2_detail" data-max-width-units="26" data-max-lines="3">确定 AP 点位、回传与容量冗余</p>
+      <div class="step-caution">
+        <div class="step-caution-icon">!</div>
+        <div class="step-caution-text" data-region="step_2_risk" data-max-width-units="28" data-max-lines="2">设计不足 = 高并发塌方</div>
+      </div>
+    </div>
+    <div class="arrow">›</div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-index" data-region="step_3_index" data-max-width-units="3">03</div>
+        <div class="step-title" data-region="step_3_title" data-max-width-units="12" data-max-lines="1">设备部署</div>
+      </div>
+      <p class="step-detail" data-region="step_3_detail" data-max-width-units="26" data-max-lines="3">安装 AP、交换与供电链路</p>
+      <div class="step-caution">
+        <div class="step-caution-icon">!</div>
+        <div class="step-caution-text" data-region="step_3_risk" data-max-width-units="28" data-max-lines="2">布线马虎 = 信号恶化</div>
+      </div>
+    </div>
+    <div class="arrow">›</div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="step-index" data-region="step_4_index" data-max-width-units="3">04</div>
+        <div class="step-title" data-region="step_4_title" data-max-width-units="12" data-max-lines="1">参数调优</div>
+      </div>
+      <p class="step-detail" data-region="step_4_detail" data-max-width-units="26" data-max-lines="3">优化信道、功率与漫游策略</p>
+      <div class="step-caution">
+        <div class="step-caution-icon">!</div>
+        <div class="step-caution-text" data-region="step_4_risk" data-max-width-units="28" data-max-lines="2">跳过调优 = 漫游断连</div>
+      </div>
+    </div>
+    <div class="arrow">›</div>
+
+    <div class="step step--final">
+      <div class="step-head">
+        <div class="step-index" data-region="step_5_index" data-max-width-units="3">05</div>
+        <div class="step-title" data-region="step_5_title" data-max-width-units="12" data-max-lines="1">测试验收</div>
+      </div>
+      <p class="step-detail" data-region="step_5_detail" data-max-width-units="26" data-max-lines="3">压测覆盖、带宽与终端体验基线</p>
+      <div class="step-caution">
+        <div class="step-caution-icon">!</div>
+        <div class="step-caution-text" data-region="step_5_risk" data-max-width-units="28" data-max-lines="2">没验收 = 隐患上线</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Closing loop note -->
+  <div class="loop-note">
+    <div class="loop-note-badge" data-region="loop_badge" data-max-width-units="3">∞</div>
+    <div class="loop-note-label" data-region="loop_label" data-max-width-units="22">CLOSE THE LOOP</div>
+    <div class="loop-note-quote" data-region="loop_quote" data-max-width-units="80" data-max-lines="1">每一步都被跳过的代价，远高于多花的时间成本。</div>
+  </div>
+</div>
+</body>
+</html>

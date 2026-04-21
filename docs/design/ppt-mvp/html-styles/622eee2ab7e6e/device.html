@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<title>Template-style device — 622eee2ab7e6e</title>
+<style>
+  :root {
+    --color-ink: #1F2937;
+    --color-ink-soft: #4B5563;
+    --color-ink-dim: #9CA3AF;
+    --color-primary: #1E40AF;
+    --color-primary-soft: #3B82F6;
+    --color-primary-bg: #EFF6FF;
+    --color-accent: #16A34A;
+    --color-accent-soft: #22C55E;
+    --color-accent-bg: #F0FDF4;
+    --color-warn: #D97706;
+    --color-warn-bg: #FFFBEB;
+    --color-surface: #FFFFFF;
+    --color-card: #F8FAFC;
+    --color-border: #E2E8F0;
+    --font-title: "思源宋体 CN", "PingFang SC", "Source Han Serif CN", serif;
+    --font-body: "PingFang SC", "Microsoft YaHei", sans-serif;
+    --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+  }
+  html, body { margin: 0; padding: 0; background: #EEE; }
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+
+  .slide-root {
+    position: relative;
+    width: 1280px;
+    height: 720px;
+    background: var(--color-surface);
+    overflow: hidden;
+    font-family: var(--font-body);
+    color: var(--color-ink);
+    padding: 44px 48px 36px 48px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .slide-root::before {
+    content: "";
+    position: absolute;
+    top: -40px; right: -80px;
+    width: 420px; height: 360px;
+    background: conic-gradient(from 210deg, transparent 0deg, var(--color-primary-bg) 90deg, transparent 180deg);
+    pointer-events: none;
+  }
+
+  /* Header */
+  .header { position: relative; display: flex; flex-direction: column; gap: 8px; z-index: 2; }
+  .eyebrow-row { display: flex; align-items: center; gap: 14px; }
+  .eyebrow-bar { width: 32px; height: 3px; background: var(--color-primary); }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 10pt; letter-spacing: 5px; text-transform: uppercase;
+    color: var(--color-primary); font-weight: 600;
+  }
+  .title {
+    font-family: var(--font-title);
+    font-size: 26pt; font-weight: 700;
+    line-height: 1.2;
+    color: var(--color-ink);
+    letter-spacing: 1px;
+  }
+  .summary {
+    font-family: var(--font-body);
+    font-size: 11pt; line-height: 1.5;
+    color: var(--color-ink-soft);
+    max-width: 960px;
+  }
+
+  /* Scenario-led triptych */
+  .triptych {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 24px;
+    flex: 1 1 auto;
+    min-height: 0;
+    z-index: 2;
+  }
+
+  .device {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+  }
+
+  /* Scenario banner on top of each card */
+  .scenario-banner {
+    position: relative;
+    height: 150px;
+    padding: 16px 20px;
+    color: #FFF;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+  }
+  .device-a .scenario-banner {
+    background: linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%);
+  }
+  .device-b .scenario-banner {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-soft) 100%);
+  }
+  .device-c .scenario-banner {
+    background: linear-gradient(135deg, #0EA5E9 0%, #10B981 100%);
+  }
+  .scenario-banner::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 90% 0%, rgba(255,255,255,0.15) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .scenario-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 9pt; font-weight: 600;
+    letter-spacing: 2px; text-transform: uppercase;
+    align-self: flex-start;
+    backdrop-filter: blur(4px);
+  }
+
+  .scenario-body {
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .scenario-name {
+    font-family: var(--font-title);
+    font-size: 20pt; font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: 1px;
+  }
+  .scenario-locale {
+    font-family: var(--font-body);
+    font-size: 11pt;
+    color: rgba(255, 255, 255, 0.85);
+    margin-top: 2px;
+  }
+
+  /* Body: device identity + note */
+  .device-body {
+    padding: 20px 22px 22px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+  }
+  .device-label {
+    font-family: var(--font-mono);
+    font-size: 9pt; letter-spacing: 3px;
+    color: var(--color-ink-dim); font-weight: 600;
+    text-transform: uppercase;
+  }
+  .device-name {
+    font-family: var(--font-title);
+    font-size: 22pt; font-weight: 700;
+    color: var(--color-ink);
+    line-height: 1.2;
+  }
+  .device-note {
+    font-family: var(--font-body);
+    font-size: 11pt; line-height: 1.6;
+    color: var(--color-ink-soft);
+  }
+  .device-fit {
+    margin-top: 4px;
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 10px 12px;
+    background: var(--color-card);
+    border-radius: 6px;
+    border-left: 3px solid var(--color-accent);
+  }
+  .device-fit-label {
+    font-family: var(--font-mono);
+    font-size: 8pt; letter-spacing: 2px;
+    color: var(--color-accent); font-weight: 700;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    padding-top: 2px;
+  }
+  .device-fit-text {
+    font-family: var(--font-body);
+    font-size: 10pt; line-height: 1.45;
+    color: var(--color-ink);
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+<div class="slide-root">
+  <!-- Header -->
+  <div class="header">
+    <div class="eyebrow-row">
+      <div class="eyebrow-bar"></div>
+      <div class="eyebrow" data-region="eyebrow" data-max-width-units="24">DEVICE OVERVIEW</div>
+    </div>
+    <div class="title" data-region="title" data-max-width-units="24" data-max-lines="1">主流 AP 形态与部署场景</div>
+    <div class="summary" data-region="summary" data-max-width-units="60" data-max-lines="2">面板、吸顶、室外三种主流形态分别适配客房、办公与园区等不同覆盖环境。</div>
+  </div>
+
+  <!-- 3 scenario-led device cards -->
+  <div class="triptych">
+    <div class="device device-a">
+      <div class="scenario-banner">
+        <div class="scenario-tag" data-region="device_1_tag" data-max-width-units="18">SCENARIO 01</div>
+        <div class="scenario-body">
+          <div class="scenario-name" data-region="device_1_scenario" data-max-width-units="20" data-max-lines="1">客房 / 小会议室</div>
+          <div class="scenario-locale" data-region="device_1_locale" data-max-width-units="26" data-max-lines="1">隐蔽空间 · 有限墙面</div>
+        </div>
+      </div>
+      <div class="device-body">
+        <div class="device-label" data-region="device_1_label" data-max-width-units="18">AP FORM FACTOR</div>
+        <div class="device-name" data-region="device_1_name" data-max-width-units="14" data-max-lines="1">面板 AP</div>
+        <div class="device-note" data-region="device_1_note" data-max-width-units="36" data-max-lines="3">隐蔽安装，兼顾无线接入与有线回传</div>
+        <div class="device-fit">
+          <div class="device-fit-label">FIT</div>
+          <div class="device-fit-text" data-region="device_1_fit" data-max-width-units="32" data-max-lines="2">贴墙薄型，信号稳定不突兀</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="device device-b">
+      <div class="scenario-banner">
+        <div class="scenario-tag" data-region="device_2_tag" data-max-width-units="18">SCENARIO 02</div>
+        <div class="scenario-body">
+          <div class="scenario-name" data-region="device_2_scenario" data-max-width-units="20" data-max-lines="1">办公区 / 教室</div>
+          <div class="scenario-locale" data-region="device_2_locale" data-max-width-units="26" data-max-lines="1">开放空间 · 高并发</div>
+        </div>
+      </div>
+      <div class="device-body">
+        <div class="device-label" data-region="device_2_label" data-max-width-units="18">AP FORM FACTOR</div>
+        <div class="device-name" data-region="device_2_name" data-max-width-units="14" data-max-lines="1">吸顶 AP</div>
+        <div class="device-note" data-region="device_2_note" data-max-width-units="36" data-max-lines="3">覆盖均匀，适合室内高并发环境</div>
+        <div class="device-fit">
+          <div class="device-fit-label">FIT</div>
+          <div class="device-fit-text" data-region="device_2_fit" data-max-width-units="32" data-max-lines="2">吊顶居中覆盖，支撑密集接入</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="device device-c">
+      <div class="scenario-banner">
+        <div class="scenario-tag" data-region="device_3_tag" data-max-width-units="18">SCENARIO 03</div>
+        <div class="scenario-body">
+          <div class="scenario-name" data-region="device_3_scenario" data-max-width-units="20" data-max-lines="1">园区 / 通道</div>
+          <div class="scenario-locale" data-region="device_3_locale" data-max-width-units="26" data-max-lines="1">室外环境 · 远距离</div>
+        </div>
+      </div>
+      <div class="device-body">
+        <div class="device-label" data-region="device_3_label" data-max-width-units="18">AP FORM FACTOR</div>
+        <div class="device-name" data-region="device_3_name" data-max-width-units="14" data-max-lines="1">室外 AP</div>
+        <div class="device-note" data-region="device_3_note" data-max-width-units="36" data-max-lines="3">防护要求更高，适合远距离覆盖</div>
+        <div class="device-fit">
+          <div class="device-fit-label">FIT</div>
+          <div class="device-fit-text" data-region="device_3_fit" data-max-width-units="32" data-max-lines="2">防水抗尘，园区级长距离</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

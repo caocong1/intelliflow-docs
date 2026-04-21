@@ -59,6 +59,10 @@ import type {
 } from "../../../../shared/src/slide-types";
 import { getStylePack, DEFAULT_STYLE_PACK_ID } from "./ppt-style-packs";
 import { renderArchetypeSlide, type PptSlide } from "./ppt-archetype-renderer";
+import {
+  parseHtmlFidelityDeckContent,
+  renderHtmlFidelityDeckToBuffer,
+} from "../../scripts/ppt-mvp/preserve/html-editable-runtime-adapter";
 
 const LEGACY_PPT_TEMPLATE_EXPORT_ENV = "INTELLIFLOW_INTERNAL_ENABLE_LEGACY_PPT_TEMPLATE_EXPORT";
 
@@ -2581,6 +2585,24 @@ async function generatePptBuffer(params: {
   nodeExecutionId: string;
   userId: string;
 }): Promise<PptBufferResult> {
+  // HTML-fidelity path: content declares itself as `html_fidelity_deck/v1`
+  // and points at template-style HTML files under docs/design/ppt-mvp/
+  // html-styles/<templateId>/<template>.html. Produces an EDITABLE .pptx
+  // (decorative CSS flattened into a bg image, each data-region becomes
+  // a real text box).
+  const htmlFidelityDeck = parseHtmlFidelityDeckContent(params.content);
+  if (htmlFidelityDeck) {
+    const htmlResult = await renderHtmlFidelityDeckToBuffer(htmlFidelityDeck);
+    return {
+      buffer: htmlResult.buffer,
+      renderMode: htmlResult.renderMode,
+      warnings: htmlResult.warnings,
+      compositionSummary: htmlResult.compositionSummary,
+      templateId: htmlFidelityDeck.templateId,
+      stylePackId: resolvePptStylePackId(params.stylePackId),
+    };
+  }
+
   const effectiveStylePackId = resolvePptStylePackId(params.stylePackId);
   const legacyTemplateId = resolveLegacyPptTemplateId({
     templateIdOverride: params.templateId,

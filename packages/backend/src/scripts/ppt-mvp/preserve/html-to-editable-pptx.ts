@@ -235,15 +235,29 @@ function pxToIn(px: number): number {
   return px / PX_PER_INCH;
 }
 
-/** Emit pptxgenjs slide: bg image + editable text regions. */
-async function compileEditablePptx(args: {
-  bgPng: string;
-  regions: RegionGeometry[];
-  outPath: string;
-}): Promise<void> {
-  const pres = new PptxGenJS();
-  pres.defineLayout({ name: "LAYOUT_HTML", width: SLIDE_W_IN, height: SLIDE_H_IN });
+/** Ensure the pres has the HTML layout registered (idempotent). */
+export function ensureHtmlLayout(pres: PptxGenJS): void {
+  // `defineLayout` is idempotent re: name but let's be safe.
+  // PptxGenJS throws on redefinition with a different size, so callers
+  // creating a fresh pres + switching layout are safe.
+  try {
+    pres.defineLayout({ name: "LAYOUT_HTML", width: SLIDE_W_IN, height: SLIDE_H_IN });
+  } catch {
+    // already defined on this pres — fine.
+  }
   pres.layout = "LAYOUT_HTML";
+}
+
+/**
+ * Stage one editable slide (bg image + text regions) into an existing pres.
+ * The slide is appended. Returns the pptxgenjs slide handle so callers can
+ * further customize if needed.
+ */
+export function addHtmlSlideToPres(
+  pres: PptxGenJS,
+  args: { bgPng: string; regions: RegionGeometry[] },
+): PptxGenJS.Slide {
+  ensureHtmlLayout(pres);
   const slide = pres.addSlide();
 
   // Layer 1: decorative background
@@ -258,7 +272,6 @@ async function compileEditablePptx(args: {
   // Layer 2: editable text regions
   for (const r of args.regions) {
     if (r.isEmpty) continue;
-    // Primary font: take the first name from the CSS font-family stack.
     const primaryFont = (r.fontFamily.split(",")[0] || "").replace(/["']/g, "").trim();
     slide.addText(r.text, {
       x: pxToIn(r.x),
@@ -273,12 +286,53 @@ async function compileEditablePptx(args: {
       align: r.align,
       valign: "top",
       margin: 0,
-      // Let PowerPoint shrink text if the user edits it into overflow.
       fit: "shrink",
     });
   }
+  return slide;
+}
 
+/** Emit a single-slide pptx file (legacy wrapper around addHtmlSlideToPres). */
+async function compileEditablePptx(args: {
+  bgPng: string;
+  regions: RegionGeometry[];
+  outPath: string;
+}): Promise<void> {
+  const pres = new PptxGenJS();
+  addHtmlSlideToPres(pres, { bgPng: args.bgPng, regions: args.regions });
   await pres.writeFile({ fileName: args.outPath });
+}
+
+/**
+ * Build bg PNG + geometry for a single page WITHOUT emitting a pptx — the
+ * caller will use addHtmlSlideToPres to stage it into a shared multi-slide
+ * pres. Useful for runtime/export.service paths that compose decks.
+ */
+export async function prepareHtmlSlideAssets(args: {
+  templateId: string;
+  htmlPath: string;
+  pageId: string;
+  pageContent: unknown;
+  scratchDir: string;
+  mockResponse?: string;
+  fillPlanOverride?: import("./html-fill-plan-schema").HtmlFillPlan;
+}): Promise<{ bgPng: string; regions: RegionGeometry[] }> {
+  const htmlRaw = readFileSync(args.htmlPath, "utf8");
+  const plan =
+    args.fillPlanOverride ??
+    (await generateHtmlFillPlan({
+      templateId: args.templateId,
+      htmlPath: args.htmlPath,
+      pageId: args.pageId,
+      pageContent: args.pageContent,
+      mockResponse: args.mockResponse,
+    }));
+  const filled = applyFillPlanToHtml(htmlRaw, plan, args.pageId);
+  const baseUrl = `file://${dirname(resolve(args.htmlPath))}/`;
+  const bgPng = resolve(args.scratchDir, `${args.pageId}.bg.png`);
+  await renderBackgroundPng(filled, baseUrl, bgPng, args.scratchDir);
+  const regions = await extractGeometry(filled, baseUrl, args.scratchDir);
+  return { bgPng, regions };
 }
 
 export async function renderHtmlToEditablePptx(args: {
@@ -292,25 +346,7 @@ export async function renderHtmlToEditablePptx(args: {
   /** Pre-computed fill plan; if supplied, skips LLM roundtrip. */
   fillPlanOverride?: import("./html-fill-plan-schema").HtmlFillPlan;
 }): Promise<{ bgPng: string; regions: RegionGeometry[] }> {
-  const htmlRaw = readFileSync(args.htmlPath, "utf8");
-
-  const plan =
-    args.fillPlanOverride ??
-    (await generateHtmlFillPlan({
-      templateId: args.templateId,
-      htmlPath: args.htmlPath,
-      pageId: args.pageId,
-      pageContent: args.pageContent,
-      mockResponse: args.mockResponse,
-    }));
-  const filled = applyFillPlanToHtml(htmlRaw, plan, args.pageId);
-  const baseUrl = `file://${dirname(resolve(args.htmlPath))}/`;
-
-  const bgPng = resolve(args.scratchDir, "bg.png");
-  await renderBackgroundPng(filled, baseUrl, bgPng, args.scratchDir);
-
-  const regions = await extractGeometry(filled, baseUrl, args.scratchDir);
-
+  const { bgPng, regions } = await prepareHtmlSlideAssets(args);
   await compileEditablePptx({ bgPng, regions, outPath: args.outPath });
   return { bgPng, regions };
 }

@@ -198,6 +198,59 @@ bun packages/backend/src/scripts/ppt-mvp/convert-ingested-template-to-native.ts 
   --out /tmp/ppt-research/ingest-out/doubao-wireless_1384bb/native-template.json
 ```
 
+## HTML Fidelity (editable pptx via HTML templates)
+
+HTML-fidelity 线独立于 preserve 模式之外，产出**可编辑** .pptx（每个
+`data-region` 成为真实 PowerPoint 文本框，装饰几何烘焙成单张背景 PNG
+垫底）。当前覆盖 6 种页型。
+
+文件布局：
+
+- `docs/design/ppt-mvp/html-styles/622eee2ab7e6e/` — 模板家族
+  - `cover.html` / `toc.html` / `comparison.html` / `timeline.html` / `process.html` / `device.html`
+  - `outline-to-deck.prompt.md` — 大纲 → `html_fidelity_deck/v1` JSON 的 model_call 指令
+- `packages/backend/src/scripts/ppt-mvp/preserve/html-roundtrip.ts` — LLM fill-plan roundtrip（带预算迭代重试）
+- `packages/backend/src/scripts/ppt-mvp/preserve/html-to-editable-pptx.ts` — HTML + fill-plan → editable .pptx
+- `packages/backend/src/modules/runtime/html-editable-adapter.ts` — 多页 deck buffer 产出器 + runtime dispatch 入口
+
+产品侧完整 chain（给下一步 UI 接入时参考）：
+
+```
+upstream model_call (system: outline-to-deck.prompt.md)
+  → 输出 html_fidelity_deck/v1 JSON 字符串
+export node (format: pptx)
+  → generatePptBuffer → parseHtmlFidelityDeckContent 识别版本签名
+  → renderHtmlFidelityDeckToBuffer 逐页 fill-plan + bg render + editable text overlay
+  → 返回可编辑 .pptx buffer
+```
+
+单页脚本线（开发/调试用）：
+
+```bash
+# fill plan + bg PNG + 可编辑单页 .pptx
+bun packages/backend/src/scripts/ppt-mvp/preserve/html-to-editable-pptx.ts \
+  --html docs/design/ppt-mvp/html-styles/622eee2ab7e6e/cover.html \
+  --content docs/design/ppt-mvp/wireless-page-plan.json \
+  --page p1 \
+  --out /tmp/cover.pptx
+
+# 用已有 fill plan 跳过 LLM（加速迭代）
+bun packages/backend/src/scripts/ppt-mvp/preserve/html-to-editable-pptx.ts \
+  --html ... --page p1 --out ... \
+  --fill-plan /tmp/intelliflow-html-roundtrip/cover-live-v3.fillplan.json
+```
+
+Outline-to-deck prompt 的 live smoke：
+
+```bash
+bun --env-file=.env /tmp/outline-to-deck-smoke.ts   # see smoke fixture
+```
+
+验证：
+
+- `packages/backend/src/scripts/ppt-mvp/preserve/html-roundtrip.test.ts` — roundtrip 6 tests
+- `packages/backend/src/modules/runtime/html-editable-adapter.test.ts` — adapter 8 tests（含 3-slide + 6-slide 集成）
+
 ## Verification
 
 - PowerPoint 打开不得弹修复

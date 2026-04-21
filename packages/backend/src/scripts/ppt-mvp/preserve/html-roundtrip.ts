@@ -19,12 +19,13 @@
  *     --out <png> [--fill-plan <out-json>] [--mock <json>]
  */
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { callClaude, extractJson } from "../ai-pipeline/claude-client";
 import { ensureLiveClaudeEnvFromDb } from "../ai-pipeline/live-config";
 import { callOpenAICompat } from "../ai-pipeline/openai-compat-client";
 import { callQwenCli } from "../ai-pipeline/qwen-cli-client";
+import { validateParagraphs, validateSingleLine, widthUnits } from "./text-width";
 import {
   extractRegionsFromHtml,
   validateHtmlFillPlan,
@@ -42,60 +43,147 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
+const SYSTEM_PROMPT = [
+  "你是一个 PPT 内容压缩器。你的任务是把输入内容填进预定义 HTML 区域的 JSON 描述。",
+  "",
+  "铁律（违反会被拒绝）：",
+  "1. 只输出 JSON 对象，不输出 markdown 代码块、不输出解释、不输出思考过程。",
+  "2. 每个 regionAssignment 的文本必须严格满足 maxWidthUnits × maxLines 预算。",
+  "3. 宽度计算: CJK 字符 = 2 单位, ASCII 字符/数字/标点 = 1 单位。",
+  "4. 当原文超出预算时, 必须删词/缩写/改换表达以 fit, 宁可丢细节也不能超。",
+  "5. 保留原文语言（中文→中文, 英文→英文）。",
+].join("\n");
+
 function buildPrompt(args: {
   templateId: string;
   pageId: string;
+  htmlFileName: string;
   regions: RegionDescriptor[];
   pageContent: unknown;
 }): string {
   return [
-    "你在帮一个 PPT 幻灯片把内容填进预定义的 HTML 页面结构。",
-    `模板 ID: ${args.templateId}`,
-    `页面 ID: ${args.pageId}`,
+    `templateId: ${args.templateId}`,
+    `pageId: ${args.pageId}`,
+    `htmlFileName: ${args.htmlFileName}`,
     "",
-    "HTML 提供了若干 data-region 区域，每个区域有可选的宽度/行数预算：",
+    "区域预算：",
     ...args.regions.map((r) => {
       const width = r.maxWidthUnits !== undefined ? ` maxWidthUnits=${r.maxWidthUnits}` : "";
       const lines = r.maxLines !== undefined ? ` maxLines=${r.maxLines}` : "";
-      const sample = r.originalText ? ` 原文示例: "${r.originalText.slice(0, 60)}"` : "";
-      return `  - regionId="${r.regionId}"${width}${lines}${sample}`;
+      const sample = r.originalText ? ` sample:"${r.originalText.slice(0, 40)}"` : "";
+      return `  - ${r.regionId}${width}${lines}${sample}`;
     }),
     "",
-    "宽度单位规则: CJK 字符算 2 单位, ASCII 字符算 1 单位。",
+    "输入内容（JSON）：",
+    JSON.stringify(args.pageContent),
     "",
-    "以下是要填入的页面内容 JSON:",
-    JSON.stringify(args.pageContent, null, 2),
+    `严格输出 html_to_ppt_fill_plan/v1 格式的 JSON。顶层字段: version, templateId="${args.templateId}", htmlPath="${args.htmlFileName}", pages=[{pageId:"${args.pageId}", regionAssignments:[{regionId, text | paragraphs}]}]`,
     "",
-    "请输出 html_to_ppt_fill_plan/v1 格式的 JSON，只输出 JSON，不要多余文字。",
-    "要求：",
-    "1. pages[0].pageId 等于页面 ID",
-    "2. regionAssignments 覆盖所有有内容可填的 regionId",
-    "3. 文本长度必须满足每个区域的 maxWidthUnits × maxLines 预算",
-    "4. 多段内容用 paragraphs 数组；单行用 text 字符串",
-    "5. 保留原内容语言（中文→中文, 英文→英文）",
-    "",
-    "输出示例格式:",
-    '```json',
-    JSON.stringify(
-      {
-        version: "html_to_ppt_fill_plan/v1",
-        templateId: args.templateId,
-        htmlPath: "...",
-        pages: [
-          {
-            pageId: args.pageId,
-            regionAssignments: [
-              { regionId: "title", text: "..." },
-              { regionId: "body", paragraphs: [{ text: "..." }, { text: "..." }] },
-            ],
-          },
-        ],
-      },
-      null,
-      2,
-    ),
-    '```',
+    "再次提醒: 每个 regionAssignment 的文本必须在该区域的 maxWidthUnits × maxLines 之内。若原文超出, 压缩到合规为止。不要 markdown fences, 只要纯 JSON。",
   ].join("\n");
+}
+
+const MAX_FILL_PLAN_ATTEMPTS = 3;
+
+type BudgetViolation = {
+  regionId: string;
+  reason: string;
+  actualWidthUnits?: number;
+  actualLines?: number;
+};
+
+/** Cross-check each regionAssignment against its region's budget. */
+function validateFillPlanBudgets(
+  plan: HtmlFillPlan,
+  pageId: string,
+  regions: RegionDescriptor[],
+): BudgetViolation[] {
+  const page = plan.pages.find((p) => p.pageId === pageId);
+  if (!page) return [{ regionId: "(page)", reason: `page "${pageId}" not in plan` }];
+  const byId = new Map(regions.map((r) => [r.regionId, r]));
+  const violations: BudgetViolation[] = [];
+  for (const a of page.regionAssignments) {
+    const region = byId.get(a.regionId);
+    if (!region) continue;
+    const maxW = region.maxWidthUnits;
+    const maxLines = region.maxLines ?? 1;
+    if (maxW === undefined) continue;
+    if (a.text !== undefined) {
+      const fit = validateSingleLine(a.text, maxW);
+      if (!fit.fits) {
+        violations.push({
+          regionId: a.regionId,
+          reason: `text "${a.text.slice(0, 24)}" width ${widthUnits(a.text)} > ${maxW}`,
+          actualWidthUnits: widthUnits(a.text),
+        });
+      }
+    }
+    if (a.paragraphs) {
+      const fit = validateParagraphs(a.paragraphs, maxW, maxLines);
+      if (!fit.fits) {
+        violations.push({
+          regionId: a.regionId,
+          reason: `paragraphs over budget (${fit.violations.map((v) => v.reason).join("; ")})`,
+          actualLines: fit.actualLines,
+        });
+      }
+    }
+  }
+  return violations;
+}
+
+/**
+ * Smooth over common LLM schema drift before strict validation:
+ *  - paragraphs: ["a", "b"]   → paragraphs: [{text: "a"}, {text: "b"}]
+ *  - regionAssignments.text: string (newline-joined) is already schema-valid,
+ *    so no change needed.
+ * Keeps the strict schema as source of truth while absorbing the two-three
+ * shapes models commonly emit despite explicit prompting.
+ */
+function normalizeLlmJson(value: unknown): unknown {
+  if (!value || typeof value !== "object") return value;
+  const pages = (value as { pages?: unknown }).pages;
+  if (!Array.isArray(pages)) return value;
+  for (const page of pages) {
+    if (!page || typeof page !== "object") continue;
+    const assignments = (page as { regionAssignments?: unknown }).regionAssignments;
+    if (!Array.isArray(assignments)) continue;
+    for (const a of assignments) {
+      if (!a || typeof a !== "object") continue;
+      const paragraphs = (a as { paragraphs?: unknown }).paragraphs;
+      if (Array.isArray(paragraphs) && paragraphs.every((p) => typeof p === "string")) {
+        (a as { paragraphs?: unknown }).paragraphs = paragraphs.map((t) => ({ text: t }));
+      }
+    }
+  }
+  return value;
+}
+
+async function callLlmForFillPlan(
+  prompt: string,
+  mockResponse: string | undefined,
+): Promise<string> {
+  const isLive = mockResponse === undefined;
+  if (isLive && process.env.USE_QWEN_CLI === "1") {
+    return (await callQwenCli({ prompt, systemPrompt: SYSTEM_PROMPT })).content;
+  }
+  if (
+    isLive &&
+    process.env.OPENAI_COMPAT_API_KEY &&
+    process.env.OPENAI_COMPAT_BASE_URL &&
+    process.env.OPENAI_COMPAT_MODEL
+  ) {
+    return (await callOpenAICompat({ prompt, maxTokens: 1500, temperature: 0.2 })).content;
+  }
+  return (
+    await callClaude({
+      prompt,
+      maxTokens: 1500,
+      temperature: 0.2,
+      mockResponse,
+      mock: mockResponse !== undefined,
+    })
+  ).content;
 }
 
 export async function generateHtmlFillPlan(args: {
@@ -110,48 +198,52 @@ export async function generateHtmlFillPlan(args: {
   const prompt = buildPrompt({
     templateId: args.templateId,
     pageId: args.pageId,
+    htmlFileName: basename(args.htmlPath),
     regions,
     pageContent: args.pageContent,
   });
-  // Provider dispatch (live mode):
-  //   1. USE_QWEN_CLI=1       → shell out to standalone `qwen` CLI (for
-  //                             Bailian Coding-Plan keys that can't be
-  //                             called directly via HTTPS)
-  //   2. OPENAI_COMPAT_*       → raw /v1/chat/completions fetch
-  //   3. default              → Anthropic /v1/messages (existing Claude path)
-  // Mock mode always uses the claude-client's canned-response path.
-  const isLive = args.mockResponse === undefined;
-  let content: string;
-  if (isLive && process.env.USE_QWEN_CLI === "1") {
-    ({ content } = await callQwenCli({ prompt }));
-  } else if (
-    isLive &&
-    process.env.OPENAI_COMPAT_API_KEY &&
-    process.env.OPENAI_COMPAT_BASE_URL &&
-    process.env.OPENAI_COMPAT_MODEL
-  ) {
-    ({ content } = await callOpenAICompat({
-      prompt,
-      maxTokens: 1500,
-      temperature: 0.2,
-    }));
-  } else {
-    ({ content } = await callClaude({
-      prompt,
-      maxTokens: 1500,
-      temperature: 0.2,
-      mockResponse: args.mockResponse,
-      mock: args.mockResponse !== undefined,
-    }));
-  }
-  const parsed = extractJson<HtmlFillPlan>(content);
-  const result = validateHtmlFillPlan(parsed);
-  if (!result.valid || !result.data) {
-    throw new Error(
-      `LLM output failed schema validation: ${JSON.stringify(result.errors)}\nRaw:\n${content.slice(0, 500)}`,
+  // Iterate: call LLM → validate schema + per-region budgets → if
+  // violations, re-prompt with specific feedback; stop on first pass
+  // or after MAX_FILL_PLAN_ATTEMPTS.
+  let currentPrompt = prompt;
+  let lastRaw = "";
+  for (let attempt = 0; attempt < MAX_FILL_PLAN_ATTEMPTS; attempt += 1) {
+    const raw = await callLlmForFillPlan(currentPrompt, args.mockResponse);
+    lastRaw = raw;
+    const parsed = normalizeLlmJson(extractJson<HtmlFillPlan>(raw));
+    const schemaResult = validateHtmlFillPlan(parsed);
+    if (!schemaResult.valid || !schemaResult.data) {
+      throw new Error(
+        `LLM output failed schema validation (attempt ${attempt + 1}): ${JSON.stringify(schemaResult.errors)}\nRaw:\n${raw.slice(0, 500)}`,
+      );
+    }
+    const violations = validateFillPlanBudgets(schemaResult.data, args.pageId, regions);
+    if (violations.length === 0) return schemaResult.data;
+
+    if (args.mockResponse !== undefined) {
+      // No point retrying a mock — it always returns the same thing.
+      throw new Error(
+        `mock fill plan violates budgets: ${violations.map((v) => v.reason).join("; ")}`,
+      );
+    }
+    if (attempt === MAX_FILL_PLAN_ATTEMPTS - 1) {
+      throw new Error(
+        `LLM fill plan still over budget after ${MAX_FILL_PLAN_ATTEMPTS} attempts: ${violations.map((v) => `${v.regionId}: ${v.reason}`).join("; ")}`,
+      );
+    }
+    console.warn(
+      `[html-roundtrip] attempt ${attempt + 1} over budget (${violations.length} violations); retrying with feedback`,
     );
+    currentPrompt = [
+      prompt,
+      "",
+      "你上一次的输出存在以下预算违规，请只输出修正后的 JSON（不要多余文字）:",
+      ...violations.map((v) => `  - ${v.regionId}: ${v.reason}`),
+      "",
+      "请务必压缩到每区域的 maxWidthUnits × maxLines 之内。宁可丢细节也要 fit。",
+    ].join("\n");
   }
-  return result.data;
+  throw new Error(`unreachable: exhausted fill-plan attempts (last raw: ${lastRaw.slice(0, 200)})`);
 }
 
 /** Apply a fill plan to HTML by substituting each region's inner text. */
@@ -211,12 +303,35 @@ export async function renderHtmlStringToPng(
       `--window-size=${VIEWPORT_W},${VIEWPORT_H}`,
       "--hide-scrollbars",
       "--force-device-scale-factor=1",
+      // Headless Chrome occasionally hangs after the screenshot is written
+      // waiting on a flaky SSL handshake to a background-networking endpoint
+      // (update/metrics/CRL). These flags bound render time to the virtual
+      // clock and disable the background chatter entirely.
+      "--virtual-time-budget=5000",
+      "--disable-background-networking",
+      "--disable-default-apps",
+      "--disable-sync",
+      "--no-first-run",
+      "--no-default-browser-check",
       `file://${tmpHtml}`,
     ],
     { stdout: "inherit", stderr: "inherit" },
   );
+  // Hard wall-clock wall: even with virtual-time-budget, Chrome sometimes
+  // stalls outside the page run-loop. Kill after 30s and trust whatever
+  // screenshot was already written.
+  const killer = setTimeout(() => {
+    try {
+      proc.kill("SIGKILL");
+    } catch {}
+  }, 30_000);
   const exitCode = await proc.exited;
-  if (exitCode !== 0) throw new Error(`chrome exited ${exitCode}`);
+  clearTimeout(killer);
+  // Accept exit codes 0 and SIGKILL (137 / -9) as success as long as the
+  // screenshot file exists — chrome writes it before the hang.
+  if (exitCode !== 0 && exitCode !== 137 && exitCode !== -9) {
+    throw new Error(`chrome exited ${exitCode}`);
+  }
 }
 
 function parseCli(argv: string[]): {

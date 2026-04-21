@@ -12,6 +12,7 @@
  */
 export type QwenCliCallOptions = {
   prompt: string;
+  systemPrompt?: string;
   mockResponse?: string;
   mock?: boolean;
 };
@@ -56,6 +57,9 @@ export async function callQwenCli(opts: QwenCliCallOptions): Promise<QwenCliCall
   const model = process.env.QWEN_MODEL;
   if (model) {
     args.push("-m", model);
+  }
+  if (opts.systemPrompt) {
+    args.push("--system-prompt", opts.systemPrompt);
   }
   // The prompt is passed as a positional argument. `qwen` treats it as a
   // one-shot when no -i flag is given.

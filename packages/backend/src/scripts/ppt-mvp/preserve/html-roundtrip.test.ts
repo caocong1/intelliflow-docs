@@ -63,6 +63,66 @@ describe("preserve/html-roundtrip", () => {
     expect(plan.pages[0].regionAssignments.length).toBe(2);
   }, 20000);
 
+  test("generateHtmlFillPlan normalizes plain-string paragraphs from LLM", async () => {
+    // Real-world qwen3.6-plus sometimes emits paragraphs as ["str", "str"]
+    // instead of [{text: "str"}, {text: "str"}]. Pipeline must normalize.
+    const stringParagraphsMock = JSON.stringify({
+      version: "html_to_ppt_fill_plan/v1",
+      templateId: "622eee2ab7e6e",
+      htmlPath: "cover.html",
+      pages: [
+        {
+          pageId: "p1",
+          regionAssignments: [
+            { regionId: "title", text: "短标题" },
+            {
+              regionId: "body",
+              paragraphs: ["场景选型·品牌·运维", "面向 IT 负责人"],
+            },
+          ],
+        },
+      ],
+    });
+    const plan = await generateHtmlFillPlan({
+      templateId: "622eee2ab7e6e",
+      htmlPath: COVER_HTML,
+      pageId: "p1",
+      pageContent: {},
+      mockResponse: stringParagraphsMock,
+    });
+    const body = plan.pages[0].regionAssignments.find((a) => a.regionId === "body");
+    expect(body?.paragraphs).toEqual([
+      { text: "场景选型·品牌·运维" },
+      { text: "面向 IT 负责人" },
+    ]);
+  }, 20000);
+
+  test("generateHtmlFillPlan with mock that violates budgets throws", async () => {
+    const overBudgetMock = JSON.stringify({
+      version: "html_to_ppt_fill_plan/v1",
+      templateId: "622eee2ab7e6e",
+      htmlPath: "cover.html",
+      pages: [
+        {
+          pageId: "p1",
+          regionAssignments: [
+            // title budget is maxWidthUnits=12; this is 16 CJK = 32 units.
+            { regionId: "title", text: "这是一个故意超过预算的标题文本" },
+          ],
+        },
+      ],
+    });
+    await expect(
+      generateHtmlFillPlan({
+        templateId: "622eee2ab7e6e",
+        htmlPath: COVER_HTML,
+        pageId: "p1",
+        pageContent: {},
+        mockResponse: overBudgetMock,
+      }),
+    ).rejects.toThrow(/violates budgets|over budget/);
+  }, 20000);
+
   test("applyFillPlanToHtml substitutes into data-region elements", () => {
     const html = readFileSync(COVER_HTML, "utf8");
     const plan = {

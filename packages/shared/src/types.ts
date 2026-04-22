@@ -270,6 +270,18 @@ export interface RestoreConfig {
   executionRule?: NodeExecutionRule;
 }
 
+/**
+ * Renderer engine for pptx export.
+ *
+ * - `archetype` (default): classic pptxgenjs-driven archetype renderer.
+ *   Fast, no external deps, but visually plainer.
+ * - `html_fidelity`: route through the HTML-fidelity pipeline
+ *   (LLM fill-plan + Chrome render + editable text overlay). Richer
+ *   asymmetric layouts, slower, requires a live LLM provider. See
+ *   [HTML fidelity section in README](../../../docs/design/ppt-mvp/README.md).
+ */
+export type PptRenderEngine = "archetype" | "html_fidelity";
+
 export interface ExportConfig {
   type: "export";
   /** Allowed export formats (multi-select in config, user picks one at runtime) */
@@ -284,6 +296,17 @@ export interface ExportConfig {
   templateId?: string | null;
   /** Per-format template binding. Key = format, value = template ID */
   templateBindings?: Partial<Record<"word" | "pdf" | "pptx", string>>;
+  /**
+   * Pptx render engine selector. Only consulted when the resolved format
+   * is `pptx`. Defaults to `archetype` when absent — existing configs
+   * behave unchanged.
+   */
+  pptRenderEngine?: PptRenderEngine;
+  /**
+   * Template ID for the HTML-fidelity family (only when
+   * pptRenderEngine === "html_fidelity"). Defaults to 622eee2ab7e6e.
+   */
+  pptHtmlFidelityTemplateId?: string;
   contentMapping: VariableRef[];
   autoAdvance?: boolean;
   allowEdit?: boolean;

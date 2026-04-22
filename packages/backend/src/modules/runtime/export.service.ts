@@ -2584,12 +2584,13 @@ async function generatePptBuffer(params: {
   documentId: string;
   nodeExecutionId: string;
   userId: string;
+  /** See ExportConfig.pptRenderEngine. Default "archetype". */
+  pptRenderEngine?: "archetype" | "html_fidelity";
+  /** HTML-fidelity template family. Only used when pptRenderEngine === "html_fidelity". */
+  pptHtmlFidelityTemplateId?: string;
 }): Promise<PptBufferResult> {
-  // HTML-fidelity path: content declares itself as `html_fidelity_deck/v1`
-  // and points at template-style HTML files under docs/design/ppt-mvp/
-  // html-styles/<templateId>/<template>.html. Produces an EDITABLE .pptx
-  // (decorative CSS flattened into a bg image, each data-region becomes
-  // a real text box).
+  // HTML-fidelity path (version-signaled): content is already a
+  // well-formed html_fidelity_deck/v1 JSON — skip LLM composition.
   const htmlFidelityDeck = parseHtmlFidelityDeckContent(params.content);
   if (htmlFidelityDeck) {
     const htmlResult = await renderHtmlFidelityDeckToBuffer(htmlFidelityDeck);
@@ -2599,6 +2600,26 @@ async function generatePptBuffer(params: {
       warnings: htmlResult.warnings,
       compositionSummary: htmlResult.compositionSummary,
       templateId: htmlFidelityDeck.templateId,
+      stylePackId: resolvePptStylePackId(params.stylePackId),
+    };
+  }
+
+  // HTML-fidelity path (engine-selected): user explicitly opted into the
+  // HTML pipeline via ExportConfig.pptRenderEngine. Content is freeform
+  // (markdown / outline) and needs composition via the LLM adapter.
+  if (params.pptRenderEngine === "html_fidelity") {
+    const { markdownToHtmlFidelityDeck } = await import("./html-fidelity-markdown-adapter");
+    const deck = await markdownToHtmlFidelityDeck({
+      markdown: params.content,
+      templateId: params.pptHtmlFidelityTemplateId,
+    });
+    const htmlResult = await renderHtmlFidelityDeckToBuffer(deck);
+    return {
+      buffer: htmlResult.buffer,
+      renderMode: htmlResult.renderMode,
+      warnings: htmlResult.warnings,
+      compositionSummary: htmlResult.compositionSummary,
+      templateId: deck.templateId,
       stylePackId: resolvePptStylePackId(params.stylePackId),
     };
   }
@@ -2784,6 +2805,8 @@ export async function generateExport(
         documentId,
         nodeExecutionId,
         userId,
+        pptRenderEngine: config?.pptRenderEngine,
+        pptHtmlFidelityTemplateId: config?.pptHtmlFidelityTemplateId,
       });
       appliedTemplateId = pptResult.templateId ?? null;
       appliedStylePackId = pptResult.stylePackId;

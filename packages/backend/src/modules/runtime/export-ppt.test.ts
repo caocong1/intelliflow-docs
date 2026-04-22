@@ -397,3 +397,11 @@ with ZipFile(path) as z:
     expect(missingCount).toBe(0);
   });
 });
+
+// Note: pptRenderEngine dispatch branches are covered via:
+// - parseHtmlFidelityDeckContent unit tests (version-signal matching)
+// - html-fidelity-markdown-adapter.test.ts (markdown composition)
+// - html-editable-adapter.test.ts (renderer integration)
+// A direct generatePptBuffer dispatch test would need stubbing chrome +
+// LLM + composeDeckWithAi; the abstraction boundaries above make that
+// unnecessary — the dispatch itself is a 15-line router.

@@ -158,12 +158,79 @@ export default function ExportConfigPanel(props: ExportConfigProps) {
           </Show>
 
           <Show when={hasPptx()}>
-            <div>
+            <div class="space-y-2">
               <p class="text-xs text-slate-500 leading-5">
                 PPT 导出主流程已切换为内置 style-pack 风格系统。流程里不再预绑定 PPT 模板，
                 运行时用户只需选择一种演示风格并导出下载；历史 `templateBindings.pptx` /
                 `templateId` 仅作兼容保留，不再影响主导出路径。
               </p>
+
+              {/* Render engine selector — opt-in HTML-fidelity pipeline */}
+              <div class="border border-slate-200 rounded-md p-3 bg-slate-50" role="radiogroup" aria-label="PPT 渲染引擎">
+                <div class="block text-xs font-semibold text-gray-700 mb-1">
+                  PPT 渲染引擎
+                </div>
+                <div class="space-y-1">
+                  <label class="flex items-start gap-2 text-xs cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pptRenderEngine"
+                      value="archetype"
+                      checked={(props.config.pptRenderEngine ?? "archetype") === "archetype"}
+                      onChange={() => props.onChange({ ...props.config, pptRenderEngine: "archetype" })}
+                      class="mt-0.5"
+                    />
+                    <span>
+                      <span class="font-medium text-slate-700">默认引擎（Archetype）</span>
+                      <span class="block text-[11px] text-slate-500 leading-4">
+                        style-pack 驱动，秒级出片，视觉偏干净企业风。无外部依赖。
+                      </span>
+                    </span>
+                  </label>
+                  <label class="flex items-start gap-2 text-xs cursor-pointer">
+                    <input
+                      type="radio"
+                      name="pptRenderEngine"
+                      value="html_fidelity"
+                      checked={props.config.pptRenderEngine === "html_fidelity"}
+                      onChange={() => props.onChange({ ...props.config, pptRenderEngine: "html_fidelity" })}
+                      class="mt-0.5"
+                    />
+                    <span>
+                      <span class="font-medium text-slate-700">HTML 保真引擎（可编辑）</span>
+                      <span class="block text-[11px] text-slate-500 leading-4">
+                        HTML 模板家族 + LLM 组版 + Chrome 渲染，非对称版式、可编辑文本框。
+                        耗时 10-30s/页，依赖 LLM provider。
+                      </span>
+                    </span>
+                  </label>
+                </div>
+
+                <Show when={props.config.pptRenderEngine === "html_fidelity"}>
+                  <div class="mt-2 pt-2 border-t border-slate-200">
+                    <label for="ppt-html-template-id-input" class="block text-xs font-semibold text-gray-700 mb-1">
+                      HTML 模板家族 ID
+                    </label>
+                    <input
+                      id="ppt-html-template-id-input"
+                      type="text"
+                      value={props.config.pptHtmlFidelityTemplateId ?? ""}
+                      placeholder="622eee2ab7e6e"
+                      onInput={(e) =>
+                        props.onChange({
+                          ...props.config,
+                          pptHtmlFidelityTemplateId: (e.currentTarget as HTMLInputElement).value || undefined,
+                        })
+                      }
+                      class="w-full px-2 py-1 text-xs border border-slate-300 rounded font-mono"
+                    />
+                    <p class="text-[11px] text-slate-500 mt-1 leading-4">
+                      留空使用默认 <code class="font-mono">622eee2ab7e6e</code>。模板文件位于
+                      <code class="font-mono">docs/design/ppt-mvp/html-styles/&lt;id&gt;/</code>。
+                    </p>
+                  </div>
+                </Show>
+              </div>
             </div>
           </Show>
         </div>

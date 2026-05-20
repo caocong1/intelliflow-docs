@@ -263,6 +263,143 @@ const warmReview: StylePack = {
   table: { headerFill: "9A3412", stripeFill: "FEF3C7", borderColor: "FDE68A", borderWidth: 0.5 },
 };
 
+// ─── 4 additional packs aligning with the editorial-ppt skill's curated palettes ──
+// These mirror Anthropic pptx + AionUi morph-ppt-3d's de-facto-standard 10
+// palette set (see ai-agent-ppt-research/06-final/references/curated-palettes.md).
+// Hex values are normalised to the StylePack shape (no '#' prefix).
+
+const forestMoss: StylePack = {
+  id: "forest_moss",
+  label: "森林苔藓",
+  palette: {
+    primary: "2C5F2D",
+    secondary: "97BC62",
+    accent: "B85042",
+    text: "2D2D2D",
+    textLight: "6B8E6B",
+    background: "F5F5F5",
+    surface: "FFFFFF",
+    tableHeader: "2C5F2D",
+    tableStripe: "EEF5EA",
+    divider: "C8D8C0",
+  },
+  fonts: {
+    title: { face: "Microsoft YaHei", size: 32, bold: true },
+    subtitle: { face: "Microsoft YaHei", size: 18, bold: false },
+    body: { face: "Microsoft YaHei", size: 14, bold: false },
+    caption: { face: "Microsoft YaHei", size: 10, bold: false },
+    kpi: { face: "Microsoft YaHei", size: 44, bold: true },
+  },
+  cover: {
+    backgroundFill: "gradient",
+    gradientStops: [
+      { position: 0, color: "2C5F2D" },
+      { position: 100, color: "97BC62" },
+    ],
+    titleAlign: "left",
+  },
+  shapes: { cornerRadius: 0.1, cardShadow: true, dividerStyle: "line" },
+  table: { headerFill: "2C5F2D", stripeFill: "EEF5EA", borderColor: "C8D8C0", borderWidth: 0.5 },
+};
+
+const oceanGradient: StylePack = {
+  id: "ocean_gradient",
+  label: "海洋渐变",
+  palette: {
+    primary: "065A82",
+    secondary: "1C7293",
+    accent: "21295C",
+    text: "2B3A4E",
+    textLight: "6B8FAA",
+    background: "F5F9FC",
+    surface: "FFFFFF",
+    tableHeader: "065A82",
+    tableStripe: "EDF4F9",
+    divider: "CFE0EA",
+  },
+  fonts: {
+    title: { face: "Microsoft YaHei", size: 32, bold: true },
+    subtitle: { face: "Microsoft YaHei", size: 18, bold: false },
+    body: { face: "Microsoft YaHei", size: 14, bold: false },
+    caption: { face: "Microsoft YaHei", size: 10, bold: false },
+    kpi: { face: "Microsoft YaHei", size: 46, bold: true },
+  },
+  cover: {
+    backgroundFill: "gradient",
+    gradientStops: [
+      { position: 0, color: "065A82" },
+      { position: 100, color: "1C7293" },
+    ],
+    titleAlign: "left",
+  },
+  shapes: { cornerRadius: 0.08, cardShadow: true, dividerStyle: "line" },
+  table: { headerFill: "065A82", stripeFill: "EDF4F9", borderColor: "CFE0EA", borderWidth: 0.5 },
+};
+
+const tealTrust: StylePack = {
+  id: "teal_trust",
+  label: "信任青蓝",
+  palette: {
+    primary: "028090",
+    secondary: "00A896",
+    accent: "02C39A",
+    text: "2D3B3B",
+    textLight: "5E8C8C",
+    background: "F0FAFA",
+    surface: "FFFFFF",
+    tableHeader: "028090",
+    tableStripe: "E5F4F3",
+    divider: "C4E1DF",
+  },
+  fonts: {
+    title: { face: "Microsoft YaHei", size: 32, bold: true },
+    subtitle: { face: "Microsoft YaHei", size: 18, bold: false },
+    body: { face: "Microsoft YaHei", size: 14, bold: false },
+    caption: { face: "Microsoft YaHei", size: 10, bold: false },
+    kpi: { face: "Microsoft YaHei", size: 44, bold: true },
+  },
+  cover: {
+    backgroundFill: "gradient",
+    gradientStops: [
+      { position: 0, color: "028090" },
+      { position: 100, color: "00A896" },
+    ],
+    titleAlign: "center",
+  },
+  shapes: { cornerRadius: 0.1, cardShadow: true, dividerStyle: "line" },
+  table: { headerFill: "028090", stripeFill: "E5F4F3", borderColor: "C4E1DF", borderWidth: 0.5 },
+};
+
+const cherryBold: StylePack = {
+  id: "cherry_bold",
+  label: "樱桃热烈",
+  palette: {
+    primary: "990011",
+    secondary: "FCF6F5",
+    accent: "2F3C7E",
+    text: "333333",
+    textLight: "8B6B6B",
+    background: "FCF6F5",
+    surface: "FFFFFF",
+    tableHeader: "990011",
+    tableStripe: "FAEDEC",
+    divider: "EFD5D3",
+  },
+  fonts: {
+    title: { face: "Microsoft YaHei", size: 34, bold: true },
+    subtitle: { face: "Microsoft YaHei", size: 18, bold: false },
+    body: { face: "Microsoft YaHei", size: 14, bold: false },
+    caption: { face: "Microsoft YaHei", size: 10, bold: false },
+    kpi: { face: "Microsoft YaHei", size: 48, bold: true },
+  },
+  cover: {
+    backgroundFill: "accent_bar",
+    titleAlign: "left",
+  },
+  shapes: { cornerRadius: 0, cardShadow: false, dividerStyle: "line" },
+  table: { headerFill: "990011", stripeFill: "FAEDEC", borderColor: "EFD5D3", borderWidth: 0.5 },
+};
+
 // ─── Registry ────────────────────────────────────────────────────────────────
 
 export const STYLE_PACKS: readonly StylePack[] = [
@@ -272,6 +409,11 @@ export const STYLE_PACKS: readonly StylePack[] = [
   consultingGray,
   highContrast,
   warmReview,
+  // 4 packs added in Tier 3 C11 (align with editorial-ppt skill curated palettes)
+  forestMoss,
+  oceanGradient,
+  tealTrust,
+  cherryBold,
 ];
 
 const packMap = new Map(STYLE_PACKS.map((p) => [p.id, p]));

@@ -6,12 +6,17 @@
  */
 
 import type { MvpPageDefinition, PresentationOutline, VisualBrief } from "../types";
+import { renderSpecLockAnchor } from "./spec-lock";
 import type {
   GlobalConstitution,
+  LayoutArchetype,
   PageAssetRef,
   PageBrief,
+  SpecLock,
   StyleGenes,
   TemplateGenes,
+  ValidationError,
+  VisualElementType,
 } from "./types";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -336,6 +341,7 @@ export function buildLayer3Prompt(
   styleGenes: StyleGenes,
   constitution: GlobalConstitution,
   pageAssets: PageAssetRef[] = [],
+  previousArchetype?: LayoutArchetype,
 ): string {
   const pageJson = JSON.stringify(page, null, 2);
 
@@ -364,6 +370,11 @@ export function buildLayer3Prompt(
     "",
     ...buildPageAssetPromptSection(page, pageAssets),
     "",
+    "## Variance constraint (H8)",
+    previousArchetype
+      ? `Previous slide used layoutArchetype="${previousArchetype}". You MUST pick a DIFFERENT archetype for this slide.`
+      : "This is the first slide; any archetype is allowed.",
+    "",
     "## Output schema",
     "```ts",
     `{
@@ -375,6 +386,17 @@ export function buildLayer3Prompt(
   composition: string;       // grid / asymmetric / split / etc + key positions
   whatToAvoid: string;       // antipatterns specific to this page type
   tone: string;              // emotional register
+
+  // REQUIRED — pick the visual element type for this page:
+  visualElement: "icon_in_colored_circle" | "colored_block" | "large_stat_number"
+                 | "chart" | "shape_composition" | "hero_image" | "diagram";
+  // visualElementRequired: true unless pageType is cover/section_break/closing/quote
+  visualElementRequired: boolean;
+
+  // REQUIRED — pick the layout archetype (must differ from previous page):
+  layoutArchetype: "centered-hero" | "split-visual" | "visual-hero" | "icon-grid"
+                   | "two-column" | "comparison" | "timeline-horizontal" | "process-flow"
+                   | "big-number" | "quote" | "title-bullets" | "device-triptych" | "section-divider";
 }`,
     "```",
     "",
@@ -395,10 +417,18 @@ export function buildLayer4Prompt(
   pageAssets: PageAssetRef[],
   designSystemCss: string,
   designSystemHref: string,
+  /** Optional — when supplied, the spec_lock anchor is prepended FIRST so the
+   *  LLM re-anchors on locked values before reading anything else. */
+  specLock?: SpecLock,
 ): string {
   const pageJson = JSON.stringify(page, null, 2);
+  const visualElementHint = brief.visualElement
+    ? `(this page MUST contain a "${brief.visualElement}" element${brief.visualElementRequired ? " — REQUIRED" : ""})`
+    : "";
 
   return [
+    // ── SPEC-LOCK ANCHOR FIRST (per PPT Master rule #8 — verbatim re-read each page)
+    ...(specLock ? [renderSpecLockAnchor(specLock), "", "---", ""] : []),
     "## Task",
     "Produce a single complete HTML file for ONE deck slide rendered at",
     "1920×1080 px.  The HTML MUST link to the provided design-system CSS",
@@ -422,6 +452,8 @@ export function buildLayer4Prompt(
     `- Composition: ${brief.composition}`,
     `- Avoid: ${brief.whatToAvoid}`,
     `- Tone: ${brief.tone}`,
+    visualElementHint ? `- Visual element: ${brief.visualElement} ${visualElementHint}` : "",
+    brief.layoutArchetype ? `- Layout archetype: ${brief.layoutArchetype}` : "",
     "",
     ...buildVariantLayoutRecipe(page),
     "",
@@ -451,6 +483,65 @@ export function buildLayer4Prompt(
     "Return one ```html fenced block only, complete with `<!DOCTYPE html>`,",
     "<html>, <head> with the link tag, and <body>.  No commentary.",
   ].join("\n");
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Retry prompt — structured error feedback (PPTAgent REPL pattern)
+// ────────────────────────────────────────────────────────────────────────
+
+/**
+ * Build the retry suffix appended to SYSTEM_DESIGN when a Layer 4
+ * attempt failed validation.  Borrowed from icip-cas/PPTAgent's REPL
+ * feedback mechanism — telling the LLM exactly which checks failed
+ * (with a one-line repair hint) is far more effective than a generic
+ * "previous attempt failed" string.
+ *
+ * See `ai-agent-ppt-research/06-final/references/source-deep-dive.md` §6.
+ */
+export function buildRetrySystemSuffix(errors: ValidationError[]): string {
+  if (errors.length === 0) {
+    return "\n\nThe previous attempt failed validation. Re-author this page.";
+  }
+  const lines = errors.map((e) => {
+    const slot = e.slot ? ` (slot: ${e.slot})` : "";
+    const expected =
+      e.expected !== undefined && e.actual !== undefined
+        ? ` [expected: ${e.expected}, got: ${e.actual}]`
+        : "";
+    return `  - [${e.code}]${slot}${expected} — ${e.suggestion}`;
+  });
+  return [
+    "",
+    "",
+    "## Previous attempt failed validation",
+    "",
+    "Fix THESE specific issues — do not rewrite working sections from",
+    "scratch, do not change unrelated content:",
+    "",
+    ...lines,
+    "",
+    "After fixing, re-validate against the same checks before emitting.",
+  ].join("\n");
+}
+
+// Describe a visualElement enum value in natural language for prompts/error messages.
+export function describeVisualElement(type: VisualElementType): string {
+  switch (type) {
+    case "icon_in_colored_circle":
+      return "an SVG icon centred inside a coloured circle background";
+    case "colored_block":
+      return "a coloured rectangular block highlighting a key concept";
+    case "large_stat_number":
+      return "a large statistic number (≥56pt) with a short caption";
+    case "chart":
+      return "a chart (bar / line / pie) rendered via SVG or canvas";
+    case "shape_composition":
+      return "a composed geometric shape arrangement (rect/ellipse/path)";
+    case "hero_image":
+      return "a large hero image / illustration used as visual focus";
+    case "diagram":
+      return "a labelled diagram (mermaid-style or hand-composed)";
+  }
 }
 
 function buildPageAssetPromptSection(

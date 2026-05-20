@@ -9,12 +9,20 @@
 
 | Tier | 范围 | 状态 | 提交 |
 |---|---|:---:|---|
-| **Tier 1.1** | C2 NEVER-list 扩展 | ✅ 已实施 | 待提交 |
-| **Tier 1.2** | C7 curated palettes 注入 Layer 0 prompt | ✅ 已实施 | 待提交 |
-| **Tier 1.3** | C9 font stack Windows 兜底 | ✅ 已实施 | 待提交 |
-| Tier 1 总体测试 | css-from-genes 单元 + pipeline 集成 | ⏳ 等待 deps | — |
+| **Tier 1.1** | C2 NEVER-list 扩展 | ✅ 已实施 | 31daad5 |
+| **Tier 1.2** | C7 curated palettes 注入 Layer 0 prompt | ✅ 已实施 | 31daad5 |
+| **Tier 1.3** | C9 font stack Windows 兜底 | ✅ 已实施 | 31daad5 |
+| Tier 1 测试 | css-from-genes 14/14 + pipeline 16/16 + claude-client 0/0 | ✅ 30/30 通过 | — |
+| Tier 1 手工验证 | SYSTEM_DESIGN / Layer 0 prompt / ensureWindowsFallback 渲染输出 | ✅ 已验证 | — |
 | Tier 2 | C1/C4/C5/C8/C10 | 待开始 | — |
 | Tier 3 | C3/C6/C11 | 待开始 | — |
+
+**Tier 1 完成。** 30/30 ai-pipeline 测试通过，3 项手工渲染验证全部正确：
+- SYSTEM_DESIGN 包含 23 条 NEVER-list 项
+- Layer 0 prompt 包含 10 套 palette + 8 套 font pairing + Windows 兜底硬规则
+- ensureWindowsFallback 行为正确（Mac-only 注入 Microsoft YaHei；已含 Windows 字体不变；YaHei 不重复）
+
+唯一未通过的 live-config.test.ts 是因为缺 drizzle-orm 包（本地 deps 解析问题，与改动无关——该文件读 DB schema）。
 
 ---
 
@@ -138,5 +146,9 @@ bunx vitest run packages/backend/src/scripts/ppt-mvp/ai-pipeline/ \
 - 阅读现有代码 `prompts.ts` / `css-from-genes.ts` / `pipeline.ts`
 - 修改 SYSTEM_DESIGN 引入 NEVER_LIST（C2）
 - 在 buildLayer0PromptFromBrief 注入 CURATED_PALETTES_REMINDER + CURATED_FONT_PAIRINGS_REMINDER（C7）
-- 在 css-from-genes 新增 ensureWindowsFallback + 单元测试（C9）
-- 测试运行受 deps 问题阻塞中（vite + fdir 缺）；deps 完成后即可验证
+- 在 css-from-genes 新增 ensureWindowsFallback + 8 单元测试（C9）
+- 解决 deps 问题（手工 link `fdir@6.5.0` 到 node_modules）
+- 跑 `bunx vitest run packages/backend/src/scripts/ppt-mvp/ai-pipeline/` → 30/30 通过（4 个 test files：claude-client / css-from-genes / pipeline；live-config 因 drizzle-orm 缺失 skip，与改动无关）
+- 手工验证 SYSTEM_DESIGN / Layer 0 prompt / ensureWindowsFallback 渲染输出
+- Tier 1 已合并到 31daad5
+- Tier 2/3 留待下一轮迭代（推荐先观察 Tier 1 在 wireless 6 页 mock 跑出的效果差异）

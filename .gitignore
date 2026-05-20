@@ -59,3 +59,6 @@ packages/backend/data/
 
 # Temporary design drafts
 STITCH-UI-PLAN.md
+
+# Local debug / test artifacts
+tmp/

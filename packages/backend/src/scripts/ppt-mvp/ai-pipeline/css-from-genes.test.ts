@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { generateDesignSystemCss } from "./css-from-genes";
+import { ensureWindowsFallback, generateDesignSystemCss } from "./css-from-genes";
 import type { TemplateGenes } from "./types";
 
 function makeGenes(overrides: Partial<TemplateGenes["designTokens"]> = {}): TemplateGenes {
@@ -97,5 +97,113 @@ describe("generateDesignSystemCss", () => {
     });
     expect(fromIngest).toContain("ingested template");
     expect(fromIngest).toContain("/some/path.json");
+  });
+
+  test("appends Microsoft YaHei fallback when stack lacks a Windows-preinstalled font", () => {
+    // titleEa is Mac-only "PingFang SC" + Latin is the Mac-only "Helvetica Neue".
+    // Without intervention the resulting stack collapses to system default on Windows.
+    const css = generateDesignSystemCss(
+      makeGenes({
+        fonts: {
+          titleLatin: "Helvetica Neue",
+          titleEa: "PingFang SC",
+          bodyLatin: "Helvetica Neue",
+          bodyEa: "PingFang SC",
+          mono: "Menlo",
+        },
+      }),
+    );
+    // Stack should include the appended Microsoft YaHei before the generic family.
+    expect(css).toMatch(/--font-display:[^;]*"Microsoft YaHei"[^;]*sans-serif/);
+    expect(css).toMatch(/--font-body:[^;]*"Microsoft YaHei"[^;]*sans-serif/);
+    expect(css).toMatch(/--font-mono:[^;]*"Microsoft YaHei"[^;]*monospace/);
+  });
+
+  test("does not append Microsoft YaHei when stack already has a Windows-preinstalled font", () => {
+    const css = generateDesignSystemCss(
+      makeGenes({
+        fonts: {
+          titleLatin: "Georgia",
+          titleEa: "Source Han Serif SC",
+          bodyLatin: "Calibri",
+          bodyEa: "Microsoft YaHei",
+          mono: "Consolas",
+        },
+      }),
+    );
+    // display stack already has Georgia → no Microsoft YaHei injection
+    const displayLine = css.match(/--font-display: ([^;]+);/)?.[1] ?? "";
+    expect(displayLine).toContain("Georgia");
+    expect(displayLine).not.toContain('"Microsoft YaHei"');
+    // body stack has Microsoft YaHei via bodyEa → no duplicate
+    const bodyLine = css.match(/--font-body: ([^;]+);/)?.[1] ?? "";
+    expect(bodyLine.match(/"Microsoft YaHei"/g)?.length ?? 0).toBe(1);
+    // mono stack has Consolas → no Microsoft YaHei injection
+    const monoLine = css.match(/--font-mono: ([^;]+);/)?.[1] ?? "";
+    expect(monoLine).toContain("Consolas");
+    expect(monoLine).not.toContain('"Microsoft YaHei"');
+  });
+});
+
+describe("ensureWindowsFallback", () => {
+  test("returns stack unchanged when it already contains Microsoft YaHei", () => {
+    expect(ensureWindowsFallback(['"PingFang SC"', '"Microsoft YaHei"', "sans-serif"])).toEqual([
+      '"PingFang SC"',
+      '"Microsoft YaHei"',
+      "sans-serif",
+    ]);
+  });
+
+  test("returns stack unchanged when it already contains another Windows-preinstalled font", () => {
+    expect(ensureWindowsFallback(['"PingFang SC"', "Georgia", "serif"])).toEqual([
+      '"PingFang SC"',
+      "Georgia",
+      "serif",
+    ]);
+  });
+
+  test("inserts Microsoft YaHei before the generic family when missing", () => {
+    expect(ensureWindowsFallback(['"PingFang SC"', '"Helvetica Neue"', "-apple-system", "sans-serif"])).toEqual([
+      '"PingFang SC"',
+      '"Helvetica Neue"',
+      "-apple-system",
+      '"Microsoft YaHei"',
+      "sans-serif",
+    ]);
+  });
+
+  test("appends Microsoft YaHei at end when no generic family present", () => {
+    expect(ensureWindowsFallback(['"PingFang SC"', '"Helvetica Neue"'])).toEqual([
+      '"PingFang SC"',
+      '"Helvetica Neue"',
+      '"Microsoft YaHei"',
+    ]);
+  });
+
+  test("treats Calibri and Cambria and Consolas as Windows-preinstalled", () => {
+    expect(ensureWindowsFallback(['"PingFang SC"', "Calibri", "sans-serif"])).toEqual([
+      '"PingFang SC"',
+      "Calibri",
+      "sans-serif",
+    ]);
+    expect(ensureWindowsFallback(['"Source Han Serif SC"', "Cambria", "serif"])).toEqual([
+      '"Source Han Serif SC"',
+      "Cambria",
+      "serif",
+    ]);
+    expect(ensureWindowsFallback(['"Source Code Pro"', "Consolas", "monospace"])).toEqual([
+      '"Source Code Pro"',
+      "Consolas",
+      "monospace",
+    ]);
+  });
+
+  test("filters empty entries", () => {
+    expect(ensureWindowsFallback(['"PingFang SC"', "", '"Helvetica Neue"', "sans-serif"])).toEqual([
+      '"PingFang SC"',
+      '"Helvetica Neue"',
+      '"Microsoft YaHei"',
+      "sans-serif",
+    ]);
   });
 });

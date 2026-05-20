@@ -18,19 +18,129 @@ import type {
 // System prompts
 // ────────────────────────────────────────────────────────────────────────
 
+/**
+ * NEVER-list — anti-patterns synthesised from anthropics/skills/pptx,
+ * iOfficeAI/AionUi officecli-pptx, and design-taste-frontend (skills.sh).
+ *
+ * Each item explicitly counters a known LLM default failure mode. Vague
+ * "avoid generic aesthetics" guidance has near-zero effect on LLM
+ * behaviour; concrete bans force the model to actively work around them.
+ *
+ * See `ai-agent-ppt-research/06-final/references/never-list.md` for the
+ * full 32-item list and source attribution.
+ */
+const NEVER_LIST = [
+  "## NEVER do these (each is a known AI-PPT failure mode)",
+  // Visual / aesthetic
+  "- NEVER place accent lines or underlines beneath slide titles — chief AI-generation tell.",
+  "- NEVER default to blue. Also forbid purple-to-blue AI gradients (the 'LILA' look).",
+  "- NEVER center body text. Only headlines/hero/short callouts may centre.",
+  "- NEVER create text-only content slides — every content slide needs at least one visual element (icon-in-circle / colored block / large stat / chart / shape composition / hero image / diagram). Exceptions: section_break, closing, quote.",
+  "- NEVER use 4+ colours in body content. Stay within primary + secondary + 1 accent + neutral.",
+  "- NEVER use hero photo with white-text overlay; if a hero image is needed, use editorial composition (asymmetric, text bites into image edge).",
+  "- NEVER include emoji or sticker decoration. Use geometric shapes or icon-library glyphs instead.",
+  "- NEVER mix icon libraries within one deck. Pick one of tabler-outline / tabler-filled / chunk-filled / phosphor-duotone.",
+  "- NEVER use the generic 4×2 card wall for TOC; use hierarchy (1 featured wide + 2 medium + 5 compact).",
+  "- NEVER use rainbow gradients.",
+  // Typography
+  "- NEVER use body text smaller than 16pt (chart axis labels ≤12pt and footnotes ≤14pt allowed).",
+  "- NEVER use font sizes text-6xl / text-7xl / text-8xl in HTML; h1 must be text-4xl or text-5xl.",
+  "- NEVER use vw / vh font units — they break PPT export. Use px or rem only.",
+  "- NEVER omit a Windows-preinstalled font fallback in font stacks (must end with Microsoft YaHei / SimHei / Arial / Calibri / Segoe UI / Times New Roman / Consolas).",
+  // Layout
+  "- NEVER repeat the same layout archetype on consecutive slides (Variance Mandate).",
+  "- NEVER fill every pixel — keep ≥40% whitespace baseline, use macro padding.",
+  "- NEVER use opacity:0 / visibility:hidden / display:none in slide content — breaks PNG capture.",
+  "- NEVER use iframe in slide HTML.",
+  "- NEVER nest deeper than 4 levels (prevents tag-closure failures).",
+  // Color / contrast
+  "- NEVER use mid-gray or muted text on dark backgrounds; dark bg (luminance <30%) requires white or near-white body text (luminance >80%).",
+  "- NEVER violate WCAG AA contrast (≥4.5:1 body, ≥3:1 large/icons).",
+  // Process
+  "- NEVER invent palette or font values that are not in the locked design contract.",
+  "- NEVER claim success without inspecting the rendered output for violations of the above.",
+].join("\n");
+
 export const SYSTEM_DESIGN = [
   "You are a senior visual designer who specialises in editorial-grade",
   "Chinese/English presentation decks. You produce structured design",
-  "specifications and clean semantic HTML.  You avoid generic AI-PPT",
-  "aesthetics — no hero photo backgrounds with white-text overlay, no",
-  "rainbow gradients, no decorative emoji.  When asked for JSON, return",
-  "JSON only inside a ```json fence.  When asked for HTML, return HTML",
-  "only inside a ```html fence — no commentary.",
-].join(" ");
+  "specifications and clean semantic HTML.",
+  "",
+  NEVER_LIST,
+  "",
+  "## Output format",
+  "When asked for JSON, return JSON only inside a ```json fence.",
+  "When asked for HTML, return HTML only inside a ```html fence — no commentary.",
+].join("\n");
 
 // ────────────────────────────────────────────────────────────────────────
 // Layer 0 — TemplateGenes from brief OR ingested template
 // ────────────────────────────────────────────────────────────────────────
+
+/**
+ * Curated fallback palettes (sourced from anthropics/skills/pptx +
+ * iOfficeAI/AionUi morph-ppt-3d — two independent projects converged
+ * on the SAME 10 sets, which makes them a de-facto standard).
+ *
+ * Use this list as anchor when the brief is ambiguous or LLM colour
+ * inference would otherwise default to generic blue.
+ *
+ * See `ai-agent-ppt-research/06-final/references/curated-palettes.md`
+ * for full HEX values, dominance rules, and selection decision tree.
+ */
+const CURATED_PALETTES_REMINDER = [
+  "## Fallback palettes (use verbatim when brief is ambiguous)",
+  "If the visual brief does NOT clearly imply primary/secondary/accent",
+  "colors, SELECT one of these 10 curated palettes verbatim — do not",
+  "invent intermediate HEX values. Set `source.kind = 'preset'` and",
+  "include `summary` that references the chosen preset name.",
+  "",
+  "Specificity test (from Anthropic pptx skill): if swapping your",
+  "colors into a completely different presentation would still 'work',",
+  "you haven't made specific enough choices.",
+  "",
+  "  1. Midnight Executive — #1E2761 / #CADCFC / #FFFFFF — finance, executive briefings",
+  "  2. Forest & Moss      — #2C5F2D / #97BC62 / #F5F5F5 — sustainability, healthcare, education",
+  "  3. Coral Energy       — #F96167 / #F9E795 / #2F3C7E — product launch, consumer marketing",
+  "  4. Warm Terracotta    — #B85042 / #E7E8D1 / #A7BEAE — architecture, hospitality, lifestyle",
+  "  5. Ocean Gradient     — #065A82 / #1C7293 / #21295C — tech, data, science",
+  "  6. Charcoal Minimal   — #36454F / #F2F2F2 / #212121 — editorial, photography, minimalist",
+  "  7. Teal Trust         — #028090 / #00A896 / #02C39A — healthcare, wellness, finance",
+  "  8. Berry & Cream      — #6D2E46 / #A26769 / #ECE2D0 — brand, fashion, food",
+  "  9. Sage Calm          — #84B59F / #69A297 / #50808E — wellness, slow brands",
+  " 10. Cherry Bold        — #990011 / #FCF6F5 / #2F3C7E — bold marketing, keynotes",
+  "",
+  "Dominance rule (60-30-10): one color dominates 60-70% of visual",
+  "weight, 1-2 supporting tones share 20-30%, one sharp accent gets",
+  "10-15%. Never give all colors equal weight.",
+].join("\n");
+
+/**
+ * Curated font pairings — same dual-source convergence as palettes.
+ * Every stack MUST end with a Windows-preinstalled fallback so that
+ * the PPTX renders consistently across Mac/Windows/WPS.
+ */
+const CURATED_FONT_PAIRINGS_REMINDER = [
+  "## Font pairings (pick one; pair with CJK font for Chinese decks)",
+  "  - Georgia / Calibri          — formal business, finance",
+  "  - Arial Black / Arial        — bold marketing, product launches",
+  "  - Calibri / Calibri Light    — clean corporate, minimal",
+  "  - Cambria / Calibri          — traditional professional",
+  "  - Trebuchet MS / Calibri     — friendly tech, startups",
+  "  - Impact / Arial             — bold headlines, keynotes",
+  "  - Palatino / Garamond        — elegant editorial, luxury",
+  "  - Consolas / Calibri         — developer tools, technical",
+  "",
+  "For Chinese decks, lead the stack with a CJK font and END with a",
+  "Windows-preinstalled fallback. Examples:",
+  "  - Title : 'Source Han Serif SC', 'PingFang SC', 'Microsoft YaHei', Georgia, serif",
+  "  - Body  : 'PingFang SC', 'Microsoft YaHei', -apple-system, sans-serif",
+  "",
+  "HARD RULE: every font stack MUST end with one of: Microsoft YaHei,",
+  "SimHei, SimSun, FangSong, KaiTi, Arial, Calibri, Cambria, Segoe UI,",
+  "Times New Roman, Georgia, Impact, Trebuchet MS, Consolas. This is a",
+  "non-negotiable Windows-compatibility requirement.",
+].join("\n");
 
 export function buildLayer0PromptFromBrief(
   outline: PresentationOutline,
@@ -56,6 +166,10 @@ export function buildLayer0PromptFromBrief(
     `- Shape language: ${brief.shapeLanguage}`,
     `- Density: ${brief.density}`,
     `- AVOID: ${brief.avoid.join(" / ")}`,
+    "",
+    CURATED_PALETTES_REMINDER,
+    "",
+    CURATED_FONT_PAIRINGS_REMINDER,
     "",
     "## Output schema",
     "Return ONE JSON object matching this TypeScript type:",

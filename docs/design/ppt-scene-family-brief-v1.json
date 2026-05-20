@@ -1,0 +1,111 @@
+{
+  "version": "ppt_scene_family_brief/v1",
+  "familyId": "wireless_editorial_curated_v1",
+  "familyLabel": "Wireless Editorial Curated V1",
+  "designIntent": [
+    "editorial",
+    "premium",
+    "asymmetric",
+    "architectural",
+    "poster"
+  ],
+  "palette": {
+    "bg": "#F6F3EE",
+    "surface": "#FFFDF8",
+    "text": "#1E1B18",
+    "muted": "#6B645C",
+    "primary": "#B2452F",
+    "secondary": "#D88C2E",
+    "accent": "#2B6CB0",
+    "border": "#E7DED2"
+  },
+  "fonts": {
+    "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+    "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+    "body": "Alibaba PuHuiTi 3.0 45 Light",
+    "mono": "JetBrains Mono"
+  },
+  "shapeLanguage": {
+    "cornerRadius": "low",
+    "borderWeight": "light",
+    "frameStyle": "architectural",
+    "shadowUsage": "sparse"
+  },
+  "imageLanguage": {
+    "imageMode": "editorial crop",
+    "captionMode": "technical",
+    "insetUsage": "moderate"
+  },
+  "iconLanguage": {
+    "iconMode": "geometric",
+    "iconContainer": "mixed"
+  },
+  "decorativeSystem": {
+    "lineUsage": "moderate",
+    "numberSystem": "strong",
+    "labelSystem": "moderate",
+    "watermarkUsage": "moderate"
+  },
+  "pageRules": {
+    "cover": [
+      "Use dramatic asymmetric layout with dark accent zones.",
+      "Apply huge display typography and high-tracking eyebrows."
+    ],
+    "comparison": [
+      "Utilize sculptural, asymmetric card layouts.",
+      "Anchor with large subtle watermarks like 'VS'."
+    ],
+    "summary": [
+      "Adopt a monumental stele or poster-like layout.",
+      "Use strong numbered lists with accent colors."
+    ],
+    "section_break": [
+      "Feature monumental, out-of-bounds huge numbers.",
+      "Use dark, atmospheric backgrounds with high contrast."
+    ],
+    "image_focus": [
+      "Employ cinematic or large editorial image crops.",
+      "Overlay technical guidelines, inset images, and technical captions."
+    ],
+    "toc": [
+      "Design an asymmetric mosaic or grid layout.",
+      "Integrate large accent numbers and color-blocked cards."
+    ],
+    "feature_grid": [
+      "Create an atlas or collage-style card grid.",
+      "Mix card sizes to build visual hierarchy and include KPI numbers."
+    ],
+    "timeline": [
+      "Use banded light/dark contrast for chronological flow.",
+      "Connect events with prominent track lines and geometric nodes."
+    ],
+    "process": [
+      "Build a directional route map with connected nodes.",
+      "Anchor the process with a strong, dark sidebar."
+    ],
+    "kpi_poster": [
+      "Establish a bold numeric hierarchy with mega KPIs.",
+      "Use a dark, premium theme to emphasize data impact."
+    ],
+    "table": [
+      "Maintain a clean, editorial table grid with subtle borders.",
+      "Pair the table with a prominent insight or suggestion card."
+    ],
+    "matrix": [
+      "Design a strategic board with clear axes and quadrant highlights.",
+      "Use subtle background watermarks to label quadrants."
+    ],
+    "quote": [
+      "Leverage dramatic whitespace and high contrast typography.",
+      "Use a giant quote mark as a background watermark."
+    ],
+    "icon_strip": [
+      "Align capability cards with numbered badge indicators.",
+      "Add subtle geometric accents in the background."
+    ],
+    "closing": [
+      "Exude quiet confidence using a dark mode theme.",
+      "Structure the page with delicate, elegant grid lines."
+    ]
+  }
+}

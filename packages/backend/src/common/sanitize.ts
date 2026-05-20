@@ -49,12 +49,20 @@ export function sanitizeFilename(input: string): string {
  * @throws AppError 400 if the resolved path escapes the root (traversal attempt)
  */
 export function assertWithinRoot(root: string, requestedPath: string): string {
-  // Resolve the path relative to root (normalizes .., symlinks, etc.)
-  const resolved = resolve(root, requestedPath);
+  const resolvedRoot = resolve(root);
+  const requestedAsPath = resolve(requestedPath);
+  const rootPrefix = resolvedRoot.endsWith(sep) ? resolvedRoot : resolvedRoot + sep;
 
-  // Strict prefix check: resolved path must be inside root directory
-  const rootPrefix = root.endsWith(sep) ? root : root + sep;
-  if (!resolved.startsWith(rootPrefix)) {
+  // Storage paths in older rows may already include WORKSPACE_ROOT. Treat those
+  // as full paths after normalization; otherwise resolve the requested basename
+  // relative to the allowed root.
+  const resolved =
+    requestedAsPath === resolvedRoot || requestedAsPath.startsWith(rootPrefix)
+      ? requestedAsPath
+      : resolve(resolvedRoot, requestedPath);
+
+  // Strict prefix check: resolved path must be inside root directory.
+  if (resolved !== resolvedRoot && !resolved.startsWith(rootPrefix)) {
     throw new AppError("Path traversal denied", 400);
   }
 

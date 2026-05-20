@@ -1,0 +1,561 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#F6F3EE",
+      "surface": "#FFFDF8",
+      "text": "#1E1B18",
+      "muted": "#6B645C",
+      "primary": "#B2452F",
+      "secondary": "#D88C2E",
+      "accent": "#2B6CB0",
+      "success": "#2F855A",
+      "warning": "#C05621",
+      "border": "#E7DED2"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 42,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.15,
+        "align": "left",
+        "valign": "mid"
+      },
+      "h1": {
+        "font": "heading",
+        "size": 28,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2
+      },
+      "h2": {
+        "font": "heading",
+        "size": 20,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2
+      },
+      "body": {
+        "font": "body",
+        "size": 14,
+        "color": "{palette.text}",
+        "lineHeight": 1.5
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 12,
+        "bold": true,
+        "tracking": 120,
+        "uppercase": true,
+        "color": "{palette.primary}"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "slide_feature_grid",
+      "name": "主流设备形态",
+      "designIntent": "editorial",
+      "compositionTags": [
+        "asymmetric",
+        "collage",
+        "premium"
+      ],
+      "density": "medium",
+      "background": {
+        "fill": "#F6F3EE"
+      },
+      "elements": [
+        {
+          "id": "bg",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "z": 0,
+          "fill": "#F6F3EE",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "eyebrow",
+          "type": "text",
+          "x": 80,
+          "y": 80,
+          "w": 400,
+          "h": 30,
+          "z": 10,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "WIRELESS NETWORK"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_title",
+          "type": "text",
+          "x": 80,
+          "y": 130,
+          "w": 400,
+          "h": 120,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "主流无线 AP\n设备类型"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_line",
+          "type": "shape",
+          "shape": "rect",
+          "x": 80,
+          "y": 270,
+          "w": 80,
+          "h": 4,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 2
+        },
+        {
+          "id": "main_desc",
+          "type": "text",
+          "x": 80,
+          "y": 310,
+          "w": 360,
+          "h": 100,
+          "z": 10,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "根据不同场景需求，选择合适的 AP 设备形态，以达到最佳的网络覆盖和使用体验。"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card1_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 520,
+          "y": 80,
+          "w": 620,
+          "h": 400,
+          "z": 5,
+          "fill": "#FFFDF8",
+          "stroke": "#E7DED2",
+          "strokeWidth": 1,
+          "radius": 24
+        },
+        {
+          "id": "card1_num",
+          "type": "text",
+          "x": 560,
+          "y": 120,
+          "w": 60,
+          "h": 40,
+          "z": 10,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "01",
+                  "color": "{palette.muted}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card1_title",
+          "type": "text",
+          "x": 560,
+          "y": 180,
+          "w": 300,
+          "h": 40,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "放装 AP"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card1_desc",
+          "type": "text",
+          "x": 560,
+          "y": 240,
+          "w": 300,
+          "h": 100,
+          "z": 10,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "覆盖范围广，适合开放区域。通常安装在天花板或墙壁高处，提供全方位的无死角覆盖。"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card1_graphic_bg",
+          "type": "shape",
+          "shape": "ellipse",
+          "x": 900,
+          "y": 140,
+          "w": 200,
+          "h": 200,
+          "z": 6,
+          "fill": "#F6F3EE",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "card1_graphic_inner",
+          "type": "shape",
+          "shape": "ellipse",
+          "x": 940,
+          "y": 180,
+          "w": 120,
+          "h": 120,
+          "z": 7,
+          "fill": "#FFFDF8",
+          "stroke": "{palette.primary}",
+          "strokeWidth": 2
+        },
+        {
+          "id": "card2_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 1160,
+          "y": 80,
+          "w": 360,
+          "h": 740,
+          "z": 5,
+          "fill": "#1E1B18",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 24
+        },
+        {
+          "id": "card2_num",
+          "type": "text",
+          "x": 1200,
+          "y": 120,
+          "w": 80,
+          "h": 60,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "02",
+                  "color": "{palette.primary}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card2_title",
+          "type": "text",
+          "x": 1200,
+          "y": 220,
+          "w": 280,
+          "h": 40,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "高密度 AP",
+                  "color": "#FFFFFF"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card2_desc",
+          "type": "text",
+          "x": 1200,
+          "y": 280,
+          "w": 280,
+          "h": 100,
+          "z": 10,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "适合会议、会场、教学等场景。具备强大的并发处理能力，确保大量终端同时接入时的稳定性。",
+                  "color": "#E7DED2"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card2_image",
+          "type": "image",
+          "assetRef": "placeholder_high_density",
+          "x": 1200,
+          "y": 420,
+          "w": 280,
+          "h": 360,
+          "z": 6,
+          "fit": "cover",
+          "radius": 16
+        },
+        {
+          "id": "card3_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 520,
+          "y": 500,
+          "w": 300,
+          "h": 320,
+          "z": 5,
+          "fill": "#E7DED2",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 24
+        },
+        {
+          "id": "card3_num",
+          "type": "text",
+          "x": 560,
+          "y": 530,
+          "w": 60,
+          "h": 40,
+          "z": 10,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "03",
+                  "color": "{palette.muted}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card3_icon_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 560,
+          "y": 580,
+          "w": 48,
+          "h": 48,
+          "z": 6,
+          "fill": "#FFFFFF",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 8
+        },
+        {
+          "id": "card3_icon_dot",
+          "type": "shape",
+          "shape": "ellipse",
+          "x": 580,
+          "y": 600,
+          "w": 8,
+          "h": 8,
+          "z": 7,
+          "fill": "{palette.success}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "card3_title",
+          "type": "text",
+          "x": 560,
+          "y": 660,
+          "w": 220,
+          "h": 40,
+          "z": 10,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "面板 AP"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card3_desc",
+          "type": "text",
+          "x": 560,
+          "y": 710,
+          "w": 220,
+          "h": 80,
+          "z": 10,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "美观，适合独立房间。替换原有网络面板，不破坏整体装修风格。"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card4_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 840,
+          "y": 500,
+          "w": 300,
+          "h": 320,
+          "z": 5,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 24
+        },
+        {
+          "id": "card4_num",
+          "type": "text",
+          "x": 880,
+          "y": 530,
+          "w": 60,
+          "h": 40,
+          "z": 10,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "04",
+                  "color": "#F0E7DB"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card4_icon",
+          "type": "shape",
+          "shape": "triangle",
+          "x": 880,
+          "y": 580,
+          "w": 48,
+          "h": 48,
+          "z": 6,
+          "fill": "{palette.secondary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "card4_title",
+          "type": "text",
+          "x": 880,
+          "y": 660,
+          "w": 220,
+          "h": 40,
+          "z": 10,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "室外 AP",
+                  "color": "#FFFFFF"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "card4_desc",
+          "type": "text",
+          "x": 880,
+          "y": 710,
+          "w": 220,
+          "h": 80,
+          "z": 10,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "适合园区、广场、停车场。具备防水防雷防尘特性，适应严苛环境。",
+                  "color": "#F6F3EE"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    }
+  ]
+}

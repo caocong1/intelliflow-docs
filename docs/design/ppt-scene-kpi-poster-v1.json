@@ -1,0 +1,457 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设的关键收益",
+    "subject": "无线网络建设全流程指南",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#0D0D0D",
+      "surface": "#1A1A1A",
+      "text": "#FFFFFF",
+      "muted": "#888888",
+      "primary": "#FF3366",
+      "secondary": "#33C3FF",
+      "accent": "#7A33FF",
+      "success": "#00E676",
+      "warning": "#FFEA00",
+      "border": "#333333"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "mega": {
+        "font": "display",
+        "size": 280,
+        "bold": true,
+        "color": "{palette.primary}",
+        "lineHeight": 1.0,
+        "align": "left",
+        "valign": "mid"
+      },
+      "mega_label": {
+        "font": "heading",
+        "size": 48,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2,
+        "align": "left"
+      },
+      "mega_desc": {
+        "font": "body",
+        "size": 20,
+        "color": "{palette.muted}",
+        "lineHeight": 1.6,
+        "align": "left"
+      },
+      "badge": {
+        "font": "mono",
+        "size": 14,
+        "bold": true,
+        "color": "#FFFFFF",
+        "align": "center",
+        "valign": "mid"
+      },
+      "eyebrow": {
+        "font": "mono",
+        "size": 14,
+        "bold": true,
+        "color": "{palette.muted}",
+        "uppercase": true,
+        "align": "left"
+      },
+      "kpi_num": {
+        "font": "display",
+        "size": 80,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.0,
+        "align": "left"
+      },
+      "kpi_label": {
+        "font": "heading",
+        "size": 20,
+        "bold": true,
+        "color": "{palette.muted}",
+        "lineHeight": 1.4,
+        "align": "left"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "kpi_poster_main",
+      "name": "关键收益海报",
+      "designIntent": "poster",
+      "compositionTags": [
+        "data poster",
+        "bold numeric hierarchy",
+        "premium",
+        "asymmetric"
+      ],
+      "density": "low",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "bg_right_panel",
+          "type": "shape",
+          "shape": "rect",
+          "x": 1000,
+          "y": 0,
+          "w": 600,
+          "h": 900,
+          "z": 0,
+          "fill": "{palette.surface}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "badge_shape",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 120,
+          "y": 120,
+          "w": 180,
+          "h": 40,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 20
+        },
+        {
+          "id": "badge_text",
+          "type": "text",
+          "x": 120,
+          "y": 120,
+          "w": 180,
+          "h": 40,
+          "z": 11,
+          "styleRef": "badge",
+          "paragraphs": [
+            {
+              "align": "center",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "CORE IMPACT",
+                  "color": "#FFFFFF",
+                  "tracking": 200
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_kpi_num",
+          "type": "text",
+          "x": 110,
+          "y": 240,
+          "w": 800,
+          "h": 260,
+          "z": 10,
+          "styleRef": "mega",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "40",
+                  "color": "{palette.primary}"
+                },
+                {
+                  "text": "%",
+                  "color": "{palette.primary}",
+                  "size": 120
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_kpi_label",
+          "type": "text",
+          "x": 120,
+          "y": 520,
+          "w": 800,
+          "h": 60,
+          "z": 10,
+          "styleRef": "mega_label",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "部署周期缩短",
+                  "color": "{palette.text}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_kpi_desc",
+          "type": "text",
+          "x": 120,
+          "y": 600,
+          "w": 640,
+          "h": 100,
+          "z": 10,
+          "styleRef": "mega_desc",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "通过引入标准化的无线网络架构与自动化的开局部署方案，整体项目落地周期被大幅压缩，极大加速了业务上线进度并降低了实施成本。"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_divider",
+          "type": "shape",
+          "shape": "rect",
+          "x": 120,
+          "y": 780,
+          "w": 640,
+          "h": 2,
+          "z": 10,
+          "fill": "{palette.border}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "right_eyebrow",
+          "type": "text",
+          "x": 1120,
+          "y": 120,
+          "w": 360,
+          "h": 40,
+          "z": 10,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "SECONDARY METRICS",
+                  "tracking": 200
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "kpi1_border",
+          "type": "shape",
+          "shape": "rect",
+          "x": 1120,
+          "y": 240,
+          "w": 40,
+          "h": 4,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 2
+        },
+        {
+          "id": "kpi1_num",
+          "type": "text",
+          "x": 1120,
+          "y": 270,
+          "w": 360,
+          "h": 90,
+          "z": 10,
+          "styleRef": "kpi_num",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "3",
+                  "color": "{palette.text}"
+                },
+                {
+                  "text": "x",
+                  "color": "{palette.primary}",
+                  "size": 60
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "kpi1_label",
+          "type": "text",
+          "x": 1120,
+          "y": 370,
+          "w": 360,
+          "h": 40,
+          "z": 10,
+          "styleRef": "kpi_label",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "扩容效率提升"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "kpi2_border",
+          "type": "shape",
+          "shape": "rect",
+          "x": 1120,
+          "y": 460,
+          "w": 40,
+          "h": 4,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 2
+        },
+        {
+          "id": "kpi2_num",
+          "type": "text",
+          "x": 1120,
+          "y": 490,
+          "w": 360,
+          "h": 90,
+          "z": 10,
+          "styleRef": "kpi_num",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "-35",
+                  "color": "{palette.text}"
+                },
+                {
+                  "text": "%",
+                  "color": "{palette.primary}",
+                  "size": 60
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "kpi2_label",
+          "type": "text",
+          "x": 1120,
+          "y": 590,
+          "w": 360,
+          "h": 40,
+          "z": 10,
+          "styleRef": "kpi_label",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "运维复杂度下降"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "kpi3_border",
+          "type": "shape",
+          "shape": "rect",
+          "x": 1120,
+          "y": 680,
+          "w": 40,
+          "h": 4,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 2
+        },
+        {
+          "id": "kpi3_num",
+          "type": "text",
+          "x": 1120,
+          "y": 710,
+          "w": 360,
+          "h": 90,
+          "z": 10,
+          "styleRef": "kpi_num",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "5",
+                  "color": "{palette.text}"
+                },
+                {
+                  "text": "x",
+                  "color": "{palette.primary}",
+                  "size": 60
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "kpi3_label",
+          "type": "text",
+          "x": 1120,
+          "y": 810,
+          "w": 360,
+          "h": 40,
+          "z": 10,
+          "styleRef": "kpi_label",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "终端接入弹性提升"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    }
+  ]
+}

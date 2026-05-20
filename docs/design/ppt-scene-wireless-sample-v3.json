@@ -1,0 +1,920 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#0D0E10",
+      "surface": "#1A1C1F",
+      "text": "#FFFFFF",
+      "textDark": "#111111",
+      "muted": "#8A8D93",
+      "primary": "#E63946",
+      "secondary": "#F1FAEE",
+      "accent": "#457B9D",
+      "border": "#2A2D34",
+      "lightSurface": "#F8F9FA"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 95 ExtraBold",
+      "heading": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "hero": {
+        "font": "display",
+        "size": 110,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.05,
+        "align": "left",
+        "valign": "mid"
+      },
+      "display": {
+        "font": "display",
+        "size": 56,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.1,
+        "align": "left",
+        "valign": "mid"
+      },
+      "h1": {
+        "font": "heading",
+        "size": 32,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2
+      },
+      "body": {
+        "font": "body",
+        "size": 16,
+        "color": "{palette.text}",
+        "lineHeight": 1.6
+      },
+      "bodyDark": {
+        "font": "body",
+        "size": 16,
+        "color": "{palette.textDark}",
+        "lineHeight": 1.6
+      },
+      "caption": {
+        "font": "body",
+        "size": 14,
+        "color": "{palette.muted}",
+        "lineHeight": 1.4
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 14,
+        "bold": true,
+        "tracking": 400,
+        "uppercase": true,
+        "color": "{palette.primary}"
+      },
+      "kpi": {
+        "font": "display",
+        "size": 180,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.0
+      }
+    },
+    "shapeStyles": {
+      "pill": {
+        "fill": "{palette.primary}",
+        "stroke": "#00000000",
+        "strokeWidth": 0,
+        "radius": 999
+      }
+    }
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "slide_cover",
+      "name": "封面",
+      "designIntent": "editorial",
+      "compositionTags": ["poster", "asymmetric", "hero-scale"],
+      "density": "low",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "cover_bg_left",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 400,
+          "h": 900,
+          "z": 0,
+          "fill": "{palette.lightSurface}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "cover_giant_anchor",
+          "type": "text",
+          "x": 800,
+          "y": -80,
+          "w": 800,
+          "h": 900,
+          "z": 1,
+          "styleRef": "kpi",
+          "paragraphs": [
+            {
+              "align": "right",
+              "runs": [
+                {
+                  "text": "01",
+                  "color": "#1A1C1F",
+                  "size": 580
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "cover_vertical_text",
+          "type": "text",
+          "x": -180,
+          "y": 450,
+          "w": 760,
+          "h": 100,
+          "z": 10,
+          "rotate": -90,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "ENTERPRISE & PUBLIC SECTOR GUIDE",
+                  "color": "{palette.textDark}",
+                  "size": 20,
+                  "tracking": 600
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "cover_title_layer1",
+          "type": "text",
+          "x": 480,
+          "y": 320,
+          "w": 1000,
+          "h": 120,
+          "z": 20,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "无线网络建设",
+                  "color": "{palette.text}",
+                  "size": 64
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "cover_title_layer2",
+          "type": "text",
+          "x": 480,
+          "y": 420,
+          "w": 1000,
+          "h": 160,
+          "z": 21,
+          "styleRef": "hero",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "全流程指南",
+                  "color": "{palette.primary}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "cover_subtitle",
+          "type": "text",
+          "x": 480,
+          "y": 620,
+          "w": 600,
+          "h": 80,
+          "z": 20,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "面向企业与公共机构的采购与IT负责人\n构建敏捷、合规、高并发的下一代无线基础设施",
+                  "color": "{palette.muted}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    },
+    {
+      "id": "slide_comparison",
+      "name": "多维对比",
+      "designIntent": "exhibition",
+      "compositionTags": ["axis-split", "contrast", "asymmetric"],
+      "density": "medium",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "comp_bg_right",
+          "type": "shape",
+          "shape": "rect",
+          "x": 1060,
+          "y": 0,
+          "w": 540,
+          "h": 900,
+          "z": 0,
+          "fill": "{palette.lightSurface}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "comp_title_left",
+          "type": "text",
+          "x": 120,
+          "y": 80,
+          "w": 600,
+          "h": 100,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "无线部署",
+                  "color": "{palette.primary}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_title_right",
+          "type": "text",
+          "x": 1140,
+          "y": 80,
+          "w": 400,
+          "h": 100,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "传统有线",
+                  "color": "{palette.textDark}",
+                  "size": 40
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_axis_line",
+          "type": "shape",
+          "shape": "line",
+          "x": 1060,
+          "y": 200,
+          "w": 1,
+          "h": 600,
+          "z": 5,
+          "fill": "#00000000",
+          "stroke": "{palette.border}",
+          "strokeWidth": 2,
+          "strokeDash": "dash"
+        },
+        {
+          "id": "comp_pill_1",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 960,
+          "y": 260,
+          "w": 200,
+          "h": 56,
+          "z": 20,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 2,
+          "radius": 28
+        },
+        {
+          "id": "comp_label_1",
+          "type": "text",
+          "x": 960,
+          "y": 272,
+          "w": 200,
+          "h": 40,
+          "z": 21,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "部署弹性",
+                  "color": "{palette.text}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_left_1",
+          "type": "text",
+          "x": 360,
+          "y": 268,
+          "w": 560,
+          "h": 80,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "align": "right",
+              "runs": [
+                {
+                  "text": "分钟级开通，按需灵活布点",
+                  "color": "{palette.text}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_right_1",
+          "type": "text",
+          "x": 1200,
+          "y": 272,
+          "w": 320,
+          "h": 80,
+          "z": 10,
+          "styleRef": "bodyDark",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "长周期施工，受限于物理桥架管道",
+                  "color": "{palette.textDark}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_pill_2",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 960,
+          "y": 410,
+          "w": 200,
+          "h": 56,
+          "z": 20,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 2,
+          "radius": 28
+        },
+        {
+          "id": "comp_label_2",
+          "type": "text",
+          "x": 960,
+          "y": 422,
+          "w": 200,
+          "h": 40,
+          "z": 21,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "建设成本",
+                  "color": "{palette.text}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_left_2",
+          "type": "text",
+          "x": 360,
+          "y": 418,
+          "w": 560,
+          "h": 80,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "align": "right",
+              "runs": [
+                {
+                  "text": "无端到端布线，初期综合投入低",
+                  "color": "{palette.text}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_right_2",
+          "type": "text",
+          "x": 1200,
+          "y": 422,
+          "w": 320,
+          "h": 80,
+          "z": 10,
+          "styleRef": "bodyDark",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "高质量线材与隐蔽工程成本高昂",
+                  "color": "{palette.textDark}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_pill_3",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 960,
+          "y": 560,
+          "w": 200,
+          "h": 56,
+          "z": 20,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 2,
+          "radius": 28
+        },
+        {
+          "id": "comp_label_3",
+          "type": "text",
+          "x": 960,
+          "y": 572,
+          "w": 200,
+          "h": 40,
+          "z": 21,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "扩容效率",
+                  "color": "{palette.text}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_left_3",
+          "type": "text",
+          "x": 360,
+          "y": 568,
+          "w": 560,
+          "h": 80,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "align": "right",
+              "runs": [
+                {
+                  "text": "AP 节点即插即用，云端统一下发配置",
+                  "color": "{palette.text}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_right_3",
+          "type": "text",
+          "x": 1200,
+          "y": 572,
+          "w": 320,
+          "h": 80,
+          "z": 10,
+          "styleRef": "bodyDark",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "需重新评估机房容量及穿墙打孔",
+                  "color": "{palette.textDark}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_pill_4",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 960,
+          "y": 710,
+          "w": 200,
+          "h": 56,
+          "z": 20,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 28
+        },
+        {
+          "id": "comp_label_4",
+          "type": "text",
+          "x": 960,
+          "y": 722,
+          "w": 200,
+          "h": 40,
+          "z": 21,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "适用场景",
+                  "color": "{palette.text}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_left_4",
+          "type": "text",
+          "x": 360,
+          "y": 718,
+          "w": 560,
+          "h": 80,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "align": "right",
+              "runs": [
+                {
+                  "text": "移动办公、高密场馆、室外园区覆盖",
+                  "color": "{palette.primary}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "comp_right_4",
+          "type": "text",
+          "x": 1200,
+          "y": 722,
+          "w": 320,
+          "h": 80,
+          "z": 10,
+          "styleRef": "bodyDark",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "固定核心工位、高保密级别核心网",
+                  "color": "{palette.textDark}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    },
+    {
+      "id": "slide_summary",
+      "name": "总结原则",
+      "designIntent": "poster",
+      "compositionTags": ["ribbons", "takeaway", "asymmetric"],
+      "density": "medium",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "sum_poster_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 80,
+          "y": 80,
+          "w": 460,
+          "h": 740,
+          "z": 0,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 32
+        },
+        {
+          "id": "sum_poster_title",
+          "type": "text",
+          "x": 120,
+          "y": 140,
+          "w": 380,
+          "h": 200,
+          "z": 10,
+          "styleRef": "hero",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "建设\n基石",
+                  "color": "{palette.text}",
+                  "size": 96
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sum_poster_desc",
+          "type": "text",
+          "x": 120,
+          "y": 660,
+          "w": 380,
+          "h": 100,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "四大核心原则\n确保项目生命周期健康",
+                  "color": "{palette.text}",
+                  "size": 24
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sum_ribbon_1",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 620,
+          "y": 120,
+          "w": 880,
+          "h": 130,
+          "z": 10,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 16
+        },
+        {
+          "id": "sum_ribbon_text_1",
+          "type": "text",
+          "x": 660,
+          "y": 165,
+          "w": 800,
+          "h": 60,
+          "z": 20,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "01",
+                  "color": "{palette.primary}",
+                  "size": 32,
+                  "font": "mono"
+                },
+                {
+                  "text": "    合规优先 ",
+                  "color": "{palette.text}",
+                  "size": 40
+                },
+                {
+                  "text": " 严格遵循等保要求与无线电频率管制",
+                  "color": "{palette.muted}",
+                  "size": 24,
+                  "font": "body"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sum_ribbon_2",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 620,
+          "y": 290,
+          "w": 740,
+          "h": 130,
+          "z": 10,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 16
+        },
+        {
+          "id": "sum_ribbon_text_2",
+          "type": "text",
+          "x": 660,
+          "y": 335,
+          "w": 660,
+          "h": 60,
+          "z": 20,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "02",
+                  "color": "{palette.primary}",
+                  "size": 32,
+                  "font": "mono"
+                },
+                {
+                  "text": "    场景适配 ",
+                  "color": "{palette.text}",
+                  "size": 40
+                },
+                {
+                  "text": " 拒绝一刀切，按业务定信道",
+                  "color": "{palette.muted}",
+                  "size": 24,
+                  "font": "body"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sum_ribbon_3",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 620,
+          "y": 460,
+          "w": 900,
+          "h": 130,
+          "z": 10,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 16
+        },
+        {
+          "id": "sum_ribbon_text_3",
+          "type": "text",
+          "x": 660,
+          "y": 505,
+          "w": 820,
+          "h": 60,
+          "z": 20,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "03",
+                  "color": "{palette.primary}",
+                  "size": 32,
+                  "font": "mono"
+                },
+                {
+                  "text": "    容量预估 ",
+                  "color": "{palette.text}",
+                  "size": 40
+                },
+                {
+                  "text": " 以峰值并发而非面积作为核心测算指标",
+                  "color": "{palette.muted}",
+                  "size": 24,
+                  "font": "body"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sum_ribbon_4",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 620,
+          "y": 630,
+          "w": 650,
+          "h": 130,
+          "z": 10,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 16
+        },
+        {
+          "id": "sum_ribbon_text_4",
+          "type": "text",
+          "x": 660,
+          "y": 675,
+          "w": 570,
+          "h": 60,
+          "z": 20,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "04",
+                  "color": "{palette.primary}",
+                  "size": 32,
+                  "font": "mono"
+                },
+                {
+                  "text": "    可运维性 ",
+                  "color": "{palette.text}",
+                  "size": 40
+                },
+                {
+                  "text": " 强制要求云端可视化管控",
+                  "color": "{palette.muted}",
+                  "size": 24,
+                  "font": "body"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    }
+  ]
+}

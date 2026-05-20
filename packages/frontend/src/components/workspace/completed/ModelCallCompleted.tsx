@@ -24,6 +24,7 @@ interface ModelOutput {
   startedAt?: string;
   completedAt?: string;
   tokenUsage?: { input: number; output: number };
+  formatErrors?: string[];
 }
 
 type ContentScope = "artifacts" | "responses";
@@ -161,7 +162,12 @@ export default function ModelCallCompleted(props: Props) {
       id: string,
       label: string,
       artifacts: Array<[string, { content: string; format: string; modelId?: string }]>,
-      options?: { meta?: string; tone?: "default" | "selected"; fallbackModelId?: string },
+      options?: {
+        meta?: string;
+        tone?: "default" | "selected" | "warning";
+        hasFormatError?: boolean;
+        fallbackModelId?: string;
+      },
     ) => {
       if (artifacts.length === 0) return;
       sources.push({
@@ -169,6 +175,7 @@ export default function ModelCallCompleted(props: Props) {
         label,
         meta: options?.meta,
         tone: options?.tone,
+        hasFormatError: options?.hasFormatError,
         artifacts: artifacts.map(([artifactId, artifact]) => ({
           artifactId,
           artifactName: defs.get(artifactId)?.name ?? artifactId,
@@ -222,13 +229,18 @@ export default function ModelCallCompleted(props: Props) {
         : modelArtifacts;
       const mergedSelectedModel =
         mergeSelectedSourceIntoModel() && model.key === singleSelectedModelId();
+      const isFormatError = model.status === "format_error";
+      const formatErrorMeta = isFormatError
+        ? `格式错误（${model.formatErrors?.length ?? 0} 项）`
+        : undefined;
       appendSource(`model:${model.key}`, model.modelDisplayName, browserArtifacts, {
         meta: mergedSelectedModel
           ? "当前采用输出"
           : model.key === props.node.selectedOutputKey
             ? "当前选中模型"
-            : (diagnostic?.issue?.sourceMeta ?? undefined),
+            : (formatErrorMeta ?? diagnostic?.issue?.sourceMeta ?? undefined),
         tone: diagnostic?.issue ? "warning" : undefined,
+        hasFormatError: isFormatError,
         fallbackModelId: model.key,
       });
     }

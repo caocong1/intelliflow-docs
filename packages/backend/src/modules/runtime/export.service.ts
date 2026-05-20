@@ -59,6 +59,7 @@ import type {
 } from "../../../../shared/src/slide-types";
 import { getStylePack, DEFAULT_STYLE_PACK_ID } from "./ppt-style-packs";
 import { renderArchetypeSlide, type PptSlide } from "./ppt-archetype-renderer";
+import { parsePptSceneContent, renderPptSceneDeckToBuffer } from "./ppt-scene";
 import {
   parseHtmlFidelityDeckContent,
   renderHtmlFidelityDeckToBuffer,
@@ -2484,7 +2485,7 @@ function isLegacyPptTemplateExportEnabled(
   return envValue === "true";
 }
 
-function resolvePptStylePackId(stylePackId?: string | null): string {
+export function resolvePptStylePackId(stylePackId?: string | null): string {
   return getStylePack(stylePackId ?? DEFAULT_STYLE_PACK_ID)?.id ?? DEFAULT_PPT_STYLE_PACK_ID;
 }
 
@@ -2504,7 +2505,7 @@ function resolveLegacyPptTemplateId(params: {
   return params.config?.templateBindings?.pptx ?? params.config?.templateId ?? null;
 }
 
-type PptBufferResult = {
+export type PptBufferResult = {
   buffer: Buffer;
   renderMode: string;
   warnings: string[];
@@ -2577,7 +2578,7 @@ async function renderSlidesToPptxWithStylePack(
   return (await pptx.write({ outputType: "nodebuffer" })) as unknown as Buffer;
 }
 
-async function generatePptBuffer(params: {
+export async function generatePptBuffer(params: {
   content: string;
   templateId?: string | null;
   stylePackId?: string | null;
@@ -2589,6 +2590,19 @@ async function generatePptBuffer(params: {
   /** HTML-fidelity template family. Only used when pptRenderEngine === "html_fidelity". */
   pptHtmlFidelityTemplateId?: string;
 }): Promise<PptBufferResult> {
+  const sceneDeck = parsePptSceneContent(params.content);
+  if (sceneDeck) {
+    const sceneResult = await renderPptSceneDeckToBuffer(sceneDeck);
+    return {
+      buffer: sceneResult.buffer,
+      renderMode: sceneResult.renderMode,
+      warnings: sceneResult.warnings,
+      compositionSummary: sceneResult.compositionSummary,
+      templateId: null,
+      stylePackId: resolvePptStylePackId(params.stylePackId),
+    };
+  }
+
   // HTML-fidelity path (version-signaled): content is already a
   // well-formed html_fidelity_deck/v1 JSON — skip LLM composition.
   const htmlFidelityDeck = parseHtmlFidelityDeckContent(params.content);

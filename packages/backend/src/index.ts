@@ -14,6 +14,7 @@ import { runtimeRoutes, runtimeAdminRoutes } from "./modules/runtime/runtime.rou
 import { inputTransformRoutes } from "./modules/runtime/input-transform.routes";
 import { desensitizeRoutes } from "./modules/runtime/desensitize.routes";
 import { exportRoutes } from "./modules/runtime/export.routes";
+import { pptRoutes } from "./modules/runtime/ppt.routes";
 import { modelCallRoutes } from "./modules/runtime/model-call.routes";
 import { restoreRoutes } from "./modules/runtime/restore.routes";
 import { modelCallLogRoutes } from "./modules/runtime/model-call-log.routes";
@@ -57,6 +58,7 @@ const app = new Elysia({ prefix: "/api" })
   .use(inputTransformRoutes)
   .use(desensitizeRoutes)
   .use(exportRoutes)
+  .use(pptRoutes)
   .use(modelCallRoutes)
   .use(restoreRoutes)
   .use(modelCallLogRoutes)

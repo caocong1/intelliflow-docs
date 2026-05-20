@@ -1,0 +1,916 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设决策矩阵",
+    "subject": "无线网络建设全流程指南",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#121110",
+      "surface": "#1A1816",
+      "text": "#F5F2EB",
+      "muted": "#8C867C",
+      "primary": "#D86B2E",
+      "secondary": "#2B6CB0",
+      "border": "#2E2A25"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 42,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.1,
+        "align": "left",
+        "valign": "mid"
+      },
+      "h1": {
+        "font": "heading",
+        "size": 24,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2
+      },
+      "h2": {
+        "font": "heading",
+        "size": 18,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2
+      },
+      "body": {
+        "font": "body",
+        "size": 14,
+        "color": "{palette.text}",
+        "lineHeight": 1.5
+      },
+      "caption": {
+        "font": "body",
+        "size": 12,
+        "color": "{palette.muted}",
+        "lineHeight": 1.4
+      },
+      "eyebrow": {
+        "font": "display",
+        "size": 12,
+        "bold": true,
+        "tracking": 200,
+        "uppercase": true,
+        "color": "{palette.primary}"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "matrix_decision_board",
+      "name": "建设策略决策矩阵",
+      "designIntent": "poster",
+      "compositionTags": ["matrix", "board", "strategic", "premium"],
+      "density": "medium",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "bg_layer",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "z": 0,
+          "fill": "{palette.bg}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "title_eyebrow",
+          "type": "text",
+          "x": 80,
+          "y": 260,
+          "w": 360,
+          "h": 30,
+          "z": 10,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "SCENARIO & STRATEGY"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "title_accent_bar",
+          "type": "shape",
+          "shape": "rect",
+          "x": 80,
+          "y": 300,
+          "w": 6,
+          "h": 90,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 4
+        },
+        {
+          "id": "main_title",
+          "type": "text",
+          "x": 106,
+          "y": 290,
+          "w": 380,
+          "h": 120,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "无线网络建设\n全流程指南"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sub_title",
+          "type": "text",
+          "x": 106,
+          "y": 430,
+          "w": 380,
+          "h": 40,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "场景适配与决策矩阵"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "description",
+          "type": "text",
+          "x": 106,
+          "y": 485,
+          "w": 340,
+          "h": 80,
+          "z": 10,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "基于",
+                  "color": "{palette.muted}"
+                },
+                {
+                  "text": "建设复杂度",
+                  "color": "{palette.text}",
+                  "bold": true
+                },
+                {
+                  "text": "和",
+                  "color": "{palette.muted}"
+                },
+                {
+                  "text": "长期价值",
+                  "color": "{palette.text}",
+                  "bold": true
+                },
+                {
+                  "text": "的双维评估框架，协助规划最优建设路径与技术方案选型。",
+                  "color": "{palette.muted}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "matrix_board_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 520,
+          "y": 100,
+          "w": 1000,
+          "h": 700,
+          "z": 5,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 24
+        },
+        {
+          "id": "matrix_highlight_q2",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 1020,
+          "y": 100,
+          "w": 500,
+          "h": 350,
+          "z": 6,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 24,
+          "opacity": 0.04
+        },
+        {
+          "id": "axis_y",
+          "type": "shape",
+          "shape": "rect",
+          "x": 1020,
+          "y": 100,
+          "w": 2,
+          "h": 700,
+          "z": 10,
+          "fill": "{palette.border}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "axis_x",
+          "type": "shape",
+          "shape": "rect",
+          "x": 520,
+          "y": 450,
+          "w": 1000,
+          "h": 2,
+          "z": 10,
+          "fill": "{palette.border}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "axis_y_arrow",
+          "type": "text",
+          "x": 1010,
+          "y": 110,
+          "w": 24,
+          "h": 24,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "▲",
+                  "color": "{palette.border}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "axis_x_arrow",
+          "type": "text",
+          "x": 1485,
+          "y": 439,
+          "w": 24,
+          "h": 24,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "▶",
+                  "color": "{palette.border}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "label_y_high",
+          "type": "text",
+          "x": 1040,
+          "y": 120,
+          "w": 140,
+          "h": 30,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "长期价值 (高)"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "label_y_low",
+          "type": "text",
+          "x": 1040,
+          "y": 750,
+          "w": 140,
+          "h": 30,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "长期价值 (低)"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "label_x_low",
+          "type": "text",
+          "x": 540,
+          "y": 420,
+          "w": 140,
+          "h": 30,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "建设复杂度 (低)"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "label_x_high",
+          "type": "text",
+          "x": 1360,
+          "y": 420,
+          "w": 140,
+          "h": 30,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "align": "right",
+              "runs": [
+                {
+                  "text": "建设复杂度 (高)"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q1_watermark_title",
+          "type": "text",
+          "x": 560,
+          "y": 140,
+          "w": 200,
+          "h": 30,
+          "z": 15,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "敏捷演进区",
+                  "color": "#4A453E"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q1_watermark_sub",
+          "type": "text",
+          "x": 560,
+          "y": 170,
+          "w": 200,
+          "h": 20,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "AGILITY / QUICK WINS",
+                  "color": "#3A352E"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q2_watermark_title",
+          "type": "text",
+          "x": 1050,
+          "y": 140,
+          "w": 200,
+          "h": 30,
+          "z": 15,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "核心战略区",
+                  "color": "#75462A"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q2_watermark_sub",
+          "type": "text",
+          "x": 1050,
+          "y": 170,
+          "w": 200,
+          "h": 20,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "STRATEGIC / HIGH IMPACT",
+                  "color": "#5A3620"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q3_watermark_title",
+          "type": "text",
+          "x": 560,
+          "y": 480,
+          "w": 200,
+          "h": 30,
+          "z": 15,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "基础支撑区",
+                  "color": "#3A352E"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q3_watermark_sub",
+          "type": "text",
+          "x": 560,
+          "y": 510,
+          "w": 200,
+          "h": 20,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "BASIC NEEDS",
+                  "color": "#2A251E"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q4_watermark_title",
+          "type": "text",
+          "x": 1050,
+          "y": 480,
+          "w": 200,
+          "h": 30,
+          "z": 15,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "审慎评估区",
+                  "color": "#3A2A2A"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q4_watermark_sub",
+          "type": "text",
+          "x": 1050,
+          "y": 510,
+          "w": 200,
+          "h": 20,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "CAUTION / AVOID",
+                  "color": "#2A1A1A"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "q4_helper_text",
+          "type": "text",
+          "x": 1200,
+          "y": 620,
+          "w": 240,
+          "h": 60,
+          "z": 15,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "此区间易产生架构冗余与过度投资\n建议优化需求边界或降级技术方案",
+                  "color": "#4A3A3A"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "group_card_1",
+          "type": "group",
+          "x": 620,
+          "y": 580,
+          "w": 280,
+          "h": 120,
+          "z": 20,
+          "children": [
+            {
+              "id": "card_1_bg",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 280,
+              "h": 120,
+              "fill": "#22201D",
+              "stroke": "{palette.border}",
+              "strokeWidth": 1,
+              "radius": 16,
+              "shadow": {
+                "color": "#000000",
+                "opacity": 0.2,
+                "blur": 12,
+                "distance": 4,
+                "angle": 90
+              }
+            },
+            {
+              "id": "card_1_marker",
+              "type": "shape",
+              "shape": "rect",
+              "x": 20,
+              "y": 24,
+              "w": 4,
+              "h": 16,
+              "fill": "{palette.muted}",
+              "stroke": "#00000000",
+              "strokeWidth": 0,
+              "radius": 2
+            },
+            {
+              "id": "card_1_title",
+              "type": "text",
+              "x": 32,
+              "y": 20,
+              "w": 220,
+              "h": 30,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "成本敏感型方案"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "card_1_desc",
+              "type": "text",
+              "x": 20,
+              "y": 55,
+              "w": 240,
+              "h": 50,
+              "styleRef": "caption",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "极简架构设计，按需部署。适用于初期预算受限且终端并发需求较低的微型办公场景。"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "group_card_2",
+          "type": "group",
+          "x": 700,
+          "y": 280,
+          "w": 280,
+          "h": 120,
+          "z": 20,
+          "children": [
+            {
+              "id": "card_2_bg",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 280,
+              "h": 120,
+              "fill": "#25221E",
+              "stroke": "#3D3730",
+              "strokeWidth": 1,
+              "radius": 16,
+              "shadow": {
+                "color": "#000000",
+                "opacity": 0.25,
+                "blur": 16,
+                "distance": 6,
+                "angle": 90
+              }
+            },
+            {
+              "id": "card_2_marker",
+              "type": "shape",
+              "shape": "rect",
+              "x": 20,
+              "y": 24,
+              "w": 4,
+              "h": 16,
+              "fill": "#8C9B7C",
+              "stroke": "#00000000",
+              "strokeWidth": 0,
+              "radius": 2
+            },
+            {
+              "id": "card_2_title",
+              "type": "text",
+              "x": 32,
+              "y": 20,
+              "w": 220,
+              "h": 30,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "基础覆盖型方案"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "card_2_desc",
+              "type": "text",
+              "x": 20,
+              "y": 55,
+              "w": 240,
+              "h": 50,
+              "styleRef": "caption",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "满足标准办公的无缝漫游体验，兼顾成本与长期扩容弹性，适合多数标准化中小企业。"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "group_card_3",
+          "type": "group",
+          "x": 1080,
+          "y": 320,
+          "w": 280,
+          "h": 120,
+          "z": 20,
+          "children": [
+            {
+              "id": "card_3_bg",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 280,
+              "h": 120,
+              "fill": "#2A231C",
+              "stroke": "#543C27",
+              "strokeWidth": 1,
+              "radius": 16,
+              "shadow": {
+                "color": "#000000",
+                "opacity": 0.3,
+                "blur": 20,
+                "distance": 8,
+                "angle": 90
+              }
+            },
+            {
+              "id": "card_3_marker",
+              "type": "shape",
+              "shape": "rect",
+              "x": 20,
+              "y": 24,
+              "w": 4,
+              "h": 16,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0,
+              "radius": 2
+            },
+            {
+              "id": "card_3_title",
+              "type": "text",
+              "x": 32,
+              "y": 20,
+              "w": 220,
+              "h": 30,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "高密并发型方案"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "card_3_desc",
+              "type": "text",
+              "x": 20,
+              "y": 55,
+              "w": 240,
+              "h": 50,
+              "styleRef": "caption",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "应对阶梯教室、大型场馆等极高终端密度场景，提供专属射频调优与高带宽实时保障。"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "group_card_4",
+          "type": "group",
+          "x": 1220,
+          "y": 140,
+          "w": 300,
+          "h": 130,
+          "z": 30,
+          "children": [
+            {
+              "id": "card_4_bg",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 300,
+              "h": 130,
+              "fill": "#362215",
+              "stroke": "{palette.primary}",
+              "strokeWidth": 2,
+              "radius": 16,
+              "shadow": {
+                "color": "{palette.primary}",
+                "opacity": 0.15,
+                "blur": 32,
+                "distance": 8,
+                "angle": 90
+              }
+            },
+            {
+              "id": "card_4_marker",
+              "type": "shape",
+              "shape": "rect",
+              "x": 20,
+              "y": 26,
+              "w": 4,
+              "h": 16,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0,
+              "radius": 2
+            },
+            {
+              "id": "card_4_title",
+              "type": "text",
+              "x": 32,
+              "y": 22,
+              "w": 240,
+              "h": 30,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "园区级统一运维方案",
+                      "color": "{palette.primary}"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "card_4_desc",
+              "type": "text",
+              "x": 20,
+              "y": 60,
+              "w": 260,
+              "h": 50,
+              "styleRef": "caption",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "全网SDN化智能管理，有线无线深度融合。提供极致体验与全局安全管控，为大型核心业务保驾护航。"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

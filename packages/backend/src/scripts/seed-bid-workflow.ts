@@ -104,6 +104,7 @@ function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
       }
       return [{ id: `${nodeId}-restored`, name: "恢复后文本", segmentKey: "restored" }];
     case "export":
+    case "ppt":
       return [];
   }
 }

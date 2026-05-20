@@ -77,6 +77,15 @@ const NODE_STYLES: Record<
     typeBg: "bg-emerald-50",
     typeText: "text-emerald-700",
   },
+  ppt: {
+    borderColor: "border-l-sky-500",
+    iconBg: "bg-sky-50",
+    iconColor: "text-sky-600",
+    icon: "M3 4.5A1.5 1.5 0 014.5 3h15A1.5 1.5 0 0121 4.5v11A1.5 1.5 0 0119.5 17H13v2.25l3 1.5M11 17v2.25l-3 1.5M7 8h5M7 11h8m2-3h.01",
+    typeLabel: "PPT 生成",
+    typeBg: "bg-sky-50",
+    typeText: "text-sky-700",
+  },
 };
 
 const DEFAULT_STYLE = NODE_STYLES.input_transform;
@@ -188,6 +197,18 @@ function getSummaryPreview(node: NodeExecution): string {
         fileSize != null ? formatFileSize(fileSize) : null,
       ].filter(Boolean);
       return parts.join(" · ") || "导出完成";
+    }
+    case "ppt": {
+      const filename = data.filename as string | undefined;
+      const fileSize = data.fileSize as number | undefined;
+      const styleId = data.styleId as string | undefined;
+      const parts = [
+        filename,
+        "PPTX",
+        styleId,
+        fileSize != null ? formatFileSize(fileSize) : null,
+      ].filter(Boolean);
+      return parts.join(" · ") || "PPT 生成完成";
     }
     default:
       return "";
@@ -502,6 +523,8 @@ function renderExpandedContent(
       return renderRestore(data);
     case "export":
       return renderExport(data, props.documentId, props.node.id);
+    case "ppt":
+      return renderExport(data, props.documentId, props.node.id, "ppt");
     default:
       return null;
   }
@@ -726,23 +749,29 @@ function renderRestore(data: Record<string, unknown>) {
   );
 }
 
-function renderExport(data: Record<string, unknown>, documentId: string, nodeId: string) {
+function renderExport(
+  data: Record<string, unknown>,
+  documentId: string,
+  nodeId: string,
+  endpoint: "export" | "ppt" = "export",
+) {
   const [downloading, setDownloading] = createSignal(false);
   const [downloadProgress, setDownloadProgress] = createSignal<DownloadProgress | null>(null);
   const filename = data.filename as string | undefined;
   const format = data.format as string | undefined;
   const fileSize = data.fileSize as number | undefined;
 
-  const FORMAT_ICONS: Record<string, string> = { word: "W", pdf: "P", markdown: "M" };
+  const FORMAT_ICONS: Record<string, string> = { word: "W", pdf: "P", markdown: "M", pptx: "S" };
   const FORMAT_LABELS: Record<string, string> = {
     word: "Word 文档",
     pdf: "PDF 文件",
     markdown: "Markdown 文件",
+    pptx: "PPT 演示文稿",
   };
 
   async function triggerDownload() {
     if (downloading()) return;
-    const url = `/api/runtime/${documentId}/export/${nodeId}/download`;
+    const url = `/api/runtime/${documentId}/${endpoint}/${nodeId}/download`;
     const token = localStorage.getItem("auth_token");
     try {
       setDownloading(true);

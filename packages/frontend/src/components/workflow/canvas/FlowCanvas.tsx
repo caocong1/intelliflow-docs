@@ -21,6 +21,7 @@ import ExportNode from "./nodes/ExportNode";
 import FlowNode from "./nodes/FlowNode";
 import InputTransformNode from "./nodes/InputTransformNode";
 import ModelCallNode from "./nodes/ModelCallNode";
+import PptNode from "./nodes/PptNode";
 import RestoreNode from "./nodes/RestoreNode";
 
 const MIN_ZOOM = 0.2;
@@ -705,6 +706,13 @@ export default function FlowCanvas(props: FlowCanvasProps) {
                   </Match>
                   <Match when={node.data.nodeType === "export"}>
                     <ExportNode
+                      data={node.data}
+                      selected={props.selectedNodeIds.has(node.id)}
+                      hasError={props.errorNodeIds.has(node.id)}
+                    />
+                  </Match>
+                  <Match when={node.data.nodeType === "ppt"}>
+                    <PptNode
                       data={node.data}
                       selected={props.selectedNodeIds.has(node.id)}
                       hasError={props.errorNodeIds.has(node.id)}

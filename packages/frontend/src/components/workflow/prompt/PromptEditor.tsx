@@ -12,6 +12,7 @@ const NODE_TYPE_TAG_CLASSES: Record<string, string> = {
   model_call: "bg-purple-100 text-purple-700 border-purple-200",
   restore: "bg-green-100 text-green-700 border-green-200",
   export: "bg-red-100 text-red-700 border-red-200",
+  ppt: "bg-sky-100 text-sky-700 border-sky-200",
   system: "bg-gray-100 text-gray-600 border-gray-200",
 };
 

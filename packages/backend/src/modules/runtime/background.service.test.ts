@@ -25,7 +25,7 @@ vi.mock("./runtime.service", () => ({
   initDocumentExecution: vi.fn(),
 }));
 
-import type { DesensitizeConfig, RestoreConfig } from "@intelliflow/shared";
+import type { DesensitizeConfig, PptConfig, RestoreConfig } from "@intelliflow/shared";
 import { shouldPauseBackgroundAfterExecution } from "./background.service";
 
 describe("shouldPauseBackgroundAfterExecution", () => {
@@ -64,5 +64,15 @@ describe("shouldPauseBackgroundAfterExecution", () => {
         autoAdvance: false,
       }),
     ).toBe(true);
+  });
+
+  it("pauses on standalone ppt nodes because generation is user-driven", () => {
+    const config: PptConfig = {
+      type: "ppt",
+      contentMapping: [],
+      styleSelectionMode: "runtime_select",
+    };
+
+    expect(shouldPauseBackgroundAfterExecution("ppt", config)).toBe(true);
   });
 });

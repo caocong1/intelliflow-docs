@@ -609,6 +609,7 @@ function getNodeIcon(nodeType: string): string {
     model_call: "\uD83E\uDD16",
     restore: "\uD83D\uDD13",
     export: "\uD83D\uDCE4",
+    ppt: "\uD83D\uDCCA",
   };
   return icons[nodeType] ?? "\u2699\uFE0F";
 }
@@ -620,6 +621,7 @@ function getNodeTypeLabel(nodeType: string): string {
     model_call: "模型调用",
     restore: "信息恢复",
     export: "文件导出",
+    ppt: "PPT 生成",
   };
   return labels[nodeType] ?? nodeType;
 }

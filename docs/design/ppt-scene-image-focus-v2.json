@@ -1,0 +1,397 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#0B0C10",
+      "surface": "#12141A",
+      "text": "#FFFFFF",
+      "muted": "#8A91A6",
+      "primary": "#E65100",
+      "secondary": "#D88C2E",
+      "accent": "#4A90E2",
+      "success": "#2F855A",
+      "warning": "#C05621",
+      "border": "#2A2F3A"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 56,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.1,
+        "align": "left",
+        "valign": "mid"
+      },
+      "h1": {
+        "font": "heading",
+        "size": 32,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2
+      },
+      "body": {
+        "font": "body",
+        "size": 16,
+        "color": "{palette.muted}",
+        "lineHeight": 1.6
+      },
+      "caption": {
+        "font": "mono",
+        "size": 12,
+        "color": "{palette.muted}",
+        "lineHeight": 1.4,
+        "tracking": 50
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 12,
+        "bold": true,
+        "tracking": 200,
+        "uppercase": true,
+        "color": "{palette.primary}"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "slide_image_focus_1",
+      "name": "核心理念",
+      "designIntent": "cinematic",
+      "compositionTags": ["image-led", "asymmetric", "editorial", "atmospheric"],
+      "density": "low",
+      "background": {
+        "fill": "#0B0C10"
+      },
+      "elements": [
+        {
+          "id": "poster_border",
+          "type": "shape",
+          "shape": "rect",
+          "x": 32,
+          "y": 32,
+          "w": 1536,
+          "h": 836,
+          "z": 0,
+          "fill": "#00000000",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 0
+        },
+        {
+          "id": "main_hero_image",
+          "type": "image",
+          "assetRef": "bg_wireless_infrastructure",
+          "x": 640,
+          "y": 32,
+          "w": 928,
+          "h": 836,
+          "z": 1,
+          "fit": "cover",
+          "radius": 0
+        },
+        {
+          "id": "eyebrow_text",
+          "type": "text",
+          "x": 100,
+          "y": 120,
+          "w": 400,
+          "h": 30,
+          "z": 10,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "01 / CORE PHILOSOPHY"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_title",
+          "type": "text",
+          "x": 100,
+          "y": 280,
+          "w": 600,
+          "h": 160,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "无线网络建设"
+                }
+              ]
+            },
+            {
+              "runs": [
+                {
+                  "text": "全流程",
+                  "color": "{palette.text}"
+                },
+                {
+                  "text": "指南",
+                  "color": "{palette.primary}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "core_message",
+          "type": "text",
+          "x": 100,
+          "y": 480,
+          "w": 440,
+          "h": 120,
+          "z": 10,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "无线网络建设绝不仅仅是“买设备”。\n它是一项复杂的系统工程，要求我们在",
+                  "color": "{palette.muted}"
+                }
+              ]
+            },
+            {
+              "runs": [
+                {
+                  "text": "场景、容量、运维",
+                  "color": "{palette.text}",
+                  "bold": true
+                },
+                {
+                  "text": "三个维度实现深度协同。",
+                  "color": "{palette.muted}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "marker_group_scenario",
+          "type": "group",
+          "x": 520,
+          "y": 220,
+          "w": 400,
+          "h": 40,
+          "z": 20,
+          "children": [
+            {
+              "id": "marker_dot_1",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": 360,
+              "y": 16,
+              "w": 6,
+              "h": 6,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "marker_ring_1",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": 355,
+              "y": 11,
+              "w": 16,
+              "h": 16,
+              "fill": "#00000000",
+              "stroke": "{palette.primary}",
+              "strokeWidth": 1
+            },
+            {
+              "id": "guide_line_1",
+              "type": "shape",
+              "shape": "line",
+              "x": 180,
+              "y": 19,
+              "w": 170,
+              "h": 1,
+              "fill": "#00000000",
+              "stroke": "{palette.primary}",
+              "strokeWidth": 1
+            },
+            {
+              "id": "caption_1",
+              "type": "text",
+              "x": 0,
+              "y": 10,
+              "w": 160,
+              "h": 20,
+              "styleRef": "caption",
+              "paragraphs": [
+                {
+                  "align": "right",
+                  "runs": [
+                    {
+                      "text": "SCENARIO / 场景适配",
+                      "color": "{palette.primary}"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "marker_group_capacity",
+          "type": "group",
+          "x": 1100,
+          "y": 420,
+          "w": 380,
+          "h": 40,
+          "z": 20,
+          "children": [
+            {
+              "id": "marker_dot_2",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": 0,
+              "y": 16,
+              "w": 6,
+              "h": 6,
+              "fill": "#FFFFFF",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "marker_ring_2",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": -5,
+              "y": 11,
+              "w": 16,
+              "h": 16,
+              "fill": "#00000000",
+              "stroke": "#FFFFFF",
+              "strokeWidth": 1
+            },
+            {
+              "id": "guide_line_2",
+              "type": "shape",
+              "shape": "line",
+              "x": 16,
+              "y": 19,
+              "w": 120,
+              "h": 1,
+              "fill": "#00000000",
+              "stroke": "#FFFFFF",
+              "strokeWidth": 1,
+              "strokeDash": "dash"
+            },
+            {
+              "id": "caption_2",
+              "type": "text",
+              "x": 150,
+              "y": 10,
+              "w": 200,
+              "h": 20,
+              "styleRef": "caption",
+              "paragraphs": [
+                {
+                  "align": "left",
+                  "runs": [
+                    {
+                      "text": "CAPACITY / 高密并发"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "inset_image_ops",
+          "type": "image",
+          "assetRef": "detail_ops_dashboard",
+          "x": 480,
+          "y": 620,
+          "w": 340,
+          "h": 200,
+          "z": 30,
+          "fit": "cover",
+          "radius": 0
+        },
+        {
+          "id": "inset_border",
+          "type": "shape",
+          "shape": "rect",
+          "x": 476,
+          "y": 616,
+          "w": 348,
+          "h": 208,
+          "z": 29,
+          "fill": "#0B0C10",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "guide_line_inset",
+          "type": "shape",
+          "shape": "line",
+          "x": 836,
+          "y": 720,
+          "w": 80,
+          "h": 1,
+          "z": 30,
+          "fill": "#00000000",
+          "stroke": "#FFFFFF",
+          "strokeWidth": 1
+        },
+        {
+          "id": "caption_3",
+          "type": "text",
+          "x": 930,
+          "y": 710,
+          "w": 200,
+          "h": 20,
+          "z": 30,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "OPS / 智能运维闭环",
+                  "color": "#FFFFFF"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    }
+  ]
+}

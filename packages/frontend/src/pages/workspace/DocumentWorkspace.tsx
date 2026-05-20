@@ -7,6 +7,7 @@ import type {
   NodeConfig,
   NodeExecution,
   NodeExecutionRule,
+  PptConfig,
   RestoreConfig,
 } from "@intelliflow/shared";
 import { A, useParams } from "@solidjs/router";
@@ -48,6 +49,7 @@ import DesensitizeExecutor from "../../components/workspace/nodes/DesensitizeExe
 import ExportExecutor from "../../components/workspace/nodes/ExportExecutor";
 import InputTransformExecutor from "../../components/workspace/nodes/InputTransformExecutor";
 import ModelCallExecutor from "../../components/workspace/nodes/ModelCallExecutor";
+import PptExecutor from "../../components/workspace/nodes/PptExecutor";
 import RestoreExecutor from "../../components/workspace/nodes/RestoreExecutor";
 import { checkFavorites, recordAccess } from "../../lib/api/user-activity";
 import { formatDuration, formatFileSize } from "../../lib/format-utils";
@@ -63,6 +65,7 @@ const DEFAULT_NODE_STEP_DESCRIPTIONS: Partial<Record<NodeConfig["type"], string>
   desensitize: "确认或调整脱敏结果，确保后续模型仅基于安全内容继续执行。",
   restore: "确认恢复结果是否可用，再继续进入后续步骤。",
   export: "确认导出条件已满足后，选择格式生成最终文件。",
+  ppt: "预览内容并选择演示风格，生成高质量 PPT 文件。",
 };
 
 export default function DocumentWorkspace() {
@@ -145,7 +148,7 @@ export default function DocumentWorkspace() {
       if (i !== currentIdx) return true; // non-current in_progress = background work
       // Current node: check if it's waiting for user interaction
       if (n.nodeType === "input_transform" || n.nodeType === "desensitize") return false;
-      if (n.nodeType === "export" || n.nodeType === "restore") return false;
+      if (n.nodeType === "export" || n.nodeType === "ppt" || n.nodeType === "restore") return false;
       if (n.nodeType === "model_call") {
         // model_call with final output = waiting for user review/edit, not generating
         const od = n.outputData as Record<string, unknown> | null;
@@ -366,7 +369,7 @@ export default function DocumentWorkspace() {
 
     const node = viewedNode();
     const s = state();
-    if (!node || !s || node.nodeType === "export") return null;
+    if (!node || !s || node.nodeType === "export" || node.nodeType === "ppt") return null;
 
     const index = s.nodes.findIndex((item) => item.id === node.id);
     return index >= 0 ? index : null;
@@ -556,7 +559,7 @@ export default function DocumentWorkspace() {
 
   function canSkipCurrentNode(): boolean {
     const node = currentNode();
-    if (!node || node.nodeType === "export") return false;
+    if (!node || node.nodeType === "export" || node.nodeType === "ppt") return false;
     return !!getNodeConfig(node)?.skippable;
   }
 
@@ -599,11 +602,11 @@ export default function DocumentWorkspace() {
     }
   }
 
-  /** Check if current node type supports inline editing (export nodes do not) */
+  /** Check if current node type supports inline editing (terminal generation nodes do not) */
   function isNodeEditable(): boolean {
     const node = currentNode();
     if (!node) return false;
-    if (node.nodeType === "export") return false;
+    if (node.nodeType === "export" || node.nodeType === "ppt") return false;
     return true;
   }
 
@@ -810,6 +813,19 @@ export default function DocumentWorkspace() {
                   <ExportExecutor
                     nodeExecution={nodeAccessor()}
                     config={getNodeConfig(nodeAccessor()) as ExportConfig}
+                    documentId={docId}
+                    onDraftSave={draftSave}
+                    onCompleted={fetchRuntimeState}
+                    readOnly={readOnly()}
+                    stepDescription={stepDescription}
+                  />
+                );
+                break;
+              case "ppt":
+                executor = (
+                  <PptExecutor
+                    nodeExecution={nodeAccessor()}
+                    config={getNodeConfig(nodeAccessor()) as PptConfig}
                     documentId={docId}
                     onDraftSave={draftSave}
                     onCompleted={fetchRuntimeState}
@@ -1348,7 +1364,8 @@ export default function DocumentWorkspace() {
                         const nodes = s().nodes;
                         const totalDuration = () =>
                           formatDuration(nodes[0]?.startedAt, nodes[nodes.length - 1]?.completedAt);
-                        const exportNode = () => nodes.find((n) => n.nodeType === "export");
+                        const terminalNode = () =>
+                          nodes.find((n) => n.nodeType === "export" || n.nodeType === "ppt");
                         const modelCallNode = () =>
                           [...nodes].reverse().find((n) => n.nodeType === "model_call");
                         const modelCallData = () =>
@@ -1424,13 +1441,15 @@ export default function DocumentWorkspace() {
                               {/* Divider */}
                               <div class="h-px bg-[rgba(199,196,216,0.2)] mb-6" />
 
-                              {/* Export hint — click stepper to access export */}
-                              <Show when={exportNode()}>
+                              {/* Terminal file hint — click stepper to access file node */}
+                              <Show when={terminalNode()}>
                                 <button
                                   type="button"
                                   class="w-full bg-[#f7f9fb] p-4 rounded-xl flex items-center justify-between hover:bg-[#eeebff] transition-colors group"
                                   onClick={() => {
-                                    const idx = nodes.findIndex((n) => n.nodeType === "export");
+                                    const idx = nodes.findIndex(
+                                      (n) => n.nodeType === "export" || n.nodeType === "ppt",
+                                    );
                                     if (idx >= 0) handleStepperClick(idx);
                                   }}
                                 >
@@ -1450,7 +1469,9 @@ export default function DocumentWorkspace() {
                                       />
                                     </svg>
                                     <span class="text-sm font-medium text-[#191c1e]">
-                                      选择格式并导出文档
+                                      {terminalNode()?.nodeType === "ppt"
+                                        ? "查看并下载高质量 PPT"
+                                        : "选择格式并导出文档"}
                                     </span>
                                   </div>
                                   <svg
@@ -1695,7 +1716,8 @@ export default function DocumentWorkspace() {
                     !readOnly() &&
                     currentNode() &&
                     viewMode() === "current" &&
-                    currentNode()?.nodeType !== "export"
+                    currentNode()?.nodeType !== "export" &&
+                    currentNode()?.nodeType !== "ppt"
                   }
                 >
                   <div class="flex-shrink-0">

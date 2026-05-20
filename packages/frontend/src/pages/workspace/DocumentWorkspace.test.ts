@@ -13,7 +13,9 @@ vi.mock("@solidjs/router", () => ({
 vi.mock("../../api/client", () => ({
   advanceNode: vi.fn(),
   api: {},
+  generatePpt: vi.fn(),
   getRuntimeState: vi.fn(),
+  getPptPreview: vi.fn(),
   initRuntime: vi.fn(),
   rollbackNode: vi.fn(),
   skipNode: vi.fn(),

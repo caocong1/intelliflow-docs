@@ -6,7 +6,7 @@ import type { AvailableModel } from "./demo-workflows/builders";
 import { resolveDemoModels } from "./demo-workflows/builders";
 import {
   PRESENTATION_DOCUMENT_TYPE,
-  PRESENTATION_WORKFLOW_NAME,
+  buildPremiumPresentationWorkflowDefinition,
   buildPresentationWorkflowDefinition,
 } from "./ppt-generation-workflow-definition";
 
@@ -53,14 +53,21 @@ function selectPresentationModels(availableModels: AvailableModel[]) {
 export async function seedPresentationWorkflow() {
   const availableModels = await loadAvailableModels();
   const selectedModels = selectPresentationModels(availableModels);
-  const workflow = buildPresentationWorkflowDefinition(selectedModels);
+  const workflowDefinitions = [
+    buildPresentationWorkflowDefinition(selectedModels),
+    buildPremiumPresentationWorkflowDefinition(selectedModels),
+  ];
 
-  const errors = validateWorkflow(workflow.nodes, workflow.edges).filter(
-    (item) => item.severity === "error",
-  );
-  if (errors.length > 0) {
-    const detail = errors.map((item) => `${item.nodeId ?? "workflow"}: ${item.message}`).join("\n");
-    throw new Error(`工作流校验失败：\n${detail}`);
+  for (const workflow of workflowDefinitions) {
+    const errors = validateWorkflow(workflow.nodes, workflow.edges).filter(
+      (item) => item.severity === "error",
+    );
+    if (errors.length > 0) {
+      const detail = errors
+        .map((item) => `${item.nodeId ?? "workflow"}: ${item.message}`)
+        .join("\n");
+      throw new Error(`工作流「${workflow.name}」校验失败：\n${detail}`);
+    }
   }
 
   const existingDocType = await db
@@ -96,60 +103,58 @@ export async function seedPresentationWorkflow() {
     documentTypeId = created.id;
   }
 
-  const existingWorkflow = await db
-    .select({ id: workflows.id })
-    .from(workflows)
-    .where(
-      and(
-        eq(workflows.documentTypeId, documentTypeId),
-        eq(workflows.name, PRESENTATION_WORKFLOW_NAME),
-      ),
-    )
-    .limit(1);
-
-  let workflowId: string;
-
   await db
     .update(workflows)
     .set({ isDefault: false, updatedAt: new Date() })
     .where(eq(workflows.documentTypeId, documentTypeId));
 
-  if (existingWorkflow.length > 0) {
-    workflowId = existingWorkflow[0].id;
-    await db
-      .update(workflows)
-      .set({
-        description: workflow.description,
-        status: "active",
-        isDefault: true,
-        nodes: workflow.nodes,
-        edges: workflow.edges,
-        schemaVersion: 1,
-        updatedAt: new Date(),
-      })
-      .where(eq(workflows.id, workflowId));
-  } else {
-    const [created] = await db
-      .insert(workflows)
-      .values({
-        documentTypeId,
-        name: workflow.name,
-        description: workflow.description,
-        status: "active",
-        isDefault: true,
-        nodes: workflow.nodes,
-        edges: workflow.edges,
-        schemaVersion: 1,
-      })
-      .returning({ id: workflows.id });
+  const workflowIds: Array<{ id: string; name: string }> = [];
+  for (const workflow of workflowDefinitions) {
+    const existingWorkflow = await db
+      .select({ id: workflows.id })
+      .from(workflows)
+      .where(and(eq(workflows.documentTypeId, documentTypeId), eq(workflows.name, workflow.name)))
+      .limit(1);
 
-    workflowId = created.id;
+    let workflowId: string;
+    if (existingWorkflow.length > 0) {
+      workflowId = existingWorkflow[0].id;
+      await db
+        .update(workflows)
+        .set({
+          description: workflow.description,
+          status: "active",
+          isDefault: workflow.isDefault,
+          nodes: workflow.nodes,
+          edges: workflow.edges,
+          schemaVersion: 1,
+          updatedAt: new Date(),
+        })
+        .where(eq(workflows.id, workflowId));
+    } else {
+      const [created] = await db
+        .insert(workflows)
+        .values({
+          documentTypeId,
+          name: workflow.name,
+          description: workflow.description,
+          status: "active",
+          isDefault: workflow.isDefault,
+          nodes: workflow.nodes,
+          edges: workflow.edges,
+          schemaVersion: 1,
+        })
+        .returning({ id: workflows.id });
+      workflowId = created.id;
+    }
+    workflowIds.push({ id: workflowId, name: workflow.name });
   }
 
   return {
     documentTypeId,
-    workflowId,
-    workflowName: workflow.name,
+    workflowId: workflowIds.find((item) => item.name === workflowDefinitions[0].name)?.id,
+    workflowName: workflowDefinitions[0].name,
+    workflowIds,
   };
 }
 

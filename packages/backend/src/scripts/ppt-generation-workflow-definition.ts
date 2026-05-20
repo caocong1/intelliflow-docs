@@ -1,10 +1,10 @@
-import { slidePresentationJsonSchema } from "../../../shared/src/slide-types";
 import type {
   InputTransformConfig,
   OutputDef,
   WorkflowEdgeDef,
   WorkflowNodeDef,
 } from "@intelliflow/shared";
+import { slidePresentationJsonSchema } from "../../../shared/src/slide-types";
 import type {
   DemoDocumentTypeDefinition,
   DemoModelSelection,
@@ -34,7 +34,10 @@ export const PRESENTATION_DOCUMENT_TYPE: DemoDocumentTypeDefinition = {
   description: "面向汇报、方案演示、培训宣讲等场景的结构化幻灯片生成流程。",
 };
 
-export const PRESENTATION_WORKFLOW_NAME = "通用 PPT 生成与质检 Agent 流程";
+export const PRESENTATION_WORKFLOW_BASE_NAME = "通用 PPT 生成与质检 Agent 流程";
+export const PRESENTATION_LEGACY_WORKFLOW_NAME = `${PRESENTATION_WORKFLOW_BASE_NAME} - 旧版导出`;
+export const PRESENTATION_PREMIUM_WORKFLOW_NAME = `${PRESENTATION_WORKFLOW_BASE_NAME} - 高质量 PPT 节点`;
+export const PRESENTATION_WORKFLOW_NAME = PRESENTATION_LEGACY_WORKFLOW_NAME;
 
 const STRATEGY_FEEDBACK_NODE_ID = "node_strategy_feedback";
 const STRATEGY_FEEDBACK_KEY = "strategy_feedback";
@@ -1380,12 +1383,62 @@ export function buildPresentationWorkflowDefinition(
 
   return {
     documentTypeCode: PRESENTATION_DOCUMENT_TYPE.code,
-    name: PRESENTATION_WORKFLOW_NAME,
+    name: PRESENTATION_LEGACY_WORKFLOW_NAME,
     description:
       "18 节点旗舰流程，覆盖需求解构、资料提炼、策略、叙事、结构化规划、视觉资产规划、初稿生成、精修、去重压缩、页级审校、关键页强化、治理门控与 PPT 导出，并新增 3 个可跳过的人工校准输入节点。",
     isDefault: true,
     category: "flagship",
     nodes: optimizedNodes,
     edges: optimizedEdges,
+  };
+}
+
+export function buildPremiumPresentationWorkflowDefinition(
+  models: DemoModelSelection,
+): DemoWorkflowDefinition {
+  const legacy = buildPresentationWorkflowDefinition(models);
+  const terminalExportNode = legacy.nodes.find((node) => node.id === "node_export");
+  if (!terminalExportNode || terminalExportNode.config.type !== "export") {
+    throw new Error("Presentation workflow terminal export node not found");
+  }
+
+  const nodes: WorkflowNodeDef[] = legacy.nodes.map((node) => {
+    if (node.id !== "node_export" || node.config.type !== "export") return node;
+    return {
+      ...node,
+      id: "node_ppt",
+      type: "ppt",
+      label: "PPT 生成",
+      config: {
+        type: "ppt",
+        contentMapping: node.config.contentMapping,
+        styleSelectionMode: "runtime_select",
+        defaultStyleId: "corporate_blue",
+        stepDescription:
+          "治理门通过后进入高质量 PPT 节点；默认自动推荐风格，也可在生成前手动切换。",
+        executionRule: node.config.executionRule,
+        autoAdvance: node.config.autoAdvance,
+        allowEdit: node.config.allowEdit,
+        skippable: node.config.skippable,
+      },
+      outputs: [],
+    };
+  });
+
+  const edges: WorkflowEdgeDef[] = legacy.edges.map((edge) => ({
+    ...edge,
+    id: edge.id.replaceAll("node_export", "node_ppt"),
+    source: edge.source === "node_export" ? "node_ppt" : edge.source,
+    target: edge.target === "node_export" ? "node_ppt" : edge.target,
+  }));
+
+  return {
+    ...legacy,
+    name: PRESENTATION_PREMIUM_WORKFLOW_NAME,
+    description:
+      "与旧版 PPT 导出流程共用同一套前序 Agent、prompt、治理门和 slides_ready 内容映射，末尾改为独立高质量 PPT 节点，支持运行时风格选择、visual_premium_v1 渲染和 OfficeCLI 质检信息回写。",
+    isDefault: false,
+    nodes,
+    edges,
   };
 }

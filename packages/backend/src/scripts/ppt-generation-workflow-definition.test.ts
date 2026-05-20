@@ -3,7 +3,9 @@ import { validateWorkflow } from "../modules/workflows/validation";
 import type { DemoModelSelection } from "./demo-workflows/builders";
 import {
   PRESENTATION_DOCUMENT_TYPE,
+  PRESENTATION_PREMIUM_WORKFLOW_NAME,
   PRESENTATION_WORKFLOW_NAME,
+  buildPremiumPresentationWorkflowDefinition,
   buildPresentationWorkflowDefinition,
 } from "./ppt-generation-workflow-definition";
 
@@ -278,5 +280,31 @@ describe("presentation workflow definition", () => {
     expect(strategyNode?.outputs.some((output) => output.category === "selected_artifact")).toBe(
       true,
     );
+  });
+
+  it("builds a premium comparison workflow that only swaps the terminal export node for a PPT node", () => {
+    const legacy = buildPresentationWorkflowDefinition(mockModels);
+    const premium = buildPremiumPresentationWorkflowDefinition(mockModels);
+
+    expect(premium.name).toBe(PRESENTATION_PREMIUM_WORKFLOW_NAME);
+    expect(validateWorkflow(premium.nodes, premium.edges)).toEqual([]);
+
+    const legacyPrefix = legacy.nodes.filter((node) => node.id !== "node_export");
+    const premiumPrefix = premium.nodes.filter((node) => node.id !== "node_ppt");
+    expect(premiumPrefix.map((node) => node.id)).toEqual(legacyPrefix.map((node) => node.id));
+    expect(premiumPrefix.map((node) => node.type)).toEqual(legacyPrefix.map((node) => node.type));
+
+    const legacyExport = legacy.nodes.find((node) => node.id === "node_export");
+    const premiumPpt = premium.nodes.find((node) => node.id === "node_ppt");
+    expect(legacyExport?.config.type).toBe("export");
+    expect(premiumPpt?.config.type).toBe("ppt");
+    if (legacyExport?.config.type === "export" && premiumPpt?.config.type === "ppt") {
+      expect(premiumPpt.config.contentMapping).toEqual(legacyExport.config.contentMapping);
+      expect(premiumPpt.config.executionRule).toEqual(legacyExport.config.executionRule);
+      expect(premiumPpt.config.styleSelectionMode).toBe("runtime_select");
+    }
+
+    expect(legacy.nodes.at(-1)?.id).toBe("node_export");
+    expect(premium.nodes.at(-1)?.id).toBe("node_ppt");
   });
 });

@@ -378,6 +378,7 @@ export function buildSkippedNodeOutputData(params: {
         selectedOutputKey: null,
       };
     case "export":
+    case "ppt":
       return { outputData: metadata, selectedOutputKey: null };
   }
 }

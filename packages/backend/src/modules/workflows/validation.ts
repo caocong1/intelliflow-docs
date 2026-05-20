@@ -30,11 +30,11 @@ export function validateWorkflow(
     });
   }
 
-  // ── Rule 2: Must have at least one export node ────────────────────────────
-  const hasExport = nodes.some((n) => n.type === "export");
-  if (!hasExport) {
+  // ── Rule 2: Must have at least one terminal generation node ───────────────
+  const hasTerminalGenerationNode = nodes.some((n) => n.type === "export" || n.type === "ppt");
+  if (!hasTerminalGenerationNode) {
     errors.push({
-      message: "工作流必须包含至少一个【文件导出】节点",
+      message: "工作流必须包含至少一个【文件导出】或【PPT 生成】节点",
       severity: "error",
     });
   }
@@ -424,6 +424,17 @@ export function validateWorkflow(
         });
       }
     }
+
+    if (node.config.type === "ppt") {
+      if (!node.config.contentMapping || node.config.contentMapping.length === 0) {
+        errors.push({
+          nodeId: node.id,
+          field: "contentMapping",
+          message: `【PPT 生成】节点 "${node.label}" 未指定 PPT 内容来源`,
+          severity: "warning",
+        });
+      }
+    }
   }
 
   // ── Rule 11: segmentKey cross-type uniqueness within a node ─────────────────
@@ -501,21 +512,21 @@ export function validateWorkflow(
       }
     }
 
-    if (node.config.type === "export") {
+    if (node.config.type === "export" || node.config.type === "ppt") {
       for (const ref of node.config.contentMapping ?? []) {
         const refNode = nodeMap.get(ref.nodeId);
         if (!refNode) {
           errors.push({
             nodeId: node.id,
             field: "contentMapping",
-            message: `【文件导出】节点 "${node.label}" 引用了已删除的节点`,
+            message: `【${node.config.type === "ppt" ? "PPT 生成" : "文件导出"}】节点 "${node.label}" 引用了已删除的节点`,
             severity: "error",
           });
         } else if (!outputIdSet.has(`${ref.nodeId}.${ref.outputId}`)) {
           errors.push({
             nodeId: node.id,
             field: "contentMapping",
-            message: `【文件导出】节点 "${node.label}" 引用了节点 "${refNode.label}" 中不存在的输出`,
+            message: `【${node.config.type === "ppt" ? "PPT 生成" : "文件导出"}】节点 "${node.label}" 引用了节点 "${refNode.label}" 中不存在的输出`,
             severity: "error",
           });
         }

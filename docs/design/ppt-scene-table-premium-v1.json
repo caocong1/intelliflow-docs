@@ -1,0 +1,356 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "主流品牌综合对比",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#F4F3F0",
+      "surface": "#FFFFFF",
+      "text": "#1A1A1A",
+      "muted": "#737373",
+      "primary": "#B2452F",
+      "secondary": "#D88C2E",
+      "accent": "#2B6CB0",
+      "border": "#E5E5E5",
+      "highlight": "#FDF7F4"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 36,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.1,
+        "align": "left",
+        "valign": "mid"
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 12,
+        "bold": true,
+        "tracking": 150,
+        "uppercase": true,
+        "color": "{palette.primary}"
+      },
+      "caption": {
+        "font": "body",
+        "size": 14,
+        "color": "{palette.muted}",
+        "lineHeight": 1.6
+      },
+      "tableText": {
+        "font": "body",
+        "size": 15,
+        "color": "{palette.text}",
+        "lineHeight": 1.5
+      },
+      "tableHeader": {
+        "font": "heading",
+        "size": 13,
+        "bold": true,
+        "color": "{palette.muted}",
+        "tracking": 50
+      },
+      "tagText": {
+        "font": "heading",
+        "size": 10,
+        "bold": true,
+        "color": "#FFFFFF"
+      }
+    },
+    "shapeStyles": {
+      "card": {
+        "fill": "{palette.surface}",
+        "stroke": "{palette.border}",
+        "strokeWidth": 1,
+        "radius": 12,
+        "shadow": {
+          "color": "#000000",
+          "opacity": 0.04,
+          "blur": 24,
+          "distance": 8,
+          "angle": 90
+        }
+      }
+    }
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "slide_brand_comparison",
+      "name": "品牌对比",
+      "designIntent": "editorial",
+      "compositionTags": ["premium", "data", "table", "refined"],
+      "density": "medium",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "accent_line",
+          "type": "shape",
+          "shape": "rect",
+          "x": 100,
+          "y": 80,
+          "w": 40,
+          "h": 4,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 2
+        },
+        {
+          "id": "eyebrow_text",
+          "type": "text",
+          "x": 100,
+          "y": 104,
+          "w": 400,
+          "h": 24,
+          "z": 10,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "VENDOR BENCHMARK"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_title",
+          "type": "text",
+          "x": 100,
+          "y": 136,
+          "w": 600,
+          "h": 60,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "主流品牌综合对比"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "subtitle_desc",
+          "type": "text",
+          "x": 1060,
+          "y": 136,
+          "w": 440,
+          "h": 60,
+          "z": 10,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "align": "right",
+              "runs": [
+                {
+                  "text": "基于市场占有率、技术成熟度及场景契合度的综合评估，\n为企业级无线网络设备选型提供核心参考框架。"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "table_container",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 100,
+          "y": 240,
+          "w": 1400,
+          "h": 560,
+          "z": 5,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 16,
+          "shadow": {
+            "color": "#000000",
+            "opacity": 0.05,
+            "blur": 32,
+            "distance": 12,
+            "angle": 90
+          }
+        },
+        {
+          "id": "comparison_table",
+          "type": "table",
+          "x": 100,
+          "y": 240,
+          "w": 1400,
+          "h": 560,
+          "z": 10,
+          "columns": [240, 280, 480, 400],
+          "header": [
+            {
+              "text": "品牌",
+              "fill": "{palette.surface}",
+              "color": "{palette.muted}",
+              "align": "left"
+            },
+            {
+              "text": "适用场景",
+              "fill": "{palette.surface}",
+              "color": "{palette.muted}",
+              "align": "left"
+            },
+            {
+              "text": "核心优势",
+              "fill": "{palette.surface}",
+              "color": "{palette.muted}",
+              "align": "left"
+            },
+            {
+              "text": "选型注意事项",
+              "fill": "{palette.surface}",
+              "color": "{palette.muted}",
+              "align": "left"
+            }
+          ],
+          "rows": [
+            [
+              {
+                "text": "华为\nHuawei"
+              },
+              {
+                "text": "大中型园区、高密高并发\n大型制造、核心政企"
+              },
+              {
+                "text": "全栈全网能力强，Wi-Fi 7 技术及天线阵列领先，无缝漫游体验极佳，智能运维体系完善。"
+              },
+              {
+                "text": "预算要求较高，全量高级特性重度依赖“全家桶”方案（如 iMaster NCE）。"
+              }
+            ],
+            [
+              {
+                "text": "新华三\nH3C"
+              },
+              {
+                "text": "医疗、教育、企业园区\n泛行业标准覆盖"
+              },
+              {
+                "text": "细分行业场景化方案极度成熟，生态开放度高，设备兼容性与管理平台包容性极好。"
+              },
+              {
+                "text": "在极高密或极限性能场景下的射频调优上限略逊于头部标杆。"
+              }
+            ],
+            [
+              {
+                "text": "锐捷\nRuijie"
+              },
+              {
+                "text": "高校宿舍、中小企业\n分支机构、酒店"
+              },
+              {
+                "text": "场景化微创新极强（如微蜂窝智分方案），极具性价比，易用性与部署门槛极低。"
+              },
+              {
+                "text": "大型核心网络及超高端核心交换机产品线积累相对较弱。"
+              }
+            ],
+            [
+              {
+                "text": "Aruba\n(HPE)"
+              },
+              {
+                "text": "外企、跨国企业分支节点\n高端商业综合体"
+              },
+              {
+                "text": "底层射频调优算法业界顶尖，ClearPass 策略控制及准入安全管控能力强大。"
+              },
+              {
+                "text": "本地化定制服务较弱，在当前信创化背景下，核心区替换面临较大合规阻力。"
+              }
+            ]
+          ],
+          "cellStyle": {
+            "font": "body",
+            "size": 14,
+            "color": "{palette.text}",
+            "padding": 36,
+            "fill": "{palette.surface}",
+            "borderColor": "{palette.border}",
+            "borderWidth": 1,
+            "align": "left",
+            "valign": "mid"
+          },
+          "stripe": {
+            "enabled": true,
+            "fill": "#FDFDFC"
+          }
+        },
+        {
+          "id": "tag_group_huawei",
+          "type": "group",
+          "x": 240,
+          "y": 352,
+          "w": 68,
+          "h": 24,
+          "z": 20,
+          "children": [
+            {
+              "id": "tag_bg",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 68,
+              "h": 24,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0,
+              "radius": 4
+            },
+            {
+              "id": "tag_text",
+              "type": "text",
+              "x": 0,
+              "y": 0,
+              "w": 68,
+              "h": 24,
+              "styleRef": "tagText",
+              "paragraphs": [
+                {
+                  "align": "center",
+                  "valign": "mid",
+                  "runs": [
+                    {
+                      "text": "行业标杆"
+                    }
+                  ]
+                }
+              ],
+              "fit": "clip"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

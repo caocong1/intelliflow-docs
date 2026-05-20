@@ -1,0 +1,252 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "核心观点海报",
+    "subject": "无线网络建设全流程指南",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#0D0D0D",
+      "surface": "#1A1A1A",
+      "text": "#FFFFFF",
+      "muted": "#666666",
+      "primary": "#E63946",
+      "secondary": "#F4A261",
+      "accent": "#457B9D",
+      "success": "#2A9D8F",
+      "warning": "#E9C46A",
+      "border": "#333333"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 95 ExtraBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 64,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2,
+        "align": "left",
+        "valign": "top"
+      },
+      "eyebrow": {
+        "font": "mono",
+        "size": 14,
+        "bold": true,
+        "tracking": 200,
+        "uppercase": true,
+        "color": "{palette.primary}",
+        "align": "left",
+        "valign": "top"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "slide_quote_poster",
+      "name": "核心观点",
+      "designIntent": "quote poster",
+      "compositionTags": [
+        "editorial",
+        "asymmetric",
+        "premium",
+        "dramatic whitespace",
+        "typographic"
+      ],
+      "density": "low",
+      "background": {
+        "fill": "#0D0D0D"
+      },
+      "elements": [
+        {
+          "id": "bg_surface_right",
+          "type": "shape",
+          "shape": "rect",
+          "x": 1100,
+          "y": 0,
+          "w": 500,
+          "h": 900,
+          "z": 0,
+          "fill": "#141414",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "accent_line_top",
+          "type": "shape",
+          "shape": "rect",
+          "x": 160,
+          "y": 0,
+          "w": 6,
+          "h": 160,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "giant_quote_mark",
+          "type": "text",
+          "x": 60,
+          "y": 140,
+          "w": 400,
+          "h": 400,
+          "z": 5,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "top",
+              "runs": [
+                {
+                  "text": "“",
+                  "font": "display",
+                  "size": 360,
+                  "color": "#222222",
+                  "bold": true
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "eyebrow_meta",
+          "type": "text",
+          "x": 160,
+          "y": 200,
+          "w": 600,
+          "h": 40,
+          "z": 20,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "top",
+              "runs": [
+                {
+                  "text": "CORE PHILOSOPHY // 核心建设理念",
+                  "font": "mono",
+                  "size": 14,
+                  "color": "{palette.primary}",
+                  "bold": true,
+                  "tracking": 200
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_quote_text",
+          "type": "text",
+          "x": 160,
+          "y": 320,
+          "w": 1200,
+          "h": 420,
+          "z": 20,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "spaceAfter": 24,
+              "align": "left",
+              "valign": "top",
+              "runs": [
+                {
+                  "text": "无线网络建设的关键，不是采购设备，",
+                  "font": "heading",
+                  "size": 42,
+                  "color": "{palette.muted}",
+                  "bold": false
+                }
+              ]
+            },
+            {
+              "spaceAfter": 16,
+              "align": "left",
+              "valign": "top",
+              "runs": [
+                {
+                  "text": "而是建立面向场景、容量与运维的",
+                  "font": "display",
+                  "size": 72,
+                  "color": "{palette.text}",
+                  "bold": true
+                }
+              ]
+            },
+            {
+              "align": "left",
+              "valign": "top",
+              "runs": [
+                {
+                  "text": "系统能力。",
+                  "font": "display",
+                  "size": 108,
+                  "color": "{palette.primary}",
+                  "bold": true
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "footer_accent_square",
+          "type": "shape",
+          "shape": "rect",
+          "x": 160,
+          "y": 790,
+          "w": 12,
+          "h": 12,
+          "z": 20,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "footer_source_text",
+          "type": "text",
+          "x": 196,
+          "y": 782,
+          "w": 600,
+          "h": 32,
+          "z": 20,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "摘自《无线网络建设全流程指南》",
+                  "font": "body",
+                  "size": 16,
+                  "color": "{palette.muted}",
+                  "bold": false,
+                  "tracking": 0
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    }
+  ]
+}

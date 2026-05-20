@@ -48,7 +48,12 @@ export function shouldPauseBackgroundAfterExecution(
   nodeType: WorkflowNodeDef["type"],
   config: NodeConfig,
 ): boolean {
-  if (nodeType === "export" || nodeType === "model_call") {
+  if (
+    nodeType === "export" ||
+    nodeType === "ppt" ||
+    nodeType === "model_call" ||
+    nodeType === "input_transform"
+  ) {
     return true;
   }
 
@@ -366,7 +371,7 @@ export async function executeDocumentPipeline(
       // Execute based on node type
       switch (exec.nodeType) {
         case "input_transform": {
-          // Input transform is already confirmed before background execution starts — skip
+          // No background execution needed — pipeline pauses for user to fill and confirm
           break;
         }
 
@@ -395,6 +400,11 @@ export async function executeDocumentPipeline(
           break;
         }
 
+        case "ppt": {
+          // PPT is driven by frontend PptExecutor — pipeline only sets it to in_progress
+          break;
+        }
+
         default: {
           console.warn(`[background] Unknown node type: ${exec.nodeType}, skipping`);
           break;
@@ -402,7 +412,12 @@ export async function executeDocumentPipeline(
       }
 
       // Interactive nodes: pause pipeline and return control to user
-      if (shouldPauseBackgroundAfterExecution(exec.nodeType, nodeDef.config as NodeConfig)) {
+      if (
+        shouldPauseBackgroundAfterExecution(
+          exec.nodeType as WorkflowNodeDef["type"],
+          nodeDef.config as NodeConfig,
+        )
+      ) {
         // Interactive node is already in_progress with fresh outputData — don't advance
         const progress = Math.round(((i + 1) / totalNodes) * 100);
         await db

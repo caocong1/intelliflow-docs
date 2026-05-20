@@ -1,0 +1,468 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "总结页",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#121110",
+      "surface": "#1E1C1A",
+      "text": "#FFFDF8",
+      "muted": "#8C857D",
+      "primary": "#D84A38",
+      "secondary": "#E5A040",
+      "accent": "#3B7DCE",
+      "success": "#389E66",
+      "warning": "#E0662A",
+      "border": "#3A3632"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 64,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.1,
+        "align": "left",
+        "valign": "mid"
+      },
+      "h1": {
+        "font": "heading",
+        "size": 42,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2
+      },
+      "h2": {
+        "font": "heading",
+        "size": 28,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2
+      },
+      "body": {
+        "font": "body",
+        "size": 18,
+        "color": "{palette.muted}",
+        "lineHeight": 1.5
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 16,
+        "bold": true,
+        "tracking": 200,
+        "uppercase": true,
+        "color": "{palette.primary}"
+      },
+      "numberLarge": {
+        "font": "display",
+        "size": 80,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.0
+      },
+      "numberMedium": {
+        "font": "display",
+        "size": 48,
+        "bold": true,
+        "color": "{palette.secondary}",
+        "lineHeight": 1.0
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "summary_final",
+      "name": "总结海报",
+      "designIntent": "poster",
+      "compositionTags": [
+        "asymmetric",
+        "strong closure",
+        "brand deck ending"
+      ],
+      "density": "low",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "stele_bg",
+          "type": "shape",
+          "shape": "rect",
+          "x": 80,
+          "y": 80,
+          "w": 560,
+          "h": 740,
+          "z": 1,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 0
+        },
+        {
+          "id": "stele_accent_top",
+          "type": "shape",
+          "shape": "rect",
+          "x": 80,
+          "y": 80,
+          "w": 560,
+          "h": 8,
+          "z": 2,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "title_eyebrow",
+          "type": "text",
+          "x": 140,
+          "y": 160,
+          "w": 440,
+          "h": 40,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "CONCLUSION"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "title_main",
+          "type": "text",
+          "x": 140,
+          "y": 220,
+          "w": 440,
+          "h": 200,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "重塑无线\n数字基座"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "stele_divider",
+          "type": "shape",
+          "shape": "line",
+          "x": 140,
+          "y": 640,
+          "w": 440,
+          "h": 1,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "#00000000",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 0
+        },
+        {
+          "id": "closing_copy",
+          "type": "text",
+          "x": 140,
+          "y": 680,
+          "w": 440,
+          "h": 100,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "面向未来的全流程建设指南，\n构建合规、安全、极简运维的标杆网络。"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "p1_bg",
+          "type": "shape",
+          "shape": "rect",
+          "x": 720,
+          "y": 120,
+          "w": 800,
+          "h": 200,
+          "z": 1,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "p1_num",
+          "type": "text",
+          "x": 780,
+          "y": 170,
+          "w": 120,
+          "h": 100,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 0.2,
+          "styleRef": "numberLarge",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "01",
+                  "color": "#FFFFFF"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "p1_title",
+          "type": "text",
+          "x": 920,
+          "y": 180,
+          "w": 560,
+          "h": 80,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "合规优先",
+                  "color": "#FFFFFF"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "p2_bg",
+          "type": "shape",
+          "shape": "rect",
+          "x": 720,
+          "y": 360,
+          "w": 640,
+          "h": 140,
+          "z": 1,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "{palette.surface}",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 0
+        },
+        {
+          "id": "p2_num",
+          "type": "text",
+          "x": 780,
+          "y": 405,
+          "w": 100,
+          "h": 60,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "numberMedium",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "02"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "p2_title",
+          "type": "text",
+          "x": 900,
+          "y": 410,
+          "w": 420,
+          "h": 60,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "场景适配"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "p3_divider",
+          "type": "shape",
+          "shape": "line",
+          "x": 720,
+          "y": 640,
+          "w": 560,
+          "h": 1,
+          "z": 1,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "#00000000",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 0
+        },
+        {
+          "id": "p3_num",
+          "type": "text",
+          "x": 720,
+          "y": 560,
+          "w": 80,
+          "h": 60,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "numberMedium",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "03",
+                  "color": "{palette.muted}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "p3_title",
+          "type": "text",
+          "x": 820,
+          "y": 565,
+          "w": 440,
+          "h": 50,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "容量预估"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "p4_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 720,
+          "y": 700,
+          "w": 320,
+          "h": 64,
+          "z": 1,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "#00000000",
+          "stroke": "{palette.secondary}",
+          "strokeWidth": 2,
+          "radius": 999
+        },
+        {
+          "id": "p4_title",
+          "type": "text",
+          "x": 760,
+          "y": 716,
+          "w": 260,
+          "h": 32,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "align": "left",
+              "valign": "mid",
+              "runs": [
+                {
+                  "text": "04 / ",
+                  "color": "{palette.secondary}",
+                  "bold": true
+                },
+                {
+                  "text": "可运维性",
+                  "color": "{palette.text}",
+                  "bold": true
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    }
+  ]
+}

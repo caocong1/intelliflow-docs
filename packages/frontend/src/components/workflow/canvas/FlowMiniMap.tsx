@@ -8,6 +8,7 @@ const NODE_TYPE_COLORS: Record<WorkflowNodeType, string> = {
   model_call: "#a855f7",
   restore: "#22c55e",
   export: "#ef4444",
+  ppt: "#0ea5e9",
 };
 
 type FlowMiniMapProps = {

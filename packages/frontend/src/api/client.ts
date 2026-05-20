@@ -82,6 +82,29 @@ interface RuntimeRoute {
   advance: Record<string, { post: (body?: unknown) => Promise<EdenResponse<DocumentRuntimeState>> }>;
   skip: Record<string, { post: (body?: unknown) => Promise<EdenResponse<DocumentRuntimeState>> }>;
   export: Record<string, { preview: { get: () => Promise<EdenResponse<{ content: string; defaultFilename: string }>> }; generate: { post: (body: unknown) => Promise<EdenResponse<{ filename: string; format: string; fileSize: number; storagePath: string }>> } }>;
+  ppt: Record<string, {
+    preview: {
+      get: () => Promise<EdenResponse<{
+        content: string;
+        defaultFilename: string;
+        styleSelectionMode: "auto" | "runtime_select" | "fixed";
+        recommendedStyleId: string;
+        defaultStyleId?: string;
+      }>>;
+    };
+    generate: {
+      post: (body: unknown) => Promise<EdenResponse<{
+        filename: string;
+        format: "pptx";
+        fileSize: number;
+        storagePath: string;
+        renderMode: "visual_premium_v1";
+        styleId: string;
+        warnings: string[];
+        compositionSummary?: Record<string, unknown>;
+      }>>;
+    };
+  }>;
   "start-background": { post: (body?: unknown) => Promise<EdenResponse<{ status: string }>> };
 }
 
@@ -180,6 +203,44 @@ export async function generateExport(
     filename,
     templateId,
     stylePackId,
+  });
+  if ("data" in res) return res.data;
+  return null;
+}
+
+export async function getPptPreview(
+  documentId: string,
+  nodeExecutionId: string,
+): Promise<{
+  content: string;
+  defaultFilename: string;
+  styleSelectionMode: "auto" | "runtime_select" | "fixed";
+  recommendedStyleId: string;
+  defaultStyleId?: string;
+} | null> {
+  const res = await runtimeOf(documentId).ppt[nodeExecutionId].preview.get();
+  if ("data" in res) return res.data;
+  return null;
+}
+
+export async function generatePpt(
+  documentId: string,
+  nodeExecutionId: string,
+  filename: string,
+  styleId?: string | null,
+): Promise<{
+  filename: string;
+  format: "pptx";
+  fileSize: number;
+  storagePath: string;
+  renderMode: "visual_premium_v1";
+  styleId: string;
+  warnings: string[];
+  compositionSummary?: Record<string, unknown>;
+} | null> {
+  const res = await runtimeOf(documentId).ppt[nodeExecutionId].generate.post({
+    filename,
+    styleId,
   });
   if ("data" in res) return res.data;
   return null;

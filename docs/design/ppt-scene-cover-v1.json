@@ -1,0 +1,293 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#F4F4F0",
+      "surface": "#FFFFFF",
+      "text": "#121212",
+      "muted": "#888888",
+      "primary": "#D93829",
+      "accent": "#1A1A1A",
+      "border": "#E0E0E0"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 105 Heavy",
+      "heading": "Alibaba PuHuiTi 3.0 85 Bold",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "hero": {
+        "font": "display",
+        "size": 130,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.0,
+        "align": "left",
+        "valign": "top"
+      },
+      "subhero": {
+        "font": "heading",
+        "size": 48,
+        "bold": true,
+        "color": "{palette.primary}",
+        "lineHeight": 1.2,
+        "align": "left",
+        "valign": "top"
+      },
+      "eyebrow": {
+        "font": "mono",
+        "size": 14,
+        "bold": true,
+        "color": "{palette.muted}",
+        "tracking": 200,
+        "uppercase": true,
+        "align": "left"
+      },
+      "bodyDesc": {
+        "font": "body",
+        "size": 22,
+        "color": "#FFFFFF",
+        "lineHeight": 1.5,
+        "align": "left"
+      },
+      "watermark": {
+        "font": "display",
+        "size": 420,
+        "bold": true,
+        "color": "#1C1C1C",
+        "lineHeight": 1.0,
+        "align": "right"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "cover_poster",
+      "name": "封面",
+      "designIntent": "editorial",
+      "compositionTags": [
+        "poster",
+        "asymmetric",
+        "premium",
+        "dramatic-whitespace"
+      ],
+      "density": "low",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "dark_zone",
+          "type": "shape",
+          "shape": "ellipse",
+          "x": 650,
+          "y": -350,
+          "w": 1600,
+          "h": 1600,
+          "z": 1,
+          "fill": "{palette.accent}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "rotate": 0,
+          "opacity": 1
+        },
+        {
+          "id": "accent_bar",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 880,
+          "w": 1600,
+          "h": 20,
+          "z": 2,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "rotate": 0,
+          "opacity": 1
+        },
+        {
+          "id": "anchor_watermark",
+          "type": "text",
+          "x": 750,
+          "y": 120,
+          "w": 800,
+          "h": 500,
+          "z": 2,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "watermark",
+          "paragraphs": [
+            {
+              "align": "right",
+              "runs": [
+                {
+                  "text": "W"
+                }
+              ]
+            }
+          ],
+          "fit": "clip"
+        },
+        {
+          "id": "eyebrow_label",
+          "type": "text",
+          "x": 120,
+          "y": 140,
+          "w": 400,
+          "h": 40,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "INFRASTRUCTURE GUIDE",
+                  "tracking": 200
+                }
+              ]
+            }
+          ],
+          "fit": "clip"
+        },
+        {
+          "id": "main_title",
+          "type": "text",
+          "x": 110,
+          "y": 280,
+          "w": 650,
+          "h": 320,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "hero",
+          "paragraphs": [
+            {
+              "spaceAfter": 16,
+              "runs": [
+                {
+                  "text": "无线网络"
+                }
+              ]
+            },
+            {
+              "runs": [
+                {
+                  "text": "建设"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sub_title",
+          "type": "text",
+          "x": 120,
+          "y": 620,
+          "w": 500,
+          "h": 80,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "subhero",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "全流程指南"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "audience_text",
+          "type": "text",
+          "x": 1020,
+          "y": 680,
+          "w": 450,
+          "h": 100,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "bodyDesc",
+          "paragraphs": [
+            {
+              "spaceAfter": 8,
+              "runs": [
+                {
+                  "text": "面向企业与公共机构的"
+                }
+              ]
+            },
+            {
+              "runs": [
+                {
+                  "text": "采购与 IT 负责人",
+                  "color": "#888888"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "dec_dot",
+          "type": "shape",
+          "shape": "ellipse",
+          "x": 120,
+          "y": 760,
+          "w": 12,
+          "h": 12,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "rotate": 0,
+          "opacity": 1
+        },
+        {
+          "id": "side_rotated_text",
+          "type": "text",
+          "x": -160,
+          "y": 450,
+          "w": 400,
+          "h": 40,
+          "z": 10,
+          "rotate": -90,
+          "opacity": 1,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "center",
+              "runs": [
+                {
+                  "text": "EDITION 2026",
+                  "tracking": 300
+                }
+              ]
+            }
+          ],
+          "fit": "clip"
+        }
+      ]
+    }
+  ]
+}

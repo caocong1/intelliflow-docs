@@ -19,6 +19,7 @@ export const nodeTypeLabels: Record<WorkflowNodeType, string> = {
   model_call: "模型调用",
   restore: "信息恢复",
   export: "文件导出",
+  ppt: "PPT 生成",
 };
 
 const nodeTypeIcons: Record<WorkflowNodeType, string> = {
@@ -30,6 +31,7 @@ const nodeTypeIcons: Record<WorkflowNodeType, string> = {
   restore:
     "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
   export: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12",
+  ppt: "M3 4.5A1.5 1.5 0 014.5 3h15A1.5 1.5 0 0121 4.5v11A1.5 1.5 0 0119.5 17H13v2.25l3 1.5M11 17v2.25l-3 1.5M7 8h5M7 11h8m2-3h.01",
 };
 
 function CheckIcon() {

@@ -6,6 +6,7 @@ import type {
   ModelCallConfig,
   RestoreConfig,
   ExportConfig,
+  PptConfig,
 } from "@intelliflow/shared";
 import type { FlowNodeData, FlowEdgeData } from "../../../lib/flow-engine/types";
 import { deriveOutputs } from "../../../lib/flow-engine/derive-outputs";
@@ -16,6 +17,7 @@ import InputTransformConfigPanel from "./InputTransformConfig";
 import DesensitizeConfigPanel from "./DesensitizeConfig";
 import RestoreConfigPanel from "./RestoreConfig";
 import ExportConfigPanel from "./ExportConfig";
+import PptConfigPanel from "./PptConfig";
 import ModelCallConfigPanel from "./ModelCallConfig";
 
 const NODE_TYPE_LABELS: Record<string, string> = {
@@ -24,6 +26,7 @@ const NODE_TYPE_LABELS: Record<string, string> = {
   model_call: "模型调用",
   restore: "信息恢复",
   export: "文件导出",
+  ppt: "PPT 生成",
 };
 
 const NODE_TYPE_ICONS: Record<string, string> = {
@@ -32,6 +35,7 @@ const NODE_TYPE_ICONS: Record<string, string> = {
   model_call: "🤖",
   restore: "🔓",
   export: "📤",
+  ppt: "📊",
 };
 
 const NODE_TYPE_COLORS: Record<string, string> = {
@@ -40,6 +44,7 @@ const NODE_TYPE_COLORS: Record<string, string> = {
   model_call: "border-purple-500",
   restore: "border-green-500",
   export: "border-red-500",
+  ppt: "border-sky-500",
 };
 
 const PANEL_MIN_WIDTH = 320;
@@ -269,6 +274,14 @@ export default function ConfigPanel(props: ConfigPanelProps) {
                   <ExportConfigPanel
                     config={nodeConfig() as unknown as ExportConfig}
                     allNodes={props.allNodes}
+                    upstreamNodes={upstreamNodes()}
+                    onChange={(c) => handleConfigChange(c as unknown as Record<string, unknown>)}
+                  />
+                </Match>
+
+                <Match when={nodeType() === "ppt" && nodeConfig()}>
+                  <PptConfigPanel
+                    config={nodeConfig() as unknown as PptConfig}
                     upstreamNodes={upstreamNodes()}
                     onChange={(c) => handleConfigChange(c as unknown as Record<string, unknown>)}
                   />

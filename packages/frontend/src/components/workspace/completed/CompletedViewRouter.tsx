@@ -4,6 +4,7 @@ import ExportExecutor from "../nodes/ExportExecutor";
 import DesensitizeCompleted from "./DesensitizeCompleted";
 import InputTransformCompleted from "./InputTransformCompleted";
 import ModelCallCompleted from "./ModelCallCompleted";
+import PptCompleted from "./PptCompleted";
 import RestoreCompleted from "./RestoreCompleted";
 
 interface Props {
@@ -66,6 +67,9 @@ export default function CompletedViewRouter(props: Props) {
           onDraftSave={() => {}}
           readOnly={false}
         />
+      </Match>
+      <Match when={props.node.nodeType === "ppt"}>
+        <PptCompleted node={props.node} config={props.config} documentId={props.documentId} />
       </Match>
     </Switch>
   );

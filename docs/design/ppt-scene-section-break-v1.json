@@ -1,0 +1,174 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#1E1B18",
+      "surface": "#2A2521",
+      "text": "#F6F3EE",
+      "muted": "#8A8175",
+      "primary": "#D88C2E",
+      "secondary": "#B2452F"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "huge_number": {
+        "font": "display",
+        "size": 480,
+        "bold": true,
+        "color": "{palette.surface}",
+        "lineHeight": 1.0,
+        "align": "left",
+        "valign": "top"
+      },
+      "section_title": {
+        "font": "display",
+        "size": 72,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2,
+        "align": "left",
+        "valign": "mid"
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 20,
+        "bold": true,
+        "tracking": 200,
+        "uppercase": true,
+        "color": "{palette.primary}",
+        "align": "left",
+        "valign": "mid"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "section_03",
+      "name": "场景选型与品牌判断",
+      "designIntent": "monumental",
+      "compositionTags": [
+        "numbered",
+        "editorial",
+        "atmospheric",
+        "premium"
+      ],
+      "density": "low",
+      "background": {
+        "fill": "#1E1B18"
+      },
+      "elements": [
+        {
+          "id": "bg_accent_shape",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 500,
+          "h": 900,
+          "z": 0,
+          "fill": "#B2452F",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "huge_number_03",
+          "type": "text",
+          "x": -60,
+          "y": -80,
+          "w": 800,
+          "h": 600,
+          "z": 10,
+          "styleRef": "huge_number",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "03"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "section_tag",
+          "type": "text",
+          "x": 640,
+          "y": 380,
+          "w": 800,
+          "h": 40,
+          "z": 20,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "SCENARIO & BRAND DECISION"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "section_title",
+          "type": "text",
+          "x": 640,
+          "y": 440,
+          "w": 800,
+          "h": 200,
+          "z": 20,
+          "styleRef": "section_title",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "场景选型"
+                }
+              ]
+            },
+            {
+              "spaceBefore": 16,
+              "runs": [
+                {
+                  "text": "与品牌判断"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "divider_line",
+          "type": "shape",
+          "shape": "rect",
+          "x": 640,
+          "y": 700,
+          "w": 120,
+          "h": 8,
+          "z": 20,
+          "fill": "#D88C2E",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        }
+      ]
+    }
+  ]
+}

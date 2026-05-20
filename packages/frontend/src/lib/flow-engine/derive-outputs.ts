@@ -172,6 +172,7 @@ export function deriveOutputs(nodeId: string, config: NodeConfig): OutputDef[] {
       ];
 
     case "export":
+    case "ppt":
       return [];
   }
 }

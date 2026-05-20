@@ -86,13 +86,14 @@ export const DEFAULT_PPT_STYLE_PACK_ID = "corporate_blue";
 
 // ─── Workflow types ───────────────────────────────────────────────────────────
 
-/** The 5 workflow node types */
+/** The workflow node types */
 export type WorkflowNodeType =
   | "input_transform"
   | "desensitize"
   | "model_call"
   | "restore"
-  | "export";
+  | "export"
+  | "ppt";
 
 /** Workflow status */
 export type WorkflowStatus = "draft" | "active" | "disabled";
@@ -314,12 +315,32 @@ export interface ExportConfig {
   executionRule?: NodeExecutionRule;
 }
 
+export type PptStyleSelectionMode = "auto" | "runtime_select" | "fixed";
+
+export interface PptConfig {
+  type: "ppt";
+  contentMapping: VariableRef[];
+  /** How the PPT node chooses its visual style at runtime. */
+  styleSelectionMode?: PptStyleSelectionMode;
+  /** Optional style pack ID used by auto/fixed selection. */
+  defaultStyleId?: string;
+  /** Optional short hint displayed to users while executing this node */
+  stepDescription?: string;
+  /** Preconfigured output materialization when this node is skipped */
+  skipStrategy?: SkipStrategy;
+  autoAdvance?: boolean;
+  allowEdit?: boolean;
+  skippable?: boolean;
+  executionRule?: NodeExecutionRule;
+}
+
 export type NodeConfig =
   | InputTransformConfig
   | DesensitizeConfig
   | ModelCallConfig
   | RestoreConfig
-  | ExportConfig;
+  | ExportConfig
+  | PptConfig;
 
 /**
  * Skip strategy is configured against the node's primary outputs.
@@ -438,6 +459,7 @@ export function getSkipStrategyTargets(nodeId: string, config: NodeConfig): Outp
       ];
 
     case "export":
+    case "ppt":
       return [];
   }
 }

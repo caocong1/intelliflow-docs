@@ -1,0 +1,38 @@
+{
+  "bg_wireless_infrastructure": {
+    "type": "image",
+    "src": "docs/design/assets/bg-wireless-infrastructure.jpg"
+  },
+  "detail_ops_dashboard": {
+    "type": "image",
+    "src": "docs/design/assets/detail-ops-dashboard.jpg"
+  },
+  "ap_ceiling_render": {
+    "type": "image",
+    "src": "docs/design/assets/ap-ceiling-render.jpg"
+  },
+  "wireless_infrastructure_hero": {
+    "type": "image",
+    "src": "docs/design/assets/wireless-infrastructure-hero.jpg"
+  },
+  "placeholder_high_density": {
+    "type": "image",
+    "src": "docs/design/assets/placeholder-high-density.jpg"
+  },
+  "icon_coverage": {
+    "type": "image",
+    "src": "docs/design/assets/icon-coverage.png"
+  },
+  "icon_capacity": {
+    "type": "image",
+    "src": "docs/design/assets/icon-capacity.png"
+  },
+  "icon_security": {
+    "type": "image",
+    "src": "docs/design/assets/icon-security.png"
+  },
+  "icon_automation": {
+    "type": "image",
+    "src": "docs/design/assets/icon-automation.png"
+  }
+}

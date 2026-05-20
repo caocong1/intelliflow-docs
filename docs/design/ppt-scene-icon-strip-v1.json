@@ -1,0 +1,545 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#F6F3EE",
+      "surface": "#FFFDF8",
+      "text": "#1E1B18",
+      "muted": "#6B645C",
+      "primary": "#B2452F",
+      "secondary": "#D88C2E",
+      "accent": "#2B6CB0",
+      "success": "#2F855A",
+      "warning": "#C05621",
+      "border": "#E7DED2"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 34,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.05,
+        "align": "left",
+        "valign": "mid"
+      },
+      "h1": {
+        "font": "heading",
+        "size": 24,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.15
+      },
+      "h2": {
+        "font": "heading",
+        "size": 18,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.15
+      },
+      "body": {
+        "font": "body",
+        "size": 12,
+        "color": "{palette.text}",
+        "lineHeight": 1.45
+      },
+      "caption": {
+        "font": "body",
+        "size": 10,
+        "color": "{palette.muted}",
+        "lineHeight": 1.35
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 10,
+        "bold": true,
+        "tracking": 120,
+        "uppercase": true,
+        "color": "{palette.primary}"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {
+    "icon_coverage": "https://example.com/icon-coverage.png",
+    "icon_capacity": "https://example.com/icon-capacity.png",
+    "icon_security": "https://example.com/icon-security.png",
+    "icon_automation": "https://example.com/icon-automation.png"
+  },
+  "slides": [
+    {
+      "id": "slide_icon_strip",
+      "name": "核心能力条带",
+      "designIntent": "premium",
+      "compositionTags": [
+        "strip",
+        "icon system",
+        "structured"
+      ],
+      "density": "medium",
+      "background": {
+        "fill": "#F6F3EE"
+      },
+      "elements": [
+        {
+          "id": "eyebrow_text",
+          "type": "text",
+          "x": 120,
+          "y": 100,
+          "w": 600,
+          "h": 30,
+          "z": 10,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "CORE CAPABILITIES"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "title_text",
+          "type": "text",
+          "x": 120,
+          "y": 140,
+          "w": 800,
+          "h": 80,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "无线网络建设中的四类核心能力"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "bg_strip",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 280,
+          "w": 1600,
+          "h": 460,
+          "z": 0,
+          "fill": "#1E1B18",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "strip_accent_line",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 280,
+          "w": 1600,
+          "h": 4,
+          "z": 1,
+          "fill": "#B2452F",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "group_coverage",
+          "type": "group",
+          "x": 120,
+          "y": 340,
+          "w": 280,
+          "h": 340,
+          "z": 10,
+          "children": [
+            {
+              "id": "icon_bg_1",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 80,
+              "h": 80,
+              "fill": "#2C2825",
+              "stroke": "#3D3833",
+              "strokeWidth": 1,
+              "radius": 20
+            },
+            {
+              "id": "icon_img_1",
+              "type": "image",
+              "assetRef": "icon_coverage",
+              "x": 20,
+              "y": 20,
+              "w": 40,
+              "h": 40,
+              "fit": "contain"
+            },
+            {
+              "id": "num_1",
+              "type": "text",
+              "x": 0,
+              "y": 110,
+              "w": 60,
+              "h": 30,
+              "styleRef": "eyebrow",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "01",
+                      "color": "#B2452F"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "title_1",
+              "type": "text",
+              "x": 0,
+              "y": 140,
+              "w": 280,
+              "h": 40,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "覆盖设计",
+                      "color": "#FFFDF8"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "desc_1",
+              "type": "text",
+              "x": 0,
+              "y": 190,
+              "w": 260,
+              "h": 100,
+              "styleRef": "body",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "基于精准的三维环境建模与射线追踪算法，确保信号无死角覆盖，满足全场景无缝漫游与高可靠接入需求。",
+                      "color": "#A39B93"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "group_capacity",
+          "type": "group",
+          "x": 480,
+          "y": 340,
+          "w": 280,
+          "h": 340,
+          "z": 10,
+          "children": [
+            {
+              "id": "icon_bg_2",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 80,
+              "h": 80,
+              "fill": "#2C2825",
+              "stroke": "#3D3833",
+              "strokeWidth": 1,
+              "radius": 20
+            },
+            {
+              "id": "icon_img_2",
+              "type": "image",
+              "assetRef": "icon_capacity",
+              "x": 20,
+              "y": 20,
+              "w": 40,
+              "h": 40,
+              "fit": "contain"
+            },
+            {
+              "id": "num_2",
+              "type": "text",
+              "x": 0,
+              "y": 110,
+              "w": 60,
+              "h": 30,
+              "styleRef": "eyebrow",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "02",
+                      "color": "#B2452F"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "title_2",
+              "type": "text",
+              "x": 0,
+              "y": 140,
+              "w": 280,
+              "h": 40,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "容量规划",
+                      "color": "#FFFDF8"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "desc_2",
+              "type": "text",
+              "x": 0,
+              "y": 190,
+              "w": 260,
+              "h": 100,
+              "styleRef": "body",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "动态预测终端密度与业务流量模型，合理配置频宽与信道资源，避免拥塞，保障高并发环境下的极速体验。",
+                      "color": "#A39B93"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "group_security",
+          "type": "group",
+          "x": 840,
+          "y": 340,
+          "w": 280,
+          "h": 340,
+          "z": 10,
+          "children": [
+            {
+              "id": "icon_bg_3",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 80,
+              "h": 80,
+              "fill": "#2C2825",
+              "stroke": "#3D3833",
+              "strokeWidth": 1,
+              "radius": 20
+            },
+            {
+              "id": "icon_img_3",
+              "type": "image",
+              "assetRef": "icon_security",
+              "x": 20,
+              "y": 20,
+              "w": 40,
+              "h": 40,
+              "fit": "contain"
+            },
+            {
+              "id": "num_3",
+              "type": "text",
+              "x": 0,
+              "y": 110,
+              "w": 60,
+              "h": 30,
+              "styleRef": "eyebrow",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "03",
+                      "color": "#B2452F"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "title_3",
+              "type": "text",
+              "x": 0,
+              "y": 140,
+              "w": 280,
+              "h": 40,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "安全合规",
+                      "color": "#FFFDF8"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "desc_3",
+              "type": "text",
+              "x": 0,
+              "y": 190,
+              "w": 260,
+              "h": 100,
+              "styleRef": "body",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "构筑端到端加密体系与准入控制策略，防范非法入侵与数据泄露，全面符合企业级网络安全审计标准。",
+                      "color": "#A39B93"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "group_automation",
+          "type": "group",
+          "x": 1200,
+          "y": 340,
+          "w": 280,
+          "h": 340,
+          "z": 10,
+          "children": [
+            {
+              "id": "icon_bg_4",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 0,
+              "y": 0,
+              "w": 80,
+              "h": 80,
+              "fill": "#2C2825",
+              "stroke": "#3D3833",
+              "strokeWidth": 1,
+              "radius": 20
+            },
+            {
+              "id": "icon_img_4",
+              "type": "image",
+              "assetRef": "icon_automation",
+              "x": 20,
+              "y": 20,
+              "w": 40,
+              "h": 40,
+              "fit": "contain"
+            },
+            {
+              "id": "num_4",
+              "type": "text",
+              "x": 0,
+              "y": 110,
+              "w": 60,
+              "h": 30,
+              "styleRef": "eyebrow",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "04",
+                      "color": "#B2452F"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "title_4",
+              "type": "text",
+              "x": 0,
+              "y": 140,
+              "w": 280,
+              "h": 40,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "运维自动化",
+                      "color": "#FFFDF8"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "desc_4",
+              "type": "text",
+              "x": 0,
+              "y": 190,
+              "w": 260,
+              "h": 100,
+              "styleRef": "body",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "引入 AI 驱动的故障自愈与智能巡检平台，实现网络状态全局可视化，大幅降低人工干预成本与平均修复时间。",
+                      "color": "#A39B93"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

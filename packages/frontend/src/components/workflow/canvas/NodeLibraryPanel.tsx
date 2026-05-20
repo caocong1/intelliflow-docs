@@ -128,6 +128,30 @@ const NODE_TYPES: NodeTypeEntry[] = [
       </svg>
     ),
   },
+  {
+    type: "ppt",
+    label: "PPT 生成",
+    accentBg: "bg-sky-500",
+    iconBg: "bg-sky-100",
+    iconColor: "text-sky-600",
+    icon: () => (
+      <svg
+        class="w-3 h-3"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
+        <title>PPT 生成</title>
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          d="M3 4.5A1.5 1.5 0 014.5 3h15A1.5 1.5 0 0121 4.5v11A1.5 1.5 0 0119.5 17H13v2.25l3 1.5M11 17v2.25l-3 1.5M7 8h5M7 11h8m2-3h.01"
+        />
+      </svg>
+    ),
+  },
 ];
 
 export default function NodeLibraryPanel() {

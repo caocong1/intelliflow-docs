@@ -1,0 +1,226 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#0B0A0A",
+      "surface": "#161414",
+      "text": "#FAFAFA",
+      "muted": "#8A847F",
+      "primary": "#D4A373",
+      "secondary": "#2C2A28",
+      "border": "#1F1D1C"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 88,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.05,
+        "align": "left",
+        "valign": "mid"
+      },
+      "body": {
+        "font": "body",
+        "size": 22,
+        "color": "{palette.muted}",
+        "lineHeight": 1.6,
+        "align": "left"
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 13,
+        "bold": true,
+        "tracking": 240,
+        "uppercase": true,
+        "color": "{palette.primary}",
+        "align": "left"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "closing_statement",
+      "name": "结束声明",
+      "designIntent": "closing statement",
+      "compositionTags": [
+        "elegant",
+        "premium",
+        "quiet confidence",
+        "asymmetric",
+        "dark mode"
+      ],
+      "density": "low",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "structural_grid_line_v1",
+          "type": "shape",
+          "shape": "rect",
+          "x": 280,
+          "y": 0,
+          "w": 1,
+          "h": 900,
+          "z": 0,
+          "fill": "{palette.border}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "structural_grid_line_h1",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 780,
+          "w": 1600,
+          "h": 1,
+          "z": 0,
+          "fill": "{palette.border}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "decorative_wireframe_circle_1",
+          "type": "shape",
+          "shape": "ellipse",
+          "x": 1100,
+          "y": -200,
+          "w": 800,
+          "h": 800,
+          "z": 1,
+          "fill": "#00000000",
+          "stroke": "{palette.secondary}",
+          "strokeWidth": 1,
+          "radius": 0
+        },
+        {
+          "id": "decorative_wireframe_circle_2",
+          "type": "shape",
+          "shape": "ellipse",
+          "x": 1300,
+          "y": 0,
+          "w": 400,
+          "h": 400,
+          "z": 1,
+          "fill": "#00000000",
+          "stroke": "{palette.border}",
+          "strokeWidth": 1,
+          "radius": 0
+        },
+        {
+          "id": "focus_accent_indicator",
+          "type": "shape",
+          "shape": "rect",
+          "x": 280,
+          "y": 420,
+          "w": 4,
+          "h": 92,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        },
+        {
+          "id": "eyebrow_thank_you",
+          "type": "text",
+          "x": 360,
+          "y": 370,
+          "w": 600,
+          "h": 30,
+          "z": 20,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "END OF PRESENTATION"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_statement",
+          "type": "text",
+          "x": 354,
+          "y": 420,
+          "w": 800,
+          "h": 100,
+          "z": 20,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "感谢聆听"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sub_statement",
+          "type": "text",
+          "x": 360,
+          "y": 550,
+          "w": 700,
+          "h": 60,
+          "z": 20,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "align": "left",
+              "runs": [
+                {
+                  "text": "可根据您的场景需求定制专属无线网络建设方案"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "bottom_right_anchor_accent",
+          "type": "shape",
+          "shape": "rect",
+          "x": 1400,
+          "y": 779,
+          "w": 120,
+          "h": 3,
+          "z": 10,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,365 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#1E1B18",
+      "surface": "#FFFDF8",
+      "text": "#1E1B18",
+      "muted": "#6B645C",
+      "primary": "#B2452F",
+      "secondary": "#D88C2E",
+      "accent": "#2B6CB0",
+      "success": "#2F855A",
+      "warning": "#C05621",
+      "border": "#E7DED2"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 64,
+        "bold": true,
+        "color": "#FFFDF8",
+        "lineHeight": 1.1,
+        "align": "left",
+        "valign": "mid"
+      },
+      "h1": {
+        "font": "heading",
+        "size": 32,
+        "bold": true,
+        "color": "#FFFDF8",
+        "lineHeight": 1.2
+      },
+      "h2": {
+        "font": "heading",
+        "size": 24,
+        "bold": true,
+        "color": "#1E1B18",
+        "lineHeight": 1.2
+      },
+      "body": {
+        "font": "body",
+        "size": 16,
+        "color": "#6B645C",
+        "lineHeight": 1.4
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "closing_summary",
+      "name": "总结页",
+      "designIntent": "poster",
+      "compositionTags": [
+        "takeaway",
+        "asymmetric",
+        "ribbons",
+        "strong closure"
+      ],
+      "density": "low",
+      "background": {
+        "fill": "#1E1B18"
+      },
+      "elements": [
+        {
+          "id": "bg_accent_primary",
+          "type": "shape",
+          "shape": "rect",
+          "x": -200,
+          "y": 600,
+          "w": 1000,
+          "h": 800,
+          "z": 1,
+          "rotate": -25,
+          "fill": "#B2452F",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "opacity": 1
+        },
+        {
+          "id": "bg_accent_secondary",
+          "type": "shape",
+          "shape": "rect",
+          "x": -100,
+          "y": -300,
+          "w": 600,
+          "h": 600,
+          "z": 1,
+          "rotate": 45,
+          "fill": "#D88C2E",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "opacity": 0.1
+        },
+        {
+          "id": "main_title",
+          "type": "text",
+          "x": 100,
+          "y": 280,
+          "w": 600,
+          "h": 200,
+          "z": 10,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "构建下一代\n",
+                  "color": "#FFFDF8",
+                  "size": 72
+                },
+                {
+                  "text": "无线网络基座",
+                  "color": "#D88C2E",
+                  "size": 72
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "sub_title",
+          "type": "text",
+          "x": 100,
+          "y": 500,
+          "w": 500,
+          "h": 100,
+          "z": 10,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "让连接成为业务的加速器\n而非运维的无底洞",
+                  "color": "#F6F3EE",
+                  "size": 24
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "band_1_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 750,
+          "y": 120,
+          "w": 900,
+          "h": 220,
+          "z": 10,
+          "fill": "#FFFDF8",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 16,
+          "opacity": 1
+        },
+        {
+          "id": "band_1_text",
+          "type": "text",
+          "x": 820,
+          "y": 170,
+          "w": 700,
+          "h": 120,
+          "z": 11,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "01  ",
+                  "color": "#B2452F",
+                  "size": 56,
+                  "bold": true
+                },
+                {
+                  "text": "合规优先\n",
+                  "color": "#1E1B18",
+                  "size": 56,
+                  "bold": true
+                }
+              ]
+            },
+            {
+              "spaceBefore": 12,
+              "runs": [
+                {
+                  "text": "       安全边界与数据合规是网络的绝对底线",
+                  "color": "#6B645C",
+                  "size": 22
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "band_2_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 950,
+          "y": 380,
+          "w": 700,
+          "h": 100,
+          "z": 10,
+          "fill": "#B2452F",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 16,
+          "opacity": 1
+        },
+        {
+          "id": "band_2_text",
+          "type": "text",
+          "x": 1000,
+          "y": 405,
+          "w": 600,
+          "h": 50,
+          "z": 11,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "02  ",
+                  "color": "#FFFDF8",
+                  "size": 32,
+                  "bold": true
+                },
+                {
+                  "text": "场景适配",
+                  "color": "#FFFDF8",
+                  "size": 32,
+                  "bold": true
+                },
+                {
+                  "text": "   拒绝一刀切的硬件堆砌",
+                  "color": "#F0E7DB",
+                  "size": 20
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "band_3_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 680,
+          "y": 520,
+          "w": 1000,
+          "h": 120,
+          "z": 10,
+          "fill": "#F0E7DB",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 16,
+          "opacity": 1
+        },
+        {
+          "id": "band_3_text",
+          "type": "text",
+          "x": 740,
+          "y": 555,
+          "w": 800,
+          "h": 50,
+          "z": 11,
+          "styleRef": "h1",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "03  ",
+                  "color": "#D88C2E",
+                  "size": 36,
+                  "bold": true
+                },
+                {
+                  "text": "容量预估",
+                  "color": "#1E1B18",
+                  "size": 36,
+                  "bold": true
+                },
+                {
+                  "text": "   精准计算并发，为未来三年留出弹性空间",
+                  "color": "#6B645C",
+                  "size": 20
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "band_4_bg",
+          "type": "shape",
+          "shape": "roundRect",
+          "x": 1100,
+          "y": 680,
+          "w": 600,
+          "h": 80,
+          "z": 10,
+          "fill": "#D88C2E",
+          "stroke": "#00000000",
+          "strokeWidth": 0,
+          "radius": 16,
+          "opacity": 1
+        },
+        {
+          "id": "band_4_text",
+          "type": "text",
+          "x": 1140,
+          "y": 705,
+          "w": 400,
+          "h": 40,
+          "z": 11,
+          "styleRef": "h2",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "04  ",
+                  "color": "#FFFDF8",
+                  "size": 24,
+                  "bold": true
+                },
+                {
+                  "text": "可运维性",
+                  "color": "#1E1B18",
+                  "size": 24,
+                  "bold": true
+                },
+                {
+                  "text": "   云端纳管与极简排障",
+                  "color": "#1E1B18",
+                  "size": 16
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        }
+      ]
+    }
+  ]
+}

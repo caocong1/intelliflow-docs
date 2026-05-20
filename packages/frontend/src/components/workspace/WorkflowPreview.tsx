@@ -8,6 +8,7 @@ const nodeTypeLabels: Record<WorkflowNodeType, string> = {
   model_call: "模型调用",
   restore: "信息恢复",
   export: "文件导出",
+  ppt: "PPT 生成",
 };
 
 /** Color classes per node type */
@@ -17,6 +18,7 @@ const nodeTypeColors: Record<WorkflowNodeType, { bg: string; text: string; borde
   model_call: { bg: "bg-violet-50", text: "text-violet-700", border: "border-violet-200" },
   restore: { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
   export: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
+  ppt: { bg: "bg-sky-50", text: "text-sky-700", border: "border-sky-200" },
 };
 
 /** SVG icon per node type */
@@ -56,6 +58,13 @@ function NodeTypeIcon(props: { type: WorkflowNodeType }) {
         <svg class={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <title>文件导出</title>
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      );
+    case "ppt":
+      return (
+        <svg class={iconClass} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <title>PPT 生成</title>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4.5A1.5 1.5 0 014.5 3h15A1.5 1.5 0 0121 4.5v11A1.5 1.5 0 0119.5 17H13v2.25l3 1.5M11 17v2.25l-3 1.5M7 8h5M7 11h8m2-3h.01" />
         </svg>
       );
   }

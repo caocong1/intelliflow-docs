@@ -71,5 +71,13 @@ describe("assertWithinRoot", () => {
       const result = assertWithinRoot("/data/exports", "/data/exports/doc.pdf");
       expect(result).toBe("/data/exports/doc.pdf");
     });
+
+    it("allows persisted storage paths when root is relative", () => {
+      const result = assertWithinRoot(
+        "./data/workspaces/exports/doc-1",
+        "data/workspaces/exports/doc-1/deck.pptx",
+      );
+      expect(result).toMatch(/\/data\/workspaces\/exports\/doc-1\/deck\.pptx$/);
+    });
   });
 });

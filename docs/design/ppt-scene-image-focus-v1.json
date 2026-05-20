@@ -1,0 +1,259 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#0A0A0A",
+      "surface": "#141414",
+      "text": "#FFFFFF",
+      "muted": "#8A8A8A",
+      "primary": "#E25325",
+      "secondary": "#D88C2E",
+      "accent": "#2B6CB0",
+      "success": "#2F855A",
+      "warning": "#C05621",
+      "border": "#2A2A2A"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 46,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.15,
+        "align": "left",
+        "valign": "mid"
+      },
+      "body": {
+        "font": "body",
+        "size": 15,
+        "color": "{palette.muted}",
+        "lineHeight": 1.6
+      },
+      "caption": {
+        "font": "mono",
+        "size": 12,
+        "color": "{palette.primary}",
+        "lineHeight": 1.4,
+        "uppercase": true,
+        "tracking": 150
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "slide_image_focus",
+      "name": "核心理念",
+      "designIntent": "cinematic",
+      "compositionTags": [
+        "image-led",
+        "editorial",
+        "overlay"
+      ],
+      "density": "low",
+      "background": {
+        "fill": "#0A0A0A"
+      },
+      "elements": [
+        {
+          "id": "hero_bg_image",
+          "type": "image",
+          "assetRef": "wireless_infrastructure_hero",
+          "src": "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=1600&q=80",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "z": 0,
+          "fit": "cover"
+        },
+        {
+          "id": "hero_overlay_mask",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 900,
+          "z": 1,
+          "fill": "#000000",
+          "opacity": 0.55,
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "content_glass_card",
+          "type": "shape",
+          "shape": "rect",
+          "x": 120,
+          "y": 460,
+          "w": 680,
+          "h": 320,
+          "z": 10,
+          "fill": "#0A0A0A",
+          "opacity": 0.85,
+          "stroke": "#2A2A2A",
+          "strokeWidth": 1,
+          "radius": 0,
+          "shadow": {
+            "color": "#000000",
+            "opacity": 0.5,
+            "blur": 40,
+            "distance": 16,
+            "angle": 90
+          }
+        },
+        {
+          "id": "card_accent_line",
+          "type": "shape",
+          "shape": "rect",
+          "x": 120,
+          "y": 460,
+          "w": 680,
+          "h": 4,
+          "z": 11,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "eyebrow_text",
+          "type": "text",
+          "x": 180,
+          "y": 520,
+          "w": 560,
+          "h": 30,
+          "z": 12,
+          "styleRef": "caption",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "CORE PARADIGM SHIFT"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "main_statement_text",
+          "type": "text",
+          "x": 180,
+          "y": 570,
+          "w": 560,
+          "h": 120,
+          "z": 12,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "无线网络建设绝不仅是设备的采买，\n"
+                },
+                {
+                  "text": "更是",
+                  "color": "{palette.muted}"
+                },
+                {
+                  "text": "场景、容量与运维",
+                  "color": "{palette.primary}"
+                },
+                {
+                  "text": "的协同演进。",
+                  "color": "{palette.muted}"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "description_text",
+          "type": "text",
+          "x": 180,
+          "y": 710,
+          "w": 560,
+          "h": 60,
+          "z": 12,
+          "styleRef": "body",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "摒弃单纯的硬件堆叠思维，转向以业务连续性和终端体验为核心的系统级架构设计，打造具备全生命周期演进能力的数字底座。"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "figure_caption_group",
+          "type": "group",
+          "x": 1180,
+          "y": 760,
+          "w": 300,
+          "h": 80,
+          "z": 10,
+          "children": [
+            {
+              "id": "caption_indicator_line",
+              "type": "shape",
+              "shape": "rect",
+              "x": 0,
+              "y": 10,
+              "w": 32,
+              "h": 2,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "caption_description_text",
+              "type": "text",
+              "x": 48,
+              "y": 0,
+              "w": 252,
+              "h": 80,
+              "styleRef": "body",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "FIG 01. ",
+                      "font": "mono",
+                      "color": "{palette.text}",
+                      "size": 12,
+                      "bold": true
+                    },
+                    {
+                      "text": "现代企业级无线网络的立体化协同架构与高密场景承载模型。"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

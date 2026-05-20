@@ -43,6 +43,7 @@ const DEFAULT_LABELS: Record<WorkflowNodeType, string> = {
   model_call: "模型调用",
   restore: "信息恢复",
   export: "文件导出",
+  ppt: "PPT 生成",
 };
 
 function buildDefaultConfig(nodeType: WorkflowNodeType): NodeConfig {
@@ -57,6 +58,8 @@ function buildDefaultConfig(nodeType: WorkflowNodeType): NodeConfig {
       return { type: "restore", pairedDesensitizeNodeId: null };
     case "export":
       return { type: "export", formats: ["word", "pdf", "markdown"], templateId: null, contentMapping: [] };
+    case "ppt":
+      return { type: "ppt", contentMapping: [], styleSelectionMode: "runtime_select" };
   }
 }
 

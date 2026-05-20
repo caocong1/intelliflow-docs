@@ -1,0 +1,825 @@
+{
+  "version": "ppt_scene/v1",
+  "meta": {
+    "title": "无线网络建设全流程指南",
+    "subject": "无线网络",
+    "language": "zh-CN",
+    "canvas": {
+      "width": 1600,
+      "height": 900,
+      "unit": "canvas"
+    }
+  },
+  "theme": {
+    "palette": {
+      "bg": "#F6F3EE",
+      "surface": "#FFFDF8",
+      "text": "#1E1B18",
+      "muted": "#6B645C",
+      "primary": "#B2452F",
+      "secondary": "#D88C2E",
+      "accent": "#2B6CB0",
+      "success": "#2F855A",
+      "warning": "#C05621",
+      "border": "#E7DED2",
+      "darkBg": "#1E1B18",
+      "darkText": "#FFFFFF",
+      "darkMuted": "#8B857E",
+      "darkHuge": "#2A2622",
+      "lightHuge": "#E7DED2",
+      "accentHuge": "#FADBD5"
+    },
+    "fonts": {
+      "display": "Alibaba PuHuiTi 3.0 75 SemiBold",
+      "heading": "Alibaba PuHuiTi 3.0 65 Medium",
+      "body": "Alibaba PuHuiTi 3.0 45 Light",
+      "mono": "JetBrains Mono"
+    },
+    "textStyles": {
+      "display": {
+        "font": "display",
+        "size": 42,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.1,
+        "align": "left",
+        "valign": "mid"
+      },
+      "eyebrow": {
+        "font": "heading",
+        "size": 14,
+        "bold": true,
+        "tracking": 120,
+        "uppercase": true,
+        "color": "{palette.primary}",
+        "align": "left",
+        "valign": "mid"
+      },
+      "h2": {
+        "font": "heading",
+        "size": 26,
+        "bold": true,
+        "color": "{palette.text}",
+        "lineHeight": 1.2,
+        "align": "left",
+        "valign": "mid"
+      },
+      "h2_dark": {
+        "font": "heading",
+        "size": 26,
+        "bold": true,
+        "color": "{palette.darkText}",
+        "lineHeight": 1.2,
+        "align": "left",
+        "valign": "mid"
+      },
+      "body": {
+        "font": "body",
+        "size": 16,
+        "color": "{palette.muted}",
+        "lineHeight": 1.5,
+        "align": "left",
+        "valign": "mid"
+      },
+      "body_dark": {
+        "font": "body",
+        "size": 16,
+        "color": "{palette.darkMuted}",
+        "lineHeight": 1.5,
+        "align": "left",
+        "valign": "mid"
+      },
+      "huge_light": {
+        "font": "display",
+        "size": 80,
+        "bold": true,
+        "color": "{palette.lightHuge}",
+        "lineHeight": 1.0,
+        "align": "left",
+        "valign": "mid"
+      },
+      "huge_dark": {
+        "font": "display",
+        "size": 80,
+        "bold": true,
+        "color": "{palette.darkHuge}",
+        "lineHeight": 1.0,
+        "align": "left",
+        "valign": "mid"
+      },
+      "huge_accent": {
+        "font": "display",
+        "size": 80,
+        "bold": true,
+        "color": "{palette.accentHuge}",
+        "lineHeight": 1.0,
+        "align": "left",
+        "valign": "mid"
+      },
+      "tag": {
+        "font": "heading",
+        "size": 12,
+        "bold": true,
+        "color": "#FFFFFF",
+        "align": "center",
+        "valign": "mid"
+      }
+    },
+    "shapeStyles": {}
+  },
+  "assets": {},
+  "slides": [
+    {
+      "id": "timeline_evolution",
+      "name": "发展历程",
+      "designIntent": "editorial",
+      "compositionTags": [
+        "banded",
+        "timeline",
+        "contrast",
+        "poster"
+      ],
+      "density": "medium",
+      "background": {
+        "fill": "{palette.bg}"
+      },
+      "elements": [
+        {
+          "id": "bg_top",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 0,
+          "w": 1600,
+          "h": 500,
+          "z": 0,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "{palette.bg}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "bg_bottom",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 500,
+          "w": 1600,
+          "h": 400,
+          "z": 0,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "{palette.darkBg}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "track_line",
+          "type": "shape",
+          "shape": "rect",
+          "x": 0,
+          "y": 499,
+          "w": 1600,
+          "h": 2,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "fill": "{palette.primary}",
+          "stroke": "#00000000",
+          "strokeWidth": 0
+        },
+        {
+          "id": "title_eyebrow",
+          "type": "text",
+          "x": 80,
+          "y": 60,
+          "w": 400,
+          "h": 30,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "eyebrow",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "WIRELESS EVOLUTION"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "title_main",
+          "type": "text",
+          "x": 80,
+          "y": 100,
+          "w": 600,
+          "h": 60,
+          "z": 10,
+          "rotate": 0,
+          "opacity": 1,
+          "styleRef": "display",
+          "paragraphs": [
+            {
+              "runs": [
+                {
+                  "text": "无线网络建设全流程指南"
+                }
+              ]
+            }
+          ],
+          "fit": "shrink"
+        },
+        {
+          "id": "node_group_1",
+          "type": "group",
+          "x": 80,
+          "y": 200,
+          "w": 260,
+          "h": 300,
+          "z": 20,
+          "rotate": 0,
+          "opacity": 1,
+          "children": [
+            {
+              "id": "n1_bg_text",
+              "type": "text",
+              "x": 0,
+              "y": 0,
+              "w": 260,
+              "h": 100,
+              "z": 0,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "huge_light",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "GEN 03"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n1_title",
+              "type": "text",
+              "x": 20,
+              "y": 120,
+              "w": 240,
+              "h": 40,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "802.11a/b/g"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n1_desc",
+              "type": "text",
+              "x": 20,
+              "y": 170,
+              "w": 240,
+              "h": 60,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "body",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "基础无线接入"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n1_line",
+              "type": "shape",
+              "shape": "rect",
+              "x": 30,
+              "y": 230,
+              "w": 2,
+              "h": 70,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "n1_dot",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": 25,
+              "y": 294,
+              "w": 12,
+              "h": 12,
+              "z": 2,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            }
+          ]
+        },
+        {
+          "id": "node_group_2",
+          "type": "group",
+          "x": 360,
+          "y": 500,
+          "w": 280,
+          "h": 360,
+          "z": 20,
+          "rotate": 0,
+          "opacity": 1,
+          "children": [
+            {
+              "id": "n2_dot",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": 25,
+              "y": -6,
+              "w": 12,
+              "h": 12,
+              "z": 2,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "n2_line",
+              "type": "shape",
+              "shape": "rect",
+              "x": 30,
+              "y": 6,
+              "w": 2,
+              "h": 90,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "n2_title",
+              "type": "text",
+              "x": 20,
+              "y": 110,
+              "w": 260,
+              "h": 40,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "h2_dark",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "802.11n (Wi-Fi 4)"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n2_desc",
+              "type": "text",
+              "x": 20,
+              "y": 160,
+              "w": 260,
+              "h": 60,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "body_dark",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "MIMO 与规模化商用"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n2_bg_text",
+              "type": "text",
+              "x": 0,
+              "y": 220,
+              "w": 280,
+              "h": 100,
+              "z": 0,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "huge_dark",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "GEN 04"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "node_group_3",
+          "type": "group",
+          "x": 660,
+          "y": 100,
+          "w": 280,
+          "h": 400,
+          "z": 20,
+          "rotate": 0,
+          "opacity": 1,
+          "children": [
+            {
+              "id": "n3_bg_text",
+              "type": "text",
+              "x": 0,
+              "y": 0,
+              "w": 280,
+              "h": 100,
+              "z": 0,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "huge_light",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "GEN 05"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n3_title",
+              "type": "text",
+              "x": 20,
+              "y": 180,
+              "w": 260,
+              "h": 40,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "802.11ac (Wi-Fi 5)"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n3_desc",
+              "type": "text",
+              "x": 20,
+              "y": 230,
+              "w": 260,
+              "h": 60,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "body",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "千兆无线时代"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n3_line",
+              "type": "shape",
+              "shape": "rect",
+              "x": 30,
+              "y": 290,
+              "w": 2,
+              "h": 110,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "n3_dot",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": 25,
+              "y": 394,
+              "w": 12,
+              "h": 12,
+              "z": 2,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            }
+          ]
+        },
+        {
+          "id": "node_group_4",
+          "type": "group",
+          "x": 960,
+          "y": 500,
+          "w": 300,
+          "h": 360,
+          "z": 20,
+          "rotate": 0,
+          "opacity": 1,
+          "children": [
+            {
+              "id": "n4_dot",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": 25,
+              "y": -6,
+              "w": 12,
+              "h": 12,
+              "z": 2,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "n4_line",
+              "type": "shape",
+              "shape": "rect",
+              "x": 30,
+              "y": 6,
+              "w": 2,
+              "h": 130,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "n4_title",
+              "type": "text",
+              "x": 20,
+              "y": 150,
+              "w": 280,
+              "h": 40,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "h2_dark",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "802.11ax (Wi-Fi 6)"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n4_desc",
+              "type": "text",
+              "x": 20,
+              "y": 200,
+              "w": 280,
+              "h": 60,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "body_dark",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "高密场景优化"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n4_bg_text",
+              "type": "text",
+              "x": 0,
+              "y": 260,
+              "w": 300,
+              "h": 100,
+              "z": 0,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "huge_dark",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "GEN 06"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            }
+          ]
+        },
+        {
+          "id": "node_group_5",
+          "type": "group",
+          "x": 1260,
+          "y": 40,
+          "w": 320,
+          "h": 460,
+          "z": 20,
+          "rotate": 0,
+          "opacity": 1,
+          "children": [
+            {
+              "id": "n5_bg_text",
+              "type": "text",
+              "x": 0,
+              "y": 0,
+              "w": 320,
+              "h": 100,
+              "z": 0,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "huge_accent",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "GEN 07"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n5_tag_bg",
+              "type": "shape",
+              "shape": "roundRect",
+              "x": 20,
+              "y": 160,
+              "w": 48,
+              "h": 24,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "radius": 12,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "n5_tag_text",
+              "type": "text",
+              "x": 20,
+              "y": 160,
+              "w": 48,
+              "h": 24,
+              "z": 2,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "tag",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "NEW"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n5_title",
+              "type": "text",
+              "x": 20,
+              "y": 200,
+              "w": 300,
+              "h": 40,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "h2",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "Wi-Fi 7",
+                      "color": "{palette.primary}"
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n5_desc",
+              "type": "text",
+              "x": 20,
+              "y": 250,
+              "w": 300,
+              "h": 60,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "styleRef": "body",
+              "paragraphs": [
+                {
+                  "runs": [
+                    {
+                      "text": "多链路与低时延体验",
+                      "color": "{palette.text}",
+                      "bold": true
+                    }
+                  ]
+                }
+              ],
+              "fit": "shrink"
+            },
+            {
+              "id": "n5_line",
+              "type": "shape",
+              "shape": "rect",
+              "x": 30,
+              "y": 310,
+              "w": 3,
+              "h": 150,
+              "z": 1,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            },
+            {
+              "id": "n5_dot",
+              "type": "shape",
+              "shape": "ellipse",
+              "x": 23,
+              "y": 452,
+              "w": 16,
+              "h": 16,
+              "z": 2,
+              "rotate": 0,
+              "opacity": 1,
+              "fill": "{palette.primary}",
+              "stroke": "#00000000",
+              "strokeWidth": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

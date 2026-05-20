@@ -567,7 +567,8 @@ export default function ModelCallExecutor(props: Props) {
       artifacts: Array<[string, ModelCallNamedOutput]>,
       options?: {
         meta?: string;
-        tone?: "default" | "selected";
+        tone?: "default" | "selected" | "warning";
+        hasFormatError?: boolean;
         fallbackModelId?: string;
         readonly?: boolean;
       },
@@ -578,6 +579,7 @@ export default function ModelCallExecutor(props: Props) {
         label,
         meta: options?.meta,
         tone: options?.tone,
+        hasFormatError: options?.hasFormatError,
         artifacts: artifacts.map(([artifactId, artifact]) => ({
           artifactId,
           artifactName: defs.get(artifactId)?.name ?? artifactId,
@@ -619,17 +621,22 @@ export default function ModelCallExecutor(props: Props) {
         : modelArtifacts;
       const mergedSelectedModel =
         mergeSelectedSourceIntoModel() && model.modelId === singleSelectedModelId();
+      const isFormatError = model.status === "format_error";
+      const formatErrorMeta = isFormatError
+        ? `格式错误（${model.formatErrors?.length ?? 0} 项）`
+        : undefined;
       appendSource(`model:${model.modelId}`, model.modelDisplayName, browserArtifacts, {
         meta: selectionEnabled()
           ? mergedSelectedModel
             ? "当前采用输出"
             : isModelSelected(model.modelId)
               ? "已加入用户选择"
-              : (diagnostic?.issue?.sourceMeta ?? undefined)
+              : (formatErrorMeta ?? diagnostic?.issue?.sourceMeta ?? undefined)
           : model.modelId === selectedModelId()
             ? "当前选中模型"
-            : (diagnostic?.issue?.sourceMeta ?? undefined),
+            : (formatErrorMeta ?? diagnostic?.issue?.sourceMeta ?? undefined),
         tone: diagnostic?.issue ? "warning" : undefined,
+        hasFormatError: isFormatError,
         fallbackModelId: model.modelId,
         readonly: props.readOnly,
       });

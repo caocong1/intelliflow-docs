@@ -15,6 +15,7 @@ export interface NamedOutputBrowserSource {
   label: string;
   meta?: string;
   tone?: "default" | "selected" | "warning";
+  hasFormatError?: boolean;
   artifacts: NamedOutputBrowserArtifact[];
 }
 
@@ -130,8 +131,9 @@ export default function NamedOutputsBrowser(props: NamedOutputsBrowserProps) {
                     classList={{
                       "border-[rgba(79,70,229,0.35)] bg-[rgba(79,70,229,0.08)]": active(),
                       "border-amber-200 bg-amber-50 hover:bg-amber-100":
-                        !active() && source.tone === "warning",
-                      "border-[rgba(199,196,216,0.24)] bg-white hover:bg-[#f7f9fb]": !active(),
+                        !active() && (source.tone === "warning" || source.hasFormatError),
+                      "border-[rgba(199,196,216,0.24)] bg-white hover:bg-[#f7f9fb]":
+                        !active() && !(source.tone === "warning" || source.hasFormatError),
                     }}
                     onClick={() => setActiveSourceId(source.id)}
                   >
@@ -150,7 +152,26 @@ export default function NamedOutputsBrowser(props: NamedOutputsBrowserProps) {
                           汇总
                         </span>
                       </Show>
-                      <Show when={source.tone === "warning"}>
+                      <Show when={source.hasFormatError}>
+                        <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                          <svg
+                            class="w-2.5 h-2.5"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2.5"
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                          >
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126z"
+                            />
+                          </svg>
+                          格式错误
+                        </span>
+                      </Show>
+                      <Show when={!source.hasFormatError && source.tone === "warning"}>
                         <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
                           异常
                         </span>
@@ -160,7 +181,9 @@ export default function NamedOutputsBrowser(props: NamedOutputsBrowserProps) {
                       <Show when={source.meta}>
                         <span
                           class="truncate"
-                          classList={{ "text-amber-700": source.tone === "warning" }}
+                          classList={{
+                            "text-amber-700": source.tone === "warning" || source.hasFormatError,
+                          }}
                         >
                           {source.meta}
                         </span>

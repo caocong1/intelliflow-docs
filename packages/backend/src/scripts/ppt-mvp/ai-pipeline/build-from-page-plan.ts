@@ -13,6 +13,8 @@ import { mkdir, readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { pathToFileURL } from "node:url";
 
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { resolveAssetPlanToPaths } from "../assets";
 import type { AssetPlan, PagePlan, PresentationOutline, VisualBrief } from "../types";
 import type { Layer0Source, PageAssetMap, PipelineArtifacts } from "./types";
@@ -20,6 +22,7 @@ import type { MockProvider } from "./pipeline";
 import { runPipeline } from "./pipeline";
 import { renderHtmlToPng } from "./render-html";
 import { packPptx } from "./pack-pptx";
+import { runVisualQa, type QaResult, type RunVisualQaOptions } from "./visual-qa";
 
 export type BuildFromPagePlanOptions = {
   outlinePath: string;
@@ -42,12 +45,17 @@ export type BuildFromPagePlanOptions = {
 
   /** Allow a caller to observe progress without scraping stdout. */
   log?: (msg: string) => void;
+
+  /** Enable Visual QA (Track A subagent + Track B detector) after render. */
+  visualQa?: boolean | RunVisualQaOptions;
 };
 
 export type BuildFromPagePlanResult = {
   pptxPath: string;
   sessionDir: string;
   artifacts: PipelineArtifacts;
+  /** Visual-QA result when enabled via opts.visualQa. */
+  visualQa?: QaResult;
 };
 
 export async function buildFromPagePlan(
@@ -119,6 +127,27 @@ export async function buildFromPagePlan(
     slidePacks.push({ pngPath, speakerNote: rp.speakerNote });
   }
 
+  // Visual QA (Track A subagent + Track B detector) before packing.
+  // Caller decides whether QA failures block shipment; current default is
+  // to log + persist the report and continue (do not silently fail).
+  let qaResult: QaResult | undefined;
+  if (opts.visualQa) {
+    log(`[ai-pipeline] running visual QA (Track A + Track B)`);
+    const qaOptions: RunVisualQaOptions =
+      typeof opts.visualQa === "object" ? opts.visualQa : {};
+    qaResult = await runVisualQa(artifacts.renderedPages, artifacts.specLock, qaOptions);
+    const qaPath = join(sessionDir, "05-visual-qa.json");
+    await writeFile(qaPath, JSON.stringify(qaResult, null, 2));
+    log(
+      `[ai-pipeline] visual QA → total=${qaResult.subagent?.total ?? "(detector-only)"} passed=${qaResult.passed} needsRegen=${qaResult.needsRegenerate.length}`,
+    );
+    if (qaResult.needsRegenerate.length > 0) {
+      log(
+        `[ai-pipeline] ⚠️  pages flagged for regeneration: ${qaResult.needsRegenerate.join(", ")} — see ${qaPath}`,
+      );
+    }
+  }
+
   log(`[ai-pipeline] packing ${slidePacks.length}-page PPTX`);
   await packPptx({
     slides: slidePacks,
@@ -133,8 +162,14 @@ export async function buildFromPagePlan(
   log(`  pptx     : ${opts.outputPptx}`);
   log(`  session  : ${sessionDir}`);
   log(`  pages    : ${slidePacks.length}`);
+  if (artifacts.placeholderFallbackCount > 0) {
+    log(`  ⚠️  placeholder fallbacks : ${artifacts.placeholderFallbackCount}`);
+  }
+  if (qaResult) {
+    log(`  visual QA passed         : ${qaResult.passed}`);
+  }
 
-  return { pptxPath: opts.outputPptx, sessionDir, artifacts };
+  return { pptxPath: opts.outputPptx, sessionDir, artifacts, visualQa: qaResult };
 }
 
 async function loadJson<T>(path: string): Promise<T> {

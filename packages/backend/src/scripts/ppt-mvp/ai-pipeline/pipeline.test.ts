@@ -417,4 +417,190 @@ describe("pipeline orchestrator", () => {
       ),
     ).rejects.toThrow(/forceMock=true.*no response for key "layer1"/);
   });
+
+  // ── Tier 2+3 regression coverage ──────────────────────────────────────
+
+  test("emits 01b-spec-lock.json with deterministic palette + Windows font fallback", async () => {
+    const artifacts = await runPipeline(
+      {
+        outline: OUTLINE,
+        pages: PAGES,
+        layer0Source: { kind: "brief", brief: FAKE_BRIEF },
+        sessionDir,
+      },
+      { mockProvider: buildAllSuccessProvider(), forceMock: true },
+    );
+
+    expect(existsSync(join(sessionDir, "01b-spec-lock.json"))).toBe(true);
+    expect(artifacts.specLock).toBeDefined();
+    expect(artifacts.specLock.version).toBe("spec_lock/v1");
+    // every distinct palette HEX from the genes lands in allValues
+    expect(artifacts.specLock.palette.allValues).toContain("#0E8B5A");
+    expect(artifacts.specLock.palette.allValues).toContain("#FAFAF7");
+    // Windows fallback is appended to each font stack (NEVER-list #14)
+    expect(artifacts.specLock.typography.titleStack).toContain('"Microsoft YaHei"');
+    expect(artifacts.specLock.typography.bodyStack).toContain('"Microsoft YaHei"');
+  });
+
+  test("PipelineArtifacts.placeholderFallbackCount matches actual fallback emission", async () => {
+    // Force BOTH pages to fall back (every layer4 mock returns invalid html)
+    const provider: MockProvider = (key) => {
+      if (key === "layer0") return `\`\`\`json\n${FAKE_GENES_JSON}\n\`\`\``;
+      if (key === "layer1") return `\`\`\`json\n${FAKE_STYLE_GENES_JSON}\n\`\`\``;
+      if (key === "layer2") return `\`\`\`json\n${FAKE_CONSTITUTION_JSON}\n\`\`\``;
+      if (key.startsWith("layer3:")) {
+        const pageId = key.slice("layer3:".length);
+        const page = PAGES.find((p) => p.pageId === pageId);
+        if (!page) return undefined;
+        return `\`\`\`json\n${fakeBrief(pageId, page.pageType)}\n\`\`\``;
+      }
+      if (key.startsWith("layer4:")) return "```html\n<x>\n```";
+      return undefined;
+    };
+
+    const artifacts = await runPipeline(
+      {
+        outline: OUTLINE,
+        pages: PAGES,
+        layer0Source: { kind: "brief", brief: FAKE_BRIEF },
+        sessionDir,
+      },
+      { mockProvider: provider, forceMock: true },
+    );
+
+    expect(artifacts.placeholderFallbackCount).toBe(PAGES.length);
+    for (const rp of artifacts.renderedPages) {
+      expect(rp.fallback).toBe(true);
+      expect(rp.retryCount).toBe(2);
+    }
+  });
+
+  test("placeholderFallbackCount is 0 on a clean run", async () => {
+    const artifacts = await runPipeline(
+      {
+        outline: OUTLINE,
+        pages: PAGES,
+        layer0Source: { kind: "brief", brief: FAKE_BRIEF },
+        sessionDir,
+      },
+      { mockProvider: buildAllSuccessProvider(), forceMock: true },
+    );
+    expect(artifacts.placeholderFallbackCount).toBe(0);
+    for (const rp of artifacts.renderedPages) {
+      expect(rp.fallback).toBeFalsy();
+    }
+  });
+
+  test("Layer 3 mock can supply visualElement + layoutArchetype, validateVisualElement enforces presence", async () => {
+    // First attempt: brief asks for chart, html is text-only → fails missing_visual_element
+    // Retry: html contains a <svg> → passes
+    let p1Calls = 0;
+    const provider: MockProvider = (key) => {
+      if (key === "layer0") return `\`\`\`json\n${FAKE_GENES_JSON}\n\`\`\``;
+      if (key === "layer1") return `\`\`\`json\n${FAKE_STYLE_GENES_JSON}\n\`\`\``;
+      if (key === "layer2") return `\`\`\`json\n${FAKE_CONSTITUTION_JSON}\n\`\`\``;
+      if (key === "layer3:p1") {
+        return `\`\`\`json\n${JSON.stringify({
+          version: "page_brief/v1",
+          pageId: "p1",
+          pageType: "cover",
+          intent: "i",
+          primaryFocal: "f",
+          composition: "c",
+          whatToAvoid: "w",
+          tone: "t",
+          visualElement: "chart",
+          visualElementRequired: true,
+          layoutArchetype: "centered-hero",
+        })}\n\`\`\``;
+      }
+      if (key === "layer3:p2") {
+        // p2 has no visualElement requirement so should not need retry
+        return `\`\`\`json\n${fakeBrief("p2", "toc")}\n\`\`\``;
+      }
+      if (key === "layer4:p1") {
+        p1Calls += 1;
+        return `\`\`\`html\n${fakeHtml("p1")}\n\`\`\``; // no <svg> / <canvas> / .chart class
+      }
+      if (key === "layer4:p1:retry") {
+        p1Calls += 1;
+        const page = PAGES.find((p) => p.pageId === "p1");
+        const content = page ? collectExpectedText(page).join(" ") : "p1";
+        return `\`\`\`html
+<!DOCTYPE html>
+<html><body><div class="slide"><div class="slide-inner">
+  <svg class="chart"><rect width="200" height="80"></rect></svg>
+  <h1>${content} ${"x".repeat(700)}</h1>
+</div></div></body></html>
+\`\`\``;
+      }
+      if (key === "layer4:p2") return `\`\`\`html\n${fakeHtml("p2")}\n\`\`\``;
+      return undefined;
+    };
+
+    const artifacts = await runPipeline(
+      {
+        outline: OUTLINE,
+        pages: PAGES,
+        layer0Source: { kind: "brief", brief: FAKE_BRIEF },
+        sessionDir,
+      },
+      { mockProvider: provider, forceMock: true },
+    );
+
+    expect(p1Calls).toBe(2);
+    expect(artifacts.renderedPages[0].retryCount).toBe(1);
+    expect(artifacts.pageBriefs[0].visualElement).toBe("chart");
+    expect(artifacts.pageBriefs[0].layoutArchetype).toBe("centered-hero");
+
+    // confirm retried HTML contains the visual element
+    const html = await readFile(artifacts.renderedPages[0].htmlPath, "utf8");
+    expect(html).toContain("<svg");
+  });
+
+  test("visualElementRequired=false suppresses the missing_visual_element check", async () => {
+    // Layer 3 declares visualElement: chart but visualElementRequired: false.
+    // Layer 4 emits text-only HTML — should NOT retry.
+    let p1Calls = 0;
+    const provider: MockProvider = (key) => {
+      if (key === "layer0") return `\`\`\`json\n${FAKE_GENES_JSON}\n\`\`\``;
+      if (key === "layer1") return `\`\`\`json\n${FAKE_STYLE_GENES_JSON}\n\`\`\``;
+      if (key === "layer2") return `\`\`\`json\n${FAKE_CONSTITUTION_JSON}\n\`\`\``;
+      if (key === "layer3:p1") {
+        return `\`\`\`json\n${JSON.stringify({
+          version: "page_brief/v1",
+          pageId: "p1",
+          pageType: "cover",
+          intent: "i",
+          primaryFocal: "f",
+          composition: "c",
+          whatToAvoid: "w",
+          tone: "t",
+          visualElement: "chart",
+          visualElementRequired: false,
+          layoutArchetype: "centered-hero",
+        })}\n\`\`\``;
+      }
+      if (key === "layer3:p2") return `\`\`\`json\n${fakeBrief("p2", "toc")}\n\`\`\``;
+      if (key === "layer4:p1") {
+        p1Calls += 1;
+        return `\`\`\`html\n${fakeHtml("p1")}\n\`\`\``;
+      }
+      if (key === "layer4:p2") return `\`\`\`html\n${fakeHtml("p2")}\n\`\`\``;
+      return undefined;
+    };
+
+    const artifacts = await runPipeline(
+      {
+        outline: OUTLINE,
+        pages: PAGES,
+        layer0Source: { kind: "brief", brief: FAKE_BRIEF },
+        sessionDir,
+      },
+      { mockProvider: provider, forceMock: true },
+    );
+
+    expect(p1Calls).toBe(1); // no retry — visualElementRequired=false
+    expect(artifacts.renderedPages[0].retryCount).toBe(0);
+  });
 });

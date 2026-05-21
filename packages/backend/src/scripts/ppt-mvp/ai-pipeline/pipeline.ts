@@ -25,17 +25,24 @@ import {
   buildLayer2Prompt,
   buildLayer3Prompt,
   buildLayer4Prompt,
+  buildRetrySystemSuffix,
+  describeVisualElement,
   SYSTEM_DESIGN,
 } from "./prompts";
+import { buildSpecLockFromGenes } from "./spec-lock";
 import type {
   GlobalConstitution,
+  LayoutArchetype,
   PageAssetRef,
   PageBrief,
   PipelineArtifacts,
   PipelineInputs,
   RenderedPage,
+  SpecLock,
   StyleGenes,
   TemplateGenes,
+  ValidationError,
+  VisualElementType,
 } from "./types";
 
 /**
@@ -130,6 +137,15 @@ export async function runPipeline(
     JSON.stringify(styleGenes, null, 2),
   );
 
+  // ── Layer 1.5 — SpecLock (deterministic, no AI)
+  stamp("Building spec_lock.json from genes (deterministic)");
+  const sourceBrief = layer0Source.kind === "brief" ? layer0Source.brief : undefined;
+  const specLock = buildSpecLockFromGenes(templateGenes, styleGenes, sourceBrief);
+  await writeFile(
+    join(sessionDir, "01b-spec-lock.json"),
+    JSON.stringify(specLock, null, 2),
+  );
+
   // ── Layer 2
   stamp("Layer 2 — GlobalConstitution");
   const m2 = shouldMock("layer2");
@@ -147,9 +163,10 @@ export async function runPipeline(
     JSON.stringify(globalConstitution, null, 2),
   );
 
-  // ── Layer 3 (per page)
+  // ── Layer 3 (per page) — sequential, with variance enforcement
   stamp(`Layer 3 — PageBriefs (×${pages.length})`);
   const pageBriefs: PageBrief[] = [];
+  let previousArchetype: LayoutArchetype | undefined;
   for (const page of pages) {
     const key = `layer3:${page.pageId}`;
     const m3 = shouldMock(key);
@@ -161,6 +178,7 @@ export async function runPipeline(
         styleGenes,
         globalConstitution,
         pageAssets?.[page.pageId] ?? [],
+        previousArchetype,
       ),
       system: SYSTEM_DESIGN,
       maxTokens: 800,
@@ -170,6 +188,7 @@ export async function runPipeline(
     stamp(`  ${page.pageId} · ${r3.mode} · ${r3.durationMs}ms`);
     const brief = extractJson<PageBrief>(r3.content);
     pageBriefs.push(brief);
+    if (brief.layoutArchetype) previousArchetype = brief.layoutArchetype;
   }
   await writeFile(
     join(sessionDir, "03-page-briefs.json"),
@@ -180,6 +199,7 @@ export async function runPipeline(
   stamp(`Layer 4 — Per-page HTML (×${pages.length})`);
   const renderedPages: RenderedPage[] = [];
   const cssHref = relative(join(sessionDir, "pages"), cssPath);
+  let placeholderFallbackCount = 0;
 
   for (let i = 0; i < pages.length; i += 1) {
     const page = pages[i];
@@ -189,8 +209,11 @@ export async function runPipeline(
     const baseKey = `layer4:${page.pageId}`;
     const retryKey = `${baseKey}:retry`;
 
-    const tryCall = async (key: string, isRetry: boolean) => {
+    const tryCall = async (key: string, retryErrors: ValidationError[] | null) => {
       const m = shouldMock(key);
+      const systemPrompt = retryErrors
+        ? `${SYSTEM_DESIGN}${buildRetrySystemSuffix(retryErrors)}`
+        : SYSTEM_DESIGN;
       return callClaude({
         prompt: buildLayer4Prompt(
           page,
@@ -201,39 +224,46 @@ export async function runPipeline(
           pageAssets?.[page.pageId] ?? [],
           css,
           cssHref,
+          specLock,
         ),
-        system: isRetry
-          ? `${SYSTEM_DESIGN}\n\nThe previous attempt failed validation (HTML structure, missing asset usage, or page completeness). Produce a complete page now.`
-          : SYSTEM_DESIGN,
+        system: systemPrompt,
         maxTokens: 4096,
         mock: m.mock,
         mockResponse: m.resp,
       });
     };
 
-    let r4 = await tryCall(baseKey, false);
+    let r4 = await tryCall(baseKey, null);
     let html = extractFencedCode(r4.content, "html");
     let retryCount = 0;
+    let fallback = false;
 
-    const initialValidationError = validateHtml(page, html, pageAssets?.[page.pageId] ?? []);
-    if (initialValidationError) {
-      stamp(`  ${page.pageId} validation failed (${initialValidationError}), retrying`);
+    const initialErrors = validateHtml(page, html, pageAssets?.[page.pageId] ?? [], brief);
+    if (initialErrors.length > 0) {
+      stamp(
+        `  ${page.pageId} validation failed (${initialErrors.length} issue${initialErrors.length === 1 ? "" : "s"}: ${initialErrors.map((e) => e.code).join(", ")}), retrying with structured feedback`,
+      );
       retryCount = 1;
-      r4 = await tryCall(retryKey, true);
+      r4 = await tryCall(retryKey, initialErrors);
       html = extractFencedCode(r4.content, "html");
     }
 
-    const retryValidationError = validateHtml(page, html, pageAssets?.[page.pageId] ?? []);
-    if (retryValidationError) {
-      // Fall back to a minimal page so the deck still builds
-      stamp(`  ${page.pageId} retry also failed (${retryValidationError}); emitting placeholder`);
+    const retryErrors = validateHtml(page, html, pageAssets?.[page.pageId] ?? [], brief);
+    if (retryErrors.length > 0) {
+      // Fall back to a minimal page so the deck still builds — but surface
+      // the failure loudly (C6 — placeholder is an anti-pattern).
+      stamp(
+        `  ${page.pageId} ❌ CRITICAL retry also failed (${retryErrors.map((e) => e.code).join(", ")}); emitting placeholder (anti-pattern)`,
+      );
       html = renderPlaceholder(page, cssHref);
       retryCount = 2;
+      fallback = true;
+      placeholderFallbackCount += 1;
     }
 
     const htmlPath = join(sessionDir, "pages", `${page.pageId}.html`);
     await writeFile(htmlPath, html!);
-    stamp(`  ${page.pageId} · ${r4.mode} · ${r4.durationMs}ms · ${html!.length}B`);
+    stamp(`  ${page.pageId} · ${r4.mode} · ${r4.durationMs}ms · ${html!.length}B${fallback ? " · FALLBACK" : ""}`);
 
     renderedPages.push({
       pageId: page.pageId,
@@ -241,7 +271,14 @@ export async function runPipeline(
       htmlPath,
       speakerNote,
       retryCount,
+      fallback,
     });
+  }
+
+  if (placeholderFallbackCount > 0) {
+    stamp(
+      `⚠️  ${placeholderFallbackCount} of ${pages.length} pages fell back to placeholder. Investigate retry-error patterns in pipeline.log.txt.`,
+    );
   }
 
   await writeFile(join(sessionDir, "pipeline.log.txt"), `${log.join("\n")}\n`);
@@ -249,41 +286,148 @@ export async function runPipeline(
   return {
     templateGenes,
     styleGenes,
+    specLock,
     globalConstitution,
     pageBriefs,
     renderedPages,
     designSystemCssPath: cssPath,
+    placeholderFallbackCount,
   };
 }
 
+/**
+ * Validate a Layer-4 HTML output against:
+ *   1. Structural constraints (body / slide class / no display:none)
+ *   2. Content presence (every PageContent field appears verbatim)
+ *   3. Asset usage (every REQUIRED asset URL is referenced)
+ *   4. Visual element presence (PageBrief.visualElement, when required)
+ *
+ * Returns structured `ValidationError[]` so the retry prompt can quote
+ * each specific failure with a repair hint (PPTAgent REPL pattern).
+ */
 function validateHtml(
   page: MvpPageDefinition,
   html: string | null,
   assets: PageAssetRef[],
-): string | null {
-  if (!html) return "empty_html";
-  if (html.length < HTML_MIN_SIZE) return `size=${html.length}`;
-  if (!/<body[\s>]/i.test(html)) return "missing_body";
-  if (!/class\s*=\s*["'][^"']*\bslide\b/.test(html)) return "missing_slide_class";
+  brief?: PageBrief,
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  if (!html) {
+    errors.push({
+      code: "empty_html",
+      suggestion: "Emit a complete HTML document with <!DOCTYPE html>, <html>, <head>, <body>.",
+    });
+    return errors; // No point checking further on empty output
+  }
+  if (html.length < HTML_MIN_SIZE) {
+    errors.push({
+      code: "size_too_small",
+      actual: `${html.length}B`,
+      expected: `>=${HTML_MIN_SIZE}B`,
+      suggestion: "Add visible content and the page brief's primary focal element; do not truncate.",
+    });
+  }
+  if (!/<body[\s>]/i.test(html)) {
+    errors.push({
+      code: "missing_body",
+      suggestion: 'Wrap content inside <body>...</body>.',
+    });
+  }
+  if (!/class\s*=\s*["'][^"']*\bslide\b/.test(html)) {
+    errors.push({
+      code: "missing_slide_class",
+      suggestion: 'Wrap the slide in <div class="slide"><div class="slide-inner">...</div></div>.',
+    });
+  }
   if (/display\s*:\s*none/i.test(html) || /visibility\s*:\s*hidden/i.test(html)) {
-    return "hidden_content";
+    errors.push({
+      code: "hidden_content",
+      suggestion: "Remove display:none / visibility:hidden — these break PNG snapshots. Use the design-system CSS instead.",
+    });
   }
 
-  const missingContent = findMissingPageContent(page, html);
-  if (missingContent) return missingContent;
+  const missing = findFirstMissingContent(page, html);
+  if (missing) {
+    errors.push({
+      code: "missing_content",
+      actual: "(not found in HTML)",
+      expected: missing,
+      suggestion: `The page content field "${missing}" must appear verbatim in the slide HTML.`,
+    });
+  }
 
   const requiredAssets = getRequiredAssets(page, assets);
   for (const asset of requiredAssets) {
     if (!html.includes(asset.fileUrl)) {
-      return `missing_asset:${asset.slot}`;
+      errors.push({
+        code: "missing_asset",
+        slot: asset.slot,
+        expected: asset.fileUrl,
+        suggestion: `Use the EXACT fileUrl for slot "${asset.slot}" via <img src> or CSS background-image (do not invent paths).`,
+      });
     }
   }
 
-  if (requiredAssets.length > 0 && !/(<img[\s>]|background-image\s*:|background\s*:|url\s*\()/i.test(html)) {
-    return "missing_visual_asset_markup";
+  if (
+    requiredAssets.length > 0 &&
+    !/(<img[\s>]|background-image\s*:|background\s*:|url\s*\()/i.test(html)
+  ) {
+    errors.push({
+      code: "missing_visual_asset_markup",
+      suggestion: "Add at least one <img src=…> or background-image:url(…) reference to use the required assets.",
+    });
   }
 
-  return null;
+  // C8 — visualElement enforcement
+  if (brief?.visualElement && brief.visualElementRequired !== false) {
+    const visualErr = validateVisualElement(html, brief.visualElement);
+    if (visualErr) errors.push(visualErr);
+  }
+
+  return errors;
+}
+
+/**
+ * Pattern-match the HTML for the declared visualElement kind.
+ *
+ * Patterns are intentionally permissive (cover both class-name and
+ * shape-inference paths) — the goal is to reject text-only pages, not
+ * to enforce a single implementation style.
+ */
+function validateVisualElement(
+  html: string,
+  type: VisualElementType,
+): ValidationError | null {
+  const matchers: Record<VisualElementType, RegExp[]> = {
+    icon_in_colored_circle: [
+      /class\s*=\s*["'][^"']*(icon-circle|circle-icon|icon-bubble|circle-(?:badge|badge-icon))/i,
+      /<svg[^>]*>[\s\S]*?<circle/i,
+    ],
+    colored_block: [
+      /class\s*=\s*["'][^"']*(colored-block|block-fill|color-block|callout-block|fill-block)/i,
+      /background(?:-color)?\s*:\s*var\(--(?:primary|accent|secondary)/i,
+    ],
+    large_stat_number: [
+      /class\s*=\s*["'][^"']*(large-stat|stat-number|kpi|big-number)/i,
+      /font-size\s*:\s*([5-9]\d|\d{3,})\s*(?:p[txc]|rem|em)/i,
+    ],
+    chart: [
+      /class\s*=\s*["'][^"']*(chart|graph)/i,
+      /<canvas[\s>]/i,
+      /<svg[^>]*>[\s\S]*?<(?:path|rect|line|polyline|circle)[\s\S]*?<\/svg>/i,
+    ],
+    shape_composition: [/<svg[\s>][\s\S]*?<\/svg>/i, /clip-path/i],
+    hero_image: [/<img[\s>]/i, /background-image\s*:\s*url/i],
+    diagram: [/<svg[\s>]/i, /class\s*=\s*["'][^"']*(diagram|mermaid)/i],
+  };
+  const patterns = matchers[type];
+  if (patterns.some((re) => re.test(html))) return null;
+  return {
+    code: "missing_visual_element",
+    expected: type,
+    suggestion: `This page must contain ${describeVisualElement(type)}. Add it to the HTML.`,
+  };
 }
 
 function renderPlaceholder(page: MvpPageDefinition, cssHref: string): string {
@@ -343,7 +487,14 @@ function getRequiredAssets(
     .filter((asset): asset is PageAssetRef => asset != null);
 }
 
-function findMissingPageContent(page: MvpPageDefinition, html: string): string | null {
+/**
+ * Returns the first PageContent field that is missing from the rendered
+ * HTML (or null if all present).  Renamed from `findMissingPageContent`
+ * which previously returned a "missing_content:VALUE" stringly-typed
+ * message; the caller now wraps the result into a structured
+ * ValidationError.
+ */
+function findFirstMissingContent(page: MvpPageDefinition, html: string): string | null {
   const checks: string[] = [];
 
   switch (page.pageType) {
@@ -381,8 +532,7 @@ function findMissingPageContent(page: MvpPageDefinition, html: string): string |
       return null;
   }
 
-  const missing = checks.find((text) => !html.includes(text));
-  return missing ? `missing_content:${missing}` : null;
+  return checks.find((text) => !html.includes(text)) ?? null;
 }
 
 /** Tiny helper used by build scripts when checking session dir. */

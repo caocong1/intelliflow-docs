@@ -9,10 +9,96 @@
 
 import type { TemplateGenes } from "./types";
 
+/**
+ * Fonts pre-installed on Windows that we trust as final fallback.
+ *
+ * The LLM may emit `titleEa: "PingFang SC"` (Mac-only) and `titleLatin:
+ * "Georgia"` (cross-platform), producing a stack like
+ * `"PingFang SC", "Georgia", -apple-system, sans-serif` which silently
+ * collapses to system default on Windows.  We append a Microsoft YaHei
+ * tail (covers both CJK and Latin acceptably) whenever no known Windows
+ * preinstalled font is already present.
+ *
+ * Sourced from `ai-agent-ppt-research/06-final/references/never-list.md`
+ * #14 + `curated-palettes.md` font stacks.
+ */
+const WINDOWS_PREINSTALLED_FONTS = new Set([
+  "Microsoft YaHei",
+  "Microsoft YaHei Light",
+  "SimHei",
+  "SimSun",
+  "FangSong",
+  "KaiTi",
+  "Arial",
+  "Arial Black",
+  "Calibri",
+  "Calibri Light",
+  "Cambria",
+  "Segoe UI",
+  "Times New Roman",
+  "Georgia",
+  "Impact",
+  "Trebuchet MS",
+  "Consolas",
+  "Courier New",
+  "Tahoma",
+  "Verdana",
+]);
+
+const GENERIC_FAMILIES = new Set(["serif", "sans-serif", "monospace", "system-ui"]);
+
+function stripQuotes(name: string): string {
+  return name.trim().replace(/^["']|["']$/g, "");
+}
+
+/**
+ * Build a font stack that is guaranteed to end with a Windows-preinstalled
+ * font (before any generic family).  Existing Windows-preinstalled entries
+ * in the stack short-circuit the appending logic.
+ */
+export function ensureWindowsFallback(stack: string[]): string[] {
+  const result = stack.filter((entry) => entry && entry.trim().length > 0);
+  const hasWindowsFont = result.some((entry) => {
+    const cleaned = stripQuotes(entry);
+    return WINDOWS_PREINSTALLED_FONTS.has(cleaned);
+  });
+  if (hasWindowsFont) return result;
+
+  // Find the last index that is a generic family (serif / sans-serif / ...)
+  let insertAt = result.length;
+  for (let i = result.length - 1; i >= 0; i -= 1) {
+    if (GENERIC_FAMILIES.has(stripQuotes(result[i]))) {
+      insertAt = i;
+    } else {
+      break;
+    }
+  }
+  result.splice(insertAt, 0, '"Microsoft YaHei"');
+  return result;
+}
+
 export function generateDesignSystemCss(genes: TemplateGenes): string {
   const c = genes.designTokens.colors;
   const f = genes.designTokens.fonts;
   const r = genes.designTokens.rhythm;
+
+  const displayStack = ensureWindowsFallback([
+    `"${f.titleEa}"`,
+    `"${f.titleLatin}"`,
+    "-apple-system",
+    "sans-serif",
+  ]).join(", ");
+  const bodyStack = ensureWindowsFallback([
+    `"${f.bodyEa}"`,
+    `"${f.bodyLatin}"`,
+    "-apple-system",
+    "sans-serif",
+  ]).join(", ");
+  const monoStack = ensureWindowsFallback([
+    `"${f.mono}"`,
+    '"JetBrains Mono"',
+    "monospace",
+  ]).join(", ");
 
   return `/* ========================================================================
    AI-pipeline design system — generated from TemplateGenes.
@@ -43,10 +129,10 @@ export function generateDesignSystemCss(genes: TemplateGenes): string {
   --line: color-mix(in srgb, ${c.textMuted} 25%, ${c.bg});
   --line-soft: color-mix(in srgb, ${c.textMuted} 12%, ${c.bg});
 
-  /* Typography */
-  --font-display: "${f.titleEa}", "${f.titleLatin}", -apple-system, sans-serif;
-  --font-body: "${f.bodyEa}", "${f.bodyLatin}", -apple-system, sans-serif;
-  --font-mono: "${f.mono}", "JetBrains Mono", monospace;
+  /* Typography (font stacks include Windows-preinstalled fallback) */
+  --font-display: ${displayStack};
+  --font-body: ${bodyStack};
+  --font-mono: ${monoStack};
 
   --size-eyebrow: 14px;
   --size-body: 19px;

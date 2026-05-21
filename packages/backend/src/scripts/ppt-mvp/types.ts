@@ -29,6 +29,47 @@ export type PresentationOutline = {
   }>;
 };
 
+/**
+ * Borrowed from PPT Master Strategist's Eight Confirmations §h — the
+ * "three orthogonal dimensions" that prevent per-image style drift
+ * across a multi-page deck.  All three are optional to keep existing
+ * fixtures (`wireless-visual-brief.json`) working unchanged.
+ *
+ * See `ai-agent-ppt-research/06-final/references/source-deep-dive.md` §4.
+ */
+export type ImageRendering =
+  | "vector-illustration"
+  | "editorial-photography"
+  | "3d-isometric"
+  | "sketch-notes"
+  | "realistic-photo"
+  | "abstract-geometric"
+  | "hand-drawn";
+
+export type ImageType =
+  | "background"
+  | "hero"
+  | "framework"
+  | "comparison"
+  | "diagram"
+  | "illustration"
+  | "icon";
+
+export type ImagePaletteUsage = {
+  dominantUsage: number; // 0.5 – 0.8
+  supportingUsage: number; // 0.15 – 0.35
+  accentUsage: number; // 0.05 – 0.2
+};
+
+/**
+ * Locked icon library — one per deck.  Matches the 4 stylistic libraries
+ * documented in `editorial-ppt` skill `references/never-list.md` #8.
+ * `simple-icons` is reserved for real brand marks only and intentionally
+ * not in this enum.
+ */
+export type IconLibrary = "tabler-outline" | "tabler-filled" | "chunk-filled" | "phosphor-duotone";
+export type IconStrokeWidth = 1.5 | 2 | 3;
+
 export type VisualBrief = {
   version: "visual_brief/v1";
   deckTone: string;
@@ -38,6 +79,15 @@ export type VisualBrief = {
   shapeLanguage: string;
   density: "low" | "medium" | "high";
   avoid: string[];
+
+  /** Optional — three-dimensional image lock (C4 from CODE-REVIEW). */
+  imageRendering?: ImageRendering;
+  imagePalette?: ImagePaletteUsage;
+  imageTypes?: Partial<Record<string /* slot id */, ImageType>>;
+
+  /** Optional — locked icon library (C10 from CODE-REVIEW). */
+  iconLibrary?: IconLibrary;
+  iconStrokeWidth?: IconStrokeWidth;
 };
 
 export type PagePlan = {

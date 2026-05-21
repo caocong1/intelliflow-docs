@@ -1,12 +1,12 @@
 import { A, useLocation } from "@solidjs/router";
 import type { Component } from "solid-js";
-import { createSignal, onCleanup, Show } from "solid-js";
+import { Show, createSignal, onCleanup } from "solid-js";
 import { api } from "../../api/client";
 import { useAuth } from "../../contexts/auth";
-import Modal from "../ui/Modal";
-import { showToast } from "../ui/Toast";
 import NotificationBell from "../notifications/NotificationBell";
 import NotificationDrawer from "../notifications/NotificationDrawer";
+import Modal from "../ui/Modal";
+import { showToast } from "../ui/Toast";
 
 const Sidebar: Component = () => {
   const auth = useAuth();
@@ -85,7 +85,9 @@ const Sidebar: Component = () => {
   };
 
   return (
-    <aside class={`${collapsed() ? "w-16" : "w-60"} flex-shrink-0 bg-indigo-950 h-full overflow-y-auto flex flex-col transition-all duration-200`}>
+    <aside
+      class={`${collapsed() ? "w-16" : "w-60"} flex-shrink-0 bg-indigo-950 h-full overflow-y-auto flex flex-col transition-all duration-200`}
+    >
       {/* Logo area */}
       <div class="px-4 py-5 border-b border-indigo-900">
         <div class={`flex items-center ${collapsed() ? "justify-center" : "gap-2.5"}`}>
@@ -141,7 +143,9 @@ const Sidebar: Component = () => {
             <p class="text-xs font-semibold text-indigo-500 uppercase tracking-widest">效率工具</p>
           </div>
         </Show>
-        <Show when={collapsed()}><div class="pt-3" /></Show>
+        <Show when={collapsed()}>
+          <div class="pt-3" />
+        </Show>
         <A href="/search" class={linkClass("/search")} title="搜索">
           <svg
             class="w-4 h-4 flex-shrink-0"
@@ -196,13 +200,33 @@ const Sidebar: Component = () => {
           </svg>
           <Show when={!collapsed()}>最近访问</Show>
         </A>
+        <A href="/ppt-generator" class={linkClass("/ppt-generator")} title="PPT生成">
+          <svg
+            class="w-4 h-4 flex-shrink-0"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            <title>PPT生成</title>
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M7 4h10a2 2 0 012 2v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6a2 2 0 012-2zm2 4h6m-6 4h3m-3 4h6"
+            />
+          </svg>
+          <Show when={!collapsed()}>PPT生成</Show>
+        </A>
 
         <Show when={!collapsed()}>
           <div class="pt-5 pb-1.5 px-3">
             <p class="text-xs font-semibold text-indigo-500 uppercase tracking-widest">工作区</p>
           </div>
         </Show>
-        <Show when={collapsed()}><div class="pt-3" /></Show>
+        <Show when={collapsed()}>
+          <div class="pt-3" />
+        </Show>
         <A href="/projects" class={linkClass("/projects")} title="项目">
           <svg
             class="w-4 h-4 flex-shrink-0"
@@ -228,7 +252,9 @@ const Sidebar: Component = () => {
               <p class="text-xs font-semibold text-indigo-500 uppercase tracking-widest">管理</p>
             </div>
           </Show>
-          <Show when={collapsed()}><div class="pt-3" /></Show>
+          <Show when={collapsed()}>
+            <div class="pt-3" />
+          </Show>
           <A href="/admin/users" class={linkClass("/admin/users")} title="用户管理">
             <svg
               class="w-4 h-4 flex-shrink-0"
@@ -247,7 +273,11 @@ const Sidebar: Component = () => {
             </svg>
             <Show when={!collapsed()}>用户管理</Show>
           </A>
-          <A href="/admin/document-types" class={linkClass("/admin/document-types")} title="文档类型管理">
+          <A
+            href="/admin/document-types"
+            class={linkClass("/admin/document-types")}
+            title="文档类型管理"
+          >
             <svg
               class="w-4 h-4 flex-shrink-0"
               fill="none"
@@ -265,7 +295,11 @@ const Sidebar: Component = () => {
             </svg>
             <Show when={!collapsed()}>文档类型管理</Show>
           </A>
-          <A href="/admin/model-config" class={linkClass("/admin/model-config")} title="AI 模型配置">
+          <A
+            href="/admin/model-config"
+            class={linkClass("/admin/model-config")}
+            title="AI 模型配置"
+          >
             <svg
               class="w-4 h-4 flex-shrink-0"
               fill="none"
@@ -301,7 +335,11 @@ const Sidebar: Component = () => {
             </svg>
             <Show when={!collapsed()}>统计面板</Show>
           </A>
-          <A href="/admin/model-call-logs" class={linkClass("/admin/model-call-logs")} title="模型调用日志">
+          <A
+            href="/admin/model-call-logs"
+            class={linkClass("/admin/model-call-logs")}
+            title="模型调用日志"
+          >
             <svg
               class="w-4 h-4 flex-shrink-0"
               fill="none"
@@ -357,86 +395,129 @@ const Sidebar: Component = () => {
             aria-hidden="true"
           >
             <title>{collapsed() ? "展开侧栏" : "收起侧栏"}</title>
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+            />
           </svg>
           <Show when={!collapsed()}>收起侧栏</Show>
         </button>
       </div>
 
       {/* User section */}
-      <div class={`${collapsed() ? "px-2" : "px-3"} py-4 border-t border-indigo-900`} data-user-menu>
+      <div
+        class={`${collapsed() ? "px-2" : "px-3"} py-4 border-t border-indigo-900`}
+        data-user-menu
+      >
         <div class={`flex items-center ${collapsed() ? "justify-center" : "gap-2"}`}>
-        <div class="relative flex-1 min-w-0">
-          <button
-            type="button"
-            onClick={() => setUserMenuOpen((v) => !v)}
-            class={`w-full flex items-center ${collapsed() ? "justify-center p-2.5" : "gap-2.5 px-1 py-1.5"} rounded-lg cursor-pointer hover:bg-white/5 transition-colors duration-150`}
-          >
-            {auth.user()?.avatar ? (
-              <img
-                src={auth.user()?.avatar ?? ""}
-                alt={auth.user()?.displayName ?? ""}
-                class="w-8 h-8 rounded-full flex-shrink-0 object-cover"
-              />
-            ) : (
-              <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">
-                {initials()}
-              </div>
-            )}
-            <Show when={!collapsed()}>
-              <div class="min-w-0 flex-1 text-left">
-                <p class="text-sm font-medium text-white truncate">{auth.user()?.displayName}</p>
-                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-800 text-indigo-200">
-                  {auth.user()?.role === "admin" ? "管理员" : "用户"}
-                </span>
-              </div>
-              <svg class="w-4 h-4 text-indigo-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <title>菜单</title>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-              </svg>
-            </Show>
-          </button>
+          <div class="relative flex-1 min-w-0">
+            <button
+              type="button"
+              onClick={() => setUserMenuOpen((v) => !v)}
+              class={`w-full flex items-center ${collapsed() ? "justify-center p-2.5" : "gap-2.5 px-1 py-1.5"} rounded-lg cursor-pointer hover:bg-white/5 transition-colors duration-150`}
+            >
+              {auth.user()?.avatar ? (
+                <img
+                  src={auth.user()?.avatar ?? ""}
+                  alt={auth.user()?.displayName ?? ""}
+                  class="w-8 h-8 rounded-full flex-shrink-0 object-cover"
+                />
+              ) : (
+                <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0 text-xs font-bold text-white">
+                  {initials()}
+                </div>
+              )}
+              <Show when={!collapsed()}>
+                <div class="min-w-0 flex-1 text-left">
+                  <p class="text-sm font-medium text-white truncate">{auth.user()?.displayName}</p>
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-indigo-800 text-indigo-200">
+                    {auth.user()?.role === "admin" ? "管理员" : "用户"}
+                  </span>
+                </div>
+                <svg
+                  class="w-4 h-4 text-indigo-400 flex-shrink-0"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                >
+                  <title>菜单</title>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M5 15l7-7 7 7"
+                  />
+                </svg>
+              </Show>
+            </button>
 
-          {/* Popup menu */}
-          <Show when={userMenuOpen()}>
-            <div class={`absolute ${collapsed() ? "left-full ml-2" : "left-0 right-0"} bottom-full mb-1 bg-indigo-900 rounded-lg shadow-lg border border-indigo-800 py-1 z-50`}>
-              <button
-                type="button"
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  setShowChangePw(true);
-                  setOldPw("");
-                  setNewPw("");
-                  setPwError("");
-                }}
-                class="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-200 hover:bg-white/10 hover:text-white transition-colors"
+            {/* Popup menu */}
+            <Show when={userMenuOpen()}>
+              <div
+                class={`absolute ${collapsed() ? "left-full ml-2" : "left-0 right-0"} bottom-full mb-1 bg-indigo-900 rounded-lg shadow-lg border border-indigo-800 py-1 z-50`}
               >
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <title>修改密码</title>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                </svg>
-                <Show when={!collapsed()}>修改密码</Show>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  auth.logout();
-                }}
-                class="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-200 hover:bg-white/10 hover:text-white transition-colors"
-              >
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                  <title>退出登录</title>
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                <Show when={!collapsed()}>退出登录</Show>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    setShowChangePw(true);
+                    setOldPw("");
+                    setNewPw("");
+                    setPwError("");
+                  }}
+                  class="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-200 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <svg
+                    class="w-4 h-4 flex-shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <title>修改密码</title>
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+                    />
+                  </svg>
+                  <Show when={!collapsed()}>修改密码</Show>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    auth.logout();
+                  }}
+                  class="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-200 hover:bg-white/10 hover:text-white transition-colors"
+                >
+                  <svg
+                    class="w-4 h-4 flex-shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    aria-hidden="true"
+                  >
+                    <title>退出登录</title>
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  <Show when={!collapsed()}>退出登录</Show>
+                </button>
+              </div>
+            </Show>
+          </div>
+          <Show when={!collapsed()}>
+            <NotificationBell onOpen={() => setDrawerOpen(true)} />
           </Show>
-        </div>
-        <Show when={!collapsed()}>
-          <NotificationBell onOpen={() => setDrawerOpen(true)} />
-        </Show>
         </div>
       </div>
 
@@ -450,23 +531,33 @@ const Sidebar: Component = () => {
           class="space-y-4"
         >
           <div>
-            <label for="old-password" class="block text-sm font-medium text-slate-700 mb-1.5">原密码</label>
+            <label for="old-password" class="block text-sm font-medium text-slate-700 mb-1.5">
+              原密码
+            </label>
             <input
               id="old-password"
               type="password"
               value={oldPw()}
-              onInput={(e) => { setOldPw(e.currentTarget.value); setPwError(""); }}
+              onInput={(e) => {
+                setOldPw(e.currentTarget.value);
+                setPwError("");
+              }}
               class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
               required
             />
           </div>
           <div>
-            <label for="new-password" class="block text-sm font-medium text-slate-700 mb-1.5">新密码</label>
+            <label for="new-password" class="block text-sm font-medium text-slate-700 mb-1.5">
+              新密码
+            </label>
             <input
               id="new-password"
               type="password"
               value={newPw()}
-              onInput={(e) => { setNewPw(e.currentTarget.value); setPwError(""); }}
+              onInput={(e) => {
+                setNewPw(e.currentTarget.value);
+                setPwError("");
+              }}
               class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-colors"
               placeholder="至少 6 个字符"
               required

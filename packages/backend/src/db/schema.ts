@@ -1,7 +1,24 @@
-import { boolean, integer, jsonb, pgEnum, pgTable, real, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
 import type { WorkflowEdgeDef, WorkflowNodeDef } from "@intelliflow/shared";
+import {
+  boolean,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  real,
+  text,
+  timestamp,
+  unique,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
 
-export const providerTypeEnum = pgEnum("provider_type", ["openai_compatible", "opencode", "claude_agent_sdk", "ollama"]);
+export const providerTypeEnum = pgEnum("provider_type", [
+  "openai_compatible",
+  "opencode",
+  "claude_agent_sdk",
+  "ollama",
+]);
 export const deploymentTypeEnum = pgEnum("deployment_type", ["cloud", "local"]);
 
 export const userRoleEnum = pgEnum("user_role", ["admin", "user"]);
@@ -81,8 +98,17 @@ export const models = pgTable("models", {
 });
 
 export const projectRoleEnum = pgEnum("project_role", ["owner", "participant"]);
-export const documentVisibilityEnum = pgEnum("document_visibility", ["self", "project", "specific"]);
-export const documentStatusEnum = pgEnum("document_status", ["draft", "in_progress", "completed", "failed"]);
+export const documentVisibilityEnum = pgEnum("document_visibility", [
+  "self",
+  "project",
+  "specific",
+]);
+export const documentStatusEnum = pgEnum("document_status", [
+  "draft",
+  "in_progress",
+  "completed",
+  "failed",
+]);
 
 export const workflowStatusEnum = pgEnum("workflow_status", ["draft", "active", "disabled"]);
 
@@ -118,7 +144,12 @@ export const projects = pgTable("projects", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const invitationStatusEnum = pgEnum("invitation_status", ["pending", "accepted", "rejected", "expired"]);
+export const invitationStatusEnum = pgEnum("invitation_status", [
+  "pending",
+  "accepted",
+  "rejected",
+  "expired",
+]);
 
 export const projectInvitations = pgTable("project_invitations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -302,16 +333,35 @@ export const documentFiles = pgTable("document_files", {
   createdBy: uuid("created_by")
     .notNull()
     .references(() => users.id),
-  slotId: varchar("slot_id", { length: 100 }),  // nullable, links to FormFieldDef.fileSlotId
+  slotId: varchar("slot_id", { length: 100 }), // nullable, links to FormFieldDef.fileSlotId
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 // ─── Phase 17 (v1.1): New tables and enums ────────────────────────────────────
 
-export const backgroundTaskStatusEnum = pgEnum("background_task_status", ["queued", "running", "completed", "failed"]);
+export const backgroundTaskStatusEnum = pgEnum("background_task_status", [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+]);
 export const backgroundTaskTypeEnum = pgEnum("background_task_type", ["document_generation"]);
-export const favoriteTargetTypeEnum = pgEnum("favorite_target_type", ["project", "document", "workflow"]);
-export const recentAccessTargetTypeEnum = pgEnum("recent_access_target_type", ["project", "document", "workflow"]);
+export const favoriteTargetTypeEnum = pgEnum("favorite_target_type", [
+  "project",
+  "document",
+  "workflow",
+]);
+export const recentAccessTargetTypeEnum = pgEnum("recent_access_target_type", [
+  "project",
+  "document",
+  "workflow",
+]);
+export const pptAgentJobStatusEnum = pgEnum("ppt_agent_job_status", [
+  "queued",
+  "running",
+  "completed",
+  "failed",
+]);
 
 export const backgroundTasks = pgTable("background_tasks", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -331,29 +381,37 @@ export const backgroundTasks = pgTable("background_tasks", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export const userFavorites = pgTable("user_favorites", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
-  targetType: favoriteTargetTypeEnum("target_type").notNull(),
-  targetId: uuid("target_id").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  unique("uq_user_favorites_user_target").on(table.userId, table.targetType, table.targetId),
-]);
+export const userFavorites = pgTable(
+  "user_favorites",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    targetType: favoriteTargetTypeEnum("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("uq_user_favorites_user_target").on(table.userId, table.targetType, table.targetId),
+  ],
+);
 
-export const userRecentAccess = pgTable("user_recent_access", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id),
-  targetType: recentAccessTargetTypeEnum("target_type").notNull(),
-  targetId: uuid("target_id").notNull(),
-  accessedAt: timestamp("accessed_at", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [
-  unique("uq_user_recent_access_user_target").on(table.userId, table.targetType, table.targetId),
-]);
+export const userRecentAccess = pgTable(
+  "user_recent_access",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id),
+    targetType: recentAccessTargetTypeEnum("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    accessedAt: timestamp("accessed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("uq_user_recent_access_user_target").on(table.userId, table.targetType, table.targetId),
+  ],
+);
 
 // ─── Phase 18: Notifications ────────────────────────────────────────────────
 
@@ -382,6 +440,29 @@ export const pptTemplates = pgTable("ppt_templates", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const pptAiConfigs = pgTable("ppt_ai_configs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: varchar("name", { length: 100 }).default("MiniMax PPT").notNull(),
+  providerType: providerTypeEnum("provider_type").default("openai_compatible").notNull(),
+  baseUrl: varchar("base_url", { length: 500 }).default("https://api.minimaxi.com/v1").notNull(),
+  apiKey: varchar("api_key", { length: 1000 }),
+  apiKeyEnvVar: varchar("api_key_env_var", { length: 100 }).default("MINIMAX_API_KEY").notNull(),
+  textModel: varchar("text_model", { length: 200 }).default("MiniMax-M2.7-highspeed").notNull(),
+  textEndpoint: varchar("text_endpoint", { length: 200 }).default("/chat/completions").notNull(),
+  imageModel: varchar("image_model", { length: 200 }).default("image-01").notNull(),
+  imageEndpoint: varchar("image_endpoint", { length: 200 }).default("/image_generation").notNull(),
+  imageAspectRatio: varchar("image_aspect_ratio", { length: 20 }).default("16:9").notNull(),
+  imageResponseFormat: varchar("image_response_format", { length: 20 }).default("base64").notNull(),
+  imagePromptOptimizer: boolean("image_prompt_optimizer").default(true).notNull(),
+  temperature: real("temperature").default(0.35),
+  maxCompletionTokens: integer("max_completion_tokens").default(9000).notNull(),
+  textTimeoutMs: integer("text_timeout_ms").default(30000).notNull(),
+  imageTimeoutMs: integer("image_timeout_ms").default(35000).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const notifications = pgTable("notifications", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id")
@@ -394,4 +475,26 @@ export const notifications = pgTable("notifications", {
   projectId: uuid("project_id").references(() => projects.id),
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ─── PPT Agent Jobs ─────────────────────────────────────────────────────────
+
+export const pptAgentJobs = pgTable("ppt_agent_jobs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  prompt: text("prompt").notNull(),
+  status: pptAgentJobStatusEnum("status").default("queued").notNull(),
+  progress: integer("progress").default(0),
+  stage: varchar("stage", { length: 100 }).default("queued"),
+  errorMessage: varchar("error_message", { length: 2000 }),
+  deckPlan: jsonb("deck_plan").$type<Record<string, unknown> | null>(),
+  resultStoragePath: varchar("result_storage_path", { length: 1000 }),
+  resultFilename: varchar("result_filename", { length: 255 }),
+  warnings: jsonb("warnings").$type<string[]>().default([]),
+  trace: jsonb("trace").$type<Record<string, unknown>[]>().default([]),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
 });

@@ -7,27 +7,34 @@ import {
 import { documentMgmtRoutes } from "./modules/documents/documents.routes";
 import { fileRoutes } from "./modules/files/files.routes";
 import { modelAdminRoutes, modelReadRoutes } from "./modules/models/models.routes";
+import { notificationRoutes } from "./modules/notifications/notifications.routes";
+import { pptAgentConfigRoutes } from "./modules/ppt-agent-config/routes";
+import { pptAgentRoutes } from "./modules/ppt-agent/routes";
+import { pptTemplateRoutes } from "./modules/ppt-templates/ppt-templates.routes";
 import { projectRoutes } from "./modules/projects/projects.routes";
+import { promptOptimizeRoutes } from "./modules/prompts";
 import { providerRoutes } from "./modules/providers/providers.routes";
-import { userAdminRoutes, userReadRoutes } from "./modules/users/users.routes";
-import { runtimeRoutes, runtimeAdminRoutes } from "./modules/runtime/runtime.routes";
-import { inputTransformRoutes } from "./modules/runtime/input-transform.routes";
+import { detectOrphanTasks, startTaskMonitor } from "./modules/runtime/background.service";
 import { desensitizeRoutes } from "./modules/runtime/desensitize.routes";
 import { exportRoutes } from "./modules/runtime/export.routes";
-import { pptRoutes } from "./modules/runtime/ppt.routes";
-import { modelCallRoutes } from "./modules/runtime/model-call.routes";
-import { restoreRoutes } from "./modules/runtime/restore.routes";
-import { modelCallLogRoutes } from "./modules/runtime/model-call-log.routes";
 import { inlineEditRoutes } from "./modules/runtime/inline-edit.routes";
-import { promptOptimizeRoutes } from "./modules/prompts";
-import { versionRoutes } from "./modules/versions/versions.routes";
-import { detectOrphanTasks, startTaskMonitor } from "./modules/runtime/background.service";
-import { notificationRoutes } from "./modules/notifications/notifications.routes";
-import { wecomAuthRoutes, wecomAdminRoutes, invitationPublicRoutes, invitationRoutes } from "./modules/wecom/wecom.routes";
-import { statisticsRoutes } from "./modules/statistics/statistics.routes";
-import { pptTemplateRoutes } from "./modules/ppt-templates/ppt-templates.routes";
+import { inputTransformRoutes } from "./modules/runtime/input-transform.routes";
+import { modelCallLogRoutes } from "./modules/runtime/model-call-log.routes";
+import { modelCallRoutes } from "./modules/runtime/model-call.routes";
+import { pptRoutes } from "./modules/runtime/ppt.routes";
+import { restoreRoutes } from "./modules/runtime/restore.routes";
+import { runtimeAdminRoutes, runtimeRoutes } from "./modules/runtime/runtime.routes";
 import { searchRoutes } from "./modules/search/search.routes";
+import { statisticsRoutes } from "./modules/statistics/statistics.routes";
 import { userActivityRoutes } from "./modules/user-activity/user-activity.routes";
+import { userAdminRoutes, userReadRoutes } from "./modules/users/users.routes";
+import { versionRoutes } from "./modules/versions/versions.routes";
+import {
+  invitationPublicRoutes,
+  invitationRoutes,
+  wecomAdminRoutes,
+  wecomAuthRoutes,
+} from "./modules/wecom/wecom.routes";
 import { workflowAdminRoutes, workflowReadRoutes } from "./modules/workflows/workflows.routes";
 
 const app = new Elysia({ prefix: "/api" })
@@ -68,6 +75,8 @@ const app = new Elysia({ prefix: "/api" })
   .use(statisticsRoutes)
   .use(searchRoutes)
   .use(userActivityRoutes)
+  .use(pptAgentRoutes)
+  .use(pptAgentConfigRoutes)
   .use(pptTemplateRoutes)
   .listen({ port: 14001, hostname: "0.0.0.0" });
 

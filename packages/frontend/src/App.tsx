@@ -6,26 +6,27 @@ import { AuthProvider, useAuth } from "./contexts/auth";
 import AppLayout from "./layouts/AppLayout";
 import AuthLayout from "./layouts/AuthLayout";
 import Dashboard from "./pages/Dashboard";
+import Favorites from "./pages/Favorites";
 import Forbidden from "./pages/Forbidden";
+import Invitation from "./pages/Invitation";
 import Login from "./pages/Login";
+import PptGenerator from "./pages/PptGenerator";
+import RecentAccess from "./pages/RecentAccess";
+import Search from "./pages/Search";
 import DocumentTypeManagement from "./pages/admin/DocumentTypeManagement";
-import ModelConfiguration from "./pages/admin/ModelConfiguration";
-import UserManagement from "./pages/admin/UserManagement";
-import WorkflowManagement from "./pages/admin/WorkflowManagement";
-import WorkflowEditor from "./pages/admin/WorkflowEditor";
 import ModelCallLogs from "./pages/admin/ModelCallLogs";
+import ModelConfiguration from "./pages/admin/ModelConfiguration";
 import PptTemplateManagement from "./pages/admin/PptTemplateManagement";
 import PptTemplateProfileEditor from "./pages/admin/PptTemplateProfileEditor";
 import StatsDashboard from "./pages/admin/StatsDashboard";
-import ProjectList from "./pages/projects/ProjectList";
-import ProjectHome from "./pages/projects/ProjectHome";
-import ProjectSettings from "./pages/projects/ProjectSettings";
+import UserManagement from "./pages/admin/UserManagement";
+import WorkflowEditor from "./pages/admin/WorkflowEditor";
+import WorkflowManagement from "./pages/admin/WorkflowManagement";
 import VersionHistory from "./pages/documents/VersionHistory";
-import Invitation from "./pages/Invitation";
+import ProjectHome from "./pages/projects/ProjectHome";
+import ProjectList from "./pages/projects/ProjectList";
+import ProjectSettings from "./pages/projects/ProjectSettings";
 import DocumentWorkspace from "./pages/workspace/DocumentWorkspace";
-import Search from "./pages/Search";
-import Favorites from "./pages/Favorites";
-import RecentAccess from "./pages/RecentAccess";
 
 const AdminRoute: ParentComponent = (props) => {
   const auth = useAuth();
@@ -66,11 +67,15 @@ const App: Component = () => {
         <Route path="/search" component={Search} />
         <Route path="/favorites" component={Favorites} />
         <Route path="/recent" component={RecentAccess} />
+        <Route path="/ppt-generator" component={PptGenerator} />
         {/* Redirect old workspace URL */}
-        <Route path="/workspace/:documentId" component={() => {
-          const p = useParams<{ documentId: string }>();
-          return <Navigate href={`/documents/${p.documentId}`} />;
-        }} />
+        <Route
+          path="/workspace/:documentId"
+          component={() => {
+            const p = useParams<{ documentId: string }>();
+            return <Navigate href={`/documents/${p.documentId}`} />;
+          }}
+        />
         <Route
           path="/admin/users"
           component={() => (

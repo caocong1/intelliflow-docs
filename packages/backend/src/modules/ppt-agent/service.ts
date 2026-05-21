@@ -2,7 +2,18 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { assertWithinRoot, sanitizeFilename } from "../../common/sanitize";
 import { getActivePptAiRuntimeConfig } from "../ppt-agent-config/service";
-import { critiqueDeckPlan, defaultSlideCount, validateDeckPlan } from "./deck-plan-schema";
+import {
+  buildDeckOutline,
+  buildDeckStyleDna,
+  refineSlideWithStyle,
+  reviewDeckCoherence,
+} from "./deck-orchestrator";
+import {
+  critiqueDeckPlan,
+  defaultSlideCount,
+  validateDeckPlan,
+  validateDeckSlide,
+} from "./deck-plan-schema";
 import { reviewDeckDesign, shouldGenerateImageForSlide } from "./design-assets";
 import { buildFallbackDeckPlan } from "./fallback-deck-plan";
 import { buildFallbackVisual } from "./fallback-visuals";
@@ -39,6 +50,8 @@ export function createPptAgentService(options: {
   client?: PptAiClient;
   workspaceRoot?: string;
 }) {
+  const COMPOSE_MAX_ATTEMPTS = 2;
+  const MAX_TARGETED_FIXES = 6;
   const repository = options.repository;
   const client = options.client ?? new MiniMaxClient();
   const workspaceRoot = resolve(
@@ -104,6 +117,61 @@ export function createPptAgentService(options: {
         warnings,
       );
       await update("design_critic", 28, "Design Critic 开始检查 DeckPlan", { deckPlan });
+      await update("outline_planner", 33, "Outline Planner 生成全局叙事大纲", { deckPlan });
+      const outline = buildDeckOutline(deckPlan);
+      trace = [...trace, traceEvent("outline_planner", "Deck 全局大纲已生成", { outline })];
+
+      await update("style_director", 36, "Style Director 固化 Deck 风格 DNA", { deckPlan });
+      const styleDna = buildDeckStyleDna(deckPlan);
+      const styleDnaSummary = JSON.stringify(styleDna);
+      trace = [...trace, traceEvent("style_director", "Deck Style DNA 已固定", { styleDna })];
+
+      await update("slide_composer", 38, "Slide Composer 逐页统一内容与风格约束", { deckPlan });
+      deckPlan = {
+        ...deckPlan,
+        slides: deckPlan.slides.map((slide) => refineSlideWithStyle(slide, styleDna)),
+      };
+      if (client.composeSlide) {
+        const rewrittenSlides = [];
+        for (const slide of deckPlan.slides) {
+          try {
+            let composed = slide;
+            let accepted = false;
+            let lastErrors = "";
+            for (let attempt = 0; attempt < COMPOSE_MAX_ATTEMPTS; attempt += 1) {
+              const rawSlide = await client.composeSlide({
+                prompt: normalized.prompt,
+                style: normalized.style,
+                slide: composed,
+                deckPlan,
+                styleDnaSummary,
+                validationErrors: lastErrors ? [lastErrors] : undefined,
+              });
+              const merged = { ...composed, ...(rawSlide as Partial<typeof slide>) };
+              const validated = validateDeckSlide(merged);
+              if (validated.ok) {
+                composed = refineSlideWithStyle(validated.slide, styleDna);
+                accepted = true;
+                break;
+              }
+              lastErrors = validated.errors.join("；");
+            }
+            if (!accepted) {
+              warnings = [...warnings, `Slide ${slide.id} AI 重写未通过结构校验，已保留原始内容`];
+            }
+            rewrittenSlides.push(composed);
+          } catch (err) {
+            warnings = [
+              ...warnings,
+              `Slide Composer 逐页重写失败（${slide.id}），已保留基础版本：${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            ];
+            rewrittenSlides.push(slide);
+          }
+        }
+        deckPlan = { ...deckPlan, slides: rewrittenSlides };
+      }
 
       const critique = [
         ...critiqueDeckPlan(deckPlan, normalized.slideCount),
@@ -151,16 +219,101 @@ export function createPptAgentService(options: {
         }
       }
 
-      await update("visual_generator", 38, "Visual Generator 开始生成每页无文字视觉素材", {
+      await update("deck_reviewer", 78, "Deck Reviewer 进行跨页一致性终审", { deckPlan });
+      const coherence = reviewDeckCoherence(deckPlan);
+      if (coherence.issues.length > 0) {
+        warnings = [...warnings, ...coherence.issues.map((item) => `Deck Coherence 警告：${item}`)];
+      }
+      if (client.composeSlide && coherence.slideFixes.length > 0) {
+        const uniqueFixes = Array.from(
+          new Map(coherence.slideFixes.map((item) => [item.slideId, item])).values(),
+        ).slice(0, MAX_TARGETED_FIXES);
+        if (coherence.slideFixes.length > uniqueFixes.length) {
+          warnings = [
+            ...warnings,
+            `Deck Reviewer 定向修复项过多，已截断为前 ${uniqueFixes.length} 项执行`,
+          ];
+        }
+        const byId = new Map(deckPlan.slides.map((slide) => [slide.id, slide]));
+        for (const fix of uniqueFixes) {
+          const original = byId.get(fix.slideId);
+          if (!original) continue;
+          try {
+            const rewritten = await client.composeSlide({
+              prompt: normalized.prompt,
+              style: normalized.style,
+              slide: original,
+              deckPlan,
+              styleDnaSummary,
+              fixReason: fix.reason,
+            });
+            const validated = validateDeckSlide({
+              ...original,
+              ...(rewritten as Partial<typeof original>),
+            });
+            if (validated.ok) {
+              byId.set(fix.slideId, refineSlideWithStyle(validated.slide, styleDna));
+            } else {
+              warnings = [
+                ...warnings,
+                `Deck Reviewer 定向修复失败（${fix.slideId}）：${validated.errors.join("；")}`,
+              ];
+            }
+          } catch (err) {
+            warnings = [
+              ...warnings,
+              `Deck Reviewer 定向修复异常（${fix.slideId}）：${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            ];
+          }
+        }
+        deckPlan = {
+          ...deckPlan,
+          slides: deckPlan.slides.map((slide) => byId.get(slide.id) ?? slide),
+        };
+      }
+      if (client.reviewDeck && coherence.slideFixes.length > 0) {
+        try {
+          const reviewed = await client.reviewDeck({
+            deckPlan,
+            style: normalized.style,
+            prompt: normalized.prompt,
+          });
+          const reviewedPlan = validateDeckPlan(reviewed, normalized.slideCount);
+          if (reviewedPlan.ok) {
+            deckPlan = reviewedPlan.deckPlan;
+          } else {
+            warnings = [
+              ...warnings,
+              `Deck Reviewer 重写结果未通过结构校验，已保留当前版本：${reviewedPlan.errors.join("；")}`,
+            ];
+          }
+        } catch (err) {
+          warnings = [
+            ...warnings,
+            `Deck Reviewer 重写失败，已保留当前版本：${
+              err instanceof Error ? err.message : String(err)
+            }`,
+          ];
+        }
+      }
+      await update("visual_generator", 82, "Visual Generator 开始生成每页无文字视觉素材", {
         deckPlan,
       });
       const visuals = await generateVisuals(deckPlan, warnings, async (progress) => {
-        await update("visual_generator", progress, "Visual Generator 正在处理页面视觉素材", {
-          deckPlan,
-        });
+        const mappedProgress = 82 + Math.round(((progress - 38) / 34) * 10);
+        await update(
+          "visual_generator",
+          Math.max(82, Math.min(92, mappedProgress)),
+          "Visual Generator 正在处理页面视觉素材",
+          {
+            deckPlan,
+          },
+        );
       });
 
-      await update("renderer", 78, "Renderer 开始输出 PPTX", { deckPlan });
+      await update("renderer", 93, "Renderer 开始输出 PPTX", { deckPlan });
       const outputDir = await ensureJobOutputDir(userId, jobId);
       const filename = buildResultFilename(deckPlan);
       const storagePath = join(outputDir, filename);
@@ -172,7 +325,7 @@ export function createPptAgentService(options: {
       }
       await writeFile(storagePath, rendered.buffer);
 
-      await update("qa", 90, "QA 开始检查 PPTX zip/xml/notes/placeholder", {
+      await update("qa", 97, "QA 开始检查 PPTX zip/xml/notes/placeholder", {
         deckPlan,
         resultFilename: filename,
         resultStoragePath: storagePath,

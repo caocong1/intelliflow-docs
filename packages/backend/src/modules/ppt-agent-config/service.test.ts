@@ -7,6 +7,11 @@ import {
 } from "./service";
 
 describe("ppt-agent-config", () => {
+  it("defaults MiniMax generation timeouts to 10 minutes", () => {
+    expect(DEFAULT_PPT_AI_CONFIG.textTimeoutMs).toBe(600_000);
+    expect(DEFAULT_PPT_AI_CONFIG.imageTimeoutMs).toBe(600_000);
+  });
+
   it("resolves API key from the configured backend env var", () => {
     const runtime = resolvePptAiRuntimeConfig(
       { ...DEFAULT_PPT_AI_CONFIG, apiKeyEnvVar: "PPT_TEST_KEY" },

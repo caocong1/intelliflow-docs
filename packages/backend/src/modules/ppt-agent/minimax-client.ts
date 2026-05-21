@@ -152,6 +152,36 @@ export class MiniMaxClient implements PptAiClient {
     return base64.startsWith("data:image/") ? base64 : `data:image/png;base64,${base64}`;
   }
 
+  async composeSlide(input: {
+    prompt: string;
+    style: string;
+    slide: DeckSlide;
+    deckPlan: DeckPlan;
+    styleDnaSummary: string;
+    validationErrors?: string[];
+    fixReason?: string;
+  }): Promise<unknown> {
+    const content = await this.chatJson([
+      { role: "system", content: buildSystemPrompt() },
+      {
+        role: "user",
+        content: buildSlideComposerPrompt(input),
+      },
+    ]);
+    return extractJsonObject(content);
+  }
+
+  async reviewDeck(input: { deckPlan: DeckPlan; style: string; prompt: string }): Promise<unknown> {
+    const content = await this.chatJson([
+      { role: "system", content: buildSystemPrompt() },
+      {
+        role: "user",
+        content: buildDeckReviewerPrompt(input),
+      },
+    ]);
+    return extractJsonObject(content);
+  }
+
   private async chatJson(messages: ChatMessage[]): Promise<string> {
     this.assertReady();
     const res = await fetchWithTimeout(
@@ -284,7 +314,8 @@ function buildDirectorPrompt(
     "Produce one DeckPlan JSON object with exactly this top-level structure:",
     "title, subtitle, audience, visualDirection, theme, slides.",
     "theme must include palette, mood, referenceKeywords, visualMotif, paletteDominance.",
-    "Each slide must include id, pageType, layoutPattern, title, optional subtitle, keyMessage, contentBlocks, optional chart/table/timeline, visualPrompt, speakerNotes, layoutIntent, contentDensity, visualHierarchy.",
+    'theme.palette must be an array of plain hex color strings only, for example ["3E4C3A", "A65F32", "E7D7B8", "243128"]. Do not return palette objects.',
+    'Each slide must include string id values like "slide-1", pageType, layoutPattern, title, optional subtitle, keyMessage, contentBlocks, optional chart/table/timeline, visualPrompt, speakerNotes, layoutIntent, contentDensity, visualHierarchy.',
     `Allowed pageType values: ${SUPPORTED_PAGE_TYPES.join(", ")}.`,
     requiredTypes,
     "Cover any explicitly requested slide types from the user prompt.",
@@ -306,6 +337,48 @@ function ensureNoTextSuffix(prompt: string): string {
   const cleaned = prompt.trim();
   if (cleaned.toLowerCase().includes(NO_TEXT_IMAGE_SUFFIX.toLowerCase())) return cleaned;
   return `${cleaned}, ${NO_TEXT_IMAGE_SUFFIX}`;
+}
+
+function buildSlideComposerPrompt(input: {
+  prompt: string;
+  style: string;
+  slide: DeckSlide;
+  deckPlan: DeckPlan;
+  styleDnaSummary: string;
+  validationErrors?: string[];
+  fixReason?: string;
+}): string {
+  return [
+    `User request:\n${input.prompt}`,
+    `Style preference: ${input.style || "auto"}`,
+    `Deck style DNA:\n${input.styleDnaSummary}`,
+    input.validationErrors?.length
+      ? `Previous validation issues:\n${input.validationErrors.map((item) => `- ${item}`).join("\n")}`
+      : "",
+    input.fixReason ? `Targeted fix objective:\n${input.fixReason}` : "",
+    "Rewrite exactly one slide JSON object using the same schema as DeckPlan.slide.",
+    "Do not remove required fields. Keep pageType stable unless current content is obviously mismatched.",
+    "Visible text concise Chinese. Speaker notes can be richer.",
+    `Current slide JSON:\n${JSON.stringify(input.slide)}`,
+    "Return only JSON object for that single slide.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function buildDeckReviewerPrompt(input: {
+  deckPlan: DeckPlan;
+  style: string;
+  prompt: string;
+}): string {
+  return [
+    `User request:\n${input.prompt}`,
+    `Style preference: ${input.style || "auto"}`,
+    "Review and improve full deck coherence while preserving exact slide count and schema.",
+    "Fix only cross-slide narrative flow, hierarchy consistency, and density rhythm.",
+    "Do not introduce markdown. Return complete DeckPlan JSON only.",
+    JSON.stringify(input.deckPlan),
+  ].join("\n\n");
 }
 
 function extractImageBase64(payload: unknown): string | null {

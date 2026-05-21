@@ -165,6 +165,10 @@ export type DeckPlanValidationResult =
   | { ok: true; deckPlan: DeckPlan }
   | { ok: false; errors: string[] };
 
+export type DeckSlideValidationResult =
+  | { ok: true; slide: DeckSlide }
+  | { ok: false; errors: string[] };
+
 export function defaultSlideCount(slideCount?: number): number {
   if (!Number.isFinite(slideCount)) return 12;
   return Math.max(1, Math.min(30, Math.round(slideCount ?? 12)));
@@ -189,6 +193,243 @@ function normalizeHexColor(value: string, fallback: string): string {
   }
   if (cleaned.length >= 6) return cleaned.slice(0, 6).toUpperCase();
   return fallback;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function coerceString(value: unknown, fallback = ""): string {
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+    return String(value);
+  }
+  return fallback;
+}
+
+function coerceNonEmptyString(value: unknown, fallback: string): string {
+  return coerceString(value, fallback).trim() || fallback;
+}
+
+function coerceOptionalString(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  return coerceString(value);
+}
+
+function coercePaletteColor(value: unknown, fallback: string): string {
+  if (typeof value === "string") return normalizeHexColor(value, fallback);
+  if (!isRecord(value)) return fallback;
+
+  for (const key of ["hex", "color", "value", "code", "rgb"]) {
+    const candidate = value[key];
+    if (typeof candidate === "string") return normalizeHexColor(candidate, fallback);
+  }
+
+  return fallback;
+}
+
+function coercePalette(value: unknown): string[] {
+  const fallbackPalette = ["0B1220", "111827", "38BDF8", "F59E0B"];
+  const rawValues = Array.isArray(value) ? value : isRecord(value) ? Object.values(value) : [];
+  const palette = rawValues
+    .slice(0, 6)
+    .map((item, index) => coercePaletteColor(item, fallbackPalette[index] ?? fallbackPalette[0]));
+
+  while (palette.length < 3) {
+    palette.push(fallbackPalette[palette.length] ?? fallbackPalette[0]);
+  }
+
+  return palette;
+}
+
+function coerceStringArray(value: unknown): string[] | unknown {
+  if (!Array.isArray(value)) return value;
+  return value.map((item) => coerceString(item).trim()).filter(Boolean);
+}
+
+function coerceNumberArray(value: unknown): number[] | unknown {
+  if (!Array.isArray(value)) return value;
+  return value
+    .map((item) => (typeof item === "number" ? item : Number(item)))
+    .filter((item) => Number.isFinite(item));
+}
+
+function coerceRows(value: unknown): string[][] | unknown {
+  if (!Array.isArray(value)) return value;
+  return value
+    .filter(Array.isArray)
+    .map((row) => row.map((item) => coerceString(item).trim()).filter(Boolean))
+    .filter((row) => row.length > 0);
+}
+
+function coerceContentBlocks(value: unknown, fallbackBody: string): unknown {
+  const safeFallback = fallbackBody.trim() || "围绕本页主题提炼关键判断和管理动作。";
+  if (!Array.isArray(value) || value.length === 0) return [{ body: safeFallback }];
+
+  const blocks = value.map((block) => {
+    if (!isRecord(block)) return { body: coerceNonEmptyString(block, safeFallback) };
+    return {
+      ...block,
+      heading: coerceOptionalString(block.heading),
+      body: coerceNonEmptyString(block.body, safeFallback),
+      emphasis: block.emphasis == null ? block.emphasis : coerceString(block.emphasis),
+    };
+  });
+  return blocks.some((block) => isRecord(block) && coerceString(block.body).trim())
+    ? blocks
+    : [{ body: safeFallback }];
+}
+
+function coerceChart(value: unknown): unknown {
+  if (value == null) return value;
+  if (!isRecord(value)) return null;
+  const labels = coerceStringArray(value.labels);
+  const values = coerceNumberArray(value.values);
+  if (
+    !Array.isArray(labels) ||
+    labels.length === 0 ||
+    !Array.isArray(values) ||
+    values.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    ...value,
+    title: coerceNonEmptyString(value.title, "关键指标"),
+    labels: labels.slice(0, 8),
+    values: values.slice(0, 8),
+    unit: coerceOptionalString(value.unit),
+  };
+}
+
+function coerceTable(value: unknown): unknown {
+  if (value == null) return value;
+  if (!isRecord(value)) return null;
+  const headers = coerceStringArray(value.headers);
+  const rows = coerceRows(value.rows);
+  if (
+    !Array.isArray(headers) ||
+    headers.length === 0 ||
+    !Array.isArray(rows) ||
+    rows.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    ...value,
+    title: coerceOptionalString(value.title),
+    headers: headers.slice(0, 5),
+    rows: rows.slice(0, 8).map((row) => row.slice(0, 5)),
+  };
+}
+
+function coerceTimeline(value: unknown): unknown {
+  if (value == null) return value;
+  const items = Array.isArray(value)
+    ? value
+    : isRecord(value)
+      ? (["items", "steps", "milestones", "events", "nodes", "timeline"]
+          .map((key) => value[key])
+          .find(Array.isArray) as unknown[] | undefined)
+      : undefined;
+
+  if (!items || items.length === 0) return null;
+
+  const timeline = items.map((item, index) => {
+    if (!isRecord(item)) return item;
+    const label = coerceNonEmptyString(item.label, `阶段 ${index + 1}`);
+    return {
+      ...item,
+      label,
+      description: coerceNonEmptyString(item.description, label),
+      date: coerceOptionalString(item.date),
+    };
+  });
+  return timeline.some((item) => isRecord(item) && coerceString(item.label).trim())
+    ? timeline
+    : null;
+}
+
+function fallbackVisualPrompt(pageType: string, title: string, keyMessage: string): string {
+  const subject = [title, keyMessage].filter(Boolean).join(" - ").slice(0, 140);
+  return [
+    "premium enterprise presentation visual system",
+    `${pageType || "business"} slide`,
+    subject || "strategic management theme",
+    "abstract diagram composition, semantic line icons, layered shapes, executive consulting style",
+  ].join(", ");
+}
+
+function coerceSlide(value: unknown, index: number): unknown {
+  if (!isRecord(value)) return value;
+  const title = coerceNonEmptyString(value.title, `第 ${index + 1} 页`);
+  const keyMessage = coerceNonEmptyString(value.keyMessage, title);
+  const pageType = coerceString(value.pageType);
+  const visualPrompt = coerceString(value.visualPrompt).trim();
+
+  return {
+    ...value,
+    id: coerceString(value.id, `slide-${index + 1}`),
+    pageType,
+    layoutPattern: coerceString(value.layoutPattern, `layout-${index + 1}`),
+    title,
+    subtitle: coerceOptionalString(value.subtitle),
+    keyMessage,
+    contentBlocks: coerceContentBlocks(value.contentBlocks, keyMessage || title),
+    chart: coerceChart(value.chart),
+    table: coerceTable(value.table),
+    timeline: coerceTimeline(value.timeline),
+    visualPrompt: visualPrompt || fallbackVisualPrompt(pageType, title, keyMessage),
+    speakerNotes: coerceNonEmptyString(value.speakerNotes, keyMessage),
+    layoutIntent: coerceNonEmptyString(
+      value.layoutIntent,
+      "正文左对齐，使用图标、图解或数据组件承载视觉重点。",
+    ),
+    contentDensity:
+      value.contentDensity == null ? value.contentDensity : coerceString(value.contentDensity),
+    visualHierarchy: coerceNonEmptyString(
+      value.visualHierarchy,
+      "标题、关键判断、内容块与视觉元素形成清晰层级。",
+    ),
+  };
+}
+
+function coerceDeckPlanCandidate(raw: unknown): unknown {
+  if (!isRecord(raw)) return raw;
+  const candidate: Record<string, unknown> = { ...raw };
+
+  candidate.title = coerceNonEmptyString(candidate.title, "企业专题汇报");
+  candidate.subtitle = coerceNonEmptyString(candidate.subtitle, "结构化汇报材料");
+  candidate.audience = coerceNonEmptyString(candidate.audience, "管理层与项目相关方");
+  candidate.visualDirection = coerceNonEmptyString(
+    candidate.visualDirection,
+    "正式商务、清晰图解、稳定配色的企业级演示风格。",
+  );
+
+  if (isRecord(candidate.theme)) {
+    const theme: Record<string, unknown> = { ...candidate.theme };
+    theme.palette = coercePalette(theme.palette);
+    theme.mood = coerceNonEmptyString(theme.mood, "正式、稳健、清晰");
+    const referenceKeywords = coerceStringArray(theme.referenceKeywords);
+    theme.referenceKeywords =
+      Array.isArray(referenceKeywords) && referenceKeywords.length > 0
+        ? referenceKeywords
+        : ["enterprise presentation", "consulting deck"];
+    theme.visualMotif = coerceNonEmptyString(theme.visualMotif, "企业能力图解与治理网络");
+    theme.paletteDominance = coerceNonEmptyString(
+      theme.paletteDominance,
+      "主色 65%，辅助色 25%，强调色 10%",
+    );
+    candidate.theme = theme;
+  }
+
+  if (Array.isArray(candidate.slides)) {
+    candidate.slides = candidate.slides.map(coerceSlide);
+  }
+
+  return candidate;
 }
 
 function normalizeVisualPrompt(prompt: string): string {
@@ -295,8 +536,31 @@ export function normalizeDeckPlan(raw: DeckPlan): DeckPlan {
   };
 }
 
+export function validateDeckSlide(raw: unknown): DeckSlideValidationResult {
+  const wrapped = { ...(raw as Record<string, unknown>) };
+  const result = validateDeckPlan(
+    {
+      title: "slide-validate",
+      subtitle: "slide-validate",
+      audience: "slide-validate",
+      visualDirection: "slide-validate",
+      theme: {
+        palette: ["0B1220", "111827", "38BDF8"],
+        mood: "professional",
+        referenceKeywords: ["business"],
+        visualMotif: "clean geometry",
+        paletteDominance: "dark base with cool accents",
+      },
+      slides: [wrapped],
+    } as unknown,
+    1,
+  );
+  if (!result.ok) return { ok: false, errors: result.errors };
+  return { ok: true, slide: result.deckPlan.slides[0] };
+}
+
 export function validateDeckPlan(raw: unknown, slideCount: number): DeckPlanValidationResult {
-  const candidate = unwrapDeckPlan(raw);
+  const candidate = coerceDeckPlanCandidate(unwrapDeckPlan(raw));
 
   if (!validateDeckPlanSchema(candidate)) {
     return {
@@ -395,7 +659,7 @@ export function critiqueDeckPlan(deckPlan: DeckPlan, slideCount: number): string
 
   const underlines = deckPlan.slides
     .filter((slide) =>
-      /underline|下划线|标题线|横线装饰/i.test(`${slide.layoutIntent} ${slide.visualHierarchy}`),
+      hasUnderlineDecorationIntent(`${slide.layoutIntent} ${slide.visualHierarchy}`),
     )
     .map((slide) => slide.id);
   if (underlines.length > 0) {
@@ -403,6 +667,19 @@ export function critiqueDeckPlan(deckPlan: DeckPlan, slideCount: number): string
   }
 
   return issues;
+}
+
+function hasUnderlineDecorationIntent(text: string): boolean {
+  const normalized = text.replace(/\s+/g, "");
+  if (
+    /不(使用|采用|要|做|设置|添加|出现)?(标题)?(下划线|标题线|横线装饰)/i.test(normalized) ||
+    /避免(标题)?(下划线|标题线|横线装饰|underline)/i.test(normalized) ||
+    /(?:do\s*not|don't|no)(?:\w|\W){0,24}underline/i.test(text)
+  ) {
+    return false;
+  }
+
+  return /underline|下划线|标题线|横线装饰/i.test(text);
 }
 
 function findAdjacentRepeat(

@@ -15,7 +15,7 @@ export const DEFAULT_PPT_AI_CONFIG: PptAiConfig = {
   imagePromptOptimizer: true,
   temperature: 0.35,
   maxCompletionTokens: 9000,
-  textTimeoutMs: 30_000,
-  imageTimeoutMs: 35_000,
+  textTimeoutMs: 600_000,
+  imageTimeoutMs: 600_000,
   isActive: true,
 };

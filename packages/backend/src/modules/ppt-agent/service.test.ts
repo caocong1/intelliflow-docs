@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import JSZip from "jszip";
 import { afterEach, describe, expect, it } from "vitest";
-import { extractJsonObject, validateDeckPlan } from "./deck-plan-schema";
+import { critiqueDeckPlan, extractJsonObject, validateDeckPlan } from "./deck-plan-schema";
 import { MiniMaxClient } from "./minimax-client";
 import { createMemoryPptAgentRepository, createPptAgentService } from "./service";
 import type { DeckPlan, PptAiClient } from "./types";
@@ -162,6 +162,66 @@ describe("ppt-agent", () => {
     }
   });
 
+  it("coerces MiniMax palette objects and numeric slide ids before validation", () => {
+    const raw = makeDeckPlan() as unknown as {
+      theme: { palette: unknown[] };
+      slides: Array<{ id: unknown }>;
+    };
+    raw.theme.palette = [
+      { hex: "#3e4c3a", name: "olive" },
+      { color: "#A65F32" },
+      { value: "E7D7B8" },
+      { code: "243128" },
+    ];
+    raw.slides[0].id = 1;
+    raw.slides[1].id = 2;
+
+    const result = validateDeckPlan(raw, 12);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.deckPlan.theme.palette).toEqual(["3E4C3A", "A65F32", "E7D7B8", "243128"]);
+      expect(result.deckPlan.slides[0].id).toBe("1");
+      expect(result.deckPlan.slides[1].id).toBe("2");
+    }
+  });
+
+  it("repairs sparse MiniMax plans with empty blocks, prompts, and partial optional data", () => {
+    const result = validateDeckPlan(makeBrittleDeckPlan(), 12);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.deckPlan.slides[0].contentBlocks).toHaveLength(1);
+      expect(result.deckPlan.slides[1].visualPrompt).toContain("no text / no letters");
+      expect(result.deckPlan.slides[4].timeline).toBeUndefined();
+      expect(result.deckPlan.slides[5].chart).toBeUndefined();
+    }
+  });
+
+  it("runs a complete job from a sparse MiniMax plan without falling back to the deterministic plan", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ brittlePlan: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(completed.deckPlan?.slides).toHaveLength(12);
+    expect(completed.warnings.some((warning) => warning.includes("保底方案"))).toBe(false);
+  });
+
+  it("does not flag negative underline guidance as title underline decoration", () => {
+    const issues = critiqueDeckPlan(makeDeckPlan(), 12);
+
+    expect(issues.some((issue) => issue.includes("避免标题下划线式装饰"))).toBe(false);
+  });
+
   it("unwraps common DeckPlan wrapper objects from model output", () => {
     const result = validateDeckPlan({ deckPlan: makeDeckPlan() }, 12);
 
@@ -232,6 +292,82 @@ describe("ppt-agent", () => {
 
     await expect(service.getDownload("user-2", job.id)).rejects.toThrow("PPT 生成任务不存在");
   });
+
+  it("retries slide composition with validation feedback and keeps deck completed", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ invalidComposeFirst: true, failImages: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(client.composeCalls).toBeGreaterThanOrEqual(12);
+    expect(completed.warnings.some((warning) => warning.includes("AI 重写未通过结构校验"))).toBe(
+      false,
+    );
+  });
+
+  it("accepts reviewed deck rewrite when reviewer returns valid plan", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ reviewDeckReturnsValidPlan: true, failImages: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(client.reviewDeckCalls).toBe(1);
+  });
+
+  it("runs stage order with deck review before visual generation", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ failImages: true, reviewDeckReturnsValidPlan: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    const stages = completed.trace.map((event) => event.stage);
+    expect(stages.indexOf("deck_reviewer")).toBeGreaterThan(stages.indexOf("slide_composer"));
+    expect(stages.indexOf("deck_reviewer")).toBeLessThan(stages.indexOf("visual_generator"));
+  });
+
+  it("applies targeted slide fixes from coherence review before optional deck rewrite", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({
+      forceHighDensityRun: true,
+      reviewDeckReturnsValidPlan: false,
+      failImages: true,
+    });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(client.composeFixCalls).toBeGreaterThan(0);
+  });
 });
 
 async function tempRoot(): Promise<string> {
@@ -248,6 +384,13 @@ class FakeMiniMaxClient implements PptAiClient {
   private readonly throwRewrite: boolean;
   private readonly blueGrayPlan: boolean;
   private readonly failImages: boolean;
+  private readonly brittlePlan: boolean;
+  private readonly invalidComposeFirst: boolean;
+  private readonly reviewDeckReturnsValidPlan: boolean;
+  private readonly forceHighDensityRun: boolean;
+  composeCalls = 0;
+  composeFixCalls = 0;
+  reviewDeckCalls = 0;
 
   constructor(
     options: {
@@ -257,6 +400,10 @@ class FakeMiniMaxClient implements PptAiClient {
       throwRewrite?: boolean;
       blueGrayPlan?: boolean;
       failImages?: boolean;
+      brittlePlan?: boolean;
+      invalidComposeFirst?: boolean;
+      reviewDeckReturnsValidPlan?: boolean;
+      forceHighDensityRun?: boolean;
     } = {},
   ) {
     this.invalidFirstPlan = options.invalidFirstPlan ?? false;
@@ -265,6 +412,10 @@ class FakeMiniMaxClient implements PptAiClient {
     this.throwRewrite = options.throwRewrite ?? false;
     this.blueGrayPlan = options.blueGrayPlan ?? false;
     this.failImages = options.failImages ?? false;
+    this.brittlePlan = options.brittlePlan ?? false;
+    this.invalidComposeFirst = options.invalidComposeFirst ?? false;
+    this.reviewDeckReturnsValidPlan = options.reviewDeckReturnsValidPlan ?? false;
+    this.forceHighDensityRun = options.forceHighDensityRun ?? false;
   }
 
   assertReady(): void {
@@ -277,9 +428,13 @@ class FakeMiniMaxClient implements PptAiClient {
     if (this.invalidFirstPlan && this.planCalls === 1) {
       return { title: "bad", slides: [] };
     }
+    if (this.brittlePlan) return makeBrittleDeckPlan();
     const plan = makeDeckPlan();
     if (this.blueGrayPlan) {
       plan.theme.palette = ["0F172A", "334155", "F1F5F9", "3B82F6"];
+    }
+    if (this.forceHighDensityRun) {
+      for (let i = 0; i < 3; i += 1) plan.slides[i].contentDensity = "high";
     }
     return plan;
   }
@@ -294,6 +449,51 @@ class FakeMiniMaxClient implements PptAiClient {
     if (this.failImages) throw new Error("image quota exhausted");
     return tinyPngDataUri();
   }
+
+  async composeSlide(input: {
+    slide: DeckPlan["slides"][number];
+    validationErrors?: string[];
+    fixReason?: string;
+  }): Promise<unknown> {
+    this.composeCalls += 1;
+    if (input.fixReason) this.composeFixCalls += 1;
+    if (this.invalidComposeFirst && !input.validationErrors?.length) {
+      return { title: "invalid-slide-with-missing-required-fields" };
+    }
+    return {
+      ...input.slide,
+      speakerNotes: `${input.slide.speakerNotes}（逐页重写完成）`,
+    };
+  }
+
+  async reviewDeck(input: { deckPlan: DeckPlan }): Promise<unknown> {
+    this.reviewDeckCalls += 1;
+    if (this.reviewDeckReturnsValidPlan) {
+      return {
+        ...input.deckPlan,
+        subtitle: `${input.deckPlan.subtitle}（全局复审通过）`,
+      };
+    }
+    return input.deckPlan;
+  }
+}
+
+function makeBrittleDeckPlan(): unknown {
+  const plan = makeDeckPlan() as unknown as {
+    slides: Array<{
+      contentBlocks: unknown[];
+      visualPrompt: string;
+      timeline?: unknown;
+      chart?: unknown;
+    }>;
+  };
+  plan.slides[0].contentBlocks = [];
+  for (const slide of plan.slides.slice(1, 5)) {
+    slide.visualPrompt = "";
+  }
+  plan.slides[4].timeline = { milestones: [] };
+  plan.slides[5].chart = { title: "" };
+  return plan;
 }
 
 function makeDeckPlan(): DeckPlan {

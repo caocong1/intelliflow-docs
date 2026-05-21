@@ -52,6 +52,7 @@ export function createPptAgentService(options: {
 }) {
   const COMPOSE_MAX_ATTEMPTS = 2;
   const MAX_TARGETED_FIXES = 6;
+  const MAX_COHERENCE_REPAIR_ROUNDS = 3;
   const repository = options.repository;
   const client = options.client ?? new MiniMaxClient();
   const workspaceRoot = resolve(
@@ -220,18 +221,16 @@ export function createPptAgentService(options: {
       }
 
       await update("deck_reviewer", 78, "Deck Reviewer 进行跨页一致性终审", { deckPlan });
-      const coherence = reviewDeckCoherence(deckPlan);
-      if (coherence.issues.length > 0) {
-        warnings = [...warnings, ...coherence.issues.map((item) => `Deck Coherence 警告：${item}`)];
-      }
-      if (client.composeSlide && coherence.slideFixes.length > 0) {
+      let coherence = reviewDeckCoherence(deckPlan);
+      for (let round = 1; round <= MAX_COHERENCE_REPAIR_ROUNDS; round += 1) {
+        if (coherence.slideFixes.length === 0 || !client.composeSlide) break;
         const uniqueFixes = Array.from(
           new Map(coherence.slideFixes.map((item) => [item.slideId, item])).values(),
         ).slice(0, MAX_TARGETED_FIXES);
         if (coherence.slideFixes.length > uniqueFixes.length) {
           warnings = [
             ...warnings,
-            `Deck Reviewer 定向修复项过多，已截断为前 ${uniqueFixes.length} 项执行`,
+            `Deck Reviewer 第 ${round} 轮定向修复项过多，已截断为前 ${uniqueFixes.length} 项执行`,
           ];
         }
         const byId = new Map(deckPlan.slides.map((slide) => [slide.id, slide]));
@@ -256,13 +255,13 @@ export function createPptAgentService(options: {
             } else {
               warnings = [
                 ...warnings,
-                `Deck Reviewer 定向修复失败（${fix.slideId}）：${validated.errors.join("；")}`,
+                `Deck Reviewer 第 ${round} 轮定向修复失败（${fix.slideId}）：${validated.errors.join("；")}`,
               ];
             }
           } catch (err) {
             warnings = [
               ...warnings,
-              `Deck Reviewer 定向修复异常（${fix.slideId}）：${
+              `Deck Reviewer 第 ${round} 轮定向修复异常（${fix.slideId}）：${
                 err instanceof Error ? err.message : String(err)
               }`,
             ];
@@ -272,6 +271,10 @@ export function createPptAgentService(options: {
           ...deckPlan,
           slides: deckPlan.slides.map((slide) => byId.get(slide.id) ?? slide),
         };
+        coherence = reviewDeckCoherence(deckPlan);
+      }
+      if (coherence.issues.length > 0) {
+        warnings = [...warnings, ...coherence.issues.map((item) => `Deck Coherence 警告：${item}`)];
       }
       if (client.reviewDeck && coherence.slideFixes.length > 0) {
         try {

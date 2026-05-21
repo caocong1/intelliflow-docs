@@ -2,6 +2,10 @@ export type PptAgentJobStatus = "queued" | "running" | "completed" | "failed";
 
 export type PptAgentStage =
   | "queued"
+  | "outline_planner"
+  | "style_director"
+  | "slide_composer"
+  | "deck_reviewer"
   | "design_director"
   | "design_critic"
   | "visual_generator"
@@ -167,6 +171,18 @@ export type PptAiClient = {
     critique: string[];
   }): Promise<unknown>;
   generateImage(input: { prompt: string; slide: DeckSlide; deckPlan: DeckPlan }): Promise<string>;
+  composeSlide?(
+    input: {
+      prompt: string;
+      style: string;
+      slide: DeckSlide;
+      deckPlan: DeckPlan;
+      styleDnaSummary: string;
+      validationErrors?: string[];
+      fixReason?: string;
+    },
+  ): Promise<unknown>;
+  reviewDeck?(input: { deckPlan: DeckPlan; style: string; prompt: string }): Promise<unknown>;
 };
 
 export type RenderedPpt = {

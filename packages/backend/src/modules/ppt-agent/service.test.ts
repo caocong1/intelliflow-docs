@@ -232,6 +232,82 @@ describe("ppt-agent", () => {
 
     await expect(service.getDownload("user-2", job.id)).rejects.toThrow("PPT 生成任务不存在");
   });
+
+  it("retries slide composition with validation feedback and keeps deck completed", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ invalidComposeFirst: true, failImages: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(client.composeCalls).toBeGreaterThanOrEqual(12);
+    expect(completed.warnings.some((warning) => warning.includes("AI 重写未通过结构校验"))).toBe(
+      false,
+    );
+  });
+
+  it("accepts reviewed deck rewrite when reviewer returns valid plan", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ reviewDeckReturnsValidPlan: true, failImages: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(client.reviewDeckCalls).toBe(1);
+  });
+
+  it("runs stage order with deck review before visual generation", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ failImages: true, reviewDeckReturnsValidPlan: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    const stages = completed.trace.map((event) => event.stage);
+    expect(stages.indexOf("deck_reviewer")).toBeGreaterThan(stages.indexOf("slide_composer"));
+    expect(stages.indexOf("deck_reviewer")).toBeLessThan(stages.indexOf("visual_generator"));
+  });
+
+  it("applies targeted slide fixes from coherence review before optional deck rewrite", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({
+      forceHighDensityRun: true,
+      reviewDeckReturnsValidPlan: false,
+      failImages: true,
+    });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(client.composeFixCalls).toBeGreaterThan(0);
+  });
 });
 
 async function tempRoot(): Promise<string> {
@@ -248,6 +324,12 @@ class FakeMiniMaxClient implements PptAiClient {
   private readonly throwRewrite: boolean;
   private readonly blueGrayPlan: boolean;
   private readonly failImages: boolean;
+  private readonly invalidComposeFirst: boolean;
+  private readonly reviewDeckReturnsValidPlan: boolean;
+  private readonly forceHighDensityRun: boolean;
+  composeCalls = 0;
+  composeFixCalls = 0;
+  reviewDeckCalls = 0;
 
   constructor(
     options: {
@@ -257,6 +339,9 @@ class FakeMiniMaxClient implements PptAiClient {
       throwRewrite?: boolean;
       blueGrayPlan?: boolean;
       failImages?: boolean;
+      invalidComposeFirst?: boolean;
+      reviewDeckReturnsValidPlan?: boolean;
+      forceHighDensityRun?: boolean;
     } = {},
   ) {
     this.invalidFirstPlan = options.invalidFirstPlan ?? false;
@@ -265,6 +350,9 @@ class FakeMiniMaxClient implements PptAiClient {
     this.throwRewrite = options.throwRewrite ?? false;
     this.blueGrayPlan = options.blueGrayPlan ?? false;
     this.failImages = options.failImages ?? false;
+    this.invalidComposeFirst = options.invalidComposeFirst ?? false;
+    this.reviewDeckReturnsValidPlan = options.reviewDeckReturnsValidPlan ?? false;
+    this.forceHighDensityRun = options.forceHighDensityRun ?? false;
   }
 
   assertReady(): void {
@@ -281,6 +369,9 @@ class FakeMiniMaxClient implements PptAiClient {
     if (this.blueGrayPlan) {
       plan.theme.palette = ["0F172A", "334155", "F1F5F9", "3B82F6"];
     }
+    if (this.forceHighDensityRun) {
+      for (let i = 0; i < 3; i += 1) plan.slides[i].contentDensity = "high";
+    }
     return plan;
   }
 
@@ -293,6 +384,33 @@ class FakeMiniMaxClient implements PptAiClient {
   async generateImage(): Promise<string> {
     if (this.failImages) throw new Error("image quota exhausted");
     return tinyPngDataUri();
+  }
+
+  async composeSlide(input: {
+    slide: DeckPlan["slides"][number];
+    validationErrors?: string[];
+    fixReason?: string;
+  }): Promise<unknown> {
+    this.composeCalls += 1;
+    if (input.fixReason) this.composeFixCalls += 1;
+    if (this.invalidComposeFirst && !input.validationErrors?.length) {
+      return { title: "invalid-slide-with-missing-required-fields" };
+    }
+    return {
+      ...input.slide,
+      speakerNotes: `${input.slide.speakerNotes}（逐页重写完成）`,
+    };
+  }
+
+  async reviewDeck(input: { deckPlan: DeckPlan }): Promise<unknown> {
+    this.reviewDeckCalls += 1;
+    if (this.reviewDeckReturnsValidPlan) {
+      return {
+        ...input.deckPlan,
+        subtitle: `${input.deckPlan.subtitle}（全局复审通过）`,
+      };
+    }
+    return input.deckPlan;
   }
 }
 

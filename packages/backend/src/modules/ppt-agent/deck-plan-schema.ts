@@ -165,6 +165,10 @@ export type DeckPlanValidationResult =
   | { ok: true; deckPlan: DeckPlan }
   | { ok: false; errors: string[] };
 
+export type DeckSlideValidationResult =
+  | { ok: true; slide: DeckSlide }
+  | { ok: false; errors: string[] };
+
 export function defaultSlideCount(slideCount?: number): number {
   if (!Number.isFinite(slideCount)) return 12;
   return Math.max(1, Math.min(30, Math.round(slideCount ?? 12)));
@@ -293,6 +297,29 @@ export function normalizeDeckPlan(raw: DeckPlan): DeckPlan {
     },
     slides: raw.slides.map(normalizeSlide),
   };
+}
+
+export function validateDeckSlide(raw: unknown): DeckSlideValidationResult {
+  const wrapped = { ...(raw as Record<string, unknown>) };
+  const result = validateDeckPlan(
+    {
+      title: "slide-validate",
+      subtitle: "slide-validate",
+      audience: "slide-validate",
+      visualDirection: "slide-validate",
+      theme: {
+        palette: ["0B1220", "111827", "38BDF8"],
+        mood: "professional",
+        referenceKeywords: ["business"],
+        visualMotif: "clean geometry",
+        paletteDominance: "dark base with cool accents",
+      },
+      slides: [wrapped],
+    } as unknown,
+    1,
+  );
+  if (!result.ok) return { ok: false, errors: result.errors };
+  return { ok: true, slide: result.deckPlan.slides[0] };
 }
 
 export function validateDeckPlan(raw: unknown, slideCount: number): DeckPlanValidationResult {

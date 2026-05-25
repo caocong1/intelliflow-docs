@@ -50,6 +50,18 @@ export function createPptAgentRoutes(options: PptAgentRoutesOptions = {}) {
           prompt: t.String({ minLength: 1, maxLength: 12000 }),
           slideCount: t.Optional(t.Number({ minimum: 1, maximum: 30 })),
           style: t.Optional(t.String({ maxLength: 80 })),
+          generationMode: t.Optional(
+            t.Union([
+              t.Literal("auto_dynamic"),
+              t.Literal("template_locked"),
+              t.Literal("template_stylized"),
+              t.Literal("svg_native"),
+            ]),
+          ),
+          styleProfile: t.Optional(t.String({ maxLength: 120 })),
+          textModel: t.Optional(t.String({ maxLength: 200 })),
+          imageModel: t.Optional(t.String({ maxLength: 200 })),
+          imageEnabled: t.Optional(t.Boolean()),
         }),
       },
     )
@@ -105,6 +117,23 @@ export function createPptAgentRoutes(options: PptAgentRoutesOptions = {}) {
           set.status = publicError.status;
           return { error: publicError.error };
         }
+      },
+      { params: t.Object({ id: t.String() }) },
+    )
+    .delete(
+      "/jobs/:id",
+      async ({ params, user, set }) => {
+        if (!user?.id) {
+          set.status = 401;
+          return { error: "未授权" };
+        }
+        const service = await resolveService();
+        const deleted = await service.deleteJob(user.id, params.id);
+        if (!deleted) {
+          set.status = 404;
+          return { error: "PPT 生成任务不存在" };
+        }
+        return { ok: true };
       },
       { params: t.Object({ id: t.String() }) },
     );

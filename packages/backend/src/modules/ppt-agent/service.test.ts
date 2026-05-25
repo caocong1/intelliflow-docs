@@ -44,6 +44,45 @@ describe("ppt-agent", () => {
     expect(completed.resultStoragePath).toMatch(/\.pptx$/);
   });
 
+  it("maps legacy style=auto to svg_native mode by default", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ failImages: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "auto",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(client.planInputs[0]?.generationMode).toBe("svg_native");
+    expect(client.planInputs[0]?.styleProfile).toBe("auto");
+    expect(client.planInputs[0]?.style).toContain("SVG native mode");
+  });
+
+  it("accepts explicit template_stylized mode without forcing auto_dynamic", async () => {
+    const root = await tempRoot();
+    const repository = createMemoryPptAgentRepository();
+    const client = new FakeMiniMaxClient({ failImages: true });
+    const service = createPptAgentService({ repository, client, workspaceRoot: root });
+    const job = await repository.createJob({ userId: "user-1", prompt: "知识中台建设方案" });
+
+    const completed = await service.runJob(job.id, "user-1", {
+      prompt: "知识中台建设方案",
+      slideCount: 12,
+      style: "formal consulting",
+      generationMode: "template_stylized",
+      styleProfile: "formal consulting",
+    });
+
+    expect(completed.status).toBe("completed");
+    expect(client.planInputs[0]?.generationMode).toBe("template_stylized");
+    expect(client.planInputs[0]?.styleProfile).toBe("formal consulting");
+  });
+
   it("retries once when deck plan validation fails", async () => {
     const root = await tempRoot();
     const repository = createMemoryPptAgentRepository();
@@ -258,6 +297,7 @@ describe("ppt-agent", () => {
       prompt: "知识中台建设方案",
       slideCount: 12,
       style: "auto",
+      generationMode: "template_stylized",
     });
 
     const download = await service.getDownload("user-1", job.id);
@@ -378,6 +418,7 @@ async function tempRoot(): Promise<string> {
 
 class FakeMiniMaxClient implements PptAiClient {
   planCalls = 0;
+  planInputs: Array<Parameters<PptAiClient["createDeckPlan"]>[0]> = [];
   private readonly invalidFirstPlan: boolean;
   private readonly alwaysInvalidPlan: boolean;
   private readonly invalidRewrite: boolean;
@@ -422,7 +463,8 @@ class FakeMiniMaxClient implements PptAiClient {
     // fake client is always ready
   }
 
-  async createDeckPlan(): Promise<unknown> {
+  async createDeckPlan(input: Parameters<PptAiClient["createDeckPlan"]>[0]): Promise<unknown> {
+    this.planInputs.push(input);
     this.planCalls += 1;
     if (this.alwaysInvalidPlan) return { title: "bad", slides: [] };
     if (this.invalidFirstPlan && this.planCalls === 1) {
@@ -586,6 +628,13 @@ function slideTitle(pageType: DeckPlan["slides"][number]["pageType"]): string {
     risk: "风险与治理",
     summary: "总结",
     closing: "总结页",
+    comparison: "方案对比",
+    process: "推进流程",
+    roadmap: "未来路线图",
+    team: "团队成员",
+    quote: "关键引用",
+    chart: "数据图表",
+    contact: "联系方式",
   };
   return map[pageType];
 }

@@ -12,7 +12,7 @@ export function buildFallbackVisual(
   const main = palette[index % palette.length];
   const support = palette[(index + 1) % palette.length];
   const accent = palette[(index + 2) % palette.length];
-  const pattern = index % 5;
+  const pattern = fallbackVisualPattern(slide.pageType, index);
 
   const motif =
     pattern === 0
@@ -55,6 +55,36 @@ function ensurePalette(palette: string[]): string[] {
     )
     .filter((value) => value.length === 6);
   return normalized.length >= 3 ? normalized : ["0B1220", "111827", "38BDF8", "F59E0B"];
+}
+
+function fallbackVisualPattern(pageType: string, index: number): number {
+  switch (pageType) {
+    case "architecture":
+    case "capability":
+    case "team":
+      return 3; // capabilityGrid
+    case "timeline":
+    case "agenda":
+    case "roadmap":
+    case "process":
+      return 4; // roadmapBands
+    case "metrics":
+    case "table":
+    case "comparison":
+      return 0; // layeredPanels
+    case "risk":
+    case "governance":
+    case "chart":
+      return 2; // radialField
+    case "strategy":
+    case "scenario":
+      return 1; // diagonalSystem
+    case "quote":
+    case "contact":
+      return 0; // layeredPanels
+    default:
+      return index % 5;
+  }
 }
 
 function layeredPanels(main: string, support: string, accent: string): string {

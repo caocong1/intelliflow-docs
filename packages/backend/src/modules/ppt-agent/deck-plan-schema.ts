@@ -1,5 +1,7 @@
 import Ajv, { type ErrorObject } from "ajv";
+import { formatLayoutDiversityIssue, scoreDeckLayoutDiversity } from "./layout-diversity";
 import type { DeckPlan, DeckSlide } from "./types";
+import type { PptGenerationMode } from "./types";
 
 export const SUPPORTED_PAGE_TYPES = [
   "cover",
@@ -17,6 +19,13 @@ export const SUPPORTED_PAGE_TYPES = [
   "risk",
   "summary",
   "closing",
+  "comparison",
+  "process",
+  "roadmap",
+  "team",
+  "quote",
+  "chart",
+  "contact",
 ] as const;
 
 export const NO_TEXT_IMAGE_SUFFIX = "no text / no letters / no typography / no UI labels";
@@ -71,6 +80,7 @@ const slideSchema = {
             labels: { type: "array", minItems: 1, maxItems: 8, items: { type: "string" } },
             values: { type: "array", minItems: 1, maxItems: 8, items: { type: "number" } },
             unit: { type: "string", maxLength: 20 },
+            chartType: { type: "string", enum: ["bar", "line", "pie", "radar"] },
           },
         },
       ],
@@ -276,7 +286,7 @@ function coerceContentBlocks(value: unknown, fallbackBody: string): unknown {
     };
   });
   return blocks.some((block) => isRecord(block) && coerceString(block.body).trim())
-    ? blocks
+    ? blocks.slice(0, 6)
     : [{ body: safeFallback }];
 }
 
@@ -362,11 +372,91 @@ function fallbackVisualPrompt(pageType: string, title: string, keyMessage: strin
   ].join(", ");
 }
 
-function coerceSlide(value: unknown, index: number): unknown {
+const PAGE_TYPE_KEYWORD_MAP: [string[], string][] = [
+  [["cover", "title", "front"], "cover"],
+  [["agenda", "toc", "overview", "outline", "content", "directory", "index"], "agenda"],
+  [["section", "divider", "chapter", "part", "transition", "separator", "break"], "section"],
+  [["problem", "challenge", "issue", "pain", "difficulty", "obstacle", "gap"], "problem"],
+  [
+    ["strategy", "approach", "solution", "plan", "method", "tactic", "initiative", "response"],
+    "strategy",
+  ],
+  [
+    ["architecture", "system", "structure", "framework", "design", "blueprint", "topology"],
+    "architecture",
+  ],
+  [
+    ["capability", "feature", "function", "competency", "capacity", "ability", "module"],
+    "capability",
+  ],
+  [
+    ["governance", "management", "process", "workflow", "operation", "mechanism", "pipeline"],
+    "governance",
+  ],
+  [["scenario", "case", "example", "use", "demo", "illustration", "walkthrough"], "scenario"],
+  [
+    ["timeline", "roadmap", "schedule", "milestone", "phase", "iteration", "path", "journey"],
+    "timeline",
+  ],
+  [
+    ["metrics", "kpi", "data", "chart", "graph", "statistics", "measure", "indicator", "number"],
+    "metrics",
+  ],
+  [["table", "comparison", "matrix", "grid", "versus", "side"], "table"],
+  [["risk", "threat", "mitigation", "warning", "caution", "vulnerability"], "risk"],
+  [
+    ["summary", "conclusion", "recap", "findings", "takeaway", "result", "outcome", "synthesis"],
+    "summary",
+  ],
+  [
+    ["closing", "end", "thank", "thanks", "contact", "next", "appendix", "reference", "q&a", "qa"],
+    "closing",
+  ],
+  [["comparison", "compare", "versus", "contrast", "diff", "side-by-side"], "comparison"],
+  [
+    ["process", "flow", "step", "pipeline", "stage", "workflow", "procedure", "sequence"],
+    "process",
+  ],
+  [["roadmap", "plan", "future", "vision", "horizon", "quarter", "milestone"], "roadmap"],
+  [
+    ["team", "member", "people", "org", "organization", "role", "bio", "profile", "contributor"],
+    "team",
+  ],
+  [["quote", "testimonial", "citation", "saying", "reference", "blockquote", "remark"], "quote"],
+  [["chart", "graph", "bar", "visualization", "plot", "histogram"], "chart"],
+  [
+    ["contact", "reach", "connect", "follow", "social", "email", "phone", "address", "website"],
+    "contact",
+  ],
+];
+
+function normalizePageType(raw: string, index: number, totalSlides: number): string {
+  const cleaned = raw.trim().toLowerCase();
+  if (!cleaned) return positionBasedPageType(index, totalSlides);
+
+  if ((SUPPORTED_PAGE_TYPES as readonly string[]).includes(cleaned)) return cleaned;
+
+  for (const [keywords, target] of PAGE_TYPE_KEYWORD_MAP) {
+    if (keywords.some((kw) => cleaned === kw || cleaned.includes(kw) || kw.includes(cleaned))) {
+      return target;
+    }
+  }
+
+  return positionBasedPageType(index, totalSlides);
+}
+
+function positionBasedPageType(index: number, totalSlides: number): string {
+  if (index === 0) return "cover";
+  if (index === totalSlides - 1) return "closing";
+  if (index === 1) return "agenda";
+  return "strategy";
+}
+
+function coerceSlide(value: unknown, index: number, totalSlides: number): unknown {
   if (!isRecord(value)) return value;
   const title = coerceNonEmptyString(value.title, `第 ${index + 1} 页`);
   const keyMessage = coerceNonEmptyString(value.keyMessage, title);
-  const pageType = coerceString(value.pageType);
+  const pageType = normalizePageType(coerceString(value.pageType), index, totalSlides);
   const visualPrompt = coerceString(value.visualPrompt).trim();
 
   return {
@@ -415,7 +505,7 @@ function coerceDeckPlanCandidate(raw: unknown): unknown {
     const referenceKeywords = coerceStringArray(theme.referenceKeywords);
     theme.referenceKeywords =
       Array.isArray(referenceKeywords) && referenceKeywords.length > 0
-        ? referenceKeywords
+        ? referenceKeywords.slice(0, 8)
         : ["enterprise presentation", "consulting deck"];
     theme.visualMotif = coerceNonEmptyString(theme.visualMotif, "企业能力图解与治理网络");
     theme.paletteDominance = coerceNonEmptyString(
@@ -423,10 +513,19 @@ function coerceDeckPlanCandidate(raw: unknown): unknown {
       "主色 65%，辅助色 25%，强调色 10%",
     );
     candidate.theme = theme;
+  } else {
+    candidate.theme = {
+      palette: ["0B1220", "111827", "38BDF8", "F59E0B"],
+      mood: "正式、稳健、清晰",
+      referenceKeywords: ["enterprise presentation", "consulting deck"],
+      visualMotif: "企业能力图解与治理网络",
+      paletteDominance: "主色 65%，辅助色 25%，强调色 10%",
+    };
   }
 
   if (Array.isArray(candidate.slides)) {
-    candidate.slides = candidate.slides.map(coerceSlide);
+    const total = candidate.slides.length;
+    candidate.slides = candidate.slides.map((slide, i) => coerceSlide(slide, i, total));
   }
 
   return candidate;
@@ -439,6 +538,10 @@ function normalizeVisualPrompt(prompt: string): string {
       "",
     )
     .replace(/文字|字幕|标题字|英文单词|中文字符|标签/g, "")
+    .replace(
+      /\b(text|letters|typography|labels|words|font|typeface|alphabet|glyph|character|calligraphy)\b/gi,
+      "",
+    )
     .replace(/\s+/g, " ")
     .trim();
 
@@ -559,7 +662,17 @@ export function validateDeckSlide(raw: unknown): DeckSlideValidationResult {
   return { ok: true, slide: result.deckPlan.slides[0] };
 }
 
-export function validateDeckPlan(raw: unknown, slideCount: number): DeckPlanValidationResult {
+export type DeckPlanValidationOptions = {
+  generationMode?: PptGenerationMode;
+  enforceLayoutDiversity?: boolean;
+  layoutDiversityThreshold?: number;
+};
+
+export function validateDeckPlan(
+  raw: unknown,
+  slideCount: number,
+  options: DeckPlanValidationOptions = {},
+): DeckPlanValidationResult {
   const candidate = coerceDeckPlanCandidate(unwrapDeckPlan(raw));
 
   if (!validateDeckPlanSchema(candidate)) {
@@ -606,10 +719,25 @@ export function validateDeckPlan(raw: unknown, slideCount: number): DeckPlanVali
     errors.push(`visualPrompt 不允许包含生成文字/字母意图：${visualTextIntent.join(", ")}`);
   }
 
+  const enforceLayoutDiversity =
+    options.enforceLayoutDiversity ?? options.generationMode === "auto_dynamic";
+  if (enforceLayoutDiversity) {
+    const diversity = scoreDeckLayoutDiversity(deckPlan, {
+      threshold: options.layoutDiversityThreshold,
+    });
+    if (!diversity.passed) {
+      errors.push(formatLayoutDiversityIssue(diversity));
+    }
+  }
+
   return errors.length > 0 ? { ok: false, errors } : { ok: true, deckPlan };
 }
 
-export function critiqueDeckPlan(deckPlan: DeckPlan, slideCount: number): string[] {
+export function critiqueDeckPlan(
+  deckPlan: DeckPlan,
+  slideCount: number,
+  options: DeckPlanValidationOptions = {},
+): string[] {
   const issues: string[] = [];
   const pageTypeCount = new Set(deckPlan.slides.map((slide) => slide.pageType)).size;
   if (slideCount >= 12 && pageTypeCount < 8) {
@@ -664,6 +792,15 @@ export function critiqueDeckPlan(deckPlan: DeckPlan, slideCount: number): string
     .map((slide) => slide.id);
   if (underlines.length > 0) {
     issues.push(`避免标题下划线式装饰：${underlines.join(", ")}`);
+  }
+
+  const enforceLayoutDiversity =
+    options.enforceLayoutDiversity ?? options.generationMode === "auto_dynamic";
+  if (enforceLayoutDiversity) {
+    const diversity = scoreDeckLayoutDiversity(deckPlan, {
+      threshold: options.layoutDiversityThreshold,
+    });
+    if (!diversity.passed) issues.push(formatLayoutDiversityIssue(diversity));
   }
 
   return issues;

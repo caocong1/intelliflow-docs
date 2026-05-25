@@ -60,6 +60,13 @@
   - 不再显示模板画像/模板匹配信息给普通用户
 
 ## Test Plan
+- 本地快速回归命令（PPT Agent 服务链路 + SVG 模板渲染）：
+  - 仓库根目录：`bun run test:ppt-agent:svg`
+  - backend 目录：`bun run test:ppt-agent:svg`
+  - 覆盖文件：
+    - `packages/backend/src/modules/ppt-agent/service.test.ts`
+    - `packages/backend/src/modules/ppt-agent/svg-templates.test.ts`
+  - 变更记录：`docs/design/ppt-agent-regression-log.md`
 - 单元测试
   - `SlidePresentation -> PresentationBlueprint` 归一化正确
   - `pageRole/archetype` 校验和补全正确

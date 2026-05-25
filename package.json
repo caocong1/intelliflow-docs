@@ -7,6 +7,10 @@
     "dev": "concurrently \"bun run --filter @intelliflow/backend dev\" \"bun run --filter @intelliflow/frontend dev\"",
     "dev:backend": "bun run --filter @intelliflow/backend dev",
     "dev:frontend": "bun run --filter @intelliflow/frontend dev",
+    "test:ppt-agent:svg": "bun run --filter @intelliflow/backend test:ppt-agent:svg",
+    "test:ppt-agent:svg:hash": "bun run --filter @intelliflow/backend test:ppt-agent:svg:hash",
+    "test:ppt-agent:svg:hash:check": "bun run --filter @intelliflow/backend test:ppt-agent:svg:hash:check",
+    "test:ppt-agent:svg:gate": "bun run --filter @intelliflow/backend test:ppt-agent:svg:gate",
     "check": "biome check .",
     "check:fix": "biome check --write .",
     "format": "biome format --write ."

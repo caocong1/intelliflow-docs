@@ -28,6 +28,10 @@ Thumbs.db
 # Logs
 *.log
 
+# Python cache
+__pycache__/
+*.py[cod]
+
 # Codex plan loop working directories
 .codex-plan-loop/
 

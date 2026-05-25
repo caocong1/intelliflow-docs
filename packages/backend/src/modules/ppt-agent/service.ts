@@ -17,9 +17,11 @@ import {
 import { reviewDeckDesign, shouldGenerateImageForSlide } from "./design-assets";
 import { buildFallbackDeckPlan } from "./fallback-deck-plan";
 import { buildFallbackVisual } from "./fallback-visuals";
+import { scoreDeckLayoutDiversity } from "./layout-diversity";
 import { MiniMaxClient, MiniMaxConfigError } from "./minimax-client";
 import { qaPptx } from "./qa";
 import { renderDeckToPptx } from "./renderer";
+import { renderDeckToSvgPptx } from "./svg-renderer";
 import type {
   DeckPlan,
   PptAgentCreateInput,
@@ -29,6 +31,7 @@ import type {
   PptAgentStage,
   PptAgentTraceEvent,
   PptAiClient,
+  PptGenerationMode,
   VisualAsset,
 } from "./types";
 import { PPTX_MIME_TYPE } from "./types";
@@ -44,6 +47,17 @@ export class PptAgentPublicError extends Error {
 }
 
 export type PptAgentService = ReturnType<typeof createPptAgentService>;
+
+type NormalizedPptAgentInput = {
+  prompt: string;
+  slideCount: number;
+  style: string;
+  generationMode: PptGenerationMode;
+  styleProfile: string;
+  textModel?: string;
+  imageModel?: string;
+  imageEnabled: boolean;
+};
 
 export function createPptAgentService(options: {
   repository: PptAgentRepository;
@@ -66,7 +80,11 @@ export function createPptAgentService(options: {
     client.assertReady();
     const normalized = normalizeInput(input);
     const trace = [
-      traceEvent("queued", "PPT 生成任务已创建", { slideCount: normalized.slideCount }),
+      traceEvent("queued", "PPT 生成任务已创建", {
+        slideCount: normalized.slideCount,
+        generationMode: normalized.generationMode,
+        styleProfile: normalized.styleProfile,
+      }),
     ];
     const job = await repository.createJob({
       userId,
@@ -85,7 +103,7 @@ export function createPptAgentService(options: {
   async function runJob(
     jobId: string,
     userId: string,
-    input: PptAgentCreateInput & { slideCount?: number },
+    input: PptAgentCreateInput,
   ): Promise<PptAgentJob> {
     const normalized = normalizeInput(input);
     const current = await getRequiredJob(jobId, userId);
@@ -114,9 +132,19 @@ export function createPptAgentService(options: {
       let deckPlan = await generateValidatedDeckPlan(
         normalized.prompt,
         normalized.slideCount,
-        normalized.style,
+        normalized,
         warnings,
       );
+      const initialDiversity = scoreDeckLayoutDiversity(deckPlan);
+      trace = [
+        ...trace,
+        traceEvent("design_director", "Deck layout diversity scored", {
+          generationMode: normalized.generationMode,
+          layoutDiversityScore: initialDiversity.score,
+          uniqueStructuralParadigms: initialDiversity.uniqueStructuralParadigms,
+          requiredStructuralParadigms: initialDiversity.requiredStructuralParadigms,
+        }),
+      ];
       await update("design_critic", 28, "Design Critic 开始检查 DeckPlan", { deckPlan });
       await update("outline_planner", 33, "Outline Planner 生成全局叙事大纲", { deckPlan });
       const outline = buildDeckOutline(deckPlan);
@@ -143,6 +171,9 @@ export function createPptAgentService(options: {
               const rawSlide = await client.composeSlide({
                 prompt: normalized.prompt,
                 style: normalized.style,
+                generationMode: normalized.generationMode,
+                styleProfile: normalized.styleProfile,
+                textModel: normalized.textModel,
                 slide: composed,
                 deckPlan,
                 styleDnaSummary,
@@ -175,7 +206,9 @@ export function createPptAgentService(options: {
       }
 
       const critique = [
-        ...critiqueDeckPlan(deckPlan, normalized.slideCount),
+        ...critiqueDeckPlan(deckPlan, normalized.slideCount, {
+          generationMode: normalized.generationMode,
+        }),
         ...reviewDeckDesign(deckPlan),
       ];
       if (critique.length > 0) {
@@ -189,6 +222,9 @@ export function createPptAgentService(options: {
             prompt: normalized.prompt,
             slideCount: normalized.slideCount,
             style: normalized.style,
+            generationMode: normalized.generationMode,
+            styleProfile: normalized.styleProfile,
+            textModel: normalized.textModel,
             deckPlan,
             critique,
           });
@@ -201,7 +237,9 @@ export function createPptAgentService(options: {
         }
 
         if (rewritten) {
-          const result = validateDeckPlan(rewritten, normalized.slideCount);
+          const result = validateDeckPlan(rewritten, normalized.slideCount, {
+            generationMode: normalized.generationMode,
+          });
           if (!result.ok) {
             warnings = [
               ...warnings,
@@ -209,7 +247,9 @@ export function createPptAgentService(options: {
             ];
           } else {
             deckPlan = result.deckPlan;
-            const remainingCritique = critiqueDeckPlan(deckPlan, normalized.slideCount);
+            const remainingCritique = critiqueDeckPlan(deckPlan, normalized.slideCount, {
+              generationMode: normalized.generationMode,
+            });
             if (remainingCritique.length > 0) {
               warnings = [
                 ...warnings,
@@ -241,6 +281,9 @@ export function createPptAgentService(options: {
             const rewritten = await client.composeSlide({
               prompt: normalized.prompt,
               style: normalized.style,
+              generationMode: normalized.generationMode,
+              styleProfile: normalized.styleProfile,
+              textModel: normalized.textModel,
               slide: original,
               deckPlan,
               styleDnaSummary,
@@ -282,8 +325,13 @@ export function createPptAgentService(options: {
             deckPlan,
             style: normalized.style,
             prompt: normalized.prompt,
+            generationMode: normalized.generationMode,
+            styleProfile: normalized.styleProfile,
+            textModel: normalized.textModel,
           });
-          const reviewedPlan = validateDeckPlan(reviewed, normalized.slideCount);
+          const reviewedPlan = validateDeckPlan(reviewed, normalized.slideCount, {
+            generationMode: normalized.generationMode,
+          });
           if (reviewedPlan.ok) {
             deckPlan = reviewedPlan.deckPlan;
           } else {
@@ -304,7 +352,7 @@ export function createPptAgentService(options: {
       await update("visual_generator", 82, "Visual Generator 开始生成每页无文字视觉素材", {
         deckPlan,
       });
-      const visuals = await generateVisuals(deckPlan, warnings, async (progress) => {
+      const visuals = await generateVisuals(deckPlan, normalized, warnings, async (progress) => {
         const mappedProgress = 82 + Math.round(((progress - 38) / 34) * 10);
         await update(
           "visual_generator",
@@ -320,7 +368,10 @@ export function createPptAgentService(options: {
       const outputDir = await ensureJobOutputDir(userId, jobId);
       const filename = buildResultFilename(deckPlan);
       const storagePath = join(outputDir, filename);
-      const rendered = await renderDeckToPptx(deckPlan, visuals);
+      const rendered =
+        normalized.generationMode === "svg_native"
+          ? await renderDeckToSvgPptx(deckPlan, visuals)
+          : await renderDeckToPptx(deckPlan, visuals, normalized.generationMode);
       warnings = [...warnings, ...rendered.warnings];
       const designWarnings = reviewDeckDesign(deckPlan, visuals);
       if (designWarnings.length > 0) {
@@ -365,6 +416,10 @@ export function createPptAgentService(options: {
     return repository.getJobForUser(jobId, userId);
   }
 
+  async function deleteJob(userId: string, jobId: string): Promise<boolean> {
+    return repository.deleteJob(jobId, userId);
+  }
+
   async function getDownload(userId: string, jobId: string) {
     const job = await repository.getJobForUser(jobId, userId);
     if (!job) throw new PptAgentPublicError("PPT 生成任务不存在", 404);
@@ -388,7 +443,7 @@ export function createPptAgentService(options: {
   async function generateValidatedDeckPlan(
     prompt: string,
     slideCount: number,
-    style: string,
+    normalized: NormalizedPptAgentInput,
     warningsRef: string[],
   ): Promise<DeckPlan> {
     let lastErrors: string[] | undefined;
@@ -397,10 +452,15 @@ export function createPptAgentService(options: {
         const raw = await client.createDeckPlan({
           prompt,
           slideCount,
-          style,
+          style: normalized.style,
+          generationMode: normalized.generationMode,
+          styleProfile: normalized.styleProfile,
+          textModel: normalized.textModel,
           validationErrors: lastErrors,
         });
-        const result = validateDeckPlan(raw, slideCount);
+        const result = validateDeckPlan(raw, slideCount, {
+          generationMode: normalized.generationMode,
+        });
         if (result.ok) return result.deckPlan;
         lastErrors = result.errors;
       } catch (err) {
@@ -410,11 +470,12 @@ export function createPptAgentService(options: {
 
     const reason = lastErrors?.join("；") ?? "unknown";
     warningsRef.push(`Design Director 生成 DeckPlan 失败，已使用保底方案继续：${reason}`);
-    return buildFallbackDeckPlan({ prompt, slideCount, style, reason });
+    return buildFallbackDeckPlan({ prompt, slideCount, style: normalized.style, reason });
   }
 
   async function generateVisuals(
     deckPlan: DeckPlan,
+    normalized: NormalizedPptAgentInput,
     warningsRef: string[],
     onProgress: (progress: number) => Promise<void>,
   ): Promise<VisualAsset[]> {
@@ -426,22 +487,32 @@ export function createPptAgentService(options: {
         continue;
       }
 
-      try {
-        const dataUri = await client.generateImage({
-          prompt: slide.visualPrompt,
-          slide,
-          deckPlan,
-        });
-        visuals.push({ slideId: slide.id, dataUri, source: "minimax" });
-      } catch (err) {
-        const warning = `第 ${index + 1} 页图片生成失败，已使用本地设计背景 fallback：${
-          err instanceof Error ? err.message : String(err)
-        }`;
+      if (!normalized.imageEnabled) {
+        const warning = `第 ${index + 1} 页已跳过图片生成，使用本地设计背景 fallback`;
         warningsRef.push(warning);
         visuals.push({
           ...buildFallbackVisual(deckPlan, slide, index),
           warning,
         });
+      } else {
+        try {
+          const dataUri = await client.generateImage({
+            prompt: slide.visualPrompt,
+            slide,
+            deckPlan,
+            imageModel: normalized.imageModel,
+          });
+          visuals.push({ slideId: slide.id, dataUri, source: "minimax" });
+        } catch (err) {
+          const warning = `第 ${index + 1} 页图片生成失败，已使用本地设计背景 fallback：${
+            err instanceof Error ? err.message : String(err)
+          }`;
+          warningsRef.push(warning);
+          visuals.push({
+            ...buildFallbackVisual(deckPlan, slide, index),
+            warning,
+          });
+        }
       }
 
       const progress = 38 + Math.round(((index + 1) / deckPlan.slides.length) * 34);
@@ -468,6 +539,7 @@ export function createPptAgentService(options: {
     runJob,
     listJobs,
     getJob,
+    deleteJob,
     getDownload,
   };
 }
@@ -477,6 +549,33 @@ export async function createDefaultPptAgentService(): Promise<PptAgentService> {
     repository: await createDbPptAgentRepository(),
     client: new MiniMaxClient(await getActivePptAiRuntimeConfig()),
   });
+}
+
+export async function resetRunningJobsOnStartup(): Promise<number> {
+  const [{ db }, schema, drizzle] = await Promise.all([
+    import("../../db"),
+    import("../../db/schema"),
+    import("drizzle-orm"),
+  ]);
+
+  const runningJobs = await db
+    .select({ id: schema.pptAgentJobs.id })
+    .from(schema.pptAgentJobs)
+    .where(drizzle.inArray(schema.pptAgentJobs.status, ["running", "queued"]));
+
+  if (runningJobs.length === 0) return 0;
+
+  await db
+    .update(schema.pptAgentJobs)
+    .set({
+      status: "failed",
+      errorMessage: "服务器重启，任务中断",
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(drizzle.inArray(schema.pptAgentJobs.status, ["running", "queued"]));
+
+  return runningJobs.length;
 }
 
 export async function createDbPptAgentRepository(): Promise<PptAgentRepository> {
@@ -531,6 +630,19 @@ export async function createDbPptAgentRepository(): Promise<PptAgentRepository> 
         .where(drizzle.eq(schema.pptAgentJobs.id, jobId))
         .returning();
       return mapRow(row);
+    },
+
+    async deleteJob(jobId, userId) {
+      const result = await db
+        .delete(schema.pptAgentJobs)
+        .where(
+          drizzle.and(
+            drizzle.eq(schema.pptAgentJobs.id, jobId),
+            drizzle.eq(schema.pptAgentJobs.userId, userId),
+          ),
+        )
+        .returning({ id: schema.pptAgentJobs.id });
+      return result.length > 0;
     },
 
     async getJobForUser(jobId, userId) {
@@ -602,6 +714,11 @@ export function createMemoryPptAgentRepository(seed: PptAgentJob[] = []): PptAge
       const job = rows.get(jobId);
       return job?.userId === userId ? job : null;
     },
+    async deleteJob(jobId, userId) {
+      const job = rows.get(jobId);
+      if (job?.userId !== userId) return false;
+      return rows.delete(jobId);
+    },
     async listJobsForUser(userId) {
       return Array.from(rows.values())
         .filter((job) => job.userId === userId)
@@ -610,14 +727,67 @@ export function createMemoryPptAgentRepository(seed: PptAgentJob[] = []): PptAge
   };
 }
 
-function normalizeInput(input: PptAgentCreateInput): Required<PptAgentCreateInput> {
+function normalizeInput(input: PptAgentCreateInput): NormalizedPptAgentInput {
   const prompt = input.prompt.trim();
   if (!prompt) throw new PptAgentPublicError("请输入 PPT 生成提示词");
+  const styleProfile = input.styleProfile?.trim() || input.style?.trim() || "auto";
+  const generationMode = normalizeGenerationMode(input.generationMode, styleProfile);
+  const textModel = input.textModel?.trim() || undefined;
+  const imageModel = input.imageModel?.trim() || undefined;
   return {
     prompt,
     slideCount: defaultSlideCount(input.slideCount),
-    style: input.style?.trim() || "auto",
+    style: buildEffectiveStylePreference(generationMode, styleProfile),
+    generationMode,
+    styleProfile,
+    textModel,
+    imageModel,
+    imageEnabled: input.imageEnabled ?? true,
   };
+}
+
+function normalizeGenerationMode(
+  mode: PptAgentCreateInput["generationMode"],
+  _styleProfile: string,
+): PptGenerationMode {
+  if (mode) return mode;
+  return "svg_native";
+}
+
+function buildEffectiveStylePreference(
+  generationMode: PptGenerationMode,
+  styleProfile: string,
+): string {
+  const base = styleProfile.trim() || "auto";
+  const modeRule = getGenerationModeRule(generationMode);
+  return `${base}\nGeneration mode: ${generationMode}\n${modeRule}`;
+}
+
+function getGenerationModeRule(generationMode: PptGenerationMode): string {
+  switch (generationMode) {
+    case "auto_dynamic":
+      return [
+        "Dynamic layout mode: invent page-specific geometry from content.",
+        "Do not reuse fixed template slots. Do not make pages differ only by palette/background/icon changes.",
+        "Target deck-level layoutDiversityScore >= 72 and at least 6 structural paradigms for 6+ slide decks.",
+      ].join(" ");
+    case "template_locked":
+      return [
+        "Template locked mode: preserve a fixed enterprise skeleton and fill content conservatively.",
+        "Do not change structural rhythm unless needed for readability.",
+      ].join(" ");
+    case "template_stylized":
+      return [
+        "Template stylized mode: keep a stable structure while varying color, background, illustration, icon, and decorative treatment.",
+        "Use structural changes only where the content type requires it.",
+      ].join(" ");
+    case "svg_native":
+      return [
+        "SVG native mode: generate editable vector slides using SVG-to-DrawingML conversion.",
+        "Produce clean geometric layouts with solid color blocks, precise typography, and formal vector icons.",
+        "Avoid emoji; use geometric shapes and simple vector paths for visual elements.",
+      ].join(" ");
+  }
 }
 
 function buildResultFilename(deckPlan: DeckPlan): string {

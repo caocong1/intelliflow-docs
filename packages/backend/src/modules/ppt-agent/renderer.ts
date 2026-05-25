@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import PptxGenJS from "pptxgenjs";
 import { shouldGenerateImageForSlide, slideIcon } from "./design-assets";
-import type { DeckPlan, DeckSlide, RenderedPpt, VisualAsset } from "./types";
+import type { DeckPlan, DeckSlide, PptGenerationMode, RenderedPpt, VisualAsset } from "./types";
 
 const SLIDE_W = 13.333;
 const SLIDE_H = 7.5;
@@ -14,6 +14,7 @@ type Rgb = { r: number; g: number; b: number };
 export async function renderDeckToPptx(
   deckPlan: DeckPlan,
   visuals: VisualAsset[],
+  generationMode: PptGenerationMode = "template_locked",
 ): Promise<RenderedPpt> {
   const pptx = new PptxGenJS();
   pptx.layout = "LAYOUT_WIDE";
@@ -37,7 +38,7 @@ export async function renderDeckToPptx(
       warnings.push(`slide ${slidePlan.id} 缺少视觉素材，已使用版式图形。`);
     }
 
-    renderSlide(slide, deckPlan, slidePlan, visual, palette, index);
+    renderSlide(slide, deckPlan, slidePlan, visual, palette, index, generationMode);
     if (slidePlan.speakerNotes.trim()) {
       (slide as unknown as { addNotes?: (notes: string) => void }).addNotes?.(
         slidePlan.speakerNotes.slice(0, 1000),
@@ -73,11 +74,16 @@ function renderSlide(
   visual: VisualAsset | undefined,
   palette: string[],
   index: number,
+  generationMode: PptGenerationMode,
 ) {
   const colors = slideColors(palette, index);
-  addBaseBackground(slide, colors);
-  renderExecutiveSlide(slide, deckPlan, slidePlan, visual, colors, index);
-  addFooter(slide, slidePlan, index, colors);
+  if (generationMode === "auto_dynamic") {
+    renderDynamicSlide(slide, deckPlan, slidePlan, visual, colors, index);
+  } else {
+    addBaseBackground(slide, colors, slidePlan, index);
+    renderExecutiveSlide(slide, deckPlan, slidePlan, visual, colors, index);
+    addFooter(slide, slidePlan, index, colors);
+  }
 }
 
 function renderExecutiveSlide(
@@ -546,7 +552,31 @@ function renderExecutiveContent(
   colors: SlideColors,
   index: number,
 ) {
-  const pattern = index % 3;
+  const hierarchy = slidePlan.visualHierarchy?.toLowerCase() ?? "";
+  const layoutIntent = slidePlan.layoutIntent?.toLowerCase() ?? "";
+  const isComparison = /对比|比较|compare|versus|两者|差异/.test(hierarchy + layoutIntent);
+  const isFlow = /流程|流转|pipeline|序列|步骤/.test(hierarchy + layoutIntent);
+  const isLayered = /层级|分层|layer|stack|架构/.test(hierarchy + layoutIntent);
+  const isCardGrid = /卡片|card|grid|并排/.test(hierarchy + layoutIntent);
+
+  if (isComparison) {
+    renderComparisonLayout(slide, slidePlan, visual, colors);
+    return;
+  }
+  if (isFlow) {
+    renderFlowLayout(slide, slidePlan, visual, colors);
+    return;
+  }
+  if (isLayered) {
+    renderLayeredLayout(slide, slidePlan, visual, colors);
+    return;
+  }
+  if (isCardGrid) {
+    renderCardGridLayout(slide, slidePlan, visual, colors);
+    return;
+  }
+
+  const pattern = index % 5;
   if (pattern === 0) {
     if (visual) {
       addVisual(slide, visual, 7.35, 0, 5.98, SLIDE_H, 0, 8);
@@ -557,9 +587,7 @@ function renderExecutiveContent(
     addPageHeader(slide, slidePlan, colors, 0.68, 0.58, 6.25);
     addInsightStack(slide, slidePlan, colors, 0.74, 1.94, 5.95);
     addKeyMessage(slide, slidePlan, 0.74, 5.82, 5.95, colors);
-    return;
-  }
-  if (pattern === 1) {
+  } else if (pattern === 1) {
     if (visual) {
       addVisual(slide, visual, 0.62, 0.52, 12.1, 2.02, 16, 8);
       addImageShade(slide, colors.bg, 18, 0.62, 0.52, 12.1, 2.02);
@@ -568,17 +596,206 @@ function renderExecutiveContent(
     }
     addPageHeader(slide, slidePlan, colors, 0.74, 2.92, 7.5);
     addProofGrid(slide, slidePlan, colors, 0.76, 4.08);
-    return;
-  }
-  if (visual) {
-    addVisual(slide, visual, 0, 0, 4.62, SLIDE_H, 0, 8);
-    addImageShade(slide, colors.bg, 18, 0, 0, 4.62, SLIDE_H);
+  } else if (pattern === 2) {
+    if (visual) {
+      addVisual(slide, visual, 0, 0, 4.62, SLIDE_H, 0, 8);
+      addImageShade(slide, colors.bg, 18, 0, 0, 4.62, SLIDE_H);
+    } else {
+      addIconWatermark(slide, slidePlan, 1.08, 1.5, 2.2, colors);
+    }
+    addPageHeader(slide, slidePlan, colors, 5.02, 0.62, 7.1);
+    addInsightStack(slide, slidePlan, colors, 5.06, 2.08, 6.92);
+    addIconFeature(slide, slidePlan, 0.92, 5.16, 2.86, 1.08, colors);
+  } else if (pattern === 3) {
+    if (visual) {
+      addVisual(slide, visual, 0, 3.52, SLIDE_W, 3.98, 0, 12);
+      addImageShade(slide, colors.bg, 14, 0, 3.52, SLIDE_W, 3.98);
+    }
+    addPageHeader(slide, slidePlan, colors, 0.68, 0.46, 10.8);
+    addNumberedList(slide, slidePlan, colors, 0.74, 1.55, 8.2);
   } else {
-    addIconWatermark(slide, slidePlan, 1.08, 1.5, 2.2, colors);
+    if (visual) {
+      addVisual(slide, visual, 8.62, 1.08, 4.15, 5.86, 18, 10);
+    } else {
+      addIconWatermark(slide, slidePlan, 9.72, 1.42, 1.78, colors);
+    }
+    addPageHeader(slide, slidePlan, colors, 0.68, 0.62, 7.45);
+    addSplitColumns(slide, slidePlan, colors, 0.74, 1.94, 7.35);
   }
-  addPageHeader(slide, slidePlan, colors, 5.02, 0.62, 7.1);
-  addInsightStack(slide, slidePlan, colors, 5.06, 2.08, 6.92);
-  addIconFeature(slide, slidePlan, 0.92, 5.16, 2.86, 1.08, colors);
+}
+
+function renderComparisonLayout(
+  slide: PptSlide,
+  slidePlan: DeckSlide,
+  visual: VisualAsset | undefined,
+  colors: SlideColors,
+) {
+  addPageHeader(slide, slidePlan, colors, 0.68, 0.58, 9.2);
+  const blocks = normalizedBlocks(slidePlan, 4);
+  const left = blocks.slice(0, 2);
+  const right = blocks.slice(2, 4);
+  if (left.length === 0)
+    left.push({ heading: "方案 A", body: slidePlan.keyMessage, emphasis: "normal" as const });
+  if (right.length === 0)
+    right.push({ heading: "方案 B", body: slidePlan.keyMessage, emphasis: "normal" as const });
+
+  for (const [side, group] of [left, right].entries()) {
+    const colX = 0.62 + side * 6.18;
+    slide.addShape("roundRect", {
+      x: colX,
+      y: 1.82,
+      w: 5.62,
+      h: 3.58,
+      rectRadius: 0.08,
+      fill: { color: colors.panel, transparency: 3 },
+      line: { color: side === 0 ? colors.accent : colors.support, transparency: 38, width: 1.2 },
+    });
+    addAccentBar(slide, colX + 0.24, 2.02, 0.68, 0.06, side === 0 ? colors.accent : colors.support);
+    for (const [i, block] of group.entries()) {
+      addText(slide, block.heading || block.body, colX + 0.26, 2.42 + i * 1.22, 4.92, 0.22, {
+        fontSize: 11.8,
+        bold: true,
+        color: colors.text,
+        fit: "shrink",
+      });
+      if (block.heading) {
+        addText(slide, block.body, colX + 0.26, 2.78 + i * 1.22, 4.88, 0.38, {
+          fontSize: 8.8,
+          color: colors.muted,
+          fit: "shrink",
+        });
+      }
+    }
+  }
+  addIconFeature(slide, slidePlan, 9.82, 5.82, 3.0, 0.82, colors);
+}
+
+function renderFlowLayout(
+  slide: PptSlide,
+  slidePlan: DeckSlide,
+  visual: VisualAsset | undefined,
+  colors: SlideColors,
+) {
+  addPageHeader(slide, slidePlan, colors, 0.68, 0.58, 10.4);
+  const blocks = normalizedBlocks(slidePlan, 5);
+  const stepW = Math.max(1.1, 11.2 / Math.max(blocks.length, 1));
+  for (const [i, block] of blocks.entries()) {
+    const x = 0.86 + i * stepW;
+    slide.addShape("roundRect", {
+      x,
+      y: 2.08,
+      w: stepW * 0.82,
+      h: 2.62,
+      rectRadius: 0.08,
+      fill: { color: i % 2 === 0 ? colors.panel : colors.main, transparency: i % 2 === 0 ? 3 : 14 },
+      line: { color: colors.accent, transparency: 32, width: 1.1 },
+    });
+    addText(slide, `0${i + 1}`, x + 0.14, 2.28, 0.6, 0.16, {
+      fontSize: 8.2,
+      bold: true,
+      color: colors.accent,
+    });
+    addText(slide, block.heading || block.body, x + 0.14, 2.68, stepW * 0.62, 0.22, {
+      fontSize: 10.2,
+      bold: true,
+      color: colors.text,
+      fit: "shrink",
+    });
+    if (block.heading) {
+      addText(slide, block.body, x + 0.14, 3.04, stepW * 0.62, 0.98, {
+        fontSize: 7.8,
+        color: colors.muted,
+        fit: "shrink",
+      });
+    }
+    if (i < blocks.length - 1) {
+      slide.addShape("line", {
+        x: x + stepW * 0.8,
+        y: 3.25,
+        w: stepW * 0.24,
+        h: 0,
+        line: { color: colors.accent, transparency: 38, width: 1.8, endArrowType: "triangle" },
+      });
+    }
+  }
+}
+
+function renderLayeredLayout(
+  slide: PptSlide,
+  slidePlan: DeckSlide,
+  visual: VisualAsset | undefined,
+  colors: SlideColors,
+) {
+  addPageHeader(slide, slidePlan, colors, 0.68, 0.58, 8.9);
+  const blocks = normalizedBlocks(slidePlan, 4);
+  for (const [i, block] of blocks.entries()) {
+    const x = 0.74 + i * 0.14;
+    const y = 1.94 + i * 0.78;
+    const w = 8.15 - i * 0.46;
+    slide.addShape("roundRect", {
+      x,
+      y,
+      w,
+      h: 0.58,
+      rectRadius: 0.06,
+      fill: { color: i % 2 === 0 ? colors.panel : colors.main, transparency: i % 2 === 0 ? 3 : 11 },
+      line: { color: i === 0 ? colors.support : colors.accent, transparency: 28, width: 1 },
+    });
+    addText(slide, block.heading || block.body, x + 0.22, y + 0.14, 1.68, 0.16, {
+      fontSize: 9.2,
+      bold: true,
+      color: i === 0 ? colors.support : colors.accent,
+      fit: "shrink",
+    });
+    if (block.heading) {
+      addText(slide, block.body, x + 2.08, y + 0.13, w - 2.32, 0.18, {
+        fontSize: 8.1,
+        color: colors.text,
+        fit: "shrink",
+      });
+    }
+  }
+  addIconFeature(slide, slidePlan, 9.14, 5.08, 3.42, 1.02, colors);
+}
+
+function renderCardGridLayout(
+  slide: PptSlide,
+  slidePlan: DeckSlide,
+  visual: VisualAsset | undefined,
+  colors: SlideColors,
+) {
+  addPageHeader(slide, slidePlan, colors, 0.68, 0.58, 9.8);
+  const blocks = normalizedBlocks(slidePlan, 4);
+  for (const [i, block] of blocks.entries()) {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = 0.68 + col * 5.88;
+    const y = 1.84 + row * 2.02;
+    slide.addShape("roundRect", {
+      x,
+      y,
+      w: 5.32,
+      h: 1.62,
+      rectRadius: 0.08,
+      fill: { color: colors.panel, transparency: 3 },
+      line: { color: i === 0 ? colors.support : colors.accent, transparency: 30, width: 1.1 },
+    });
+    addAccentBar(slide, x + 0.22, y + 0.22, 0.42, 0.05, i === 0 ? colors.support : colors.accent);
+    addText(slide, block.heading || block.body, x + 0.22, y + 0.48, 4.68, 0.24, {
+      fontSize: 11.8,
+      bold: true,
+      color: colors.text,
+      fit: "shrink",
+    });
+    if (block.heading) {
+      addText(slide, block.body, x + 0.22, y + 0.92, 4.72, 0.38, {
+        fontSize: 8.2,
+        color: colors.muted,
+        fit: "shrink",
+      });
+    }
+  }
+  addIconFeature(slide, slidePlan, 0.68, 6.08, 11.8, 0.7, colors);
 }
 
 function addPageHeader(
@@ -872,7 +1089,12 @@ function addSemanticGlyph(
   }
 }
 
-function addBaseBackground(slide: PptSlide, colors: SlideColors) {
+function addBaseBackground(
+  slide: PptSlide,
+  colors: SlideColors,
+  slidePlan: DeckSlide,
+  index: number,
+) {
   slide.addShape("rect", {
     x: 0,
     y: 0,
@@ -881,430 +1103,315 @@ function addBaseBackground(slide: PptSlide, colors: SlideColors) {
     fill: { color: colors.bg },
     line: { color: colors.bg, transparency: 100 },
   });
-  slide.addShape("rect", {
-    x: 0.34,
-    y: 0,
-    w: 2.2,
-    h: SLIDE_H,
-    fill: { color: colors.main, transparency: 92 },
-    line: { color: colors.main, transparency: 100 },
-  });
-  slide.addShape("rect", {
-    x: 0,
-    y: 6.58,
-    w: SLIDE_W,
-    h: 0.18,
-    fill: { color: colors.accent, transparency: 86 },
-    line: { color: colors.accent, transparency: 100 },
-  });
+
+  const variant = backgroundVariant(slidePlan, index);
+  if (variant === "left-panel") {
+    slide.addShape("rect", {
+      x: 0.34,
+      y: 0,
+      w: 2.2,
+      h: SLIDE_H,
+      fill: { color: colors.main, transparency: 92 },
+      line: { color: colors.main, transparency: 100 },
+    });
+    slide.addShape("rect", {
+      x: 0,
+      y: 6.58,
+      w: SLIDE_W,
+      h: 0.18,
+      fill: { color: colors.accent, transparency: 86 },
+      line: { color: colors.accent, transparency: 100 },
+    });
+  } else if (variant === "right-panel") {
+    slide.addShape("rect", {
+      x: 10.93,
+      y: 0,
+      w: 2.4,
+      h: SLIDE_H,
+      fill: { color: colors.main, transparency: 93 },
+      line: { color: colors.main, transparency: 100 },
+    });
+    slide.addShape("rect", {
+      x: 9.55,
+      y: 0.62,
+      w: 0.06,
+      h: 5.72,
+      fill: { color: colors.accent, transparency: 78 },
+      line: { color: colors.accent, transparency: 100 },
+    });
+  } else if (variant === "top-band") {
+    slide.addShape("rect", {
+      x: 0,
+      y: 0,
+      w: SLIDE_W,
+      h: 0.62,
+      fill: { color: colors.main, transparency: 86 },
+      line: { color: colors.main, transparency: 100 },
+    });
+    slide.addShape("rect", {
+      x: 0.58,
+      y: 0.34,
+      w: 1.52,
+      h: 0.08,
+      fill: { color: colors.accent, transparency: 22 },
+      line: { color: colors.accent, transparency: 100 },
+    });
+    slide.addShape("rect", {
+      x: 0,
+      y: 7.08,
+      w: SLIDE_W,
+      h: 0.42,
+      fill: { color: colors.main, transparency: 86 },
+      line: { color: colors.main, transparency: 100 },
+    });
+  } else if (variant === "diagonal-split") {
+    slide.addShape("rect", {
+      x: 0,
+      y: 0,
+      w: 4.82,
+      h: SLIDE_H,
+      fill: { color: colors.main, transparency: 90 },
+      line: { color: colors.main, transparency: 100 },
+    });
+    slide.addShape("rect", {
+      x: 4.52,
+      y: 0,
+      w: 0.06,
+      h: SLIDE_H,
+      fill: { color: colors.accent, transparency: 72 },
+      line: { color: colors.accent, transparency: 100 },
+    });
+  } else if (variant === "corner-accent") {
+    slide.addShape("rect", {
+      x: 0,
+      y: 0,
+      w: 1.68,
+      h: 1.68,
+      fill: { color: colors.accent, transparency: 88 },
+      line: { color: colors.accent, transparency: 100 },
+    });
+    slide.addShape("rect", {
+      x: 11.42,
+      y: 5.58,
+      w: 1.92,
+      h: 1.92,
+      fill: { color: colors.support, transparency: 92 },
+      line: { color: colors.support, transparency: 100 },
+    });
+  } else {
+    slide.addShape("rect", {
+      x: 0,
+      y: 0.42,
+      w: SLIDE_W,
+      h: 0.06,
+      fill: { color: colors.accent, transparency: 76 },
+      line: { color: colors.accent, transparency: 100 },
+    });
+    slide.addShape("rect", {
+      x: 0,
+      y: 7.02,
+      w: SLIDE_W,
+      h: 0.06,
+      fill: { color: colors.accent, transparency: 76 },
+      line: { color: colors.accent, transparency: 100 },
+    });
+  }
 }
 
-function renderCover(
+function backgroundVariant(slidePlan: DeckSlide, index: number): string {
+  const variants = [
+    "left-panel",
+    "right-panel",
+    "top-band",
+    "diagonal-split",
+    "corner-accent",
+    "edge-lines",
+  ];
+  if (slidePlan.pageType === "cover" || slidePlan.pageType === "closing") return "left-panel";
+  if (slidePlan.pageType === "section") return "diagonal-split";
+  return variants[index % variants.length];
+}
+
+// --- dynamic layout engine (auto_dynamic mode) ---
+
+type DynamicLayout = {
+  imagePos: "left" | "right" | "top" | "bottom" | "full" | "none";
+  contentStyle: "list" | "grid" | "flow" | "comparison" | "stack";
+  gap: number;
+  titleSize: number;
+  bodySize: number;
+};
+
+function parseLayoutIntent(slidePlan: DeckSlide): DynamicLayout {
+  const text = `${slidePlan.layoutIntent ?? ""} ${slidePlan.visualHierarchy ?? ""}`.toLowerCase();
+
+  let imagePos: DynamicLayout["imagePos"] = "right";
+  if (/左图|image.?left|图位.*左|左侧.*图|图片在左/.test(text)) imagePos = "left";
+  else if (/右图|image.?right|图位.*右|右侧.*图|图片在右/.test(text)) imagePos = "right";
+  else if (/上图|image.?top|图位.*上|上方.*图|图片在上|顶部.*图/.test(text)) imagePos = "top";
+  else if (/下图|image.?bottom|图位.*下|下方.*图|图片在下|底部.*图/.test(text)) imagePos = "bottom";
+  else if (/全图|full.?image|full.?bleed|铺满|背景图/.test(text)) imagePos = "full";
+  else if (/无图|no.?image|纯文|纯排版/.test(text)) imagePos = "none";
+
+  let contentStyle: DynamicLayout["contentStyle"] = "stack";
+  if (/对比|比较|compare|versus|两侧/.test(text)) contentStyle = "comparison";
+  else if (/流程|流转|pipeline|步骤|序列/.test(text)) contentStyle = "flow";
+  else if (/卡片|card|grid|网格|并排|平铺/.test(text)) contentStyle = "grid";
+  else if (/列表|list|条目|要点/.test(text)) contentStyle = "list";
+
+  const density = slidePlan.contentDensity ?? "medium";
+  const gap = density === "low" ? 0.22 : density === "high" ? 0.12 : 0.16;
+  const titleSize = density === "low" ? 26 : density === "high" ? 20 : 23;
+  const bodySize = density === "low" ? 10 : density === "high" ? 8 : 9;
+
+  return { imagePos, contentStyle, gap, titleSize, bodySize };
+}
+
+function renderDynamicSlide(
+  slide: PptSlide,
+  deckPlan: DeckPlan,
+  slidePlan: DeckSlide,
+  visual: VisualAsset | undefined,
+  colors: SlideColors,
+  index: number,
+) {
+  const layout = parseLayoutIntent(slidePlan);
+  addCleanBackground(slide, colors);
+
+  const isCover = index === 0;
+  const isClosing = index === deckPlan.slides.length - 1;
+
+  if (isCover) {
+    renderDynamicCover(slide, deckPlan, slidePlan, visual, colors);
+    return;
+  }
+  if (isClosing) {
+    renderDynamicClosing(slide, slidePlan, visual, colors);
+    return;
+  }
+
+  const titleX = 0.62;
+  const titleY = 0.48;
+  const titleW = 11.8;
+
+  addText(slide, slidePlan.title, titleX, titleY, titleW, 0.42, {
+    fontSize: layout.titleSize,
+    bold: true,
+    color: colors.text,
+    fit: "shrink",
+    margin: 0,
+  });
+  addText(slide, slidePlan.keyMessage, titleX, titleY + 0.52, titleW, 0.22, {
+    fontSize: layout.bodySize + 2,
+    color: colors.muted,
+    fit: "shrink",
+    margin: 0,
+  });
+
+  const contentTop = titleY + 1.08;
+  const visualW = layout.imagePos === "right" || layout.imagePos === "left" ? 5.35 : 12.5;
+  const visualH = layout.imagePos === "top" || layout.imagePos === "bottom" ? 2.65 : 3.98;
+
+  if (layout.imagePos === "left" && visual) {
+    addVisual(slide, visual, 0.48, contentTop, visualW, visualH, 12, 8);
+    renderContentBlocks(slide, slidePlan, colors, layout, visualW + 0.86, contentTop, 7.15);
+  } else if (layout.imagePos === "right" && visual) {
+    addVisual(slide, visual, 7.48, contentTop, visualW, visualH, 12, 8);
+    renderContentBlocks(slide, slidePlan, colors, layout, 0.62, contentTop, 6.5);
+  } else if (layout.imagePos === "top" && visual) {
+    addVisual(slide, visual, 0.62, contentTop, visualW, visualH, 12, 8);
+    renderContentBlocks(slide, slidePlan, colors, layout, 0.62, contentTop + visualH + 0.28, 11.8);
+  } else if (layout.imagePos === "bottom" && visual) {
+    renderContentBlocks(slide, slidePlan, colors, layout, 0.62, contentTop, 11.8);
+    addVisual(slide, visual, 0.62, 4.58, visualW, 2.65, 12, 4);
+  } else if (layout.imagePos === "full" && visual) {
+    addVisual(slide, visual, 0, 0, SLIDE_W, SLIDE_H, 0, 5);
+    slide.addShape("rect", {
+      x: 0,
+      y: 0,
+      w: SLIDE_W,
+      h: SLIDE_H,
+      fill: { color: colors.bg, transparency: 22 },
+      line: { color: colors.bg, transparency: 100 },
+    });
+    renderContentBlocks(slide, slidePlan, colors, layout, 0.62, contentTop, 11.8);
+  } else {
+    renderContentBlocks(slide, slidePlan, colors, layout, 0.62, contentTop + 0.22, 11.8);
+  }
+
+  addSlideNumber(slide, index, colors);
+}
+
+function renderDynamicCover(
   slide: PptSlide,
   deckPlan: DeckPlan,
   slidePlan: DeckSlide,
   visual: VisualAsset | undefined,
   colors: SlideColors,
 ) {
-  addVisual(slide, visual, 6.8, 0, 6.533, SLIDE_H, 8);
-  addMotif(slide, colors, 0.35, 0.35, 3.0, 6.5, 0);
-  addText(slide, deckPlan.title || slidePlan.title, 0.72, 1.35, 5.8, 1.45, {
-    fontSize: 36,
-    bold: true,
-    color: colors.text,
-    fit: "shrink",
-    margin: 0.02,
-  });
-  addText(slide, deckPlan.subtitle || slidePlan.keyMessage, 0.76, 3.08, 5.3, 0.75, {
-    fontSize: 16,
-    color: colors.muted,
-    fit: "shrink",
-    margin: 0.02,
-    breakLine: false,
-  });
-  addText(slide, deckPlan.audience, 0.78, 5.65, 4.9, 0.36, {
-    fontSize: 9.5,
-    color: colors.muted,
-  });
-  addAccentBar(slide, 0.78, 4.35, 1.55, 0.08, colors.accent);
-}
-
-function renderAgenda(
-  slide: PptSlide,
-  slidePlan: DeckSlide,
-  visual: VisualAsset | undefined,
-  colors: SlideColors,
-) {
-  addVisual(slide, visual, 8.8, 0.45, 3.8, 6.6, 18);
-  addTitleBlock(slide, slidePlan, colors);
-  const items = slidePlan.contentBlocks.slice(0, 6);
-  for (const [i, block] of items.entries()) {
-    const y = 1.72 + i * 0.76;
-    slide.addShape("ellipse", {
-      x: SAFE,
-      y,
-      w: 0.38,
-      h: 0.38,
-      fill: { color: i % 2 === 0 ? colors.accent : colors.support },
+  if (visual) {
+    addVisual(slide, visual, 0, 0, SLIDE_W, SLIDE_H, 0, 0);
+    slide.addShape("rect", {
+      x: 0,
+      y: 0,
+      w: SLIDE_W,
+      h: SLIDE_H,
+      fill: { color: colors.bg, transparency: 32 },
       line: { color: colors.bg, transparency: 100 },
     });
-    addText(slide, String(i + 1).padStart(2, "0"), SAFE + 0.02, y + 0.1, 0.34, 0.12, {
-      fontSize: 6,
-      bold: true,
-      color: colors.bg,
-      align: "center",
-    });
-    addText(slide, block.heading || block.body, 1.08, y - 0.04, 6.8, 0.26, {
-      fontSize: 16,
-      bold: true,
-      color: colors.text,
-      fit: "shrink",
-    });
-    if (block.heading) {
-      addText(slide, block.body, 1.1, y + 0.28, 6.65, 0.28, {
-        fontSize: 10.5,
-        color: colors.muted,
-        fit: "shrink",
-      });
-    }
   }
-}
-
-function renderSection(
-  slide: PptSlide,
-  slidePlan: DeckSlide,
-  visual: VisualAsset | undefined,
-  colors: SlideColors,
-  index: number,
-) {
-  addVisual(slide, visual, 0, 0, SLIDE_W, SLIDE_H, 0, 18);
-  slide.addShape("rect", {
-    x: 0,
-    y: 0,
-    w: SLIDE_W,
-    h: SLIDE_H,
-    fill: { color: colors.bg, transparency: 17 },
-    line: { color: colors.bg, transparency: 100 },
-  });
-  addMotif(slide, colors, 0.75, 0.9, 3.2, 5.7, index);
-  addText(slide, slidePlan.title, 4.2, 2.35, 7.4, 0.86, {
+  addText(slide, deckPlan.title, 0.72, 1.72, 8.8, 1.35, {
     fontSize: 34,
     bold: true,
     color: colors.text,
     fit: "shrink",
+    margin: 0.02,
   });
-  addText(slide, slidePlan.keyMessage, 4.24, 3.38, 6.2, 0.5, {
-    fontSize: 14,
+  addText(slide, deckPlan.subtitle || slidePlan.keyMessage, 0.76, 3.32, 7.5, 0.56, {
+    fontSize: 15,
+    color: colors.muted,
+    fit: "shrink",
+    margin: 0.02,
+  });
+  addText(slide, deckPlan.audience, 0.78, 4.52, 6.0, 0.32, {
+    fontSize: 10,
     color: colors.muted,
     fit: "shrink",
   });
 }
 
-function renderArchitecture(
+function renderDynamicClosing(
   slide: PptSlide,
   slidePlan: DeckSlide,
   visual: VisualAsset | undefined,
   colors: SlideColors,
 ) {
-  addVisual(slide, visual, 8.95, 0.5, 3.85, 6.5, 18);
-  addTitleBlock(slide, slidePlan, colors);
-  const blocks = normalizedBlocks(slidePlan, 5);
-  const layerY = [1.76, 2.68, 3.6, 4.52, 5.44];
-  for (const [i, block] of blocks.entries()) {
-    const x = 0.7 + (i % 2) * 3.9;
-    const y = layerY[i] ?? 5.44;
-    slide.addShape("roundRect", {
-      x,
-      y,
-      w: 3.45,
-      h: 0.64,
-      rectRadius: 0.08,
-      fill: { color: i % 2 === 0 ? colors.panel : colors.main, transparency: i % 2 === 0 ? 7 : 13 },
-      line: { color: colors.accent, transparency: 42, width: 1 },
-    });
-    addText(slide, block.heading || block.body, x + 0.18, y + 0.12, 3.05, 0.18, {
-      fontSize: 10,
-      bold: true,
-      color: colors.text,
-      fit: "shrink",
-    });
-    if (block.heading) {
-      addText(slide, block.body, x + 0.18, y + 0.34, 3.0, 0.16, {
-        fontSize: 7.2,
-        color: colors.muted,
-        fit: "shrink",
-      });
-    }
-  }
-  slide.addShape("line", {
-    x: 4.37,
-    y: 1.95,
-    w: 0.9,
-    h: 3.95,
-    line: {
-      color: colors.accent,
-      transparency: 15,
-      width: 2,
-      beginArrowType: "none",
-      endArrowType: "triangle",
-    },
-  });
-}
-
-function renderTimeline(
-  slide: PptSlide,
-  slidePlan: DeckSlide,
-  visual: VisualAsset | undefined,
-  colors: SlideColors,
-) {
-  addVisual(slide, visual, 0.55, 5.78, 12.2, 1.1, 16, 8);
-  addTitleBlock(slide, slidePlan, colors);
-  const items: Array<{ label: string; description: string; date?: string }> =
-    slidePlan.timeline && slidePlan.timeline.length > 0
-      ? slidePlan.timeline.slice(0, 5)
-      : normalizedBlocks(slidePlan, 5).map((block, i) => ({
-          label: block.heading || `阶段 ${i + 1}`,
-          description: block.body,
-        }));
-  const startX = 0.8;
-  const gap = 2.35;
-  slide.addShape("line", {
-    x: startX + 0.25,
-    y: 3.58,
-    w: gap * (items.length - 1),
-    h: 0,
-    line: { color: colors.accent, transparency: 20, width: 3 },
-  });
-  for (const [i, item] of items.entries()) {
-    const x = startX + i * gap;
-    slide.addShape("ellipse", {
-      x,
-      y: 3.27,
-      w: 0.62,
-      h: 0.62,
-      fill: { color: i % 2 === 0 ? colors.accent : colors.support },
+  if (visual) {
+    addVisual(slide, visual, 0, 0, SLIDE_W, SLIDE_H, 0, 0);
+    slide.addShape("rect", {
+      x: 0,
+      y: 0,
+      w: SLIDE_W,
+      h: SLIDE_H,
+      fill: { color: colors.bg, transparency: 28 },
       line: { color: colors.bg, transparency: 100 },
     });
-    addText(slide, item.date || `0${i + 1}`, x + 0.05, 3.47, 0.52, 0.1, {
-      fontSize: 6.5,
-      bold: true,
-      color: colors.bg,
-      align: "center",
-    });
-    addText(slide, item.label, x - 0.3, 2.58, 1.25, 0.28, {
-      fontSize: 11.5,
-      bold: true,
-      color: colors.text,
-      fit: "shrink",
-      align: "center",
-    });
-    addText(slide, item.description, x - 0.52, 4.08, 1.68, 0.66, {
-      fontSize: 8.5,
-      color: colors.muted,
-      fit: "shrink",
-      align: "center",
-    });
   }
-}
-
-function renderMetrics(
-  slide: PptSlide,
-  slidePlan: DeckSlide,
-  visual: VisualAsset | undefined,
-  colors: SlideColors,
-) {
-  addVisual(slide, visual, 8.15, 1.0, 4.35, 5.65, 18);
-  addTitleBlock(slide, slidePlan, colors);
-  const chart = slidePlan.chart;
-  const blocks = normalizedBlocks(slidePlan, 4);
-  for (const [i, block] of blocks.slice(0, 4).entries()) {
-    const x = SAFE + (i % 2) * 3.55;
-    const y = 1.85 + Math.floor(i / 2) * 1.72;
-    const metric =
-      extractMetric(block.body) ||
-      (chart?.values?.[i] !== undefined ? `${chart.values[i]}${chart.unit ?? ""}` : `${i + 1}`);
-    slide.addShape("roundRect", {
-      x,
-      y,
-      w: 3.05,
-      h: 1.18,
-      rectRadius: 0.08,
-      fill: { color: colors.panel, transparency: 5 },
-      line: { color: colors.accent, transparency: 55, width: 1 },
-    });
-    addText(slide, metric, x + 0.22, y + 0.16, 1.15, 0.36, {
-      fontSize: 22,
-      bold: true,
-      color: colors.accent,
-      fit: "shrink",
-    });
-    addText(
-      slide,
-      block.heading || block.body.replace(metric, "").trim() || "关键指标",
-      x + 0.22,
-      y + 0.68,
-      2.55,
-      0.22,
-      {
-        fontSize: 9.5,
-        bold: true,
-        color: colors.text,
-        fit: "shrink",
-      },
-    );
-    if (block.heading) {
-      addText(slide, block.body, x + 0.22, y + 0.92, 2.55, 0.16, {
-        fontSize: 7,
-        color: colors.muted,
-        fit: "shrink",
-      });
-    }
-  }
-}
-
-function renderTable(
-  slide: PptSlide,
-  slidePlan: DeckSlide,
-  visual: VisualAsset | undefined,
-  colors: SlideColors,
-) {
-  addVisual(slide, visual, 10.1, 0.7, 2.3, 5.95, 18);
-  addTitleBlock(slide, slidePlan, colors);
-  const table =
-    slidePlan.table ??
-    ({
-      headers: ["维度", "设计要点", "管理抓手"],
-      rows: normalizedBlocks(slidePlan, 5).map((block) => [
-        block.heading || "议题",
-        block.body.slice(0, 40),
-        slidePlan.keyMessage.slice(0, 32),
-      ]),
-    } satisfies NonNullable<DeckSlide["table"]>);
-  const headers = table.headers.slice(0, 4);
-  const rows = table.rows.slice(0, 6);
-  const x = SAFE;
-  const y = 1.8;
-  const w = 8.75;
-  const rowH = 0.48;
-  const colW = w / headers.length;
-  for (const [col, header] of headers.entries()) {
-    slide.addShape("rect", {
-      x: x + col * colW,
-      y,
-      w: colW,
-      h: rowH,
-      fill: { color: colors.main, transparency: 4 },
-      line: { color: colors.bg, transparency: 85 },
-    });
-    addText(slide, header, x + col * colW + 0.08, y + 0.14, colW - 0.16, 0.16, {
-      fontSize: 8.5,
-      bold: true,
-      color: colors.bg,
-      fit: "shrink",
-    });
-  }
-  for (const [rowIndex, row] of rows.entries()) {
-    for (const [col, cell] of row.slice(0, headers.length).entries()) {
-      slide.addShape("rect", {
-        x: x + col * colW,
-        y: y + rowH * (rowIndex + 1),
-        w: colW,
-        h: rowH,
-        fill: {
-          color: rowIndex % 2 === 0 ? colors.panel : colors.bg,
-          transparency: rowIndex % 2 === 0 ? 3 : 0,
-        },
-        line: { color: colors.main, transparency: 82 },
-      });
-      addText(
-        slide,
-        cell,
-        x + col * colW + 0.08,
-        y + rowH * (rowIndex + 1) + 0.12,
-        colW - 0.16,
-        0.18,
-        {
-          fontSize: 7.2,
-          color: colors.text,
-          fit: "shrink",
-        },
-      );
-    }
-  }
-}
-
-function renderRiskGovernance(
-  slide: PptSlide,
-  slidePlan: DeckSlide,
-  visual: VisualAsset | undefined,
-  colors: SlideColors,
-) {
-  addVisual(slide, visual, 0.55, 4.88, 12.2, 1.45, 16, 12);
-  addTitleBlock(slide, slidePlan, colors);
-  const blocks = normalizedBlocks(slidePlan, 4);
-  for (const [i, block] of blocks.entries()) {
-    const x = SAFE + i * 3.1;
-    slide.addShape("roundRect", {
-      x,
-      y: 2.16,
-      w: 2.62,
-      h: 1.72,
-      rectRadius: 0.08,
-      fill: { color: i % 2 === 0 ? colors.panel : colors.main, transparency: i % 2 === 0 ? 3 : 12 },
-      line: { color: colors.accent, transparency: 38, width: 1.2 },
-    });
-    slide.addShape("arc", {
-      x: x + 0.18,
-      y: 2.35,
-      w: 0.5,
-      h: 0.5,
-      line: { color: colors.accent, transparency: 5, width: 2 },
-      adjustPoint: 0.3,
-    } as never);
-    addText(slide, block.heading || `治理项 ${i + 1}`, x + 0.82, 2.34, 1.55, 0.24, {
-      fontSize: 11.2,
-      bold: true,
-      color: colors.text,
-      fit: "shrink",
-    });
-    addText(slide, block.body, x + 0.22, 2.82, 2.16, 0.66, {
-      fontSize: 8.2,
-      color: colors.muted,
-      fit: "shrink",
-    });
-  }
-}
-
-function renderClosing(
-  slide: PptSlide,
-  slidePlan: DeckSlide,
-  visual: VisualAsset | undefined,
-  colors: SlideColors,
-) {
-  addVisual(slide, visual, 0, 0, SLIDE_W, SLIDE_H, 0, 24);
-  slide.addShape("rect", {
-    x: 0,
-    y: 0,
-    w: SLIDE_W,
-    h: SLIDE_H,
-    fill: { color: colors.bg, transparency: 12 },
-    line: { color: colors.bg, transparency: 100 },
-  });
-  addText(slide, slidePlan.title, 0.9, 2.1, 5.9, 0.72, {
+  addText(slide, slidePlan.title, 0.72, 1.86, 8.5, 0.72, {
     fontSize: 30,
     bold: true,
     color: colors.text,
     fit: "shrink",
   });
-  addText(slide, slidePlan.keyMessage, 0.92, 3.04, 5.5, 0.58, {
+  addText(slide, slidePlan.keyMessage, 0.76, 2.84, 7.2, 0.48, {
     fontSize: 14,
     color: colors.muted,
     fit: "shrink",
   });
   const blocks = normalizedBlocks(slidePlan, 3);
   for (const [i, block] of blocks.entries()) {
-    addText(slide, block.heading || block.body, 0.95 + i * 2.1, 4.35, 1.75, 0.3, {
-      fontSize: 10.5,
+    addText(slide, block.heading || block.body, 0.78 + i * 2.2, 4.38, 1.88, 0.3, {
+      fontSize: 10,
       bold: true,
       color: colors.text,
       fit: "shrink",
@@ -1312,89 +1419,286 @@ function renderClosing(
   }
 }
 
-function renderContentSlide(
+function renderContentBlocks(
   slide: PptSlide,
   slidePlan: DeckSlide,
-  visual: VisualAsset | undefined,
   colors: SlideColors,
-  index: number,
+  layout: DynamicLayout,
+  x: number,
+  y: number,
+  w: number,
 ) {
-  const imageRight = index % 2 === 0;
-  addVisual(slide, visual, imageRight ? 8.35 : 0.55, 1.08, 4.05, 5.8, 18);
-  addTitleBlock(slide, slidePlan, colors, imageRight ? SAFE : 5.1);
-  const blocks = normalizedBlocks(slidePlan, 4);
-  for (const [i, block] of blocks.entries()) {
-    const x = imageRight ? SAFE : 5.1;
-    const y = 2.0 + i * 0.86;
+  const blocks = normalizedBlocks(slidePlan, 6);
+
+  if (layout.contentStyle === "comparison" && blocks.length >= 2) {
+    const mid = Math.ceil(blocks.length / 2);
+    renderComparisonBlocks(slide, blocks.slice(0, mid), blocks.slice(mid), colors, layout, x, y, w);
+    return;
+  }
+  if (layout.contentStyle === "flow") {
+    renderFlowBlocks(slide, blocks, colors, layout, x, y, w);
+    return;
+  }
+  if (layout.contentStyle === "grid") {
+    renderGridBlocks(slide, blocks, colors, layout, x, y, w);
+    return;
+  }
+  if (layout.contentStyle === "list") {
+    renderListBlocks(slide, blocks, slidePlan, colors, layout, x, y, w);
+    return;
+  }
+  renderStackBlocks(slide, blocks, slidePlan, colors, layout, x, y, w);
+}
+
+function renderComparisonBlocks(
+  slide: PptSlide,
+  left: ReturnType<typeof normalizedBlocks>,
+  right: ReturnType<typeof normalizedBlocks>,
+  colors: SlideColors,
+  layout: DynamicLayout,
+  x: number,
+  y: number,
+  w: number,
+) {
+  const colW = (w - 0.4) / 2;
+  for (const [side, group] of [left, right].entries()) {
+    const colX = x + side * (colW + 0.4);
     slide.addShape("roundRect", {
-      x,
+      x: colX,
       y,
-      w: 6.9,
-      h: 0.58,
-      rectRadius: 0.07,
-      fill: { color: i % 2 === 0 ? colors.panel : colors.bg, transparency: i % 2 === 0 ? 3 : 0 },
-      line: { color: colors.main, transparency: 88 },
+      w: colW,
+      h: 3.6,
+      rectRadius: 0.08,
+      fill: { color: colors.panel, transparency: 2 },
+      line: { color: side === 0 ? colors.accent : colors.support, transparency: 34, width: 1.2 },
     });
-    addText(slide, block.heading || block.body, x + 0.18, y + 0.1, 2.0, 0.16, {
-      fontSize: 9.2,
+    for (const [i, block] of group.entries()) {
+      addText(
+        slide,
+        block.heading || block.body,
+        colX + 0.18,
+        y + 0.22 + i * 1.22,
+        colW - 0.36,
+        0.2,
+        {
+          fontSize: layout.bodySize + 1,
+          bold: true,
+          color: colors.text,
+          fit: "shrink",
+        },
+      );
+      if (block.heading) {
+        addText(slide, block.body, colX + 0.18, y + 0.52 + i * 1.22, colW - 0.36, 0.36, {
+          fontSize: layout.bodySize - 1,
+          color: colors.muted,
+          fit: "shrink",
+        });
+      }
+    }
+  }
+}
+
+function renderFlowBlocks(
+  slide: PptSlide,
+  blocks: ReturnType<typeof normalizedBlocks>,
+  colors: SlideColors,
+  layout: DynamicLayout,
+  x: number,
+  y: number,
+  w: number,
+) {
+  const stepW = Math.max(1.1, w / Math.max(blocks.length, 1));
+  for (const [i, block] of blocks.entries()) {
+    const sx = x + i * stepW;
+    slide.addShape("roundRect", {
+      x: sx,
+      y,
+      w: stepW * 0.82,
+      h: 2.8,
+      rectRadius: 0.08,
+      fill: { color: i % 2 === 0 ? colors.panel : colors.bg, transparency: i % 2 === 0 ? 2 : 0 },
+      line: { color: colors.accent, transparency: 32, width: 1 },
+    });
+    addText(slide, `0${i + 1}`, sx + 0.14, y + 0.16, 0.5, 0.14, {
+      fontSize: 8,
       bold: true,
       color: colors.accent,
+    });
+    addText(slide, block.heading || block.body, sx + 0.14, y + 0.52, stepW * 0.6, 0.22, {
+      fontSize: layout.bodySize + 1,
+      bold: true,
+      color: colors.text,
+      fit: "shrink",
+    });
+    if (block.heading) {
+      addText(slide, block.body, sx + 0.14, y + 0.88, stepW * 0.6, 1.02, {
+        fontSize: layout.bodySize - 1,
+        color: colors.muted,
+        fit: "shrink",
+      });
+    }
+    if (i < blocks.length - 1) {
+      slide.addShape("line", {
+        x: sx + stepW * 0.8,
+        y: y + 1.2,
+        w: stepW * 0.24,
+        h: 0,
+        line: { color: colors.accent, transparency: 38, width: 1.8, endArrowType: "triangle" },
+      });
+    }
+  }
+}
+
+function renderGridBlocks(
+  slide: PptSlide,
+  blocks: ReturnType<typeof normalizedBlocks>,
+  colors: SlideColors,
+  layout: DynamicLayout,
+  x: number,
+  y: number,
+  w: number,
+) {
+  const cols = blocks.length <= 2 ? blocks.length : 2;
+  const rows = Math.ceil(blocks.length / cols);
+  const cardW = (w - 0.3 * (cols - 1)) / cols;
+  const cardH = Math.min(1.6, 4.2 / rows);
+  for (const [i, block] of blocks.entries()) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cx = x + col * (cardW + 0.3);
+    const cy = y + row * (cardH + 0.22);
+    slide.addShape("roundRect", {
+      x: cx,
+      y: cy,
+      w: cardW,
+      h: cardH,
+      rectRadius: 0.08,
+      fill: { color: colors.panel, transparency: 2 },
+      line: { color: i === 0 ? colors.support : colors.accent, transparency: 30, width: 1 },
+    });
+    addText(slide, block.heading || block.body, cx + 0.18, cy + 0.16, cardW - 0.36, 0.22, {
+      fontSize: layout.bodySize + 1,
+      bold: true,
+      color: colors.text,
+      fit: "shrink",
+    });
+    if (block.heading) {
+      addText(slide, block.body, cx + 0.18, cy + 0.52, cardW - 0.36, cardH - 0.72, {
+        fontSize: layout.bodySize - 1,
+        color: colors.muted,
+        fit: "shrink",
+      });
+    }
+  }
+}
+
+function renderListBlocks(
+  slide: PptSlide,
+  blocks: ReturnType<typeof normalizedBlocks>,
+  slidePlan: DeckSlide,
+  colors: SlideColors,
+  layout: DynamicLayout,
+  x: number,
+  y: number,
+  w: number,
+) {
+  for (const [i, block] of blocks.entries()) {
+    const rowY = y + i * 0.72;
+    slide.addShape("ellipse", {
+      x,
+      y: rowY + 0.08,
+      w: 0.32,
+      h: 0.32,
+      fill: { color: colors.accent, transparency: 10 },
+      line: { color: colors.bg, transparency: 100 },
+    });
+    addText(slide, String(i + 1), x + 0.02, rowY + 0.18, 0.28, 0.1, {
+      fontSize: 6.8,
+      bold: true,
+      color: colors.bg,
+      align: "center",
+    });
+    addText(slide, block.heading || block.body, x + 0.48, rowY + 0.08, 1.6, 0.18, {
+      fontSize: layout.bodySize + 1,
+      bold: true,
+      color: colors.text,
       fit: "shrink",
     });
     addText(
       slide,
       block.heading ? block.body : slidePlan.keyMessage,
-      x + 2.34,
-      y + 0.09,
-      4.25,
+      x + 2.2,
+      rowY + 0.07,
+      w - 2.4,
       0.2,
       {
-        fontSize: 8.5,
+        fontSize: layout.bodySize - 1,
+        color: colors.muted,
+        fit: "shrink",
+      },
+    );
+  }
+}
+
+function renderStackBlocks(
+  slide: PptSlide,
+  blocks: ReturnType<typeof normalizedBlocks>,
+  slidePlan: DeckSlide,
+  colors: SlideColors,
+  layout: DynamicLayout,
+  x: number,
+  y: number,
+  w: number,
+) {
+  for (const [i, block] of blocks.entries()) {
+    const rowY = y + i * 0.86;
+    slide.addShape("roundRect", {
+      x,
+      y: rowY,
+      w,
+      h: 0.66,
+      rectRadius: 0.06,
+      fill: { color: i % 2 === 0 ? colors.panel : colors.bg, transparency: i % 2 === 0 ? 2 : 0 },
+      line: { color: i === 0 ? colors.support : colors.accent, transparency: 42, width: 0.8 },
+    });
+    addText(slide, block.heading || block.body, x + 0.2, rowY + 0.14, 1.52, 0.18, {
+      fontSize: layout.bodySize + 1,
+      bold: true,
+      color: i === 0 ? colors.support : colors.accent,
+      fit: "shrink",
+    });
+    addText(
+      slide,
+      block.heading ? block.body : slidePlan.keyMessage,
+      x + 1.88,
+      rowY + 0.13,
+      w - 2.12,
+      0.2,
+      {
+        fontSize: layout.bodySize - 1,
         color: colors.text,
         fit: "shrink",
       },
     );
   }
-  addKeyMessage(slide, slidePlan, imageRight ? SAFE : 5.1, 5.72, 6.9, colors);
 }
 
-function addTitleBlock(slide: PptSlide, slidePlan: DeckSlide, colors: SlideColors, x = SAFE) {
-  addText(slide, slidePlan.title, x, 0.56, 7.45, 0.48, {
-    fontSize: 22,
-    bold: true,
-    color: colors.text,
-    fit: "shrink",
-    margin: 0,
+function addCleanBackground(slide: PptSlide, colors: SlideColors) {
+  slide.addShape("rect", {
+    x: 0,
+    y: 0,
+    w: SLIDE_W,
+    h: SLIDE_H,
+    fill: { color: colors.bg },
+    line: { color: colors.bg, transparency: 100 },
   });
-  addText(slide, slidePlan.keyMessage, x, 1.13, 7.2, 0.32, {
-    fontSize: 10.6,
+}
+
+function addSlideNumber(slide: PptSlide, index: number, colors: SlideColors) {
+  addText(slide, `${index + 1}`.padStart(2, "0"), 12.28, 7.08, 0.56, 0.16, {
+    fontSize: 6.5,
     color: colors.muted,
-    fit: "shrink",
-    margin: 0,
-  });
-}
-
-function addKeyMessage(
-  slide: PptSlide,
-  slidePlan: DeckSlide,
-  x: number,
-  y: number,
-  w: number,
-  colors: SlideColors,
-) {
-  slide.addShape("roundRect", {
-    x,
-    y,
-    w,
-    h: 0.72,
-    rectRadius: 0.08,
-    fill: { color: colors.main, transparency: 10 },
-    line: { color: colors.accent, transparency: 55, width: 1 },
-  });
-  addText(slide, slidePlan.keyMessage, x + 0.22, y + 0.17, w - 0.44, 0.24, {
-    fontSize: 9.5,
-    color: colors.text,
-    fit: "shrink",
+    align: "right",
   });
 }
 
@@ -1480,6 +1784,119 @@ function addFooter(slide: PptSlide, slidePlan: DeckSlide, index: number, colors:
     color: colors.muted,
     align: "right",
   });
+}
+
+function addKeyMessage(
+  slide: PptSlide,
+  slidePlan: DeckSlide,
+  x: number,
+  y: number,
+  w: number,
+  colors: SlideColors,
+) {
+  slide.addShape("roundRect", {
+    x,
+    y,
+    w,
+    h: 0.72,
+    rectRadius: 0.08,
+    fill: { color: colors.main, transparency: 10 },
+    line: { color: colors.accent, transparency: 55, width: 1 },
+  });
+  addText(slide, slidePlan.keyMessage, x + 0.22, y + 0.17, w - 0.44, 0.24, {
+    fontSize: 9.5,
+    color: colors.text,
+    fit: "shrink",
+  });
+}
+
+function addNumberedList(
+  slide: PptSlide,
+  slidePlan: DeckSlide,
+  colors: SlideColors,
+  x: number,
+  y: number,
+  w: number,
+) {
+  const blocks = normalizedBlocks(slidePlan, 5);
+  for (const [i, block] of blocks.entries()) {
+    const rowY = y + i * 0.72;
+    slide.addShape("roundRect", {
+      x,
+      y: rowY,
+      w,
+      h: 0.55,
+      rectRadius: 0.06,
+      fill: { color: i % 2 === 0 ? colors.panel : colors.bg, transparency: i % 2 === 0 ? 3 : 0 },
+      line: { color: colors.accent, transparency: 54, width: 0.8 },
+    });
+    addText(slide, `${i + 1}`, x + 0.16, rowY + 0.14, 0.35, 0.14, {
+      fontSize: 8.2,
+      bold: true,
+      color: colors.accent,
+      align: "center",
+    });
+    addText(slide, block.heading || block.body, x + 0.62, rowY + 0.1, 1.64, 0.18, {
+      fontSize: 9.8,
+      bold: true,
+      color: colors.text,
+      fit: "shrink",
+    });
+    addText(
+      slide,
+      block.heading ? block.body : slidePlan.keyMessage,
+      x + 2.4,
+      rowY + 0.09,
+      w - 2.6,
+      0.2,
+      {
+        fontSize: 8.6,
+        color: colors.muted,
+        fit: "shrink",
+      },
+    );
+  }
+}
+
+function addSplitColumns(
+  slide: PptSlide,
+  slidePlan: DeckSlide,
+  colors: SlideColors,
+  x: number,
+  y: number,
+  w: number,
+) {
+  const blocks = normalizedBlocks(slidePlan, 6);
+  const mid = Math.ceil(blocks.length / 2);
+  const colW = (w - 0.34) / 2;
+  for (const [col, group] of [blocks.slice(0, mid), blocks.slice(mid)].entries()) {
+    const colX = x + col * (colW + 0.34);
+    for (const [i, block] of group.entries()) {
+      const rowY = y + i * 0.96;
+      slide.addShape("roundRect", {
+        x: colX,
+        y: rowY,
+        w: colW,
+        h: 0.72,
+        rectRadius: 0.06,
+        fill: { color: i % 2 === 0 ? colors.panel : colors.bg, transparency: i % 2 === 0 ? 3 : 0 },
+        line: { color: col === 0 ? colors.accent : colors.support, transparency: 42, width: 0.9 },
+      });
+      addText(slide, block.heading || block.body, colX + 0.18, rowY + 0.12, colW - 0.36, 0.16, {
+        fontSize: 8.6,
+        bold: true,
+        color: colors.text,
+        fit: "shrink",
+      });
+      if (block.heading) {
+        addText(slide, block.body, colX + 0.18, rowY + 0.36, colW - 0.36, 0.16, {
+          fontSize: 7.4,
+          color: colors.muted,
+          fit: "shrink",
+        });
+      }
+    }
+  }
 }
 
 function addAccentBar(slide: PptSlide, x: number, y: number, w: number, h: number, color: string) {

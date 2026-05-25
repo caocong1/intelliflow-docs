@@ -98,7 +98,12 @@ describe("PptGenerator", () => {
     await flush();
 
     expect(mocks.createPptAgentJob).toHaveBeenCalledWith(
-      expect.objectContaining({ slideCount: 12, style: "auto" }),
+      expect.objectContaining({
+        slideCount: 12,
+        style: "auto",
+        generationMode: "auto_dynamic",
+        styleProfile: "auto",
+      }),
     );
 
     await vi.advanceTimersByTimeAsync(2300);

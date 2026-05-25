@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>当前 PPT Agent 流程说明</title>
+    <style>
+      :root {
+        --bg: #f5f7fa;
+        --ink: #172033;
+        --muted: #667085;
+        --panel: #ffffff;
+        --line: #d7dde8;
+        --soft: #eef3f8;
+        --local: #256d5a;
+        --ai: #a45720;
+        --warn: #a73b3b;
+        --blue: #23658a;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        line-height: 1.55;
+      }
+
+      main {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 32px 20px 52px;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        letter-spacing: 0;
+      }
+
+      h1 {
+        font-size: 28px;
+      }
+
+      h2 {
+        font-size: 18px;
+        margin-bottom: 14px;
+      }
+
+      h3 {
+        font-size: 14px;
+        margin-bottom: 5px;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .intro {
+        max-width: 880px;
+        margin: 8px 0 22px;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(320px, 0.92fr) minmax(420px, 1.28fr);
+        gap: 18px;
+        align-items: start;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 18px;
+      }
+
+      .timeline {
+        display: grid;
+        gap: 10px;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 34px 1fr;
+        gap: 10px;
+        padding: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #fbfcfe;
+      }
+
+      .num {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--soft);
+        color: var(--blue);
+        font-weight: 700;
+        font-size: 13px;
+      }
+
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--soft);
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .pill.ai {
+        background: #fff1e8;
+        color: var(--ai);
+      }
+
+      .pill.local {
+        background: #eaf6ef;
+        color: var(--local);
+      }
+
+      .pill.warn {
+        background: #fdecec;
+        color: var(--warn);
+      }
+
+      .cards {
+        display: grid;
+        gap: 12px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #ffffff;
+      }
+
+      .card header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 11px 13px;
+        background: #f0f4f8;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .card .body {
+        padding: 13px;
+      }
+
+      .kv {
+        display: grid;
+        grid-template-columns: 126px 1fr;
+        gap: 8px 12px;
+        font-size: 13px;
+      }
+
+      .kv div:nth-child(odd) {
+        color: var(--muted);
+      }
+
+      code,
+      pre {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      }
+
+      pre {
+        margin: 11px 0 0;
+        padding: 11px;
+        border-radius: 8px;
+        background: #111827;
+        color: #eef4ff;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        font-size: 12px;
+      }
+
+      .band {
+        margin-top: 18px;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+      }
+
+      .metric {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 14px;
+      }
+
+      .metric strong {
+        display: block;
+        font-size: 20px;
+        margin-bottom: 4px;
+      }
+
+      ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+
+      li + li {
+        margin-top: 4px;
+      }
+
+      .note {
+        border-left: 4px solid var(--blue);
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 900px) {
+        .grid,
+        .summary {
+          grid-template-columns: 1fr;
+        }
+
+        .kv {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>当前 PPT Agent 流程</h1>
+      <p class="intro">
+        当前实现已经不是简单的“生成 DeckPlan 然后渲染”。现在流程加入了大纲规划、风格 DNA、逐页 compose、跨页 reviewer 和定向修复。
+        MiniMax 调用次数变多，但大部分新增调用是单页短上下文。
+      </p>
+
+      <section class="summary">
+        <div class="metric">
+          <strong>4 类</strong>
+          <p class="small">MiniMax 文本调用：DeckPlan、单页 compose、整 deck rewrite、整 deck review。</p>
+        </div>
+        <div class="metric">
+          <strong>2 次</strong>
+          <p class="small">每页 compose 最多尝试次数：<code>COMPOSE_MAX_ATTEMPTS = 2</code>。</p>
+        </div>
+        <div class="metric">
+          <strong>6 项</strong>
+          <p class="small">Deck Reviewer 定向修复最多执行：<code>MAX_TARGETED_FIXES = 6</code>。</p>
+        </div>
+      </section>
+
+      <section class="grid band">
+        <div class="panel">
+          <h2>主流程顺序</h2>
+          <div class="timeline">
+            <div class="step">
+              <div class="num">1</div>
+              <div>
+                <h3>创建任务</h3>
+                <p class="small">接口创建 job，记录 queued trace，后台异步执行。</p>
+                <div class="meta"><span class="pill local">本地</span><span class="pill">/api/ppt-agent/jobs</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">2</div>
+              <div>
+                <h3>Design Director</h3>
+                <p class="small">MiniMax 生成完整 DeckPlan JSON；失败会重试一次，仍失败才走 deterministic fallback。</p>
+                <div class="meta"><span class="pill ai">MiniMax 文本</span><span class="pill">最多 2 次</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">3</div>
+              <div>
+                <h3>校验前修复 + Schema 校验</h3>
+                <p class="small">修复 palette 对象、数字 id、空 visualPrompt、空 contentBlocks、坏 chart/table/timeline。</p>
+                <div class="meta"><span class="pill local">本地容错</span><span class="pill local">AJV</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">4</div>
+              <div>
+                <h3>Outline Planner</h3>
+                <p class="small">根据 DeckPlan 切章节，生成 narrative 和 sections。</p>
+                <div class="meta"><span class="pill local">本地</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">5</div>
+              <div>
+                <h3>Style Director</h3>
+                <p class="small">固化 palette、mood、motif、typography、spacing，形成 Style DNA。</p>
+                <div class="meta"><span class="pill local">本地</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">6</div>
+              <div>
+                <h3>Slide Composer</h3>
+                <p class="small">先本地给每页追加统一风格约束；如果 client 支持 composeSlide，再逐页让 MiniMax 重写。</p>
+                <div class="meta"><span class="pill ai">MiniMax 单页</span><span class="pill warn">页数 × 最多 2</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">7</div>
+              <div>
+                <h3>Design Critic + DeckPlan Rewrite</h3>
+                <p class="small">本地检查页型、配色、布局、图片比例；有问题时让 MiniMax 重写完整 DeckPlan。</p>
+                <div class="meta"><span class="pill local">本地 critic</span><span class="pill ai">可选 full deck</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">8</div>
+              <div>
+                <h3>Deck Reviewer</h3>
+                <p class="small">检查跨页叙事、密度节奏；可触发定向单页修复，也可能触发完整 deck review。</p>
+                <div class="meta"><span class="pill local">本地 coherence</span><span class="pill ai">可选修复</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">9</div>
+              <div>
+                <h3>Visual Generator</h3>
+                <p class="small">只对封面、章节、战略、场景、结尾等少数页生成图片；图表/表格/时间线页跳过。</p>
+                <div class="meta"><span class="pill ai">MiniMax 图片</span><span class="pill local">失败本地 fallback</span></div>
+              </div>
+            </div>
+
+            <div class="step">
+              <div class="num">10</div>
+              <div>
+                <h3>Renderer + QA</h3>
+                <p class="small">PptxGenJS 渲染文件，再做 zip/xml/notes/placeholder 检查。</p>
+                <div class="meta"><span class="pill local">本地</span><span class="pill">输出 .pptx</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2>现在 MiniMax 具体怎么被调用</h2>
+          <div class="cards">
+            <article class="card">
+              <header>
+                <strong>A. createDeckPlan</strong>
+                <span class="pill ai">完整 DeckPlan</span>
+              </header>
+              <div class="body">
+                <div class="kv">
+                  <div>触发阶段</div>
+                  <div>Design Director</div>
+                  <div>上下文</div>
+                  <div>用户 prompt + 页数 + 风格 + DeckPlan schema 规则 + 上次校验错误。</div>
+                  <div>输出</div>
+                  <div>完整 DeckPlan JSON。</div>
+                </div>
+                <pre>System: 企业 PPT 设计总监，只返回 JSON
+
+User:
+User request
+Slide count
+Style preference
+Previous validation issues 可选
+DeckPlan 顶层结构和每页字段要求</pre>
+              </div>
+            </article>
+
+            <article class="card">
+              <header>
+                <strong>B. composeSlide</strong>
+                <span class="pill ai">单页短上下文</span>
+              </header>
+              <div class="body">
+                <div class="kv">
+                  <div>触发阶段</div>
+                  <div>Slide Composer；Deck Reviewer 定向修复也复用它。</div>
+                  <div>上下文</div>
+                  <div>用户 prompt + style + Style DNA + 当前单页 JSON + 校验错误或修复目标。</div>
+                  <div>特点</div>
+                  <div>不发送完整 DeckPlan JSON，只改一页；调用次数会随页数增加。</div>
+                </div>
+                <pre>User:
+User request
+Style preference
+Deck style DNA
+Previous validation issues 可选
+Targeted fix objective 可选
+Current slide JSON
+
+Return only JSON object for that single slide.</pre>
+              </div>
+            </article>
+
+            <article class="card">
+              <header>
+                <strong>C. rewriteDeckPlan</strong>
+                <span class="pill ai">完整 DeckPlan 长上下文</span>
+              </header>
+              <div class="body">
+                <div class="kv">
+                  <div>触发阶段</div>
+                  <div>Design Critic 发现问题后。</div>
+                  <div>上下文</div>
+                  <div>Director prompt + critique 列表 + 当前完整 DeckPlan JSON。</div>
+                  <div>风险</div>
+                  <div>这是长上下文调用之一，页数越多越长。</div>
+                </div>
+                <pre>User:
+[Director prompt + critique]
+
+下面是需要按批评意见重写的 DeckPlan JSON：
+{ full deckPlan }
+
+只返回修订后的 JSON。</pre>
+              </div>
+            </article>
+
+            <article class="card">
+              <header>
+                <strong>D. reviewDeck</strong>
+                <span class="pill ai">完整 DeckPlan 终审</span>
+              </header>
+              <div class="body">
+                <div class="kv">
+                  <div>触发阶段</div>
+                  <div>Deck Reviewer 发现跨页问题且 client 支持 reviewDeck。</div>
+                  <div>上下文</div>
+                  <div>用户 prompt + style + 完整 DeckPlan JSON。</div>
+                  <div>目标</div>
+                  <div>只修跨页叙事、层级一致性、密度节奏。</div>
+                </div>
+                <pre>User:
+User request
+Style preference
+Review and improve full deck coherence
+Preserve exact slide count and schema
+{ full deckPlan }</pre>
+              </div>
+            </article>
+
+            <article class="card">
+              <header>
+                <strong>E. generateImage</strong>
+                <span class="pill ai">图片接口</span>
+              </header>
+              <div class="body">
+                <div class="kv">
+                  <div>触发阶段</div>
+                  <div>Visual Generator，只处理适合图片的页。</div>
+                  <div>上下文</div>
+                  <div>slide.visualPrompt + theme mood + visual motif + pageType + 禁止文字后缀。</div>
+                  <div>失败处理</div>
+                  <div>使用本地 SVG/图形 fallback，不阻断 PPT 输出。</div>
+                </div>
+                <pre>prompt:
+slide.visualPrompt.
+Style mood: theme.mood.
+Visual motif: theme.visualMotif.
+Slide role: pageType.
+no text / no letters / no typography / no UI labels</pre>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel band note">
+        <h2>当前版本的关键变化</h2>
+        <ul>
+          <li>新增 <code>outline_planner</code>：本地生成章节和叙事大纲，但暂时主要用于 trace，不直接进 MiniMax prompt。</li>
+          <li>新增 <code>style_director</code>：本地抽取 Style DNA，后续每页 compose 都带这个摘要。</li>
+          <li>新增 <code>slide_composer</code>：逐页调用 MiniMax，单页短上下文，但调用次数可能最多是页数 × 2。</li>
+          <li>新增 <code>deck_reviewer</code>：本地找跨页问题，最多触发 6 个单页定向修复，也可能触发完整 deck review。</li>
+          <li>DeckPlan 校验前现在会做容错修复，避免模型返回空块、空 prompt、半截 chart/timeline 时直接进入保底。</li>
+        </ul>
+      </section>
+
+      <section class="panel band note">
+        <h2>关于“上下文是否太长”</h2>
+        <p>
+          当前最容易变长的是 <code>rewriteDeckPlan</code> 和 <code>reviewDeck</code>，因为它们会发送完整 DeckPlan。
+          新增的 <code>composeSlide</code> 只发送单页 JSON 和 Style DNA，单次上下文短，但调用次数多。图片调用仍然很短。
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

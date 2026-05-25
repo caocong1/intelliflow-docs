@@ -61,23 +61,29 @@ export class MiniMaxClient implements PptAiClient {
     prompt: string;
     slideCount: number;
     style: string;
+    generationMode?: string;
+    styleProfile?: string;
     validationErrors?: string[];
+    textModel?: string;
   }): Promise<unknown> {
-    const content = await this.chatJson([
-      {
-        role: "system",
-        content: buildSystemPrompt(),
-      },
-      {
-        role: "user",
-        content: buildDirectorPrompt(
-          input.prompt,
-          input.slideCount,
-          input.style,
-          input.validationErrors,
-        ),
-      },
-    ]);
+    const content = await this.chatJson(
+      [
+        {
+          role: "system",
+          content: buildSystemPrompt(),
+        },
+        {
+          role: "user",
+          content: buildDirectorPrompt(
+            input.prompt,
+            input.slideCount,
+            input.style,
+            input.validationErrors,
+          ),
+        },
+      ],
+      input.textModel,
+    );
     return extractJsonObject(content);
   }
 
@@ -85,24 +91,30 @@ export class MiniMaxClient implements PptAiClient {
     prompt: string;
     slideCount: number;
     style: string;
+    generationMode?: string;
+    styleProfile?: string;
     deckPlan: DeckPlan;
     critique: string[];
+    textModel?: string;
   }): Promise<unknown> {
-    const content = await this.chatJson([
-      {
-        role: "system",
-        content: buildSystemPrompt(),
-      },
-      {
-        role: "user",
-        content: [
-          buildDirectorPrompt(input.prompt, input.slideCount, input.style, input.critique),
-          "下面是需要按批评意见重写的 DeckPlan JSON：",
-          JSON.stringify(input.deckPlan),
-          "只返回修订后的 JSON，不要解释。",
-        ].join("\n\n"),
-      },
-    ]);
+    const content = await this.chatJson(
+      [
+        {
+          role: "system",
+          content: buildSystemPrompt(),
+        },
+        {
+          role: "user",
+          content: [
+            buildDirectorPrompt(input.prompt, input.slideCount, input.style, input.critique),
+            "下面是需要按批评意见重写的 DeckPlan JSON：",
+            JSON.stringify(input.deckPlan),
+            "只返回修订后的 JSON，不要解释。",
+          ].join("\n\n"),
+        },
+      ],
+      input.textModel,
+    );
     return extractJsonObject(content);
   }
 
@@ -110,6 +122,7 @@ export class MiniMaxClient implements PptAiClient {
     prompt: string;
     slide: DeckSlide;
     deckPlan: DeckPlan;
+    imageModel?: string;
   }): Promise<string> {
     this.assertReady();
     const prompt = ensureNoTextSuffix(
@@ -127,7 +140,7 @@ export class MiniMaxClient implements PptAiClient {
         method: "POST",
         headers: this.headers(),
         body: JSON.stringify({
-          model: this.imageModel,
+          model: input.imageModel?.trim() || this.imageModel,
           aspect_ratio: this.imageAspectRatio,
           response_format: this.imageResponseFormat,
           n: 1,
@@ -155,34 +168,50 @@ export class MiniMaxClient implements PptAiClient {
   async composeSlide(input: {
     prompt: string;
     style: string;
+    generationMode?: string;
+    styleProfile?: string;
     slide: DeckSlide;
     deckPlan: DeckPlan;
     styleDnaSummary: string;
     validationErrors?: string[];
     fixReason?: string;
+    textModel?: string;
   }): Promise<unknown> {
-    const content = await this.chatJson([
-      { role: "system", content: buildSystemPrompt() },
-      {
-        role: "user",
-        content: buildSlideComposerPrompt(input),
-      },
-    ]);
+    const content = await this.chatJson(
+      [
+        { role: "system", content: buildSystemPrompt() },
+        {
+          role: "user",
+          content: buildSlideComposerPrompt(input),
+        },
+      ],
+      input.textModel,
+    );
     return extractJsonObject(content);
   }
 
-  async reviewDeck(input: { deckPlan: DeckPlan; style: string; prompt: string }): Promise<unknown> {
-    const content = await this.chatJson([
-      { role: "system", content: buildSystemPrompt() },
-      {
-        role: "user",
-        content: buildDeckReviewerPrompt(input),
-      },
-    ]);
+  async reviewDeck(input: {
+    deckPlan: DeckPlan;
+    style: string;
+    prompt: string;
+    generationMode?: string;
+    styleProfile?: string;
+    textModel?: string;
+  }): Promise<unknown> {
+    const content = await this.chatJson(
+      [
+        { role: "system", content: buildSystemPrompt() },
+        {
+          role: "user",
+          content: buildDeckReviewerPrompt(input),
+        },
+      ],
+      input.textModel,
+    );
     return extractJsonObject(content);
   }
 
-  private async chatJson(messages: ChatMessage[]): Promise<string> {
+  private async chatJson(messages: ChatMessage[], textModel?: string): Promise<string> {
     this.assertReady();
     const res = await fetchWithTimeout(
       buildUrl(this.baseUrl, this.textEndpoint),
@@ -190,7 +219,7 @@ export class MiniMaxClient implements PptAiClient {
         method: "POST",
         headers: this.headers(),
         body: JSON.stringify({
-          model: this.textModel,
+          model: textModel?.trim() || this.textModel,
           temperature: this.temperature,
           response_format: { type: "json_object" },
           reasoning_split: true,

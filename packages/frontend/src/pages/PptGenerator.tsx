@@ -1,13 +1,17 @@
 import type { Component } from "solid-js";
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from "solid-js";
 import { showToast } from "../components/ui/Toast";
+import { listActiveModelOptions } from "../lib/api/models-catalog";
 import {
   type PptAgentJob,
+  type PptGenerationMode,
   createPptAgentJob,
+  deletePptAgentJob,
   downloadPptAgentJob,
   getPptAgentJob,
   listPptAgentJobs,
 } from "../lib/api/ppt-agent";
+import { getPptAgentConfig } from "../lib/api/ppt-agent-config";
 import { downloadBlobResponse } from "../lib/download";
 
 const SAMPLE_PROMPT =
@@ -24,10 +28,28 @@ const stageLabels: Record<string, string> = {
   failed: "失败",
 };
 
+const generationModeOptions: Array<{ value: PptGenerationMode; label: string }> = [
+  { value: "auto_dynamic", label: "自动排版" },
+  { value: "template_locked", label: "模板锁定" },
+  { value: "template_stylized", label: "模板风格化" },
+  { value: "svg_native", label: "原生矢量" },
+];
+
+type ModelOption = {
+  modelId: string;
+  displayName: string;
+  providerName?: string | null;
+};
+
 const PptGenerator: Component = () => {
   const [prompt, setPrompt] = createSignal(SAMPLE_PROMPT);
   const [slideCount, setSlideCount] = createSignal(12);
   const [style, setStyle] = createSignal("auto");
+  const [generationMode, setGenerationMode] = createSignal<PptGenerationMode>("svg_native");
+  const [textModel, setTextModel] = createSignal("");
+  const [imageModel, setImageModel] = createSignal("");
+  const [imageEnabled, setImageEnabled] = createSignal(true);
+  const [modelOptions, setModelOptions] = createSignal<ModelOption[]>([]);
   const [jobs, setJobs] = createSignal<PptAgentJob[]>([]);
   const [currentJob, setCurrentJob] = createSignal<PptAgentJob | null>(null);
   const [loading, setLoading] = createSignal(false);
@@ -41,9 +63,21 @@ const PptGenerator: Component = () => {
   });
 
   const orderedJobs = createMemo(() => jobs());
+  const groupedModelOptions = createMemo(() => {
+    const groups = new Map<string, ModelOption[]>();
+    for (const item of modelOptions()) {
+      const label = item.providerName?.trim() || "未标记 Provider";
+      const bucket = groups.get(label);
+      if (bucket) bucket.push(item);
+      else groups.set(label, [item]);
+    }
+    return Array.from(groups.entries()).map(([providerName, items]) => ({ providerName, items }));
+  });
 
   onMount(() => {
     void loadJobs();
+    void loadModelBindingConfig();
+    void loadModelOptions();
   });
 
   onCleanup(() => {
@@ -70,6 +104,31 @@ const PptGenerator: Component = () => {
       showToast(err instanceof Error ? err.message : "加载 PPT 任务失败", "error");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadModelBindingConfig() {
+    try {
+      const config = await getPptAgentConfig();
+      setTextModel(config.textModel);
+      setImageModel(config.imageModel);
+    } catch {
+      // config endpoint is admin-only; keep manual fallback inputs for non-admin users
+    }
+  }
+
+  async function loadModelOptions() {
+    try {
+      const models = await listActiveModelOptions();
+      setModelOptions(
+        models.map((m) => ({
+          modelId: m.modelId,
+          displayName: m.displayName,
+          providerName: m.providerName,
+        })),
+      );
+    } catch {
+      // silently fallback to manual input
     }
   }
 
@@ -117,6 +176,11 @@ const PptGenerator: Component = () => {
         prompt: prompt().trim(),
         slideCount: slideCount(),
         style: style(),
+        generationMode: generationMode(),
+        styleProfile: style(),
+        textModel: textModel().trim() || undefined,
+        imageModel: imageModel().trim() || undefined,
+        imageEnabled: imageEnabled(),
       });
       setCurrentJob(job);
       setJobs((items) => [job, ...items.filter((item) => item.id !== job.id)]);
@@ -142,6 +206,29 @@ const PptGenerator: Component = () => {
     }
   }
 
+  async function handleDelete(job: PptAgentJob, e: Event) {
+    e.stopPropagation();
+    if (job.status === "queued" || job.status === "running") {
+      showToast("任务进行中，无法删除", "error");
+      return;
+    }
+    try {
+      await deletePptAgentJob(job.id);
+      if (pollTimer && currentJob()?.id === job.id) {
+        window.clearInterval(pollTimer);
+        pollTimer = undefined;
+      }
+      const remaining = jobs().filter((item) => item.id !== job.id);
+      setJobs(remaining);
+      if (currentJob()?.id === job.id) {
+        setCurrentJob(remaining[0] ?? null);
+      }
+      showToast("任务已删除", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "删除失败", "error");
+    }
+  }
+
   function selectJob(job: PptAgentJob) {
     setCurrentJob(job);
     if (job.status === "queued" || job.status === "running") {
@@ -156,7 +243,7 @@ const PptGenerator: Component = () => {
           <div>
             <h1 class="text-2xl font-semibold tracking-normal text-stone-950">PPT生成</h1>
             <p class="mt-1 text-sm text-stone-600">
-              MiniMax-M2.7-highspeed · PptxGenJS · Speaker notes
+              默认 svg_native（ppt-master） · Deck/图片模型可分开绑定
             </p>
           </div>
           <button
@@ -184,6 +271,27 @@ const PptGenerator: Component = () => {
               class="mt-2 min-h-[280px] w-full resize-y rounded-md border border-stone-300 bg-white px-3 py-3 text-sm leading-6 text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-700/15"
               placeholder="输入主题、受众、页数、必须包含的页面、风格、语言和备注要求"
             />
+
+            <div class="mt-4">
+              <div class="block text-sm font-semibold text-stone-900">生成模式</div>
+              <div class="mt-2 grid grid-cols-3 overflow-hidden rounded-md border border-stone-300 bg-white">
+                <For each={generationModeOptions}>
+                  {(option) => (
+                    <button
+                      type="button"
+                      onClick={() => setGenerationMode(option.value)}
+                      class={`border-r border-stone-300 px-3 py-2 text-sm font-medium last:border-r-0 ${
+                        generationMode() === option.value
+                          ? "bg-[#6f3f25] text-white"
+                          : "bg-white text-stone-700 hover:bg-stone-100"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
 
             <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[160px_220px_1fr]">
               <div>
@@ -227,6 +335,81 @@ const PptGenerator: Component = () => {
                 </button>
               </div>
             </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <label for="ppt-text-model" class="block text-sm font-semibold text-stone-900">
+                  Deck 生成模型
+                </label>
+                <select
+                  value={textModel()}
+                  onChange={(e) => setTextModel(e.currentTarget.value)}
+                  class="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-700/15"
+                >
+                  <option value="">使用配置页默认 textModel</option>
+                  <For each={groupedModelOptions()}>
+                    {(group) => (
+                      <optgroup label={group.providerName}>
+                        <For each={group.items}>
+                          {(item) => (
+                            <option value={item.modelId}>
+                              {item.displayName} ({item.modelId})
+                            </option>
+                          )}
+                        </For>
+                      </optgroup>
+                    )}
+                  </For>
+                </select>
+                <input
+                  id="ppt-text-model"
+                  value={textModel()}
+                  onInput={(e) => setTextModel(e.currentTarget.value)}
+                  class="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-700/15"
+                  placeholder="也可手动输入 modelId"
+                />
+              </div>
+              <div>
+                <label for="ppt-image-model" class="block text-sm font-semibold text-stone-900">
+                  图片生成模型
+                </label>
+                <select
+                  value={imageModel()}
+                  onChange={(e) => setImageModel(e.currentTarget.value)}
+                  class="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-700/15"
+                >
+                  <option value="">使用配置页默认 imageModel</option>
+                  <For each={groupedModelOptions()}>
+                    {(group) => (
+                      <optgroup label={group.providerName}>
+                        <For each={group.items}>
+                          {(item) => (
+                            <option value={item.modelId}>
+                              {item.displayName} ({item.modelId})
+                            </option>
+                          )}
+                        </For>
+                      </optgroup>
+                    )}
+                  </For>
+                </select>
+                <input
+                  id="ppt-image-model"
+                  value={imageModel()}
+                  onInput={(e) => setImageModel(e.currentTarget.value)}
+                  class="mt-2 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 outline-none focus:border-amber-700 focus:ring-2 focus:ring-amber-700/15"
+                  placeholder="也可手动输入 modelId"
+                />
+              </div>
+            </div>
+            <label class="mt-3 inline-flex items-center gap-2 text-sm text-stone-800">
+              <input
+                type="checkbox"
+                checked={imageEnabled()}
+                onChange={(e) => setImageEnabled(e.currentTarget.checked)}
+              />
+              启用图片生成（关闭后使用本地 fallback 视觉）
+            </label>
           </form>
 
           <section class="rounded-lg border border-stone-200 bg-[#fffdf8] p-5 shadow-sm">
@@ -298,6 +481,16 @@ const PptGenerator: Component = () => {
                   >
                     {downloadingId() === job().id ? "下载中" : "下载 PPTX"}
                   </button>
+
+                  <Show when={job().status === "completed" || job().status === "failed"}>
+                    <button
+                      type="button"
+                      onClick={(e) => void handleDelete(job(), e)}
+                      class="w-full rounded-md border border-red-200 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                    >
+                      删除任务
+                    </button>
+                  </Show>
                 </div>
               )}
             </Show>
@@ -347,6 +540,15 @@ const PptGenerator: Component = () => {
                         class="rounded border border-stone-300 px-2 py-1 text-xs font-medium text-stone-800 hover:bg-stone-100"
                       >
                         下载
+                      </button>
+                    </Show>
+                    <Show when={job.status === "completed" || job.status === "failed"}>
+                      <button
+                        type="button"
+                        onClick={(e) => void handleDelete(job, e)}
+                        class="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50"
+                      >
+                        删除
                       </button>
                     </Show>
                   </div>

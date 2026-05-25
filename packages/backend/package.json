@@ -9,7 +9,11 @@
     "dev": "bun --env-file=../../.env --watch src/index.ts",
     "db:push": "bun --env-file=../../.env drizzle-kit push",
     "db:seed": "bun --env-file=../../.env src/db/seed.ts",
-    "seed:ppt-workflow": "bun --env-file=../../.env src/scripts/seed-ppt-generation-workflow.ts"
+    "seed:ppt-workflow": "bun --env-file=../../.env src/scripts/seed-ppt-generation-workflow.ts",
+    "test:ppt-agent:svg": "bun test src/modules/ppt-agent/service.test.ts src/modules/ppt-agent/svg-templates.test.ts",
+    "test:ppt-agent:svg:hash": "bun src/modules/ppt-agent/scripts/print-svg-hashes.ts",
+    "test:ppt-agent:svg:hash:check": "bun src/modules/ppt-agent/scripts/print-svg-hashes.ts --check",
+    "test:ppt-agent:svg:gate": "bun run test:ppt-agent:svg:hash:check && bun run test:ppt-agent:svg"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.81",

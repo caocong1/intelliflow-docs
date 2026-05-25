@@ -1,5 +1,11 @@
 export type PptAgentJobStatus = "queued" | "running" | "completed" | "failed";
 
+export type PptGenerationMode =
+  | "auto_dynamic"
+  | "template_locked"
+  | "template_stylized"
+  | "svg_native";
+
 export type PptAgentJob = {
   id: string;
   userId: string;
@@ -19,6 +25,11 @@ export type CreatePptAgentJobInput = {
   prompt: string;
   slideCount: number;
   style: string;
+  generationMode?: PptGenerationMode;
+  styleProfile?: string;
+  textModel?: string;
+  imageModel?: string;
+  imageEnabled?: boolean;
 };
 
 function authHeaders(extra?: HeadersInit): HeadersInit {
@@ -71,4 +82,12 @@ export async function downloadPptAgentJob(id: string): Promise<Response> {
   });
   if (!res.ok) throw new Error(await parseJsonError(res));
   return res;
+}
+
+export async function deletePptAgentJob(id: string): Promise<void> {
+  const res = await fetch(`/api/ppt-agent/jobs/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error(await parseJsonError(res));
 }

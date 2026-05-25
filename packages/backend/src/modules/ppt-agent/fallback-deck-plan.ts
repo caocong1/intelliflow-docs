@@ -34,6 +34,13 @@ const TITLE_BY_TYPE: Record<DeckSlide["pageType"], string> = {
   risk: "风险与治理机制",
   summary: "关键结论",
   closing: "总结与立项请求",
+  comparison: "方案对比分析",
+  process: "流程与步骤",
+  roadmap: "未来路线图",
+  team: "团队与分工",
+  quote: "关键引用与评价",
+  chart: "数据图表分析",
+  contact: "联系方式与下一步",
 };
 
 export function buildFallbackDeckPlan(input: {
@@ -123,7 +130,15 @@ function buildSlide(input: {
             values: [35, 20, 60],
             unit: "%",
           }
-        : undefined,
+        : input.pageType === "chart"
+          ? {
+              title: "关键数据对比",
+              labels: ["效率提升", "成本下降", "知识复用", "错误率降低"],
+              values: [35, 20, 60, 15],
+              unit: "%",
+              chartType: "bar",
+            }
+          : undefined,
     table:
       input.pageType === "table"
         ? {
@@ -272,6 +287,46 @@ function buildBlocks(pageType: DeckSlide["pageType"]) {
       { heading: "立项请求", body: "批准预算、试点范围和跨部门工作机制。", emphasis: "strong" },
       { heading: "下一步", body: "两周内完成试点方案、数据清单和实施计划。", emphasis: "normal" },
     ],
+    comparison: [
+      {
+        heading: "方案 A",
+        body: "知识中台方案，兼顾短期试点价值和长期集团复用。",
+        emphasis: "strong",
+      },
+      { heading: "方案 B", body: "单点工具方案，启动快但难沉淀集团级能力。", emphasis: "normal" },
+    ],
+    process: [
+      { heading: "需求分析", body: "梳理高频知识场景和关键度量指标。", emphasis: "normal" },
+      { heading: "平台搭建", body: "完成架构设计、数据接入和核心服务部署。", emphasis: "strong" },
+      { heading: "试点验证", body: "在 2-3 个业务场景完成价值验证。", emphasis: "normal" },
+      { heading: "规模推广", body: "形成标准化能力包，推进集团推广。", emphasis: "normal" },
+    ],
+    roadmap: [
+      { heading: "短期 (Q1)", body: "试点验证，选择高频知识场景。", emphasis: "strong" },
+      { heading: "中期 (Q2)", body: "能力扩展，接入治理和安全机制。", emphasis: "normal" },
+      { heading: "长期 (Q3)", body: "集团推广，形成标准化能力包。", emphasis: "normal" },
+    ],
+    team: [
+      { heading: "项目 Owner", body: "负责整体推进和资源协调。", emphasis: "strong" },
+      { heading: "技术负责人", body: "负责架构设计和技术选型。", emphasis: "normal" },
+      { heading: "业务负责人", body: "负责场景选择和业务验证。", emphasis: "normal" },
+    ],
+    quote: [
+      {
+        heading: "关键判断",
+        body: "知识中台是集团级 AI 应用落地的关键基础设施。",
+        emphasis: "strong",
+      },
+    ],
+    chart: [
+      { heading: "效率提升", body: "年化效率提升 35%", emphasis: "metric" },
+      { heading: "成本下降", body: "重复劳动下降 20%", emphasis: "metric" },
+      { heading: "知识复用", body: "跨部门复用率提升 60%", emphasis: "metric" },
+    ],
+    contact: [
+      { heading: "项目组", body: "contact@example.com", emphasis: "normal" },
+      { heading: "发起部门", body: "信息化部 / 知识管理办公室", emphasis: "normal" },
+    ],
   };
   return blockMap[pageType];
 }
@@ -293,6 +348,13 @@ function buildKeyMessage(pageType: DeckSlide["pageType"]): string {
     risk: "风险可通过治理机制、运营指标和分阶段推进来控制。",
     summary: "建议批准试点授权并启动预算测算和实施准备。",
     closing: "请批准预算、试点范围和跨部门协同机制。",
+    comparison: "知识中台方案兼顾短期试点价值和长期集团复用，优于单点工具方案。",
+    process: "建议按照需求分析、平台搭建、试点验证、规模推广四步推进。",
+    roadmap: "以 Q1 试点、Q2 扩展、Q3 推广的节奏控制风险和节奏。",
+    team: "建议由信息化部牵头，联合业务部门和外部技术伙伴组成项目团队。",
+    quote: "知识中台是集团级 AI 应用落地的关键基础设施。",
+    chart: "关键指标显示效率、成本和复用均有显著改善空间。",
+    contact: "欢迎联系项目组，期待与您深入交流。",
   };
   return map[pageType];
 }
@@ -314,6 +376,13 @@ function buildVisualPrompt(pageType: DeckSlide["pageType"]): string {
     risk: "risk control shield and mitigation loop",
     summary: "executive synthesis map with three converging paths",
     closing: "boardroom decision moment, abstract approval gateway",
+    comparison: "side-by-side strategic comparison with split visual field",
+    process: "process flow diagram with numbered steps and directional arrows",
+    roadmap: "future timeline with glowing milestone markers on dark path",
+    team: "professional team portrait placeholder with role indicators",
+    quote: "large quotation mark motif with executive testimonial framing",
+    chart: "bar chart visualization with layered metric indicators",
+    contact: "professional contact card with geometric icon placeholders",
   };
   return [
     "premium dark executive enterprise AI knowledge platform visual",

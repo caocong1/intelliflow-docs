@@ -2,13 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: AI 自动生成流程
-status: roadmap ready
-last_updated: "2026-04-10T17:30:00.000Z"
+status: planning
+stopped_at: context exhaustion at 75% (2026-05-22)
+last_updated: "2026-05-22T06:10:20.985Z"
+last_activity: 2026-04-10 — v1.5 roadmap created (Phases 32-37, 45 requirements mapped)
 progress:
-  total_phases: 6
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 8
+  completed_phases: 2
+  total_plans: 7
+  completed_plans: 5
+  percent: 25
 ---
 
 # Project State
@@ -71,6 +74,7 @@ None.
 ### Blockers/Concerns
 
 None. Design doc §20 "待确认问题" items were resolved during milestone scoping:
+
 - Template binding: scope explicitly excludes template file binding (structure only)
 - Reference existing workflow: v1.5 only accepts natural-language input
 - Allow editing blueprint description before persist: deferred to FUT-OPS-04
@@ -79,6 +83,6 @@ None. Design doc §20 "待确认问题" items were resolved during milestone sco
 
 ## Session Continuity
 
-Last session: 2026-04-10
-Stopped at: v1.5 roadmap created — ready to plan Phase 32
+Last session: 2026-05-22T06:10:20.979Z
+Stopped at: context exhaustion at 75% (2026-05-22)
 Resume file: None

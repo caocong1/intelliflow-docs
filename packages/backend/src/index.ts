@@ -10,6 +10,7 @@ import { modelAdminRoutes, modelReadRoutes } from "./modules/models/models.route
 import { notificationRoutes } from "./modules/notifications/notifications.routes";
 import { pptAgentConfigRoutes } from "./modules/ppt-agent-config/routes";
 import { pptAgentRoutes } from "./modules/ppt-agent/routes";
+import { resetRunningJobsOnStartup } from "./modules/ppt-agent/service";
 import { pptTemplateRoutes } from "./modules/ppt-templates/ppt-templates.routes";
 import { projectRoutes } from "./modules/projects/projects.routes";
 import { promptOptimizeRoutes } from "./modules/prompts";
@@ -89,6 +90,17 @@ detectOrphanTasks()
   })
   .catch((err) => {
     console.error("[startup] Failed to detect orphan tasks:", err);
+  });
+
+// Reset running/queued PPT agent jobs from previous server runs
+resetRunningJobsOnStartup()
+  .then((count) => {
+    if (count > 0) {
+      console.warn(`[startup] Reset ${count} running/queued PPT agent job(s) (server restart)`);
+    }
+  })
+  .catch((err) => {
+    console.error("[startup] Failed to reset PPT agent jobs:", err);
   });
 
 // Start periodic monitor for stuck tasks (running but no progress)

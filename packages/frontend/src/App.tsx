@@ -16,6 +16,7 @@ import Search from "./pages/Search";
 import DocumentTypeManagement from "./pages/admin/DocumentTypeManagement";
 import ModelCallLogs from "./pages/admin/ModelCallLogs";
 import ModelConfiguration from "./pages/admin/ModelConfiguration";
+import PptAgentConfig from "./pages/admin/PptAgentConfig";
 import PptTemplateManagement from "./pages/admin/PptTemplateManagement";
 import PptTemplateProfileEditor from "./pages/admin/PptTemplateProfileEditor";
 import StatsDashboard from "./pages/admin/StatsDashboard";
@@ -105,6 +106,14 @@ const App: Component = () => {
           component={() => (
             <AdminRoute>
               <ModelCallLogs />
+            </AdminRoute>
+          )}
+        />
+        <Route
+          path="/admin/ppt-agent-config"
+          component={() => (
+            <AdminRoute>
+              <PptAgentConfig />
             </AdminRoute>
           )}
         />

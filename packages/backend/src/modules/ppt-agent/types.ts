@@ -1,5 +1,14 @@
 export type PptAgentJobStatus = "queued" | "running" | "completed" | "failed";
 
+export const PPT_GENERATION_MODES = [
+  "auto_dynamic",
+  "template_locked",
+  "template_stylized",
+  "svg_native",
+] as const;
+
+export type PptGenerationMode = (typeof PPT_GENERATION_MODES)[number];
+
 export type PptAgentStage =
   | "queued"
   | "outline_planner"
@@ -17,7 +26,16 @@ export type PptAgentStage =
 export type PptAgentCreateInput = {
   prompt: string;
   slideCount?: number;
+  /**
+   * Legacy style string kept for backwards-compatible clients.
+   * New clients should send generationMode + styleProfile.
+   */
   style?: string;
+  generationMode?: PptGenerationMode;
+  styleProfile?: string;
+  textModel?: string;
+  imageModel?: string;
+  imageEnabled?: boolean;
 };
 
 export type DeckTheme = {
@@ -39,6 +57,7 @@ export type DeckChart = {
   labels: string[];
   values: number[];
   unit?: string;
+  chartType?: "bar" | "line" | "pie" | "radar";
 };
 
 export type DeckTable = {
@@ -70,7 +89,14 @@ export type DeckSlide = {
     | "table"
     | "risk"
     | "summary"
-    | "closing";
+    | "closing"
+    | "comparison"
+    | "process"
+    | "roadmap"
+    | "team"
+    | "quote"
+    | "chart"
+    | "contact";
   layoutPattern: string;
   title: string;
   subtitle?: string;
@@ -151,6 +177,7 @@ export type PptAgentRepository = {
     trace?: PptAgentTraceEvent[];
   }): Promise<PptAgentJob>;
   updateJob(jobId: string, patch: PptAgentJobPatch): Promise<PptAgentJob>;
+  deleteJob(jobId: string, userId: string): Promise<boolean>;
   getJobForUser(jobId: string, userId: string): Promise<PptAgentJob | null>;
   listJobsForUser(userId: string): Promise<PptAgentJob[]>;
 };
@@ -161,26 +188,47 @@ export type PptAiClient = {
     prompt: string;
     slideCount: number;
     style: string;
+    generationMode?: PptGenerationMode;
+    styleProfile?: string;
     validationErrors?: string[];
+    textModel?: string;
   }): Promise<unknown>;
   rewriteDeckPlan(input: {
     prompt: string;
     slideCount: number;
     style: string;
+    generationMode?: PptGenerationMode;
+    styleProfile?: string;
     deckPlan: DeckPlan;
     critique: string[];
+    textModel?: string;
   }): Promise<unknown>;
-  generateImage(input: { prompt: string; slide: DeckSlide; deckPlan: DeckPlan }): Promise<string>;
+  generateImage(input: {
+    prompt: string;
+    slide: DeckSlide;
+    deckPlan: DeckPlan;
+    imageModel?: string;
+  }): Promise<string>;
   composeSlide?(input: {
     prompt: string;
     style: string;
+    generationMode?: PptGenerationMode;
+    styleProfile?: string;
     slide: DeckSlide;
     deckPlan: DeckPlan;
     styleDnaSummary: string;
     validationErrors?: string[];
     fixReason?: string;
+    textModel?: string;
   }): Promise<unknown>;
-  reviewDeck?(input: { deckPlan: DeckPlan; style: string; prompt: string }): Promise<unknown>;
+  reviewDeck?(input: {
+    deckPlan: DeckPlan;
+    style: string;
+    prompt: string;
+    generationMode?: PptGenerationMode;
+    styleProfile?: string;
+    textModel?: string;
+  }): Promise<unknown>;
 };
 
 export type RenderedPpt = {

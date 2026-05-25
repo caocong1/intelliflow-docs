@@ -188,3 +188,165 @@ bunx vitest run packages/backend/src/scripts/ppt-mvp/ai-pipeline/ \
   - visual-qa.test.ts 8 测试（修正一处 font-family 正则：允许带引号字体名）
   - **52/52 测试通过**（30 → 52，新增 22 个测试）
 - 已 push 到 d64af39
+
+
+## 2026-05-21 补充：Auto/Template/Styleized 三模式重构建议（针对“同质化”）
+
+### 现状复盘（为什么看起来像“只换颜色”）
+
+当前链路虽然引入了 style DNA、spec-lock 和 pageType 约束，但在 **layout 生成层**仍偏向“受控模板填充”：
+
+1. `layoutPattern` 主要作为文本标签存在，缺少可执行的几何约束与差异度目标。
+2. `style=auto` 仍通过同一套保守规则收敛，导致生成器倾向重复采用安全布局骨架。
+3. 风格包扩展（palette/icon/background）解决了“皮肤层”问题，但没有实质放大“结构层”变化。
+
+这会导致你看到的结果：整体版式近似，仅颜色/背景/图标变化。
+
+---
+
+### 产品语义澄清：必须拆成 3 种模式
+
+建议把前后端契约从单一 `style` 字段升级为 `generationMode` + `styleProfile`：
+
+- **A. auto_dynamic（真正 AI 自动排版）**
+  - 目标：每页布局由 AI 生成，不依赖固定模板槽位。
+  - 约束：只保留硬规则（可读性、对齐、安全边距、品牌色上限、信息密度）。
+  - 输出：`layoutDsl`（可执行几何）+ `designTokens`（颜色/字体/间距）。
+
+- **B. template_locked（完全写死模板）**
+  - 目标：结构 100% 固定，只做文本/图片填充。
+  - 适用：企业标准宣讲、强合规模板。
+
+- **C. template_stylized（风格化模板）**
+  - 目标：结构大体固定，允许局部替换（颜色、背景、插画、图标、装饰）。
+  - 适用：效率优先且要保持一定品牌稳定。
+
+> 结论：`auto` 不应复用模板填充逻辑；若复用，只能命名为 stylized/template，不可对外叫 auto。
+
+---
+
+### 技术路线建议：Auto 模式优先走“HTML 中间层”
+
+对于 `auto_dynamic`，推荐采用 **HTML/CSS 先生成，再映射 PPT JSON** 的双阶段：
+
+1. **Stage 1: 生成 HTML 布局**
+   - AI 直接输出单页 HTML（受 design-system token + 硬规则约束）。
+   - 在浏览器引擎中可快速做视觉 QA（overlap、对比度、文本溢出、留白节奏）。
+
+2. **Stage 2: HTML → PPT JSON 转译**
+   - 将 DOM 盒模型映射为 `shape/text/image` 的绝对坐标。
+   - 抽取字体、边框、圆角、阴影、渐变并落盘为 native template JSON。
+
+3. **Stage 3: 结构保真校验**
+   - 对比 HTML 截图与 PPT 渲染截图，做像素差/元素对齐差检测。
+   - 超阈值自动触发局部修正（文字重排、容器拉伸、图文互换）。
+
+为什么这条路更适合 auto：
+- HTML 的排版表达力更强，AI 更容易“创造新结构”。
+- 可以复用现有 `render-html.ts`、visual QA、spec-lock 体系，减少重复造轮子。
+- PPT 端只负责“保真转译”，将创造性前置到更擅长的媒介。
+
+---
+
+### 实施优先级（两周内可执行）
+
+1. **协议升级（P0）**
+   - 新增请求字段：`generationMode: auto_dynamic | template_locked | template_stylized`。
+   - 旧 `style=auto` 自动映射到 `auto_dynamic`，并保留向后兼容。
+
+2. **路由分流（P0）**
+   - `auto_dynamic`：走 ai-pipeline HTML-first。
+   - `template_locked/template_stylized`：走 native-template fill。
+
+3. **差异度指标（P0）**
+   - 新增 deck-level `layoutDiversityScore`（网格占用、视觉重心、组件组合、阅读路径）。
+   - 低于阈值时，强制重采样 page layout（不是重上色）。
+
+4. **模板库扩容（P1）**
+   - stylized 家族至少扩到 20+（按行业/情绪/信息密度维度分桶），降低重复感。
+
+5. **观测与回归（P1）**
+   - 每次导出记录：mode、layoutDiversityScore、重试次数、用户二次编辑率。
+
+---
+
+### 验收标准（针对“auto 不可接受”问题）
+
+`auto_dynamic` 必须满足：
+
+- 相邻页禁止复用同一布局骨架（不仅是名字不同）。
+- 全 deck 至少出现 6 种结构范式（hero、split、matrix、timeline、process、data+insight 等）。
+- 视觉差异主要来自版式结构，而非仅颜色替换。
+- 用户主观评分（样式满意度）较当前基线提升明显（建议先以 +30% 为阶段目标）。
+
+---
+
+### 与当前重构的关系
+
+现有 spec-lock / visual-QA / curated-palettes 并非无效，它们解决的是“质量下限”和“稳定性”；
+你指出的问题是“创造性上限”。
+
+下一阶段的核心不是再加更多配色包，而是把 `auto` 从“模板填充”中解耦出来，建立独立的 **动态排版生成路径**。
+
+---
+
+### 2026-05-21 实施日志：三模式契约 + auto 动态版式差异度门控
+
+本次完成 P0 的可执行底座：
+
+- 后端 `/ppt-agent/jobs` 请求协议新增 `generationMode` 与 `styleProfile`：
+  - `auto_dynamic`
+  - `template_locked`
+  - `template_stylized`
+- 保留旧字段兼容：
+  - 旧 `style=auto` 自动映射为 `generationMode=auto_dynamic`
+  - 旧非 auto 风格自动映射为 `template_stylized`
+- `auto_dynamic` prompt 明确要求：
+  - 内容驱动动态几何
+  - 不复用固定模板槽位
+  - 不允许只靠 palette/background/icon 变化制造差异
+- 新增 `layout-diversity.ts`，计算 deck-level `layoutDiversityScore`：
+  - layoutPattern 去重
+  - pageType 去重
+  - structural paradigm 去重
+  - 相邻重复惩罚
+- `auto_dynamic` 模式下 `validateDeckPlan` / `critiqueDeckPlan` 强制门控：
+  - `layoutDiversityScore >= 72`
+  - 6 页及以上至少 6 种 structural paradigm
+  - 不达标时把结构化失败原因反馈给 Design Director / evaluator-optimizer，触发重新采样版式结构
+- 前端 PPT 生成页新增三段式模式选择：
+  - 自动排版
+  - 模板锁定
+  - 模板风格化
+- 任务 trace 记录：
+  - `generationMode`
+  - `styleProfile`
+  - `layoutDiversityScore`
+  - structural paradigm 覆盖数
+
+新增/更新测试：
+
+- `layout-diversity.test.ts`：覆盖多结构通过、低结构失败、template_stylized 不触发 auto 门控
+- `service.test.ts`：覆盖旧 `style=auto` 到 `auto_dynamic` 映射、显式 `template_stylized` 映射
+- `PptGenerator.test.tsx`：覆盖前端提交 `generationMode/styleProfile`
+
+验证结果：
+
+```bash
+bunx vitest run packages/backend/src/modules/ppt-agent/layout-diversity.test.ts packages/backend/src/modules/ppt-agent/service.test.ts
+# 2 files, 27 tests passed
+
+bunx vitest run packages/frontend/src/pages/PptGenerator.test.tsx
+# 1 file, 2 tests passed
+
+bunx vitest run packages/backend/src/scripts/ppt-mvp/ai-pipeline/ --config packages/backend/vitest.config.ts
+# 6 files, 63 tests passed
+
+bunx biome check --write <touched files>
+# passed
+```
+
+仍需后续单独落地：
+
+- 将生产 `/ppt-agent` 的 `auto_dynamic` 渲染器从当前 DeckPlan/PptxGenJS 路径进一步切到 `ai-pipeline` HTML-first 路径，需要补齐 `DeckPlan -> PresentationOutline/VisualBrief/PagePlan` 适配层。
+- `template_locked/template_stylized` 与 native-template/preserve fill 的真实渲染分流仍需接入模板输入与模板选择上下文；当前先完成协议和门控，不做无模板的伪锁定。
